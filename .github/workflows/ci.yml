@@ -1,0 +1,150 @@
+name: CI
+
+on: [push, pull_request]
+
+permissions:
+  contents: read
+
+jobs:
+  checkers:
+    name: Run static checkers
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@44c2b7a8a4ea60a981eaca3cf939b5f4305c123b # v4.1.5
+    - name: Run clang-format style check (.c and .h)
+      uses: jidicula/clang-format-action@f62da5e3d3a2d88ff364771d9d938773a618ab5e # v4.11.0
+
+  ubuntu:
+    name: ${{ matrix.cmake-build-type }}-build [${{ matrix.compiler }}, cmake-${{ matrix.cmake-version }} sanitizer="${{ matrix.sanitizer }}"]
+    runs-on: ubuntu-20.04
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler: [gcc-11, clang-12]
+        cmake-version: [3.19]
+        cmake-build-type: [Release, RelWithDebInfo]
+        sanitizer: ["", thread, undefined, leak, address]
+        include:
+          - compiler: gcc-7
+            cmake-version: 3.14
+            cmake-build-type: Release
+            sanitizer: ""
+          - compiler: gcc-8
+            cmake-version: 3.15
+            cmake-build-type: Release
+            sanitizer: ""
+          - compiler: clang-7
+            cmake-version: 3.17
+            cmake-build-type: Release
+            sanitizer: ""
+          - compiler: clang-9
+            cmake-version: 3.18
+            cmake-build-type: Release
+            sanitizer: ""
+
+    steps:
+    - name: Prepare
+      uses: awalsh128/cache-apt-pkgs-action@a6c3917cc929dd0345bfb2d3feaf9101823370ad # v1.4.2
+      with:
+        packages: libevent-dev libuv1-dev libev-dev libglib2.0-dev ${{ matrix.compiler }}
+        version: 1.0
+    - name: Install hiredis
+      env:
+        VERSION: 1.2.0
+      run: |
+        curl -L https://github.com/redis/hiredis/archive/v${VERSION}.tar.gz | tar -xz
+        cmake -S hiredis-${VERSION} -B hiredis-build -DENABLE_SSL=ON
+        sudo make -C hiredis-build install
+    - name: Setup cmake
+      uses: jwlawson/actions-setup-cmake@802fa1a2c4e212495c05bf94dba2704a92a472be # v2.0.2
+      with:
+        cmake-version: ${{ matrix.cmake-version }}
+    - uses: actions/checkout@44c2b7a8a4ea60a981eaca3cf939b5f4305c123b # v4.1.5
+    - name: Create build folder
+      run: cmake -E make_directory build
+    - name: Generate makefiles
+      shell: bash
+      env:
+        CC: ${{ matrix.compiler }}
+      working-directory: build
+      run: cmake $GITHUB_WORKSPACE -DCMAKE_BUILD_TYPE=$BUILD_TYPE -DENABLE_SSL=ON -DENABLE_IPV6_TESTS=ON -DDOWNLOAD_HIREDIS=OFF -DUSE_SANITIZER=${{ matrix.sanitizer }} ..
+    - name: Build
+      shell: bash
+      working-directory: build
+      run: VERBOSE=1 make
+    - name: Setup clusters
+      shell: bash
+      working-directory: build
+      run: make start
+    - name: Wait for clusters to start..
+      uses: kibertoad/wait-action@99f6f101c5be7b88bb9b41c0d3b810722491b8e5 # 1.0.1
+      with:
+        time: '20s'
+    - name: Run tests
+      shell: bash
+      working-directory: build
+      run: make CTEST_OUTPUT_ON_FAILURE=1 test
+    - name: Teardown clusters
+      working-directory: build
+      shell: bash
+      run: make stop
+    - name: Build examples
+      shell: bash
+      env:
+        CC: ${{ matrix.compiler }}
+      run: |
+        examples/using_cmake_externalproject/build.sh
+        examples/using_cmake_separate/build.sh
+        examples/using_cmake_and_make_mixed/build.sh
+        examples/using_make/build.sh
+
+  macos:
+    name: macOS
+    runs-on: macos-latest
+    steps:
+      - name: Prepare
+        run: |
+          brew install cmake ninja openssl
+      - uses: actions/checkout@44c2b7a8a4ea60a981eaca3cf939b5f4305c123b # v4.1.5
+      - name: Build
+        run: |
+          mkdir build && cd build
+          cmake .. -G Ninja -DCMAKE_BUILD_TYPE=Release -DENABLE_SSL=ON
+          ninja -v
+
+  windows:
+    name: Windows
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@44c2b7a8a4ea60a981eaca3cf939b5f4305c123b # v4.1.5
+      - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1.13.0
+      - name: Prepare
+        run: |
+          choco install -y ninja
+          vcpkg install --triplet x64-windows pkgconf libevent
+      - name: Build
+        run: |
+          mkdir build && cd build
+          cmake .. -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE=C:\vcpkg\scripts\buildsystems\vcpkg.cmake
+          ninja -v
+
+  windows-mingw64:
+    name: Windows (MinGW64)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@44c2b7a8a4ea60a981eaca3cf939b5f4305c123b # v4.1.5
+      - name: Set up MinGW
+        uses: msys2/setup-msys2@d0e80f58dffbc64f6a3a1f43527d469b4fc7b6c8 # v2.23.0
+        with:
+          msystem: mingw64
+          install: |
+            mingw-w64-x86_64-gcc
+            mingw-w64-x86_64-cmake
+            mingw-w64-x86_64-ninja
+            mingw-w64-x86_64-libevent
+      - name: Build
+        shell: msys2 {0}
+        run: |
+          mkdir build && cd build
+          cmake .. -G Ninja
+          cmake --build .
