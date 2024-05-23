@@ -31,8 +31,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef __HIREDIS_H
-#define __HIREDIS_H
+#ifndef VALKEY_H
+#define VALKEY_H
 #include "read.h"
 #include <stdarg.h> /* for va_list */
 #ifndef _MSC_VER
@@ -45,141 +45,141 @@ typedef long long ssize_t;
 #include "sds.h" /* for sds */
 #include "alloc.h" /* for allocation wrappers */
 
-#define HIREDIS_MAJOR 1
-#define HIREDIS_MINOR 2
-#define HIREDIS_PATCH 0
-#define HIREDIS_SONAME 1.2.1-dev
+#define LIBVALKEY_MAJOR 1
+#define LIBVALKEY_MINOR 2
+#define LIBVALKEY_PATCH 0
+#define LIBVALKEY_SONAME 1.2.1-dev
 
 /* Connection type can be blocking or non-blocking and is set in the
- * least significant bit of the flags field in redisContext. */
-#define REDIS_BLOCK 0x1
+ * least significant bit of the flags field in valkeyContext. */
+#define VALKEY_BLOCK 0x1
 
 /* Connection may be disconnected before being free'd. The second bit
  * in the flags field is set when the context is connected. */
-#define REDIS_CONNECTED 0x2
+#define VALKEY_CONNECTED 0x2
 
 /* The async API might try to disconnect cleanly and flush the output
  * buffer and read all subsequent replies before disconnecting.
  * This flag means no new commands can come in and the connection
  * should be terminated once all replies have been read. */
-#define REDIS_DISCONNECTING 0x4
+#define VALKEY_DISCONNECTING 0x4
 
 /* Flag specific to the async API which means that the context should be clean
  * up as soon as possible. */
-#define REDIS_FREEING 0x8
+#define VALKEY_FREEING 0x8
 
 /* Flag that is set when an async callback is executed. */
-#define REDIS_IN_CALLBACK 0x10
+#define VALKEY_IN_CALLBACK 0x10
 
 /* Flag that is set when the async context has one or more subscriptions. */
-#define REDIS_SUBSCRIBED 0x20
+#define VALKEY_SUBSCRIBED 0x20
 
 /* Flag that is set when monitor mode is active */
-#define REDIS_MONITORING 0x40
+#define VALKEY_MONITORING 0x40
 
 /* Flag that is set when we should set SO_REUSEADDR before calling bind() */
-#define REDIS_REUSEADDR 0x80
+#define VALKEY_REUSEADDR 0x80
 
 /* Flag that is set when the async connection supports push replies. */
-#define REDIS_SUPPORTS_PUSH 0x100
+#define VALKEY_SUPPORTS_PUSH 0x100
 
 /**
  * Flag that indicates the user does not want the context to
  * be automatically freed upon error
  */
-#define REDIS_NO_AUTO_FREE 0x200
+#define VALKEY_NO_AUTO_FREE 0x200
 
 /* Flag that indicates the user does not want replies to be automatically freed */
-#define REDIS_NO_AUTO_FREE_REPLIES 0x400
+#define VALKEY_NO_AUTO_FREE_REPLIES 0x400
 
 /* Flags to prefer IPv6 or IPv4 when doing DNS lookup. (If both are set,
  * AF_UNSPEC is used.) */
-#define REDIS_PREFER_IPV4 0x800
-#define REDIS_PREFER_IPV6 0x1000
+#define VALKEY_PREFER_IPV4 0x800
+#define VALKEY_PREFER_IPV6 0x1000
 
-#define REDIS_KEEPALIVE_INTERVAL 15 /* seconds */
+#define VALKEY_KEEPALIVE_INTERVAL 15 /* seconds */
 
 /* number of times we retry to connect in the case of EADDRNOTAVAIL and
  * SO_REUSEADDR is being used. */
-#define REDIS_CONNECT_RETRIES  10
+#define VALKEY_CONNECT_RETRIES  10
 
 /* Forward declarations for structs defined elsewhere */
-struct redisAsyncContext;
-struct redisContext;
+struct valkeyAsyncContext;
+struct valkeyContext;
 
 /* RESP3 push helpers and callback prototypes */
-#define redisIsPushReply(r) (((redisReply*)(r))->type == REDIS_REPLY_PUSH)
-typedef void (redisPushFn)(void *, void *);
-typedef void (redisAsyncPushFn)(struct redisAsyncContext *, void *);
+#define valkeyIsPushReply(r) (((valkeyReply*)(r))->type == VALKEY_REPLY_PUSH)
+typedef void (valkeyPushFn)(void *, void *);
+typedef void (valkeyAsyncPushFn)(struct valkeyAsyncContext *, void *);
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-/* This is the reply object returned by redisCommand() */
-typedef struct redisReply {
-    int type; /* REDIS_REPLY_* */
-    long long integer; /* The integer when type is REDIS_REPLY_INTEGER */
-    double dval; /* The double when type is REDIS_REPLY_DOUBLE */
+/* This is the reply object returned by valkeyCommand() */
+typedef struct valkeyReply {
+    int type; /* VALKEY_REPLY_* */
+    long long integer; /* The integer when type is VALKEY_REPLY_INTEGER */
+    double dval; /* The double when type is VALKEY_REPLY_DOUBLE */
     size_t len; /* Length of string */
-    char *str; /* Used for REDIS_REPLY_ERROR, REDIS_REPLY_STRING
-                  REDIS_REPLY_VERB, REDIS_REPLY_DOUBLE (in additional to dval),
-                  and REDIS_REPLY_BIGNUM. */
-    char vtype[4]; /* Used for REDIS_REPLY_VERB, contains the null
+    char *str; /* Used for VALKEY_REPLY_ERROR, VALKEY_REPLY_STRING
+                  VALKEY_REPLY_VERB, VALKEY_REPLY_DOUBLE (in additional to dval),
+                  and VALKEY_REPLY_BIGNUM. */
+    char vtype[4]; /* Used for VALKEY_REPLY_VERB, contains the null
                       terminated 3 character content type, such as "txt". */
-    size_t elements; /* number of elements, for REDIS_REPLY_ARRAY */
-    struct redisReply **element; /* elements vector for REDIS_REPLY_ARRAY */
-} redisReply;
+    size_t elements; /* number of elements, for VALKEY_REPLY_ARRAY */
+    struct valkeyReply **element; /* elements vector for VALKEY_REPLY_ARRAY */
+} valkeyReply;
 
-redisReader *redisReaderCreate(void);
+valkeyReader *valkeyReaderCreate(void);
 
-/* Function to free the reply objects hiredis returns by default. */
+/* Function to free the reply objects hivalkey returns by default. */
 void freeReplyObject(void *reply);
 
 /* Functions to format a command according to the protocol. */
-int redisvFormatCommand(char **target, const char *format, va_list ap);
-int redisFormatCommand(char **target, const char *format, ...);
-long long redisFormatCommandArgv(char **target, int argc, const char **argv, const size_t *argvlen);
-long long redisFormatSdsCommandArgv(sds *target, int argc, const char ** argv, const size_t *argvlen);
-void redisFreeCommand(char *cmd);
-void redisFreeSdsCommand(sds cmd);
+int valkeyvFormatCommand(char **target, const char *format, va_list ap);
+int valkeyFormatCommand(char **target, const char *format, ...);
+long long valkeyFormatCommandArgv(char **target, int argc, const char **argv, const size_t *argvlen);
+long long valkeyFormatSdsCommandArgv(sds *target, int argc, const char ** argv, const size_t *argvlen);
+void valkeyFreeCommand(char *cmd);
+void valkeyFreeSdsCommand(sds cmd);
 
-enum redisConnectionType {
-    REDIS_CONN_TCP,
-    REDIS_CONN_UNIX,
-    REDIS_CONN_USERFD
+enum valkeyConnectionType {
+    VALKEY_CONN_TCP,
+    VALKEY_CONN_UNIX,
+    VALKEY_CONN_USERFD
 };
 
-struct redisSsl;
+struct valkeySsl;
 
-#define REDIS_OPT_NONBLOCK 0x01
-#define REDIS_OPT_REUSEADDR 0x02
-#define REDIS_OPT_NOAUTOFREE 0x04        /* Don't automatically free the async
+#define VALKEY_OPT_NONBLOCK 0x01
+#define VALKEY_OPT_REUSEADDR 0x02
+#define VALKEY_OPT_NOAUTOFREE 0x04        /* Don't automatically free the async
                                           * object on a connection failure, or
                                           * other implicit conditions. Only free
                                           * on an explicit call to disconnect()
                                           * or free() */
-#define REDIS_OPT_NO_PUSH_AUTOFREE 0x08  /* Don't automatically intercept and
+#define VALKEY_OPT_NO_PUSH_AUTOFREE 0x08  /* Don't automatically intercept and
                                           * free RESP3 PUSH replies. */
-#define REDIS_OPT_NOAUTOFREEREPLIES 0x10 /* Don't automatically free replies. */
-#define REDIS_OPT_PREFER_IPV4 0x20       /* Prefer IPv4 in DNS lookups. */
-#define REDIS_OPT_PREFER_IPV6 0x40       /* Prefer IPv6 in DNS lookups. */
-#define REDIS_OPT_PREFER_IP_UNSPEC (REDIS_OPT_PREFER_IPV4 | REDIS_OPT_PREFER_IPV6)
+#define VALKEY_OPT_NOAUTOFREEREPLIES 0x10 /* Don't automatically free replies. */
+#define VALKEY_OPT_PREFER_IPV4 0x20       /* Prefer IPv4 in DNS lookups. */
+#define VALKEY_OPT_PREFER_IPV6 0x40       /* Prefer IPv6 in DNS lookups. */
+#define VALKEY_OPT_PREFER_IP_UNSPEC (VALKEY_OPT_PREFER_IPV4 | VALKEY_OPT_PREFER_IPV6)
 
 /* In Unix systems a file descriptor is a regular signed int, with -1
  * representing an invalid descriptor. In Windows it is a SOCKET
  * (32- or 64-bit unsigned integer depending on the architecture), where
  * all bits set (~0) is INVALID_SOCKET.  */
 #ifndef _WIN32
-typedef int redisFD;
-#define REDIS_INVALID_FD -1
+typedef int valkeyFD;
+#define VALKEY_INVALID_FD -1
 #else
 #ifdef _WIN64
-typedef unsigned long long redisFD; /* SOCKET = 64-bit UINT_PTR */
+typedef unsigned long long valkeyFD; /* SOCKET = 64-bit UINT_PTR */
 #else
-typedef unsigned long redisFD;      /* SOCKET = 32-bit UINT_PTR */
+typedef unsigned long valkeyFD;      /* SOCKET = 32-bit UINT_PTR */
 #endif
-#define REDIS_INVALID_FD ((redisFD)(~0)) /* INVALID_SOCKET */
+#define VALKEY_INVALID_FD ((valkeyFD)(~0)) /* INVALID_SOCKET */
 #endif
 
 typedef struct {
@@ -188,12 +188,12 @@ typedef struct {
      * `endpoint` member field to use
      */
     int type;
-    /* bit field of REDIS_OPT_xxx */
+    /* bit field of VALKEY_OPT_xxx */
     int options;
     /* timeout value for connect operation. If NULL, no timeout is used */
     const struct timeval *connect_timeout;
     /* timeout value for commands. If NULL, no timeout is used.  This can be
-     * updated at runtime with redisSetTimeout/redisAsyncSetTimeout. */
+     * updated at runtime with valkeySetTimeout/valkeyAsyncSetTimeout. */
     const struct timeval *command_timeout;
     union {
         /** use this field for tcp/ip connections */
@@ -205,9 +205,9 @@ typedef struct {
         /** use this field for unix domain sockets */
         const char *unix_socket;
         /**
-         * use this field to have hiredis operate an already-open
+         * use this field to have libvalkey operate an already-open
          * file descriptor */
-        redisFD fd;
+        valkeyFD fd;
     } endpoint;
 
     /* Optional user defined data/destructor */
@@ -215,56 +215,56 @@ typedef struct {
     void (*free_privdata)(void *);
 
     /* A user defined PUSH message callback */
-    redisPushFn *push_cb;
-    redisAsyncPushFn *async_push_cb;
-} redisOptions;
+    valkeyPushFn *push_cb;
+    valkeyAsyncPushFn *async_push_cb;
+} valkeyOptions;
 
 /**
  * Helper macros to initialize options to their specified fields.
  */
-#define REDIS_OPTIONS_SET_TCP(opts, ip_, port_) do { \
-        (opts)->type = REDIS_CONN_TCP;               \
+#define VALKEY_OPTIONS_SET_TCP(opts, ip_, port_) do { \
+        (opts)->type = VALKEY_CONN_TCP;               \
         (opts)->endpoint.tcp.ip = ip_;               \
         (opts)->endpoint.tcp.port = port_;           \
     } while(0)
 
-#define REDIS_OPTIONS_SET_UNIX(opts, path) do { \
-        (opts)->type = REDIS_CONN_UNIX;         \
+#define VALKEY_OPTIONS_SET_UNIX(opts, path) do { \
+        (opts)->type = VALKEY_CONN_UNIX;         \
         (opts)->endpoint.unix_socket = path;    \
     } while(0)
 
-#define REDIS_OPTIONS_SET_PRIVDATA(opts, data, dtor) do {  \
+#define VALKEY_OPTIONS_SET_PRIVDATA(opts, data, dtor) do {  \
         (opts)->privdata = data;                           \
         (opts)->free_privdata = dtor;                      \
     } while(0)
 
-typedef struct redisContextFuncs {
-    void (*close)(struct redisContext *);
+typedef struct valkeyContextFuncs {
+    void (*close)(struct valkeyContext *);
     void (*free_privctx)(void *);
-    void (*async_read)(struct redisAsyncContext *);
-    void (*async_write)(struct redisAsyncContext *);
+    void (*async_read)(struct valkeyAsyncContext *);
+    void (*async_write)(struct valkeyAsyncContext *);
 
     /* Read/Write data to the underlying communication stream, returning the
      * number of bytes read/written.  In the event of an unrecoverable error
      * these functions shall return a value < 0.  In the event of a
      * recoverable error, they should return 0. */
-    ssize_t (*read)(struct redisContext *, char *, size_t);
-    ssize_t (*write)(struct redisContext *);
-} redisContextFuncs;
+    ssize_t (*read)(struct valkeyContext *, char *, size_t);
+    ssize_t (*write)(struct valkeyContext *);
+} valkeyContextFuncs;
 
 
-/* Context for a connection to Redis */
-typedef struct redisContext {
-    const redisContextFuncs *funcs;   /* Function table */
+/* Context for a connection to Valkey */
+typedef struct valkeyContext {
+    const valkeyContextFuncs *funcs;   /* Function table */
 
     int err; /* Error flags, 0 when there is no error */
     char errstr[128]; /* String representation of error when applicable */
-    redisFD fd;
+    valkeyFD fd;
     int flags;
     char *obuf; /* Write buffer */
-    redisReader *reader; /* Protocol reader */
+    valkeyReader *reader; /* Protocol reader */
 
-    enum redisConnectionType connection_type;
+    enum valkeyConnectionType connection_type;
     struct timeval *connect_timeout;
     struct timeval *command_timeout;
 
@@ -283,30 +283,30 @@ typedef struct redisContext {
     size_t addrlen;
 
     /* Optional data and corresponding destructor users can use to provide
-     * context to a given redisContext.  Not used by hiredis. */
+     * context to a given valkeyContext.  Not used by libvalkey. */
     void *privdata;
     void (*free_privdata)(void *);
 
-    /* Internal context pointer presently used by hiredis to manage
+    /* Internal context pointer presently used by libvalkey to manage
      * SSL connections. */
     void *privctx;
 
     /* An optional RESP3 PUSH handler */
-    redisPushFn *push_cb;
-} redisContext;
+    valkeyPushFn *push_cb;
+} valkeyContext;
 
-redisContext *redisConnectWithOptions(const redisOptions *options);
-redisContext *redisConnect(const char *ip, int port);
-redisContext *redisConnectWithTimeout(const char *ip, int port, const struct timeval tv);
-redisContext *redisConnectNonBlock(const char *ip, int port);
-redisContext *redisConnectBindNonBlock(const char *ip, int port,
+valkeyContext *valkeyConnectWithOptions(const valkeyOptions *options);
+valkeyContext *valkeyConnect(const char *ip, int port);
+valkeyContext *valkeyConnectWithTimeout(const char *ip, int port, const struct timeval tv);
+valkeyContext *valkeyConnectNonBlock(const char *ip, int port);
+valkeyContext *valkeyConnectBindNonBlock(const char *ip, int port,
                                        const char *source_addr);
-redisContext *redisConnectBindNonBlockWithReuse(const char *ip, int port,
+valkeyContext *valkeyConnectBindNonBlockWithReuse(const char *ip, int port,
                                                 const char *source_addr);
-redisContext *redisConnectUnix(const char *path);
-redisContext *redisConnectUnixWithTimeout(const char *path, const struct timeval tv);
-redisContext *redisConnectUnixNonBlock(const char *path);
-redisContext *redisConnectFd(redisFD fd);
+valkeyContext *valkeyConnectUnix(const char *path);
+valkeyContext *valkeyConnectUnixWithTimeout(const char *path, const struct timeval tv);
+valkeyContext *valkeyConnectUnixNonBlock(const char *path);
+valkeyContext *valkeyConnectFd(valkeyFD fd);
 
 /**
  * Reconnect the given context using the saved information.
@@ -315,45 +315,45 @@ redisContext *redisConnectFd(redisFD fd);
  * host, ip (or path), timeout and bind address are reused,
  * flags are used unmodified from the existing context.
  *
- * Returns REDIS_OK on successful connect or REDIS_ERR otherwise.
+ * Returns VALKEY_OK on successful connect or VALKEY_ERR otherwise.
  */
-int redisReconnect(redisContext *c);
+int valkeyReconnect(valkeyContext *c);
 
-redisPushFn *redisSetPushCallback(redisContext *c, redisPushFn *fn);
-int redisSetTimeout(redisContext *c, const struct timeval tv);
-int redisEnableKeepAlive(redisContext *c);
-int redisEnableKeepAliveWithInterval(redisContext *c, int interval);
-int redisSetTcpUserTimeout(redisContext *c, unsigned int timeout);
-void redisFree(redisContext *c);
-redisFD redisFreeKeepFd(redisContext *c);
-int redisBufferRead(redisContext *c);
-int redisBufferWrite(redisContext *c, int *done);
+valkeyPushFn *valkeySetPushCallback(valkeyContext *c, valkeyPushFn *fn);
+int valkeySetTimeout(valkeyContext *c, const struct timeval tv);
+int valkeyEnableKeepAlive(valkeyContext *c);
+int valkeyEnableKeepAliveWithInterval(valkeyContext *c, int interval);
+int valkeySetTcpUserTimeout(valkeyContext *c, unsigned int timeout);
+void valkeyFree(valkeyContext *c);
+valkeyFD valkeyFreeKeepFd(valkeyContext *c);
+int valkeyBufferRead(valkeyContext *c);
+int valkeyBufferWrite(valkeyContext *c, int *done);
 
 /* In a blocking context, this function first checks if there are unconsumed
  * replies to return and returns one if so. Otherwise, it flushes the output
  * buffer to the socket and reads until it has a reply. In a non-blocking
  * context, it will return unconsumed replies until there are no more. */
-int redisGetReply(redisContext *c, void **reply);
-int redisGetReplyFromReader(redisContext *c, void **reply);
+int valkeyGetReply(valkeyContext *c, void **reply);
+int valkeyGetReplyFromReader(valkeyContext *c, void **reply);
 
 /* Write a formatted command to the output buffer. Use these functions in blocking mode
  * to get a pipeline of commands. */
-int redisAppendFormattedCommand(redisContext *c, const char *cmd, size_t len);
+int valkeyAppendFormattedCommand(valkeyContext *c, const char *cmd, size_t len);
 
 /* Write a command to the output buffer. Use these functions in blocking mode
  * to get a pipeline of commands. */
-int redisvAppendCommand(redisContext *c, const char *format, va_list ap);
-int redisAppendCommand(redisContext *c, const char *format, ...);
-int redisAppendCommandArgv(redisContext *c, int argc, const char **argv, const size_t *argvlen);
+int valkeyvAppendCommand(valkeyContext *c, const char *format, va_list ap);
+int valkeyAppendCommand(valkeyContext *c, const char *format, ...);
+int valkeyAppendCommandArgv(valkeyContext *c, int argc, const char **argv, const size_t *argvlen);
 
-/* Issue a command to Redis. In a blocking context, it is identical to calling
- * redisAppendCommand, followed by redisGetReply. The function will return
+/* Issue a command to Valkey. In a blocking context, it is identical to calling
+ * valkeyAppendCommand, followed by valkeyGetReply. The function will return
  * NULL if there was an error in performing the request, otherwise it will
  * return the reply. In a non-blocking context, it is identical to calling
- * only redisAppendCommand and will always return NULL. */
-void *redisvCommand(redisContext *c, const char *format, va_list ap);
-void *redisCommand(redisContext *c, const char *format, ...);
-void *redisCommandArgv(redisContext *c, int argc, const char **argv, const size_t *argvlen);
+ * only valkeyAppendCommand and will always return NULL. */
+void *valkeyvCommand(valkeyContext *c, const char *format, va_list ap);
+void *valkeyCommand(valkeyContext *c, const char *format, ...);
+void *valkeyCommandArgv(valkeyContext *c, int argc, const char **argv, const size_t *argvlen);
 
 #ifdef __cplusplus
 }

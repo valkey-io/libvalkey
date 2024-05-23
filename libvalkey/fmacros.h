@@ -1,5 +1,5 @@
-#ifndef __HIREDIS_FMACRO_H
-#define __HIREDIS_FMACRO_H
+#ifndef VALKEY_FMACRO_H
+#define VALKEY_FMACRO_H
 
 #ifndef _AIX
 #define _XOPEN_SOURCE 600

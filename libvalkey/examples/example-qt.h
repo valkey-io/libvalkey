@@ -1,5 +1,5 @@
-#ifndef __HIREDIS_EXAMPLE_QT_H
-#define __HIREDIS_EXAMPLE_QT_H
+#ifndef VALKEY_EXAMPLE_QT_H
+#define VALKEY_EXAMPLE_QT_H
 
 #include <adapters/qt.h>
 
@@ -22,11 +22,11 @@ class ExampleQt : public QObject {
 
     private:
         const char * m_value;
-        redisAsyncContext * m_ctx;
+        valkeyAsyncContext * m_ctx;
         RedisQtAdapter m_adapter;
 
     friend
-    void getCallback(redisAsyncContext *, void *, void *);
+    void getCallback(valkeyAsyncContext *, void *, void *);
 };
 
-#endif /* !__HIREDIS_EXAMPLE_QT_H */
+#endif /* VALKEY_EXAMPLE_QT_H */

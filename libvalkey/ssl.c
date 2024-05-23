@@ -30,7 +30,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "hiredis.h"
+#include "valkey.h"
 #include "async.h"
 #include "net.h"
 
@@ -57,14 +57,14 @@
 
 #include "win32.h"
 #include "async_private.h"
-#include "hiredis_ssl.h"
+#include "valkey_ssl.h"
 
 #define OPENSSL_1_1_0 0x10100000L
 
-void __redisSetError(redisContext *c, int type, const char *str);
+void __valkeySetError(valkeyContext *c, int type, const char *str);
 
-struct redisSSLContext {
-    /* Associated OpenSSL SSL_CTX as created by redisCreateSSLContext() */
+struct valkeySSLContext {
+    /* Associated OpenSSL SSL_CTX as created by valkeyCreateSSLContext() */
     SSL_CTX *ssl_ctx;
 
     /* Requested SNI, or NULL */
@@ -72,7 +72,7 @@ struct redisSSLContext {
 };
 
 /* The SSL connection context is attached to SSL/TLS connections as a privdata. */
-typedef struct redisSSL {
+typedef struct valkeySSL {
     /**
      * OpenSSL SSL object.
      */
@@ -92,10 +92,10 @@ typedef struct redisSSL {
      * should resume whenever a read takes place, if possible
      */
     int pendingWrite;
-} redisSSL;
+} valkeySSL;
 
 /* Forward declaration */
-redisContextFuncs redisContextSSLFuncs;
+valkeyContextFuncs valkeyContextSSLFuncs;
 
 /**
  * OpenSSL global initialization and locking handling callbacks.
@@ -103,10 +103,10 @@ redisContextFuncs redisContextSSLFuncs;
  */
 
 #if OPENSSL_VERSION_NUMBER < OPENSSL_1_1_0
-#define HIREDIS_USE_CRYPTO_LOCKS
+#define VALKEY_USE_CRYPTO_LOCKS
 #endif
 
-#ifdef HIREDIS_USE_CRYPTO_LOCKS
+#ifdef VALKEY_USE_CRYPTO_LOCKS
 #ifdef _WIN32
 typedef CRITICAL_SECTION sslLockType;
 static void sslLockInit(sslLockType* l) {
@@ -150,66 +150,66 @@ static int initOpensslLocks(void) {
     unsigned ii, nlocks;
     if (CRYPTO_get_locking_callback() != NULL) {
         /* Someone already set the callback before us. Don't destroy it! */
-        return REDIS_OK;
+        return VALKEY_OK;
     }
     nlocks = CRYPTO_num_locks();
-    ossl_locks = hi_malloc(sizeof(*ossl_locks) * nlocks);
+    ossl_locks = vk_malloc(sizeof(*ossl_locks) * nlocks);
     if (ossl_locks == NULL)
-        return REDIS_ERR;
+        return VALKEY_ERR;
 
     for (ii = 0; ii < nlocks; ii++) {
         sslLockInit(ossl_locks + ii);
     }
     CRYPTO_set_locking_callback(opensslDoLock);
-    return REDIS_OK;
+    return VALKEY_OK;
 }
-#endif /* HIREDIS_USE_CRYPTO_LOCKS */
+#endif /* VALKEY_USE_CRYPTO_LOCKS */
 
-int redisInitOpenSSL(void)
+int valkeyInitOpenSSL(void)
 {
     SSL_library_init();
-#ifdef HIREDIS_USE_CRYPTO_LOCKS
+#ifdef VALKEY_USE_CRYPTO_LOCKS
     initOpensslLocks();
 #endif
 
-    return REDIS_OK;
+    return VALKEY_OK;
 }
 
 /**
- * redisSSLContext helper context destruction.
+ * valkeySSLContext helper context destruction.
  */
 
-const char *redisSSLContextGetError(redisSSLContextError error)
+const char *valkeySSLContextGetError(valkeySSLContextError error)
 {
     switch (error) {
-        case REDIS_SSL_CTX_NONE:
+        case VALKEY_SSL_CTX_NONE:
             return "No Error";
-        case REDIS_SSL_CTX_CREATE_FAILED:
+        case VALKEY_SSL_CTX_CREATE_FAILED:
             return "Failed to create OpenSSL SSL_CTX";
-        case REDIS_SSL_CTX_CERT_KEY_REQUIRED:
+        case VALKEY_SSL_CTX_CERT_KEY_REQUIRED:
             return "Client cert and key must both be specified or skipped";
-        case REDIS_SSL_CTX_CA_CERT_LOAD_FAILED:
+        case VALKEY_SSL_CTX_CA_CERT_LOAD_FAILED:
             return "Failed to load CA Certificate or CA Path";
-        case REDIS_SSL_CTX_CLIENT_CERT_LOAD_FAILED:
+        case VALKEY_SSL_CTX_CLIENT_CERT_LOAD_FAILED:
             return "Failed to load client certificate";
-        case REDIS_SSL_CTX_PRIVATE_KEY_LOAD_FAILED:
+        case VALKEY_SSL_CTX_PRIVATE_KEY_LOAD_FAILED:
             return "Failed to load private key";
-        case REDIS_SSL_CTX_OS_CERTSTORE_OPEN_FAILED:
+        case VALKEY_SSL_CTX_OS_CERTSTORE_OPEN_FAILED:
             return "Failed to open system certificate store";
-        case REDIS_SSL_CTX_OS_CERT_ADD_FAILED:
+        case VALKEY_SSL_CTX_OS_CERT_ADD_FAILED:
             return "Failed to add CA certificates obtained from system to the SSL context";
         default:
             return "Unknown error code";
     }
 }
 
-void redisFreeSSLContext(redisSSLContext *ctx)
+void valkeyFreeSSLContext(valkeySSLContext *ctx)
 {
     if (!ctx)
         return;
 
     if (ctx->server_name) {
-        hi_free(ctx->server_name);
+        vk_free(ctx->server_name);
         ctx->server_name = NULL;
     }
 
@@ -218,31 +218,31 @@ void redisFreeSSLContext(redisSSLContext *ctx)
         ctx->ssl_ctx = NULL;
     }
 
-    hi_free(ctx);
+    vk_free(ctx);
 }
 
 
 /**
- * redisSSLContext helper context initialization.
+ * valkeySSLContext helper context initialization.
  */
 
-redisSSLContext *redisCreateSSLContext(const char *cacert_filename, const char *capath,
+valkeySSLContext *valkeyCreateSSLContext(const char *cacert_filename, const char *capath,
         const char *cert_filename, const char *private_key_filename,
-        const char *server_name, redisSSLContextError *error)
+        const char *server_name, valkeySSLContextError *error)
 {
-    redisSSLOptions options = {
+    valkeySSLOptions options = {
         .cacert_filename = cacert_filename,
         .capath = capath,
         .cert_filename = cert_filename,
         .private_key_filename = private_key_filename,
         .server_name = server_name,
-        .verify_mode = REDIS_SSL_VERIFY_PEER,
+        .verify_mode = VALKEY_SSL_VERIFY_PEER,
     };
 
-    return redisCreateSSLContextWithOptions(&options, error);
+    return valkeyCreateSSLContextWithOptions(&options, error);
 }
 
-redisSSLContext *redisCreateSSLContextWithOptions(redisSSLOptions *options, redisSSLContextError *error) {
+valkeySSLContext *valkeyCreateSSLContextWithOptions(valkeySSLOptions *options, valkeySSLContextError *error) {
     const char *cacert_filename = options->cacert_filename;
     const char *capath = options->capath;
     const char *cert_filename = options->cert_filename;
@@ -254,7 +254,7 @@ redisSSLContext *redisCreateSSLContextWithOptions(redisSSLOptions *options, redi
     PCCERT_CONTEXT win_ctx = NULL;
 #endif
 
-    redisSSLContext *ctx = hi_calloc(1, sizeof(redisSSLContext));
+    valkeySSLContext *ctx = vk_calloc(1, sizeof(valkeySSLContext));
     if (ctx == NULL)
         goto error;
 
@@ -267,7 +267,7 @@ redisSSLContext *redisCreateSSLContextWithOptions(redisSSLOptions *options, redi
 
     ctx->ssl_ctx = SSL_CTX_new(ssl_method);
     if (!ctx->ssl_ctx) {
-        if (error) *error = REDIS_SSL_CTX_CREATE_FAILED;
+        if (error) *error = VALKEY_SSL_CTX_CREATE_FAILED;
         goto error;
     }
 
@@ -281,7 +281,7 @@ redisSSLContext *redisCreateSSLContextWithOptions(redisSSLOptions *options, redi
 
     if ((cert_filename != NULL && private_key_filename == NULL) ||
             (private_key_filename != NULL && cert_filename == NULL)) {
-        if (error) *error = REDIS_SSL_CTX_CERT_KEY_REQUIRED;
+        if (error) *error = VALKEY_SSL_CTX_CERT_KEY_REQUIRED;
         goto error;
     }
 
@@ -290,7 +290,7 @@ redisSSLContext *redisCreateSSLContextWithOptions(redisSSLOptions *options, redi
         if (0 == strcmp(cacert_filename, "wincert")) {
             win_store = CertOpenSystemStore(NULL, "Root");
             if (!win_store) {
-                if (error) *error = REDIS_SSL_CTX_OS_CERTSTORE_OPEN_FAILED;
+                if (error) *error = VALKEY_SSL_CTX_OS_CERTSTORE_OPEN_FAILED;
                 goto error;
             }
             X509_STORE* store = SSL_CTX_get_cert_store(ctx->ssl_ctx);
@@ -301,7 +301,7 @@ redisSSLContext *redisCreateSSLContextWithOptions(redisSSLOptions *options, redi
                     if ((1 != X509_STORE_add_cert(store, x509)) ||
                         (1 != SSL_CTX_add_client_CA(ctx->ssl_ctx, x509)))
                     {
-                        if (error) *error = REDIS_SSL_CTX_OS_CERT_ADD_FAILED;
+                        if (error) *error = VALKEY_SSL_CTX_OS_CERT_ADD_FAILED;
                         goto error;
                     }
                     X509_free(x509);
@@ -312,29 +312,29 @@ redisSSLContext *redisCreateSSLContextWithOptions(redisSSLOptions *options, redi
         } else
 #endif
         if (!SSL_CTX_load_verify_locations(ctx->ssl_ctx, cacert_filename, capath)) {
-            if (error) *error = REDIS_SSL_CTX_CA_CERT_LOAD_FAILED;
+            if (error) *error = VALKEY_SSL_CTX_CA_CERT_LOAD_FAILED;
             goto error;
         }
     } else {
         if (!SSL_CTX_set_default_verify_paths(ctx->ssl_ctx)) {
-            if (error) *error = REDIS_SSL_CTX_CLIENT_DEFAULT_CERT_FAILED;
+            if (error) *error = VALKEY_SSL_CTX_CLIENT_DEFAULT_CERT_FAILED;
             goto error;
         }
     }
 
     if (cert_filename) {
         if (!SSL_CTX_use_certificate_chain_file(ctx->ssl_ctx, cert_filename)) {
-            if (error) *error = REDIS_SSL_CTX_CLIENT_CERT_LOAD_FAILED;
+            if (error) *error = VALKEY_SSL_CTX_CLIENT_CERT_LOAD_FAILED;
             goto error;
         }
         if (!SSL_CTX_use_PrivateKey_file(ctx->ssl_ctx, private_key_filename, SSL_FILETYPE_PEM)) {
-            if (error) *error = REDIS_SSL_CTX_PRIVATE_KEY_LOAD_FAILED;
+            if (error) *error = VALKEY_SSL_CTX_PRIVATE_KEY_LOAD_FAILED;
             goto error;
         }
     }
 
     if (server_name)
-        ctx->server_name = hi_strdup(server_name);
+        ctx->server_name = vk_strdup(server_name);
 
     return ctx;
 
@@ -343,7 +343,7 @@ error:
     CertFreeCertificateContext(win_ctx);
     CertCloseStore(win_store, 0);
 #endif
-    redisFreeSSLContext(ctx);
+    valkeyFreeSSLContext(ctx);
     return NULL;
 }
 
@@ -352,16 +352,16 @@ error:
  */
 
 
-static int redisSSLConnect(redisContext *c, SSL *ssl) {
+static int valkeySSLConnect(valkeyContext *c, SSL *ssl) {
     if (c->privctx) {
-        __redisSetError(c, REDIS_ERR_OTHER, "redisContext was already associated");
-        return REDIS_ERR;
+        __valkeySetError(c, VALKEY_ERR_OTHER, "valkeyContext was already associated");
+        return VALKEY_ERR;
     }
 
-    redisSSL *rssl = hi_calloc(1, sizeof(redisSSL));
+    valkeySSL *rssl = vk_calloc(1, sizeof(valkeySSL));
     if (rssl == NULL) {
-        __redisSetError(c, REDIS_ERR_OOM, "Out of memory");
-        return REDIS_ERR;
+        __valkeySetError(c, VALKEY_ERR_OOM, "Out of memory");
+        return VALKEY_ERR;
     }
 
     rssl->ssl = ssl;
@@ -374,18 +374,18 @@ static int redisSSLConnect(redisContext *c, SSL *ssl) {
 
     int rv = SSL_connect(rssl->ssl);
     if (rv == 1) {
-        c->funcs = &redisContextSSLFuncs;
+        c->funcs = &valkeyContextSSLFuncs;
         c->privctx = rssl;
-        return REDIS_OK;
+        return VALKEY_OK;
     }
 
     rv = SSL_get_error(rssl->ssl, rv);
-    if (((c->flags & REDIS_BLOCK) == 0) &&
+    if (((c->flags & VALKEY_BLOCK) == 0) &&
         (rv == SSL_ERROR_WANT_READ || rv == SSL_ERROR_WANT_WRITE))
     {
-        c->funcs = &redisContextSSLFuncs;
+        c->funcs = &valkeyContextSSLFuncs;
         c->privctx = rssl;
-        return REDIS_OK;
+        return VALKEY_OK;
     }
 
     if (c->err == 0) {
@@ -397,64 +397,64 @@ static int redisSSLConnect(redisContext *c, SSL *ssl) {
             snprintf(err,sizeof(err)-1,"SSL_connect failed: %s",
                     ERR_reason_error_string(e));
         }
-        __redisSetError(c, REDIS_ERR_IO, err);
+        __valkeySetError(c, VALKEY_ERR_IO, err);
     }
 
-    hi_free(rssl);
-    return REDIS_ERR;
+    vk_free(rssl);
+    return VALKEY_ERR;
 }
 
 /**
- * A wrapper around redisSSLConnect() for users who manage their own context and
+ * A wrapper around valkeySSLConnect() for users who manage their own context and
  * create their own SSL object.
  */
 
-int redisInitiateSSL(redisContext *c, SSL *ssl) {
-    return redisSSLConnect(c, ssl);
+int valkeyInitiateSSL(valkeyContext *c, SSL *ssl) {
+    return valkeySSLConnect(c, ssl);
 }
 
 /**
- * A wrapper around redisSSLConnect() for users who use redisSSLContext and don't
+ * A wrapper around valkeySSLConnect() for users who use valkeySSLContext and don't
  * manage their own SSL objects.
  */
 
-int redisInitiateSSLWithContext(redisContext *c, redisSSLContext *redis_ssl_ctx)
+int valkeyInitiateSSLWithContext(valkeyContext *c, valkeySSLContext *valkey_ssl_ctx)
 {
-    if (!c || !redis_ssl_ctx)
-        return REDIS_ERR;
+    if (!c || !valkey_ssl_ctx)
+        return VALKEY_ERR;
 
-    /* We want to verify that redisSSLConnect() won't fail on this, as it will
+    /* We want to verify that valkeySSLConnect() won't fail on this, as it will
      * not own the SSL object in that case and we'll end up leaking.
      */
     if (c->privctx)
-        return REDIS_ERR;
+        return VALKEY_ERR;
 
-    SSL *ssl = SSL_new(redis_ssl_ctx->ssl_ctx);
+    SSL *ssl = SSL_new(valkey_ssl_ctx->ssl_ctx);
     if (!ssl) {
-        __redisSetError(c, REDIS_ERR_OTHER, "Couldn't create new SSL instance");
+        __valkeySetError(c, VALKEY_ERR_OTHER, "Couldn't create new SSL instance");
         goto error;
     }
 
-    if (redis_ssl_ctx->server_name) {
-        if (!SSL_set_tlsext_host_name(ssl, redis_ssl_ctx->server_name)) {
-            __redisSetError(c, REDIS_ERR_OTHER, "Failed to set server_name/SNI");
+    if (valkey_ssl_ctx->server_name) {
+        if (!SSL_set_tlsext_host_name(ssl, valkey_ssl_ctx->server_name)) {
+            __valkeySetError(c, VALKEY_ERR_OTHER, "Failed to set server_name/SNI");
             goto error;
         }
     }
 
-    if (redisSSLConnect(c, ssl) != REDIS_OK) {
+    if (valkeySSLConnect(c, ssl) != VALKEY_OK) {
         goto error;
     }
 
-    return REDIS_OK;
+    return VALKEY_OK;
 
 error:
     if (ssl)
         SSL_free(ssl);
-    return REDIS_ERR;
+    return VALKEY_ERR;
 }
 
-static int maybeCheckWant(redisSSL *rssl, int rv) {
+static int maybeCheckWant(valkeySSL *rssl, int rv) {
     /**
      * If the error is WANT_READ or WANT_WRITE, the appropriate flags are set
      * and true is returned. False is returned otherwise
@@ -471,32 +471,32 @@ static int maybeCheckWant(redisSSL *rssl, int rv) {
 }
 
 /**
- * Implementation of redisContextFuncs for SSL connections.
+ * Implementation of valkeyContextFuncs for SSL connections.
  */
 
-static void redisSSLFree(void *privctx){
-    redisSSL *rsc = privctx;
+static void valkeySSLFree(void *privctx){
+    valkeySSL *rsc = privctx;
 
     if (!rsc) return;
     if (rsc->ssl) {
         SSL_free(rsc->ssl);
         rsc->ssl = NULL;
     }
-    hi_free(rsc);
+    vk_free(rsc);
 }
 
-static ssize_t redisSSLRead(redisContext *c, char *buf, size_t bufcap) {
-    redisSSL *rssl = c->privctx;
+static ssize_t valkeySSLRead(valkeyContext *c, char *buf, size_t bufcap) {
+    valkeySSL *rssl = c->privctx;
 
     int nread = SSL_read(rssl->ssl, buf, bufcap);
     if (nread > 0) {
         return nread;
     } else if (nread == 0) {
-        __redisSetError(c, REDIS_ERR_EOF, "Server closed the connection");
+        __valkeySetError(c, VALKEY_ERR_EOF, "Server closed the connection");
         return -1;
     } else {
         int err = SSL_get_error(rssl->ssl, nread);
-        if (c->flags & REDIS_BLOCK) {
+        if (c->flags & VALKEY_BLOCK) {
             /**
              * In blocking mode, we should never end up in a situation where
              * we get an error without it being an actual error, except
@@ -510,7 +510,7 @@ static ssize_t redisSSLRead(redisContext *c, char *buf, size_t bufcap) {
                 if (errno == EAGAIN) {
                     msg = "Resource temporarily unavailable";
                 }
-                __redisSetError(c, REDIS_ERR_IO, msg);
+                __valkeySetError(c, VALKEY_ERR_IO, msg);
                 return -1;
             }
         }
@@ -521,14 +521,14 @@ static ssize_t redisSSLRead(redisContext *c, char *buf, size_t bufcap) {
         if (maybeCheckWant(rssl, err)) {
             return 0;
         } else {
-            __redisSetError(c, REDIS_ERR_IO, NULL);
+            __valkeySetError(c, VALKEY_ERR_IO, NULL);
             return -1;
         }
     }
 }
 
-static ssize_t redisSSLWrite(redisContext *c) {
-    redisSSL *rssl = c->privctx;
+static ssize_t valkeySSLWrite(valkeyContext *c) {
+    valkeySSL *rssl = c->privctx;
 
     size_t len = rssl->lastLen ? rssl->lastLen : sdslen(c->obuf);
     int rv = SSL_write(rssl->ssl, c->obuf, len);
@@ -539,20 +539,20 @@ static ssize_t redisSSLWrite(redisContext *c) {
         rssl->lastLen = len;
 
         int err = SSL_get_error(rssl->ssl, rv);
-        if ((c->flags & REDIS_BLOCK) == 0 && maybeCheckWant(rssl, err)) {
+        if ((c->flags & VALKEY_BLOCK) == 0 && maybeCheckWant(rssl, err)) {
             return 0;
         } else {
-            __redisSetError(c, REDIS_ERR_IO, NULL);
+            __valkeySetError(c, VALKEY_ERR_IO, NULL);
             return -1;
         }
     }
     return rv;
 }
 
-static void redisSSLAsyncRead(redisAsyncContext *ac) {
+static void valkeySSLAsyncRead(valkeyAsyncContext *ac) {
     int rv;
-    redisSSL *rssl = ac->c.privctx;
-    redisContext *c = &ac->c;
+    valkeySSL *rssl = ac->c.privctx;
+    valkeyContext *c = &ac->c;
 
     rssl->wantRead = 0;
 
@@ -561,33 +561,33 @@ static void redisSSLAsyncRead(redisAsyncContext *ac) {
 
         /* This is probably just a write event */
         rssl->pendingWrite = 0;
-        rv = redisBufferWrite(c, &done);
-        if (rv == REDIS_ERR) {
-            __redisAsyncDisconnect(ac);
+        rv = valkeyBufferWrite(c, &done);
+        if (rv == VALKEY_ERR) {
+            __valkeyAsyncDisconnect(ac);
             return;
         } else if (!done) {
             _EL_ADD_WRITE(ac);
         }
     }
 
-    rv = redisBufferRead(c);
-    if (rv == REDIS_ERR) {
-        __redisAsyncDisconnect(ac);
+    rv = valkeyBufferRead(c);
+    if (rv == VALKEY_ERR) {
+        __valkeyAsyncDisconnect(ac);
     } else {
         _EL_ADD_READ(ac);
-        redisProcessCallbacks(ac);
+        valkeyProcessCallbacks(ac);
     }
 }
 
-static void redisSSLAsyncWrite(redisAsyncContext *ac) {
+static void valkeySSLAsyncWrite(valkeyAsyncContext *ac) {
     int rv, done = 0;
-    redisSSL *rssl = ac->c.privctx;
-    redisContext *c = &ac->c;
+    valkeySSL *rssl = ac->c.privctx;
+    valkeyContext *c = &ac->c;
 
     rssl->pendingWrite = 0;
-    rv = redisBufferWrite(c, &done);
-    if (rv == REDIS_ERR) {
-        __redisAsyncDisconnect(ac);
+    rv = valkeyBufferWrite(c, &done);
+    if (rv == VALKEY_ERR) {
+        __valkeyAsyncDisconnect(ac);
         return;
     }
 
@@ -609,12 +609,12 @@ static void redisSSLAsyncWrite(redisAsyncContext *ac) {
     _EL_ADD_READ(ac);
 }
 
-redisContextFuncs redisContextSSLFuncs = {
-    .close = redisNetClose,
-    .free_privctx = redisSSLFree,
-    .async_read = redisSSLAsyncRead,
-    .async_write = redisSSLAsyncWrite,
-    .read = redisSSLRead,
-    .write = redisSSLWrite
+valkeyContextFuncs valkeyContextSSLFuncs = {
+    .close = valkeyNetClose,
+    .free_privctx = valkeySSLFree,
+    .async_read = valkeySSLAsyncRead,
+    .async_write = valkeySSLAsyncWrite,
+    .read = valkeySSLRead,
+    .write = valkeySSLWrite
 };
 

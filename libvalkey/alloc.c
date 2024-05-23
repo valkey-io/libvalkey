@@ -33,7 +33,7 @@
 #include <string.h>
 #include <stdlib.h>
 
-hiredisAllocFuncs hiredisAllocFns = {
+valkeyAllocFuncs valkeyAllocFns = {
     .mallocFn = malloc,
     .callocFn = calloc,
     .reallocFn = realloc,
@@ -41,18 +41,18 @@ hiredisAllocFuncs hiredisAllocFns = {
     .freeFn = free,
 };
 
-/* Override hiredis' allocators with ones supplied by the user */
-hiredisAllocFuncs hiredisSetAllocators(hiredisAllocFuncs *override) {
-    hiredisAllocFuncs orig = hiredisAllocFns;
+/* Override valkey' allocators with ones supplied by the user */
+valkeyAllocFuncs valkeySetAllocators(valkeyAllocFuncs *override) {
+    valkeyAllocFuncs orig = valkeyAllocFns;
 
-    hiredisAllocFns = *override;
+    valkeyAllocFns = *override;
 
     return orig;
 }
 
 /* Reset allocators to use libc defaults */
-void hiredisResetAllocators(void) {
-    hiredisAllocFns = (hiredisAllocFuncs) {
+void valkeyResetAllocators(void) {
+    valkeyAllocFns = (valkeyAllocFuncs) {
         .mallocFn = malloc,
         .callocFn = calloc,
         .reallocFn = realloc,
@@ -63,28 +63,28 @@ void hiredisResetAllocators(void) {
 
 #ifdef _WIN32
 
-void *hi_malloc(size_t size) {
-    return hiredisAllocFns.mallocFn(size);
+void *vk_malloc(size_t size) {
+    return valkeyAllocFns.mallocFn(size);
 }
 
-void *hi_calloc(size_t nmemb, size_t size) {
+void *vk_calloc(size_t nmemb, size_t size) {
     /* Overflow check as the user can specify any arbitrary allocator */
     if (SIZE_MAX / size < nmemb)
         return NULL;
 
-    return hiredisAllocFns.callocFn(nmemb, size);
+    return valkeyAllocFns.callocFn(nmemb, size);
 }
 
-void *hi_realloc(void *ptr, size_t size) {
-    return hiredisAllocFns.reallocFn(ptr, size);
+void *vk_realloc(void *ptr, size_t size) {
+    return valkeyAllocFns.reallocFn(ptr, size);
 }
 
-char *hi_strdup(const char *str) {
-    return hiredisAllocFns.strdupFn(str);
+char *vk_strdup(const char *str) {
+    return valkeyAllocFns.strdupFn(str);
 }
 
-void hi_free(void *ptr) {
-    hiredisAllocFns.freeFn(ptr);
+void vk_free(void *ptr) {
+    valkeyAllocFns.freeFn(ptr);
 }
 
 #endif

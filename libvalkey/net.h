@@ -32,26 +32,26 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef __NET_H
-#define __NET_H
+#ifndef VALKEY_NET_H
+#define VALKEY_NET_H
 
-#include "hiredis.h"
+#include "valkey.h"
 
-void redisNetClose(redisContext *c);
-ssize_t redisNetRead(redisContext *c, char *buf, size_t bufcap);
-ssize_t redisNetWrite(redisContext *c);
+void valkeyNetClose(valkeyContext *c);
+ssize_t valkeyNetRead(valkeyContext *c, char *buf, size_t bufcap);
+ssize_t valkeyNetWrite(valkeyContext *c);
 
-int redisCheckSocketError(redisContext *c);
-int redisContextSetTimeout(redisContext *c, const struct timeval tv);
-int redisContextConnectTcp(redisContext *c, const char *addr, int port, const struct timeval *timeout);
-int redisContextConnectBindTcp(redisContext *c, const char *addr, int port,
+int valkeyCheckSocketError(valkeyContext *c);
+int valkeyContextSetTimeout(valkeyContext *c, const struct timeval tv);
+int valkeyContextConnectTcp(valkeyContext *c, const char *addr, int port, const struct timeval *timeout);
+int valkeyContextConnectBindTcp(valkeyContext *c, const char *addr, int port,
                                const struct timeval *timeout,
                                const char *source_addr);
-int redisContextConnectUnix(redisContext *c, const char *path, const struct timeval *timeout);
-int redisKeepAlive(redisContext *c, int interval);
-int redisCheckConnectDone(redisContext *c, int *completed);
+int valkeyContextConnectUnix(valkeyContext *c, const char *path, const struct timeval *timeout);
+int valkeyKeepAlive(valkeyContext *c, int interval);
+int valkeyCheckConnectDone(valkeyContext *c, int *completed);
 
-int redisSetTcpNoDelay(redisContext *c);
-int redisContextSetTcpUserTimeout(redisContext *c, unsigned int timeout);
+int valkeySetTcpNoDelay(valkeyContext *c);
+int valkeyContextSetTcpUserTimeout(valkeyContext *c, unsigned int timeout);
 
 #endif

@@ -1,84 +1,84 @@
-#ifndef __HIREDIS_IVYKIS_H__
-#define __HIREDIS_IVYKIS_H__
+#ifndef VALKEY_IVYKIS_H
+#define VALKEY_IVYKIS_H
 #include <iv.h>
-#include "../hiredis.h"
+#include "../valkey.h"
 #include "../async.h"
 
-typedef struct redisIvykisEvents {
-    redisAsyncContext *context;
+typedef struct valkeyIvykisEvents {
+    valkeyAsyncContext *context;
     struct iv_fd fd;
-} redisIvykisEvents;
+} valkeyIvykisEvents;
 
-static void redisIvykisReadEvent(void *arg) {
-    redisAsyncContext *context = (redisAsyncContext *)arg;
-    redisAsyncHandleRead(context);
+static void valkeyIvykisReadEvent(void *arg) {
+    valkeyAsyncContext *context = (valkeyAsyncContext *)arg;
+    valkeyAsyncHandleRead(context);
 }
 
-static void redisIvykisWriteEvent(void *arg) {
-    redisAsyncContext *context = (redisAsyncContext *)arg;
-    redisAsyncHandleWrite(context);
+static void valkeyIvykisWriteEvent(void *arg) {
+    valkeyAsyncContext *context = (valkeyAsyncContext *)arg;
+    valkeyAsyncHandleWrite(context);
 }
 
-static void redisIvykisAddRead(void *privdata) {
-    redisIvykisEvents *e = (redisIvykisEvents*)privdata;
-    iv_fd_set_handler_in(&e->fd, redisIvykisReadEvent);
+static void valkeyIvykisAddRead(void *privdata) {
+    valkeyIvykisEvents *e = (valkeyIvykisEvents*)privdata;
+    iv_fd_set_handler_in(&e->fd, valkeyIvykisReadEvent);
 }
 
-static void redisIvykisDelRead(void *privdata) {
-    redisIvykisEvents *e = (redisIvykisEvents*)privdata;
+static void valkeyIvykisDelRead(void *privdata) {
+    valkeyIvykisEvents *e = (valkeyIvykisEvents*)privdata;
     iv_fd_set_handler_in(&e->fd, NULL);
 }
 
-static void redisIvykisAddWrite(void *privdata) {
-    redisIvykisEvents *e = (redisIvykisEvents*)privdata;
-    iv_fd_set_handler_out(&e->fd, redisIvykisWriteEvent);
+static void valkeyIvykisAddWrite(void *privdata) {
+    valkeyIvykisEvents *e = (valkeyIvykisEvents*)privdata;
+    iv_fd_set_handler_out(&e->fd, valkeyIvykisWriteEvent);
 }
 
-static void redisIvykisDelWrite(void *privdata) {
-    redisIvykisEvents *e = (redisIvykisEvents*)privdata;
+static void valkeyIvykisDelWrite(void *privdata) {
+    valkeyIvykisEvents *e = (valkeyIvykisEvents*)privdata;
     iv_fd_set_handler_out(&e->fd, NULL);
 }
 
-static void redisIvykisCleanup(void *privdata) {
-    redisIvykisEvents *e = (redisIvykisEvents*)privdata;
+static void valkeyIvykisCleanup(void *privdata) {
+    valkeyIvykisEvents *e = (valkeyIvykisEvents*)privdata;
 
     iv_fd_unregister(&e->fd);
-    hi_free(e);
+    vk_free(e);
 }
 
-static int redisIvykisAttach(redisAsyncContext *ac) {
-    redisContext *c = &(ac->c);
-    redisIvykisEvents *e;
+static int valkeyIvykisAttach(valkeyAsyncContext *ac) {
+    valkeyContext *c = &(ac->c);
+    valkeyIvykisEvents *e;
 
     /* Nothing should be attached when something is already attached */
     if (ac->ev.data != NULL)
-        return REDIS_ERR;
+        return VALKEY_ERR;
 
     /* Create container for context and r/w events */
-    e = (redisIvykisEvents*)hi_malloc(sizeof(*e));
+    e = (valkeyIvykisEvents*)vk_malloc(sizeof(*e));
     if (e == NULL)
-        return REDIS_ERR;
+        return VALKEY_ERR;
 
     e->context = ac;
 
     /* Register functions to start/stop listening for events */
-    ac->ev.addRead = redisIvykisAddRead;
-    ac->ev.delRead = redisIvykisDelRead;
-    ac->ev.addWrite = redisIvykisAddWrite;
-    ac->ev.delWrite = redisIvykisDelWrite;
-    ac->ev.cleanup = redisIvykisCleanup;
+    ac->ev.addRead = valkeyIvykisAddRead;
+    ac->ev.delRead = valkeyIvykisDelRead;
+    ac->ev.addWrite = valkeyIvykisAddWrite;
+    ac->ev.delWrite = valkeyIvykisDelWrite;
+    ac->ev.cleanup = valkeyIvykisCleanup;
     ac->ev.data = e;
 
     /* Initialize and install read/write events */
     IV_FD_INIT(&e->fd);
     e->fd.fd = c->fd;
-    e->fd.handler_in = redisIvykisReadEvent;
-    e->fd.handler_out = redisIvykisWriteEvent;
+    e->fd.handler_in = valkeyIvykisReadEvent;
+    e->fd.handler_out = valkeyIvykisWriteEvent;
     e->fd.handler_err = NULL;
     e->fd.cookie = e->context;
 
     iv_fd_register(&e->fd);
 
-    return REDIS_OK;
+    return VALKEY_OK;
 }
 #endif

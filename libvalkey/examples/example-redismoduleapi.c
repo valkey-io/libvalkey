@@ -3,24 +3,24 @@
 #include <string.h>
 #include <signal.h>
 
-#include <hiredis.h>
+#include <valkey.h>
 #include <async.h>
-#include <adapters/redismoduleapi.h>
+#include <adapters/valkeymoduleapi.h>
 
-void debugCallback(redisAsyncContext *c, void *r, void *privdata) {
+void debugCallback(valkeyAsyncContext *c, void *r, void *privdata) {
     (void)privdata; //unused
-    redisReply *reply = r;
+    valkeyReply *reply = r;
     if (reply == NULL) {
         /* The DEBUG SLEEP command will almost always fail, because we have set a 1 second timeout */
         printf("`DEBUG SLEEP` error: %s\n", c->errstr ? c->errstr : "unknown error");
         return;
     }
     /* Disconnect after receiving the reply of DEBUG SLEEP (which will not)*/
-    redisAsyncDisconnect(c);
+    valkeyAsyncDisconnect(c);
 }
 
-void getCallback(redisAsyncContext *c, void *r, void *privdata) {
-    redisReply *reply = r;
+void getCallback(valkeyAsyncContext *c, void *r, void *privdata) {
+    valkeyReply *reply = r;
     if (reply == NULL) {
         if (c->errstr) {
             printf("errstr: %s\n", c->errstr);
@@ -30,19 +30,19 @@ void getCallback(redisAsyncContext *c, void *r, void *privdata) {
     printf("argv[%s]: %s\n", (char*)privdata, reply->str);
 
     /* start another request that demonstrate timeout */
-    redisAsyncCommand(c, debugCallback, NULL, "DEBUG SLEEP %f", 1.5);
+    valkeyAsyncCommand(c, debugCallback, NULL, "DEBUG SLEEP %f", 1.5);
 }
 
-void connectCallback(const redisAsyncContext *c, int status) {
-    if (status != REDIS_OK) {
+void connectCallback(const valkeyAsyncContext *c, int status) {
+    if (status != VALKEY_OK) {
         printf("Error: %s\n", c->errstr);
         return;
     }
     printf("Connected...\n");
 }
 
-void disconnectCallback(const redisAsyncContext *c, int status) {
-    if (status != REDIS_OK) {
+void disconnectCallback(const valkeyAsyncContext *c, int status) {
+    if (status != VALKEY_OK) {
         printf("Error: %s\n", c->errstr);
         return;
     }
@@ -52,27 +52,27 @@ void disconnectCallback(const redisAsyncContext *c, int status) {
 /*
  * This example requires Redis 7.0 or above.
  *
- * 1- Compile this file as a shared library. Directory of "redismodule.h" must
+ * 1- Compile this file as a shared library. Directory of "valkeymodule.h" must
  *    be in the include path.
- *       gcc -fPIC -shared -I../../redis/src/ -I.. example-redismoduleapi.c -o example-redismoduleapi.so
+ *       gcc -fPIC -shared -I../../valkey/src/ -I.. example-valkeymoduleapi.c -o example-valkeymoduleapi.so
  *
  * 2- Load module:
- *       redis-server --loadmodule ./example-redismoduleapi.so value
+ *       valkey-server --loadmodule ./example-valkeymoduleapi.so value
  */
 int RedisModule_OnLoad(RedisModuleCtx *ctx, RedisModuleString **argv, int argc) {
 
-    int ret = RedisModule_Init(ctx, "example-redismoduleapi", 1, REDISMODULE_APIVER_1);
-    if (ret != REDISMODULE_OK) {
+    int ret = RedisModule_Init(ctx, "example-valkeymoduleapi", 1, VALKEYMODULE_APIVER_1);
+    if (ret != VALKEYMODULE_OK) {
         printf("error module init \n");
-        return REDISMODULE_ERR;
+        return VALKEYMODULE_ERR;
     }
 
-    if (redisModuleCompatibilityCheck() != REDIS_OK) {
+    if (valkeyModuleCompatibilityCheck() != VALKEY_OK) {
         printf("Redis 7.0 or above is required! \n");
-        return REDISMODULE_ERR;
+        return VALKEYMODULE_ERR;
     }
 
-    redisAsyncContext *c = redisAsyncConnect("127.0.0.1", 6379);
+    valkeyAsyncContext *c = valkeyAsyncConnect("127.0.0.1", 6379);
     if (c->err) {
         /* Let *c leak for now... */
         printf("Error: %s\n", c->errstr);
@@ -83,10 +83,10 @@ int RedisModule_OnLoad(RedisModuleCtx *ctx, RedisModuleString **argv, int argc) 
     const char *val = RedisModule_StringPtrLen(argv[argc-1], &len);
 
     RedisModuleCtx *module_ctx = RedisModule_GetDetachedThreadSafeContext(ctx);
-    redisModuleAttach(c, module_ctx);
-    redisAsyncSetConnectCallback(c,connectCallback);
-    redisAsyncSetDisconnectCallback(c,disconnectCallback);
-    redisAsyncSetTimeout(c, (struct timeval){ .tv_sec = 1, .tv_usec = 0});
+    valkeyModuleAttach(c, module_ctx);
+    valkeyAsyncSetConnectCallback(c,connectCallback);
+    valkeyAsyncSetDisconnectCallback(c,disconnectCallback);
+    valkeyAsyncSetTimeout(c, (struct timeval){ .tv_sec = 1, .tv_usec = 0});
 
     /*
     In this demo, we first `set key`, then `get key` to demonstrate the basic usage of the adapter.
@@ -95,7 +95,7 @@ int RedisModule_OnLoad(RedisModuleCtx *ctx, RedisModuleString **argv, int argc) 
     timeout error, which is shown in the `debugCallback`.
     */
 
-    redisAsyncCommand(c, NULL, NULL, "SET key %b", val, len);
-    redisAsyncCommand(c, getCallback, (char*)"end-1", "GET key");
+    valkeyAsyncCommand(c, NULL, NULL, "SET key %b", val, len);
+    valkeyAsyncCommand(c, getCallback, (char*)"end-1", "GET key");
     return 0;
 }

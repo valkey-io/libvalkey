@@ -28,59 +28,59 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef __HIREDIS_LIBEVENT_H__
-#define __HIREDIS_LIBEVENT_H__
+#ifndef VALKEY_LIBEVENT_H
+#define VALKEY_LIBEVENT_H
 #include <event2/event.h>
-#include "../hiredis.h"
+#include "../valkey.h"
 #include "../async.h"
 
-#define REDIS_LIBEVENT_DELETED 0x01
-#define REDIS_LIBEVENT_ENTERED 0x02
+#define VALKEY_LIBEVENT_DELETED 0x01
+#define VALKEY_LIBEVENT_ENTERED 0x02
 
-typedef struct redisLibeventEvents {
-    redisAsyncContext *context;
+typedef struct valkeyLibeventEvents {
+    valkeyAsyncContext *context;
     struct event *ev;
     struct event_base *base;
     struct timeval tv;
     short flags;
     short state;
-} redisLibeventEvents;
+} valkeyLibeventEvents;
 
-static void redisLibeventDestroy(redisLibeventEvents *e) {
-    hi_free(e);
+static void valkeyLibeventDestroy(valkeyLibeventEvents *e) {
+    vk_free(e);
 }
 
-static void redisLibeventHandler(evutil_socket_t fd, short event, void *arg) {
+static void valkeyLibeventHandler(evutil_socket_t fd, short event, void *arg) {
     ((void)fd);
-    redisLibeventEvents *e = (redisLibeventEvents*)arg;
-    e->state |= REDIS_LIBEVENT_ENTERED;
+    valkeyLibeventEvents *e = (valkeyLibeventEvents*)arg;
+    e->state |= VALKEY_LIBEVENT_ENTERED;
 
-    #define CHECK_DELETED() if (e->state & REDIS_LIBEVENT_DELETED) {\
-        redisLibeventDestroy(e);\
+    #define CHECK_DELETED() if (e->state & VALKEY_LIBEVENT_DELETED) {\
+        valkeyLibeventDestroy(e);\
         return; \
     }
 
-    if ((event & EV_TIMEOUT) && (e->state & REDIS_LIBEVENT_DELETED) == 0) {
-        redisAsyncHandleTimeout(e->context);
+    if ((event & EV_TIMEOUT) && (e->state & VALKEY_LIBEVENT_DELETED) == 0) {
+        valkeyAsyncHandleTimeout(e->context);
         CHECK_DELETED();
     }
 
-    if ((event & EV_READ) && e->context && (e->state & REDIS_LIBEVENT_DELETED) == 0) {
-        redisAsyncHandleRead(e->context);
+    if ((event & EV_READ) && e->context && (e->state & VALKEY_LIBEVENT_DELETED) == 0) {
+        valkeyAsyncHandleRead(e->context);
         CHECK_DELETED();
     }
 
-    if ((event & EV_WRITE) && e->context && (e->state & REDIS_LIBEVENT_DELETED) == 0) {
-        redisAsyncHandleWrite(e->context);
+    if ((event & EV_WRITE) && e->context && (e->state & VALKEY_LIBEVENT_DELETED) == 0) {
+        valkeyAsyncHandleWrite(e->context);
         CHECK_DELETED();
     }
 
-    e->state &= ~REDIS_LIBEVENT_ENTERED;
+    e->state &= ~VALKEY_LIBEVENT_ENTERED;
     #undef CHECK_DELETED
 }
 
-static void redisLibeventUpdate(void *privdata, short flag, int isRemove) {
-    redisLibeventEvents *e = (redisLibeventEvents *)privdata;
+static void valkeyLibeventUpdate(void *privdata, short flag, int isRemove) {
+    valkeyLibeventEvents *e = (valkeyLibeventEvents *)privdata;
     const struct timeval *tv = e->tv.tv_sec || e->tv.tv_usec ? &e->tv : NULL;
 
     if (isRemove) {
@@ -99,28 +99,28 @@ static void redisLibeventUpdate(void *privdata, short flag, int isRemove) {
 
     event_del(e->ev);
     event_assign(e->ev, e->base, e->context->c.fd, e->flags | EV_PERSIST,
-                 redisLibeventHandler, privdata);
+                 valkeyLibeventHandler, privdata);
     event_add(e->ev, tv);
 }
 
-static void redisLibeventAddRead(void *privdata) {
-    redisLibeventUpdate(privdata, EV_READ, 0);
+static void valkeyLibeventAddRead(void *privdata) {
+    valkeyLibeventUpdate(privdata, EV_READ, 0);
 }
 
-static void redisLibeventDelRead(void *privdata) {
-    redisLibeventUpdate(privdata, EV_READ, 1);
+static void valkeyLibeventDelRead(void *privdata) {
+    valkeyLibeventUpdate(privdata, EV_READ, 1);
 }
 
-static void redisLibeventAddWrite(void *privdata) {
-    redisLibeventUpdate(privdata, EV_WRITE, 0);
+static void valkeyLibeventAddWrite(void *privdata) {
+    valkeyLibeventUpdate(privdata, EV_WRITE, 0);
 }
 
-static void redisLibeventDelWrite(void *privdata) {
-    redisLibeventUpdate(privdata, EV_WRITE, 1);
+static void valkeyLibeventDelWrite(void *privdata) {
+    valkeyLibeventUpdate(privdata, EV_WRITE, 1);
 }
 
-static void redisLibeventCleanup(void *privdata) {
-    redisLibeventEvents *e = (redisLibeventEvents*)privdata;
+static void valkeyLibeventCleanup(void *privdata) {
+    valkeyLibeventEvents *e = (valkeyLibeventEvents*)privdata;
     if (!e) {
         return;
     }
@@ -128,48 +128,48 @@ static void redisLibeventCleanup(void *privdata) {
     event_free(e->ev);
     e->ev = NULL;
 
-    if (e->state & REDIS_LIBEVENT_ENTERED) {
-        e->state |= REDIS_LIBEVENT_DELETED;
+    if (e->state & VALKEY_LIBEVENT_ENTERED) {
+        e->state |= VALKEY_LIBEVENT_DELETED;
     } else {
-        redisLibeventDestroy(e);
+        valkeyLibeventDestroy(e);
     }
 }
 
-static void redisLibeventSetTimeout(void *privdata, struct timeval tv) {
-    redisLibeventEvents *e = (redisLibeventEvents *)privdata;
+static void valkeyLibeventSetTimeout(void *privdata, struct timeval tv) {
+    valkeyLibeventEvents *e = (valkeyLibeventEvents *)privdata;
     short flags = e->flags;
     e->flags = 0;
     e->tv = tv;
-    redisLibeventUpdate(e, flags, 0);
+    valkeyLibeventUpdate(e, flags, 0);
 }
 
-static int redisLibeventAttach(redisAsyncContext *ac, struct event_base *base) {
-    redisContext *c = &(ac->c);
-    redisLibeventEvents *e;
+static int valkeyLibeventAttach(valkeyAsyncContext *ac, struct event_base *base) {
+    valkeyContext *c = &(ac->c);
+    valkeyLibeventEvents *e;
 
     /* Nothing should be attached when something is already attached */
     if (ac->ev.data != NULL)
-        return REDIS_ERR;
+        return VALKEY_ERR;
 
     /* Create container for context and r/w events */
-    e = (redisLibeventEvents*)hi_calloc(1, sizeof(*e));
+    e = (valkeyLibeventEvents*)vk_calloc(1, sizeof(*e));
     if (e == NULL)
-        return REDIS_ERR;
+        return VALKEY_ERR;
 
     e->context = ac;
 
     /* Register functions to start/stop listening for events */
-    ac->ev.addRead = redisLibeventAddRead;
-    ac->ev.delRead = redisLibeventDelRead;
-    ac->ev.addWrite = redisLibeventAddWrite;
-    ac->ev.delWrite = redisLibeventDelWrite;
-    ac->ev.cleanup = redisLibeventCleanup;
-    ac->ev.scheduleTimer = redisLibeventSetTimeout;
+    ac->ev.addRead = valkeyLibeventAddRead;
+    ac->ev.delRead = valkeyLibeventDelRead;
+    ac->ev.addWrite = valkeyLibeventAddWrite;
+    ac->ev.delWrite = valkeyLibeventDelWrite;
+    ac->ev.cleanup = valkeyLibeventCleanup;
+    ac->ev.scheduleTimer = valkeyLibeventSetTimeout;
     ac->ev.data = e;
 
     /* Initialize and install read/write events */
-    e->ev = event_new(base, c->fd, EV_READ | EV_WRITE, redisLibeventHandler, e);
+    e->ev = event_new(base, c->fd, EV_READ | EV_WRITE, valkeyLibeventHandler, e);
     e->base = base;
-    return REDIS_OK;
+    return VALKEY_OK;
 }
 #endif

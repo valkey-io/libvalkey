@@ -23,8 +23,8 @@
  * SUCH DAMAGE.
  */
 
-#ifndef __HIREDIS_QT_H__
-#define __HIREDIS_QT_H__
+#ifndef VALKEY_QT_H
+#define VALKEY_QT_H
 #include <QSocketNotifier>
 #include "../async.h"
 
@@ -78,9 +78,9 @@ class RedisQtAdapter : public QObject {
             }
         }
 
-        int setContext(redisAsyncContext * ac) {
+        int setContext(valkeyAsyncContext * ac) {
             if (ac->ev.data != NULL) {
-                return REDIS_ERR;
+                return VALKEY_ERR;
             }
             m_ctx = ac;
             m_ctx->ev.data = this;
@@ -89,7 +89,7 @@ class RedisQtAdapter : public QObject {
             m_ctx->ev.addWrite = RedisQtAddWrite;
             m_ctx->ev.delWrite = RedisQtDelWrite;
             m_ctx->ev.cleanup = RedisQtCleanup;
-            return REDIS_OK;
+            return VALKEY_OK;
         }
 
     private:
@@ -123,13 +123,13 @@ class RedisQtAdapter : public QObject {
         }
 
     private slots:
-        void read() { redisAsyncHandleRead(m_ctx); }
-        void write() { redisAsyncHandleWrite(m_ctx); }
+        void read() { valkeyAsyncHandleRead(m_ctx); }
+        void write() { valkeyAsyncHandleWrite(m_ctx); }
 
     private:
-        redisAsyncContext * m_ctx;
+        valkeyAsyncContext * m_ctx;
         QSocketNotifier * m_read;
         QSocketNotifier * m_write;
 };
 
-#endif /* !__HIREDIS_QT_H__ */
+#endif /* !VALKEY_QT_H */

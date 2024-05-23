@@ -72,9 +72,9 @@ ssize_t win32_send(SOCKET sockfd, const void *buf, size_t len, int flags);
 typedef ULONG nfds_t;
 int win32_poll(struct pollfd *fds, nfds_t nfds, int timeout);
 
-int win32_redisKeepAlive(SOCKET sockfd, int interval_ms);
+int win32_valkeyKeepAlive(SOCKET sockfd, int interval_ms);
 
-#ifndef REDIS_SOCKCOMPAT_IMPLEMENTATION
+#ifndef VALKEY_SOCKCOMPAT_IMPLEMENTATION
 #define getaddrinfo(node, service, hints, res) win32_getaddrinfo(node, service, hints, res)
 #undef gai_strerror
 #define gai_strerror(errcode) win32_gai_strerror(errcode)
@@ -89,7 +89,7 @@ int win32_redisKeepAlive(SOCKET sockfd, int interval_ms);
 #define recv(sockfd, buf, len, flags) win32_recv(sockfd, buf, len, flags)
 #define send(sockfd, buf, len, flags) win32_send(sockfd, buf, len, flags)
 #define poll(fds, nfds, timeout) win32_poll(fds, nfds, timeout)
-#endif /* REDIS_SOCKCOMPAT_IMPLEMENTATION */
+#endif /* VALKEY_SOCKCOMPAT_IMPLEMENTATION */
 #endif /* _WIN32 */
 
 #endif /* __SOCKCOMPAT_H */

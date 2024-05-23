@@ -1,23 +1,23 @@
-#ifndef HIREDIS_LIBSDEVENT_H
-#define HIREDIS_LIBSDEVENT_H
+#ifndef VALKEY_LIBSDEVENT_H
+#define VALKEY_LIBSDEVENT_H
 #include <systemd/sd-event.h>
-#include "../hiredis.h"
+#include "../valkey.h"
 #include "../async.h"
 
-#define REDIS_LIBSDEVENT_DELETED 0x01
-#define REDIS_LIBSDEVENT_ENTERED 0x02
+#define VALKEY_LIBSDEVENT_DELETED 0x01
+#define VALKEY_LIBSDEVENT_ENTERED 0x02
 
-typedef struct redisLibsdeventEvents {
-    redisAsyncContext *context;
+typedef struct valkeyLibsdeventEvents {
+    valkeyAsyncContext *context;
     struct sd_event *event;
     struct sd_event_source *fdSource;
     struct sd_event_source *timerSource;
     int fd;
     short flags;
     short state;
-} redisLibsdeventEvents;
+} valkeyLibsdeventEvents;
 
-static void redisLibsdeventDestroy(redisLibsdeventEvents *e) {
+static void valkeyLibsdeventDestroy(valkeyLibsdeventEvents *e) {
     if (e->fdSource) {
         e->fdSource = sd_event_source_disable_unref(e->fdSource);
     }
@@ -25,46 +25,46 @@ static void redisLibsdeventDestroy(redisLibsdeventEvents *e) {
         e->timerSource = sd_event_source_disable_unref(e->timerSource);
     }
     sd_event_unref(e->event);
-    hi_free(e);
+    vk_free(e);
 }
 
-static int redisLibsdeventTimeoutHandler(sd_event_source *s, uint64_t usec, void *userdata) {
+static int valkeyLibsdeventTimeoutHandler(sd_event_source *s, uint64_t usec, void *userdata) {
     ((void)s);
     ((void)usec);
-    redisLibsdeventEvents *e = (redisLibsdeventEvents*)userdata;
-    redisAsyncHandleTimeout(e->context);
+    valkeyLibsdeventEvents *e = (valkeyLibsdeventEvents*)userdata;
+    valkeyAsyncHandleTimeout(e->context);
     return 0;
 }
 
-static int redisLibsdeventHandler(sd_event_source *s, int fd, uint32_t event, void *userdata) {
+static int valkeyLibsdeventHandler(sd_event_source *s, int fd, uint32_t event, void *userdata) {
     ((void)s);
     ((void)fd);
-    redisLibsdeventEvents *e = (redisLibsdeventEvents*)userdata;
-    e->state |= REDIS_LIBSDEVENT_ENTERED;
+    valkeyLibsdeventEvents *e = (valkeyLibsdeventEvents*)userdata;
+    e->state |= VALKEY_LIBSDEVENT_ENTERED;
 
-#define CHECK_DELETED() if (e->state & REDIS_LIBSDEVENT_DELETED) {\
-        redisLibsdeventDestroy(e);\
+#define CHECK_DELETED() if (e->state & VALKEY_LIBSDEVENT_DELETED) {\
+        valkeyLibsdeventDestroy(e);\
         return 0; \
     }
 
-    if ((event & EPOLLIN) && e->context && (e->state & REDIS_LIBSDEVENT_DELETED) == 0) {
-        redisAsyncHandleRead(e->context);
+    if ((event & EPOLLIN) && e->context && (e->state & VALKEY_LIBSDEVENT_DELETED) == 0) {
+        valkeyAsyncHandleRead(e->context);
         CHECK_DELETED();
     }
 
-    if ((event & EPOLLOUT) && e->context && (e->state & REDIS_LIBSDEVENT_DELETED) == 0) {
-        redisAsyncHandleWrite(e->context);
+    if ((event & EPOLLOUT) && e->context && (e->state & VALKEY_LIBSDEVENT_DELETED) == 0) {
+        valkeyAsyncHandleWrite(e->context);
         CHECK_DELETED();
     }
 
-    e->state &= ~REDIS_LIBSDEVENT_ENTERED;
+    e->state &= ~VALKEY_LIBSDEVENT_ENTERED;
 #undef CHECK_DELETED
 
     return 0;
 }
 
-static void redisLibsdeventAddRead(void *userdata) {
-    redisLibsdeventEvents *e = (redisLibsdeventEvents*)userdata;
+static void valkeyLibsdeventAddRead(void *userdata) {
+    valkeyLibsdeventEvents *e = (valkeyLibsdeventEvents*)userdata;
 
     if (e->flags & EPOLLIN) {
         return;
@@ -75,12 +75,12 @@ static void redisLibsdeventAddRead(void *userdata) {
     if (e->flags & EPOLLOUT) {
         sd_event_source_set_io_events(e->fdSource, e->flags);
     } else {
-        sd_event_add_io(e->event, &e->fdSource, e->fd, e->flags, redisLibsdeventHandler, e);
+        sd_event_add_io(e->event, &e->fdSource, e->fd, e->flags, valkeyLibsdeventHandler, e);
     }
 }
 
-static void redisLibsdeventDelRead(void *userdata) {
-    redisLibsdeventEvents *e = (redisLibsdeventEvents*)userdata;
+static void valkeyLibsdeventDelRead(void *userdata) {
+    valkeyLibsdeventEvents *e = (valkeyLibsdeventEvents*)userdata;
 
     e->flags &= ~EPOLLIN;
 
@@ -91,8 +91,8 @@ static void redisLibsdeventDelRead(void *userdata) {
     }
 }
 
-static void redisLibsdeventAddWrite(void *userdata) {
-    redisLibsdeventEvents *e = (redisLibsdeventEvents*)userdata;
+static void valkeyLibsdeventAddWrite(void *userdata) {
+    valkeyLibsdeventEvents *e = (valkeyLibsdeventEvents*)userdata;
 
     if (e->flags & EPOLLOUT) {
         return;
@@ -103,12 +103,12 @@ static void redisLibsdeventAddWrite(void *userdata) {
     if (e->flags & EPOLLIN) {
         sd_event_source_set_io_events(e->fdSource, e->flags);
     } else {
-        sd_event_add_io(e->event, &e->fdSource, e->fd, e->flags, redisLibsdeventHandler, e);
+        sd_event_add_io(e->event, &e->fdSource, e->fd, e->flags, valkeyLibsdeventHandler, e);
     }
 }
 
-static void redisLibsdeventDelWrite(void *userdata) {
-    redisLibsdeventEvents *e = (redisLibsdeventEvents*)userdata;
+static void valkeyLibsdeventDelWrite(void *userdata) {
+    valkeyLibsdeventEvents *e = (valkeyLibsdeventEvents*)userdata;
 
     e->flags &= ~EPOLLOUT;
 
@@ -119,43 +119,43 @@ static void redisLibsdeventDelWrite(void *userdata) {
     }
 }
 
-static void redisLibsdeventCleanup(void *userdata) {
-    redisLibsdeventEvents *e = (redisLibsdeventEvents*)userdata;
+static void valkeyLibsdeventCleanup(void *userdata) {
+    valkeyLibsdeventEvents *e = (valkeyLibsdeventEvents*)userdata;
 
     if (!e) {
         return;
     }
 
-    if (e->state & REDIS_LIBSDEVENT_ENTERED) {
-        e->state |= REDIS_LIBSDEVENT_DELETED;
+    if (e->state & VALKEY_LIBSDEVENT_ENTERED) {
+        e->state |= VALKEY_LIBSDEVENT_DELETED;
     } else {
-        redisLibsdeventDestroy(e);
+        valkeyLibsdeventDestroy(e);
     }
 }
 
-static void redisLibsdeventSetTimeout(void *userdata, struct timeval tv) {
-    redisLibsdeventEvents *e = (redisLibsdeventEvents *)userdata;
+static void valkeyLibsdeventSetTimeout(void *userdata, struct timeval tv) {
+    valkeyLibsdeventEvents *e = (valkeyLibsdeventEvents *)userdata;
 
     uint64_t usec = tv.tv_sec * 1000000 + tv.tv_usec;
     if (!e->timerSource) {
-        sd_event_add_time_relative(e->event, &e->timerSource, CLOCK_MONOTONIC, usec, 1, redisLibsdeventTimeoutHandler, e);
+        sd_event_add_time_relative(e->event, &e->timerSource, CLOCK_MONOTONIC, usec, 1, valkeyLibsdeventTimeoutHandler, e);
     } else {
         sd_event_source_set_time_relative(e->timerSource, usec);
     }
 }
 
-static int redisLibsdeventAttach(redisAsyncContext *ac, struct sd_event *event) {
-    redisContext *c = &(ac->c);
-    redisLibsdeventEvents *e;
+static int valkeyLibsdeventAttach(valkeyAsyncContext *ac, struct sd_event *event) {
+    valkeyContext *c = &(ac->c);
+    valkeyLibsdeventEvents *e;
 
     /* Nothing should be attached when something is already attached */
     if (ac->ev.data != NULL)
-        return REDIS_ERR;
+        return VALKEY_ERR;
 
     /* Create container for context and r/w events */
-    e = (redisLibsdeventEvents*)hi_calloc(1, sizeof(*e));
+    e = (valkeyLibsdeventEvents*)vk_calloc(1, sizeof(*e));
     if (e == NULL)
-        return REDIS_ERR;
+        return VALKEY_ERR;
 
     /* Initialize and increase event refcount */
     e->context = ac;
@@ -164,14 +164,14 @@ static int redisLibsdeventAttach(redisAsyncContext *ac, struct sd_event *event) 
     sd_event_ref(event);
 
     /* Register functions to start/stop listening for events */
-    ac->ev.addRead = redisLibsdeventAddRead;
-    ac->ev.delRead = redisLibsdeventDelRead;
-    ac->ev.addWrite = redisLibsdeventAddWrite;
-    ac->ev.delWrite = redisLibsdeventDelWrite;
-    ac->ev.cleanup = redisLibsdeventCleanup;
-    ac->ev.scheduleTimer = redisLibsdeventSetTimeout;
+    ac->ev.addRead = valkeyLibsdeventAddRead;
+    ac->ev.delRead = valkeyLibsdeventDelRead;
+    ac->ev.addWrite = valkeyLibsdeventAddWrite;
+    ac->ev.delWrite = valkeyLibsdeventDelWrite;
+    ac->ev.cleanup = valkeyLibsdeventCleanup;
+    ac->ev.scheduleTimer = valkeyLibsdeventSetTimeout;
     ac->ev.data = e;
 
-    return REDIS_OK;
+    return VALKEY_OK;
 }
 #endif

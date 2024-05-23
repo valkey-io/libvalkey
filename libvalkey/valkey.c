@@ -38,35 +38,35 @@
 #include <errno.h>
 #include <ctype.h>
 
-#include "hiredis.h"
+#include "valkey.h"
 #include "net.h"
 #include "sds.h"
 #include "async.h"
 #include "win32.h"
 
-extern int redisContextUpdateConnectTimeout(redisContext *c, const struct timeval *timeout);
-extern int redisContextUpdateCommandTimeout(redisContext *c, const struct timeval *timeout);
+extern int valkeyContextUpdateConnectTimeout(valkeyContext *c, const struct timeval *timeout);
+extern int valkeyContextUpdateCommandTimeout(valkeyContext *c, const struct timeval *timeout);
 
-static redisContextFuncs redisContextDefaultFuncs = {
-    .close = redisNetClose,
+static valkeyContextFuncs valkeyContextDefaultFuncs = {
+    .close = valkeyNetClose,
     .free_privctx = NULL,
-    .async_read = redisAsyncRead,
-    .async_write = redisAsyncWrite,
-    .read = redisNetRead,
-    .write = redisNetWrite
+    .async_read = valkeyAsyncRead,
+    .async_write = valkeyAsyncWrite,
+    .read = valkeyNetRead,
+    .write = valkeyNetWrite
 };
 
-static redisReply *createReplyObject(int type);
-static void *createStringObject(const redisReadTask *task, char *str, size_t len);
-static void *createArrayObject(const redisReadTask *task, size_t elements);
-static void *createIntegerObject(const redisReadTask *task, long long value);
-static void *createDoubleObject(const redisReadTask *task, double value, char *str, size_t len);
-static void *createNilObject(const redisReadTask *task);
-static void *createBoolObject(const redisReadTask *task, int bval);
+static valkeyReply *createReplyObject(int type);
+static void *createStringObject(const valkeyReadTask *task, char *str, size_t len);
+static void *createArrayObject(const valkeyReadTask *task, size_t elements);
+static void *createIntegerObject(const valkeyReadTask *task, long long value);
+static void *createDoubleObject(const valkeyReadTask *task, double value, char *str, size_t len);
+static void *createNilObject(const valkeyReadTask *task);
+static void *createBoolObject(const valkeyReadTask *task, int bval);
 
 /* Default set of functions to build the reply. Keep in mind that such a
  * function returning NULL is interpreted as OOM. */
-static redisReplyObjectFunctions defaultFunctions = {
+static valkeyReplyObjectFunctions defaultFunctions = {
     createStringObject,
     createArrayObject,
     createIntegerObject,
@@ -77,8 +77,8 @@ static redisReplyObjectFunctions defaultFunctions = {
 };
 
 /* Create a reply object */
-static redisReply *createReplyObject(int type) {
-    redisReply *r = hi_calloc(1,sizeof(*r));
+static valkeyReply *createReplyObject(int type) {
+    valkeyReply *r = vk_calloc(1,sizeof(*r));
 
     if (r == NULL)
         return NULL;
@@ -89,57 +89,57 @@ static redisReply *createReplyObject(int type) {
 
 /* Free a reply object */
 void freeReplyObject(void *reply) {
-    redisReply *r = reply;
+    valkeyReply *r = reply;
     size_t j;
 
     if (r == NULL)
         return;
 
     switch(r->type) {
-    case REDIS_REPLY_INTEGER:
-    case REDIS_REPLY_NIL:
-    case REDIS_REPLY_BOOL:
+    case VALKEY_REPLY_INTEGER:
+    case VALKEY_REPLY_NIL:
+    case VALKEY_REPLY_BOOL:
         break; /* Nothing to free */
-    case REDIS_REPLY_ARRAY:
-    case REDIS_REPLY_MAP:
-    case REDIS_REPLY_ATTR:
-    case REDIS_REPLY_SET:
-    case REDIS_REPLY_PUSH:
+    case VALKEY_REPLY_ARRAY:
+    case VALKEY_REPLY_MAP:
+    case VALKEY_REPLY_ATTR:
+    case VALKEY_REPLY_SET:
+    case VALKEY_REPLY_PUSH:
         if (r->element != NULL) {
             for (j = 0; j < r->elements; j++)
                 freeReplyObject(r->element[j]);
-            hi_free(r->element);
+            vk_free(r->element);
         }
         break;
-    case REDIS_REPLY_ERROR:
-    case REDIS_REPLY_STATUS:
-    case REDIS_REPLY_STRING:
-    case REDIS_REPLY_DOUBLE:
-    case REDIS_REPLY_VERB:
-    case REDIS_REPLY_BIGNUM:
-        hi_free(r->str);
+    case VALKEY_REPLY_ERROR:
+    case VALKEY_REPLY_STATUS:
+    case VALKEY_REPLY_STRING:
+    case VALKEY_REPLY_DOUBLE:
+    case VALKEY_REPLY_VERB:
+    case VALKEY_REPLY_BIGNUM:
+        vk_free(r->str);
         break;
     }
-    hi_free(r);
+    vk_free(r);
 }
 
-static void *createStringObject(const redisReadTask *task, char *str, size_t len) {
-    redisReply *r, *parent;
+static void *createStringObject(const valkeyReadTask *task, char *str, size_t len) {
+    valkeyReply *r, *parent;
     char *buf;
 
     r = createReplyObject(task->type);
     if (r == NULL)
         return NULL;
 
-    assert(task->type == REDIS_REPLY_ERROR  ||
-           task->type == REDIS_REPLY_STATUS ||
-           task->type == REDIS_REPLY_STRING ||
-           task->type == REDIS_REPLY_VERB   ||
-           task->type == REDIS_REPLY_BIGNUM);
+    assert(task->type == VALKEY_REPLY_ERROR  ||
+           task->type == VALKEY_REPLY_STATUS ||
+           task->type == VALKEY_REPLY_STRING ||
+           task->type == VALKEY_REPLY_VERB   ||
+           task->type == VALKEY_REPLY_BIGNUM);
 
     /* Copy string value */
-    if (task->type == REDIS_REPLY_VERB) {
-        buf = hi_malloc(len-4+1); /* Skip 4 bytes of verbatim type header. */
+    if (task->type == VALKEY_REPLY_VERB) {
+        buf = vk_malloc(len-4+1); /* Skip 4 bytes of verbatim type header. */
         if (buf == NULL) goto oom;
 
         memcpy(r->vtype,str,3);
@@ -148,7 +148,7 @@ static void *createStringObject(const redisReadTask *task, char *str, size_t len
         buf[len-4] = '\0';
         r->len = len - 4;
     } else {
-        buf = hi_malloc(len+1);
+        buf = vk_malloc(len+1);
         if (buf == NULL) goto oom;
 
         memcpy(buf,str,len);
@@ -159,11 +159,11 @@ static void *createStringObject(const redisReadTask *task, char *str, size_t len
 
     if (task->parent) {
         parent = task->parent->obj;
-        assert(parent->type == REDIS_REPLY_ARRAY ||
-               parent->type == REDIS_REPLY_MAP ||
-               parent->type == REDIS_REPLY_ATTR ||
-               parent->type == REDIS_REPLY_SET ||
-               parent->type == REDIS_REPLY_PUSH);
+        assert(parent->type == VALKEY_REPLY_ARRAY ||
+               parent->type == VALKEY_REPLY_MAP ||
+               parent->type == VALKEY_REPLY_ATTR ||
+               parent->type == VALKEY_REPLY_SET ||
+               parent->type == VALKEY_REPLY_PUSH);
         parent->element[task->idx] = r;
     }
     return r;
@@ -173,15 +173,15 @@ oom:
     return NULL;
 }
 
-static void *createArrayObject(const redisReadTask *task, size_t elements) {
-    redisReply *r, *parent;
+static void *createArrayObject(const valkeyReadTask *task, size_t elements) {
+    valkeyReply *r, *parent;
 
     r = createReplyObject(task->type);
     if (r == NULL)
         return NULL;
 
     if (elements > 0) {
-        r->element = hi_calloc(elements,sizeof(redisReply*));
+        r->element = vk_calloc(elements,sizeof(valkeyReply*));
         if (r->element == NULL) {
             freeReplyObject(r);
             return NULL;
@@ -192,20 +192,20 @@ static void *createArrayObject(const redisReadTask *task, size_t elements) {
 
     if (task->parent) {
         parent = task->parent->obj;
-        assert(parent->type == REDIS_REPLY_ARRAY ||
-               parent->type == REDIS_REPLY_MAP ||
-               parent->type == REDIS_REPLY_ATTR ||
-               parent->type == REDIS_REPLY_SET ||
-               parent->type == REDIS_REPLY_PUSH);
+        assert(parent->type == VALKEY_REPLY_ARRAY ||
+               parent->type == VALKEY_REPLY_MAP ||
+               parent->type == VALKEY_REPLY_ATTR ||
+               parent->type == VALKEY_REPLY_SET ||
+               parent->type == VALKEY_REPLY_PUSH);
         parent->element[task->idx] = r;
     }
     return r;
 }
 
-static void *createIntegerObject(const redisReadTask *task, long long value) {
-    redisReply *r, *parent;
+static void *createIntegerObject(const valkeyReadTask *task, long long value) {
+    valkeyReply *r, *parent;
 
-    r = createReplyObject(REDIS_REPLY_INTEGER);
+    r = createReplyObject(VALKEY_REPLY_INTEGER);
     if (r == NULL)
         return NULL;
 
@@ -213,28 +213,28 @@ static void *createIntegerObject(const redisReadTask *task, long long value) {
 
     if (task->parent) {
         parent = task->parent->obj;
-        assert(parent->type == REDIS_REPLY_ARRAY ||
-               parent->type == REDIS_REPLY_MAP ||
-               parent->type == REDIS_REPLY_ATTR ||
-               parent->type == REDIS_REPLY_SET ||
-               parent->type == REDIS_REPLY_PUSH);
+        assert(parent->type == VALKEY_REPLY_ARRAY ||
+               parent->type == VALKEY_REPLY_MAP ||
+               parent->type == VALKEY_REPLY_ATTR ||
+               parent->type == VALKEY_REPLY_SET ||
+               parent->type == VALKEY_REPLY_PUSH);
         parent->element[task->idx] = r;
     }
     return r;
 }
 
-static void *createDoubleObject(const redisReadTask *task, double value, char *str, size_t len) {
-    redisReply *r, *parent;
+static void *createDoubleObject(const valkeyReadTask *task, double value, char *str, size_t len) {
+    valkeyReply *r, *parent;
 
-    if (len == SIZE_MAX) // Prevents hi_malloc(0) if len equals to SIZE_MAX
+    if (len == SIZE_MAX) // Prevents vk_malloc(0) if len equals to SIZE_MAX
         return NULL;
 
-    r = createReplyObject(REDIS_REPLY_DOUBLE);
+    r = createReplyObject(VALKEY_REPLY_DOUBLE);
     if (r == NULL)
         return NULL;
 
     r->dval = value;
-    r->str = hi_malloc(len+1);
+    r->str = vk_malloc(len+1);
     if (r->str == NULL) {
         freeReplyObject(r);
         return NULL;
@@ -251,39 +251,39 @@ static void *createDoubleObject(const redisReadTask *task, double value, char *s
 
     if (task->parent) {
         parent = task->parent->obj;
-        assert(parent->type == REDIS_REPLY_ARRAY ||
-               parent->type == REDIS_REPLY_MAP ||
-               parent->type == REDIS_REPLY_ATTR ||
-               parent->type == REDIS_REPLY_SET ||
-               parent->type == REDIS_REPLY_PUSH);
+        assert(parent->type == VALKEY_REPLY_ARRAY ||
+               parent->type == VALKEY_REPLY_MAP ||
+               parent->type == VALKEY_REPLY_ATTR ||
+               parent->type == VALKEY_REPLY_SET ||
+               parent->type == VALKEY_REPLY_PUSH);
         parent->element[task->idx] = r;
     }
     return r;
 }
 
-static void *createNilObject(const redisReadTask *task) {
-    redisReply *r, *parent;
+static void *createNilObject(const valkeyReadTask *task) {
+    valkeyReply *r, *parent;
 
-    r = createReplyObject(REDIS_REPLY_NIL);
+    r = createReplyObject(VALKEY_REPLY_NIL);
     if (r == NULL)
         return NULL;
 
     if (task->parent) {
         parent = task->parent->obj;
-        assert(parent->type == REDIS_REPLY_ARRAY ||
-               parent->type == REDIS_REPLY_MAP ||
-               parent->type == REDIS_REPLY_ATTR ||
-               parent->type == REDIS_REPLY_SET ||
-               parent->type == REDIS_REPLY_PUSH);
+        assert(parent->type == VALKEY_REPLY_ARRAY ||
+               parent->type == VALKEY_REPLY_MAP ||
+               parent->type == VALKEY_REPLY_ATTR ||
+               parent->type == VALKEY_REPLY_SET ||
+               parent->type == VALKEY_REPLY_PUSH);
         parent->element[task->idx] = r;
     }
     return r;
 }
 
-static void *createBoolObject(const redisReadTask *task, int bval) {
-    redisReply *r, *parent;
+static void *createBoolObject(const valkeyReadTask *task, int bval) {
+    valkeyReply *r, *parent;
 
-    r = createReplyObject(REDIS_REPLY_BOOL);
+    r = createReplyObject(VALKEY_REPLY_BOOL);
     if (r == NULL)
         return NULL;
 
@@ -291,18 +291,18 @@ static void *createBoolObject(const redisReadTask *task, int bval) {
 
     if (task->parent) {
         parent = task->parent->obj;
-        assert(parent->type == REDIS_REPLY_ARRAY ||
-               parent->type == REDIS_REPLY_MAP ||
-               parent->type == REDIS_REPLY_ATTR ||
-               parent->type == REDIS_REPLY_SET ||
-               parent->type == REDIS_REPLY_PUSH);
+        assert(parent->type == VALKEY_REPLY_ARRAY ||
+               parent->type == VALKEY_REPLY_MAP ||
+               parent->type == VALKEY_REPLY_ATTR ||
+               parent->type == VALKEY_REPLY_SET ||
+               parent->type == VALKEY_REPLY_PUSH);
         parent->element[task->idx] = r;
     }
     return r;
 }
 
 /* Return the number of digits of 'v' when converted to string in radix 10.
- * Implementation borrowed from link in redis/src/util.c:string2ll(). */
+ * Implementation borrowed from link in valkey/src/util.c:string2ll(). */
 static uint32_t countDigits(uint64_t v) {
   uint32_t result = 1;
   for (;;) {
@@ -320,7 +320,7 @@ static size_t bulklen(size_t len) {
     return 1+countDigits(len)+2+len+2;
 }
 
-int redisvFormatCommand(char **target, const char *format, va_list ap) {
+int valkeyvFormatCommand(char **target, const char *format, va_list ap) {
     const char *c = format;
     char *cmd = NULL; /* final command */
     int pos; /* position in final command */
@@ -345,7 +345,7 @@ int redisvFormatCommand(char **target, const char *format, va_list ap) {
         if (*c != '%' || c[1] == '\0') {
             if (*c == ' ') {
                 if (touched) {
-                    newargv = hi_realloc(curargv,sizeof(char*)*(argc+1));
+                    newargv = vk_realloc(curargv,sizeof(char*)*(argc+1));
                     if (newargv == NULL) goto memory_err;
                     curargv = newargv;
                     curargv[argc++] = curarg;
@@ -501,7 +501,7 @@ int redisvFormatCommand(char **target, const char *format, va_list ap) {
 
     /* Add the last argument if needed */
     if (touched) {
-        newargv = hi_realloc(curargv,sizeof(char*)*(argc+1));
+        newargv = vk_realloc(curargv,sizeof(char*)*(argc+1));
         if (newargv == NULL) goto memory_err;
         curargv = newargv;
         curargv[argc++] = curarg;
@@ -517,7 +517,7 @@ int redisvFormatCommand(char **target, const char *format, va_list ap) {
     totlen += 1+countDigits(argc)+2;
 
     /* Build the command at protocol level */
-    cmd = hi_malloc(totlen+1);
+    cmd = vk_malloc(totlen+1);
     if (cmd == NULL) goto memory_err;
 
     pos = sprintf(cmd,"*%d\r\n",argc);
@@ -532,7 +532,7 @@ int redisvFormatCommand(char **target, const char *format, va_list ap) {
     assert(pos == totlen);
     cmd[pos] = '\0';
 
-    hi_free(curargv);
+    vk_free(curargv);
     *target = cmd;
     return totlen;
 
@@ -548,11 +548,11 @@ cleanup:
     if (curargv) {
         while(argc--)
             sdsfree(curargv[argc]);
-        hi_free(curargv);
+        vk_free(curargv);
     }
 
     sdsfree(curarg);
-    hi_free(cmd);
+    vk_free(cmd);
 
     return error_type;
 }
@@ -566,14 +566,14 @@ cleanup:
  * When using %b you need to provide both the pointer to the string
  * and the length in bytes as a size_t. Examples:
  *
- * len = redisFormatCommand(target, "GET %s", mykey);
- * len = redisFormatCommand(target, "SET %s %b", mykey, myval, myvallen);
+ * len = valkeyFormatCommand(target, "GET %s", mykey);
+ * len = valkeyFormatCommand(target, "SET %s %b", mykey, myval, myvallen);
  */
-int redisFormatCommand(char **target, const char *format, ...) {
+int valkeyFormatCommand(char **target, const char *format, ...) {
     va_list ap;
     int len;
     va_start(ap,format);
-    len = redisvFormatCommand(target,format,ap);
+    len = valkeyvFormatCommand(target,format,ap);
     va_end(ap);
 
     /* The API says "-1" means bad result, but we now also return "-2" in some
@@ -590,7 +590,7 @@ int redisFormatCommand(char **target, const char *format, ...) {
  * lengths. If the latter is set to NULL, strlen will be used to compute the
  * argument lengths.
  */
-long long redisFormatSdsCommandArgv(sds *target, int argc, const char **argv,
+long long valkeyFormatSdsCommandArgv(sds *target, int argc, const char **argv,
                                     const size_t *argvlen)
 {
     sds cmd, aux;
@@ -637,7 +637,7 @@ long long redisFormatSdsCommandArgv(sds *target, int argc, const char **argv,
     return totlen;
 }
 
-void redisFreeSdsCommand(sds cmd) {
+void valkeyFreeSdsCommand(sds cmd) {
     sdsfree(cmd);
 }
 
@@ -646,7 +646,7 @@ void redisFreeSdsCommand(sds cmd) {
  * lengths. If the latter is set to NULL, strlen will be used to compute the
  * argument lengths.
  */
-long long redisFormatCommandArgv(char **target, int argc, const char **argv, const size_t *argvlen) {
+long long valkeyFormatCommandArgv(char **target, int argc, const char **argv, const size_t *argvlen) {
     char *cmd = NULL; /* final command */
     size_t pos; /* position in final command */
     size_t len, totlen;
@@ -664,7 +664,7 @@ long long redisFormatCommandArgv(char **target, int argc, const char **argv, con
     }
 
     /* Build the command at protocol level */
-    cmd = hi_malloc(totlen+1);
+    cmd = vk_malloc(totlen+1);
     if (cmd == NULL)
         return -1;
 
@@ -684,11 +684,11 @@ long long redisFormatCommandArgv(char **target, int argc, const char **argv, con
     return totlen;
 }
 
-void redisFreeCommand(char *cmd) {
-    hi_free(cmd);
+void valkeyFreeCommand(char *cmd) {
+    vk_free(cmd);
 }
 
-void __redisSetError(redisContext *c, int type, const char *str) {
+void __valkeySetError(valkeyContext *c, int type, const char *str) {
     size_t len;
 
     c->err = type;
@@ -698,43 +698,43 @@ void __redisSetError(redisContext *c, int type, const char *str) {
         memcpy(c->errstr,str,len);
         c->errstr[len] = '\0';
     } else {
-        /* Only REDIS_ERR_IO may lack a description! */
-        assert(type == REDIS_ERR_IO);
+        /* Only VALKEY_ERR_IO may lack a description! */
+        assert(type == VALKEY_ERR_IO);
         strerror_r(errno, c->errstr, sizeof(c->errstr));
     }
 }
 
-redisReader *redisReaderCreate(void) {
-    return redisReaderCreateWithFunctions(&defaultFunctions);
+valkeyReader *valkeyReaderCreate(void) {
+    return valkeyReaderCreateWithFunctions(&defaultFunctions);
 }
 
-static void redisPushAutoFree(void *privdata, void *reply) {
+static void valkeyPushAutoFree(void *privdata, void *reply) {
     (void)privdata;
     freeReplyObject(reply);
 }
 
-static redisContext *redisContextInit(void) {
-    redisContext *c;
+static valkeyContext *valkeyContextInit(void) {
+    valkeyContext *c;
 
-    c = hi_calloc(1, sizeof(*c));
+    c = vk_calloc(1, sizeof(*c));
     if (c == NULL)
         return NULL;
 
-    c->funcs = &redisContextDefaultFuncs;
+    c->funcs = &valkeyContextDefaultFuncs;
 
     c->obuf = sdsempty();
-    c->reader = redisReaderCreate();
-    c->fd = REDIS_INVALID_FD;
+    c->reader = valkeyReaderCreate();
+    c->fd = VALKEY_INVALID_FD;
 
     if (c->obuf == NULL || c->reader == NULL) {
-        redisFree(c);
+        valkeyFree(c);
         return NULL;
     }
 
     return c;
 }
 
-void redisFree(redisContext *c) {
+void valkeyFree(valkeyContext *c) {
     if (c == NULL)
         return;
 
@@ -743,13 +743,13 @@ void redisFree(redisContext *c) {
     }
 
     sdsfree(c->obuf);
-    redisReaderFree(c->reader);
-    hi_free(c->tcp.host);
-    hi_free(c->tcp.source_addr);
-    hi_free(c->unix_sock.path);
-    hi_free(c->connect_timeout);
-    hi_free(c->command_timeout);
-    hi_free(c->saddr);
+    valkeyReaderFree(c->reader);
+    vk_free(c->tcp.host);
+    vk_free(c->tcp.source_addr);
+    vk_free(c->unix_sock.path);
+    vk_free(c->connect_timeout);
+    vk_free(c->command_timeout);
+    vk_free(c->saddr);
 
     if (c->privdata && c->free_privdata)
         c->free_privdata(c->privdata);
@@ -758,17 +758,17 @@ void redisFree(redisContext *c) {
         c->funcs->free_privctx(c->privctx);
 
     memset(c, 0xff, sizeof(*c));
-    hi_free(c);
+    vk_free(c);
 }
 
-redisFD redisFreeKeepFd(redisContext *c) {
-    redisFD fd = c->fd;
-    c->fd = REDIS_INVALID_FD;
-    redisFree(c);
+valkeyFD valkeyFreeKeepFd(valkeyContext *c) {
+    valkeyFD fd = c->fd;
+    c->fd = VALKEY_INVALID_FD;
+    valkeyFree(c);
     return fd;
 }
 
-int redisReconnect(redisContext *c) {
+int valkeyReconnect(valkeyContext *c) {
     c->err = 0;
     memset(c->errstr, '\0', strlen(c->errstr));
 
@@ -782,95 +782,95 @@ int redisReconnect(redisContext *c) {
     }
 
     sdsfree(c->obuf);
-    redisReaderFree(c->reader);
+    valkeyReaderFree(c->reader);
 
     c->obuf = sdsempty();
-    c->reader = redisReaderCreate();
+    c->reader = valkeyReaderCreate();
 
     if (c->obuf == NULL || c->reader == NULL) {
-        __redisSetError(c, REDIS_ERR_OOM, "Out of memory");
-        return REDIS_ERR;
+        __valkeySetError(c, VALKEY_ERR_OOM, "Out of memory");
+        return VALKEY_ERR;
     }
 
-    int ret = REDIS_ERR;
-    if (c->connection_type == REDIS_CONN_TCP) {
-        ret = redisContextConnectBindTcp(c, c->tcp.host, c->tcp.port,
+    int ret = VALKEY_ERR;
+    if (c->connection_type == VALKEY_CONN_TCP) {
+        ret = valkeyContextConnectBindTcp(c, c->tcp.host, c->tcp.port,
                c->connect_timeout, c->tcp.source_addr);
-    } else if (c->connection_type == REDIS_CONN_UNIX) {
-        ret = redisContextConnectUnix(c, c->unix_sock.path, c->connect_timeout);
+    } else if (c->connection_type == VALKEY_CONN_UNIX) {
+        ret = valkeyContextConnectUnix(c, c->unix_sock.path, c->connect_timeout);
     } else {
         /* Something bad happened here and shouldn't have. There isn't
            enough information in the context to reconnect. */
-        __redisSetError(c,REDIS_ERR_OTHER,"Not enough information to reconnect");
-        ret = REDIS_ERR;
+        __valkeySetError(c,VALKEY_ERR_OTHER,"Not enough information to reconnect");
+        ret = VALKEY_ERR;
     }
 
-    if (c->command_timeout != NULL && (c->flags & REDIS_BLOCK) && c->fd != REDIS_INVALID_FD) {
-        redisContextSetTimeout(c, *c->command_timeout);
+    if (c->command_timeout != NULL && (c->flags & VALKEY_BLOCK) && c->fd != VALKEY_INVALID_FD) {
+        valkeyContextSetTimeout(c, *c->command_timeout);
     }
 
     return ret;
 }
 
-redisContext *redisConnectWithOptions(const redisOptions *options) {
-    redisContext *c = redisContextInit();
+valkeyContext *valkeyConnectWithOptions(const valkeyOptions *options) {
+    valkeyContext *c = valkeyContextInit();
     if (c == NULL) {
         return NULL;
     }
-    if (!(options->options & REDIS_OPT_NONBLOCK)) {
-        c->flags |= REDIS_BLOCK;
+    if (!(options->options & VALKEY_OPT_NONBLOCK)) {
+        c->flags |= VALKEY_BLOCK;
     }
-    if (options->options & REDIS_OPT_REUSEADDR) {
-        c->flags |= REDIS_REUSEADDR;
+    if (options->options & VALKEY_OPT_REUSEADDR) {
+        c->flags |= VALKEY_REUSEADDR;
     }
-    if (options->options & REDIS_OPT_NOAUTOFREE) {
-        c->flags |= REDIS_NO_AUTO_FREE;
+    if (options->options & VALKEY_OPT_NOAUTOFREE) {
+        c->flags |= VALKEY_NO_AUTO_FREE;
     }
-    if (options->options & REDIS_OPT_NOAUTOFREEREPLIES) {
-        c->flags |= REDIS_NO_AUTO_FREE_REPLIES;
+    if (options->options & VALKEY_OPT_NOAUTOFREEREPLIES) {
+        c->flags |= VALKEY_NO_AUTO_FREE_REPLIES;
     }
-    if (options->options & REDIS_OPT_PREFER_IPV4) {
-        c->flags |= REDIS_PREFER_IPV4;
+    if (options->options & VALKEY_OPT_PREFER_IPV4) {
+        c->flags |= VALKEY_PREFER_IPV4;
     }
-    if (options->options & REDIS_OPT_PREFER_IPV6) {
-        c->flags |= REDIS_PREFER_IPV6;
+    if (options->options & VALKEY_OPT_PREFER_IPV6) {
+        c->flags |= VALKEY_PREFER_IPV6;
     }
 
     /* Set any user supplied RESP3 PUSH handler or use freeReplyObject
      * as a default unless specifically flagged that we don't want one. */
     if (options->push_cb != NULL)
-        redisSetPushCallback(c, options->push_cb);
-    else if (!(options->options & REDIS_OPT_NO_PUSH_AUTOFREE))
-        redisSetPushCallback(c, redisPushAutoFree);
+        valkeySetPushCallback(c, options->push_cb);
+    else if (!(options->options & VALKEY_OPT_NO_PUSH_AUTOFREE))
+        valkeySetPushCallback(c, valkeyPushAutoFree);
 
     c->privdata = options->privdata;
     c->free_privdata = options->free_privdata;
 
-    if (redisContextUpdateConnectTimeout(c, options->connect_timeout) != REDIS_OK ||
-        redisContextUpdateCommandTimeout(c, options->command_timeout) != REDIS_OK) {
-        __redisSetError(c, REDIS_ERR_OOM, "Out of memory");
+    if (valkeyContextUpdateConnectTimeout(c, options->connect_timeout) != VALKEY_OK ||
+        valkeyContextUpdateCommandTimeout(c, options->command_timeout) != VALKEY_OK) {
+        __valkeySetError(c, VALKEY_ERR_OOM, "Out of memory");
         return c;
     }
 
-    if (options->type == REDIS_CONN_TCP) {
-        redisContextConnectBindTcp(c, options->endpoint.tcp.ip,
+    if (options->type == VALKEY_CONN_TCP) {
+        valkeyContextConnectBindTcp(c, options->endpoint.tcp.ip,
                                    options->endpoint.tcp.port, options->connect_timeout,
                                    options->endpoint.tcp.source_addr);
-    } else if (options->type == REDIS_CONN_UNIX) {
-        redisContextConnectUnix(c, options->endpoint.unix_socket,
+    } else if (options->type == VALKEY_CONN_UNIX) {
+        valkeyContextConnectUnix(c, options->endpoint.unix_socket,
                                 options->connect_timeout);
-    } else if (options->type == REDIS_CONN_USERFD) {
+    } else if (options->type == VALKEY_CONN_USERFD) {
         c->fd = options->endpoint.fd;
-        c->flags |= REDIS_CONNECTED;
+        c->flags |= VALKEY_CONNECTED;
     } else {
-        redisFree(c);
+        valkeyFree(c);
         return NULL;
     }
 
-    if (c->err == 0 && c->fd != REDIS_INVALID_FD &&
-        options->command_timeout != NULL && (c->flags & REDIS_BLOCK))
+    if (c->err == 0 && c->fd != VALKEY_INVALID_FD &&
+        options->command_timeout != NULL && (c->flags & VALKEY_BLOCK))
     {
-        redisContextSetTimeout(c, *options->command_timeout);
+        valkeyContextSetTimeout(c, *options->command_timeout);
     }
 
     return c;
@@ -879,95 +879,95 @@ redisContext *redisConnectWithOptions(const redisOptions *options) {
 /* Connect to a Redis instance. On error the field error in the returned
  * context will be set to the return value of the error function.
  * When no set of reply functions is given, the default set will be used. */
-redisContext *redisConnect(const char *ip, int port) {
-    redisOptions options = {0};
-    REDIS_OPTIONS_SET_TCP(&options, ip, port);
-    return redisConnectWithOptions(&options);
+valkeyContext *valkeyConnect(const char *ip, int port) {
+    valkeyOptions options = {0};
+    VALKEY_OPTIONS_SET_TCP(&options, ip, port);
+    return valkeyConnectWithOptions(&options);
 }
 
-redisContext *redisConnectWithTimeout(const char *ip, int port, const struct timeval tv) {
-    redisOptions options = {0};
-    REDIS_OPTIONS_SET_TCP(&options, ip, port);
+valkeyContext *valkeyConnectWithTimeout(const char *ip, int port, const struct timeval tv) {
+    valkeyOptions options = {0};
+    VALKEY_OPTIONS_SET_TCP(&options, ip, port);
     options.connect_timeout = &tv;
-    return redisConnectWithOptions(&options);
+    return valkeyConnectWithOptions(&options);
 }
 
-redisContext *redisConnectNonBlock(const char *ip, int port) {
-    redisOptions options = {0};
-    REDIS_OPTIONS_SET_TCP(&options, ip, port);
-    options.options |= REDIS_OPT_NONBLOCK;
-    return redisConnectWithOptions(&options);
+valkeyContext *valkeyConnectNonBlock(const char *ip, int port) {
+    valkeyOptions options = {0};
+    VALKEY_OPTIONS_SET_TCP(&options, ip, port);
+    options.options |= VALKEY_OPT_NONBLOCK;
+    return valkeyConnectWithOptions(&options);
 }
 
-redisContext *redisConnectBindNonBlock(const char *ip, int port,
+valkeyContext *valkeyConnectBindNonBlock(const char *ip, int port,
                                        const char *source_addr) {
-    redisOptions options = {0};
-    REDIS_OPTIONS_SET_TCP(&options, ip, port);
+    valkeyOptions options = {0};
+    VALKEY_OPTIONS_SET_TCP(&options, ip, port);
     options.endpoint.tcp.source_addr = source_addr;
-    options.options |= REDIS_OPT_NONBLOCK;
-    return redisConnectWithOptions(&options);
+    options.options |= VALKEY_OPT_NONBLOCK;
+    return valkeyConnectWithOptions(&options);
 }
 
-redisContext *redisConnectBindNonBlockWithReuse(const char *ip, int port,
+valkeyContext *valkeyConnectBindNonBlockWithReuse(const char *ip, int port,
                                                 const char *source_addr) {
-    redisOptions options = {0};
-    REDIS_OPTIONS_SET_TCP(&options, ip, port);
+    valkeyOptions options = {0};
+    VALKEY_OPTIONS_SET_TCP(&options, ip, port);
     options.endpoint.tcp.source_addr = source_addr;
-    options.options |= REDIS_OPT_NONBLOCK|REDIS_OPT_REUSEADDR;
-    return redisConnectWithOptions(&options);
+    options.options |= VALKEY_OPT_NONBLOCK|VALKEY_OPT_REUSEADDR;
+    return valkeyConnectWithOptions(&options);
 }
 
-redisContext *redisConnectUnix(const char *path) {
-    redisOptions options = {0};
-    REDIS_OPTIONS_SET_UNIX(&options, path);
-    return redisConnectWithOptions(&options);
+valkeyContext *valkeyConnectUnix(const char *path) {
+    valkeyOptions options = {0};
+    VALKEY_OPTIONS_SET_UNIX(&options, path);
+    return valkeyConnectWithOptions(&options);
 }
 
-redisContext *redisConnectUnixWithTimeout(const char *path, const struct timeval tv) {
-    redisOptions options = {0};
-    REDIS_OPTIONS_SET_UNIX(&options, path);
+valkeyContext *valkeyConnectUnixWithTimeout(const char *path, const struct timeval tv) {
+    valkeyOptions options = {0};
+    VALKEY_OPTIONS_SET_UNIX(&options, path);
     options.connect_timeout = &tv;
-    return redisConnectWithOptions(&options);
+    return valkeyConnectWithOptions(&options);
 }
 
-redisContext *redisConnectUnixNonBlock(const char *path) {
-    redisOptions options = {0};
-    REDIS_OPTIONS_SET_UNIX(&options, path);
-    options.options |= REDIS_OPT_NONBLOCK;
-    return redisConnectWithOptions(&options);
+valkeyContext *valkeyConnectUnixNonBlock(const char *path) {
+    valkeyOptions options = {0};
+    VALKEY_OPTIONS_SET_UNIX(&options, path);
+    options.options |= VALKEY_OPT_NONBLOCK;
+    return valkeyConnectWithOptions(&options);
 }
 
-redisContext *redisConnectFd(redisFD fd) {
-    redisOptions options = {0};
-    options.type = REDIS_CONN_USERFD;
+valkeyContext *valkeyConnectFd(valkeyFD fd) {
+    valkeyOptions options = {0};
+    options.type = VALKEY_CONN_USERFD;
     options.endpoint.fd = fd;
-    return redisConnectWithOptions(&options);
+    return valkeyConnectWithOptions(&options);
 }
 
 /* Set read/write timeout on a blocking socket. */
-int redisSetTimeout(redisContext *c, const struct timeval tv) {
-    if (c->flags & REDIS_BLOCK)
-        return redisContextSetTimeout(c,tv);
-    return REDIS_ERR;
+int valkeySetTimeout(valkeyContext *c, const struct timeval tv) {
+    if (c->flags & VALKEY_BLOCK)
+        return valkeyContextSetTimeout(c,tv);
+    return VALKEY_ERR;
 }
 
-int redisEnableKeepAliveWithInterval(redisContext *c, int interval) {
-    return redisKeepAlive(c, interval);
+int valkeyEnableKeepAliveWithInterval(valkeyContext *c, int interval) {
+    return valkeyKeepAlive(c, interval);
 }
 
 /* Enable connection KeepAlive. */
-int redisEnableKeepAlive(redisContext *c) {
-    return redisKeepAlive(c, REDIS_KEEPALIVE_INTERVAL);
+int valkeyEnableKeepAlive(valkeyContext *c) {
+    return valkeyKeepAlive(c, VALKEY_KEEPALIVE_INTERVAL);
 }
 
 /* Set the socket option TCP_USER_TIMEOUT. */
-int redisSetTcpUserTimeout(redisContext *c, unsigned int timeout) {
-    return redisContextSetTcpUserTimeout(c, timeout);
+int valkeySetTcpUserTimeout(valkeyContext *c, unsigned int timeout) {
+    return valkeyContextSetTcpUserTimeout(c, timeout);
 }
 
 /* Set a user provided RESP3 PUSH handler and return any old one set. */
-redisPushFn *redisSetPushCallback(redisContext *c, redisPushFn *fn) {
-    redisPushFn *old = c->push_cb;
+valkeyPushFn *valkeySetPushCallback(valkeyContext *c, valkeyPushFn *fn) {
+    valkeyPushFn *old = c->push_cb;
     c->push_cb = fn;
     return old;
 }
@@ -975,46 +975,46 @@ redisPushFn *redisSetPushCallback(redisContext *c, redisPushFn *fn) {
 /* Use this function to handle a read event on the descriptor. It will try
  * and read some bytes from the socket and feed them to the reply parser.
  *
- * After this function is called, you may use redisGetReplyFromReader to
+ * After this function is called, you may use valkeyGetReplyFromReader to
  * see if there is a reply available. */
-int redisBufferRead(redisContext *c) {
+int valkeyBufferRead(valkeyContext *c) {
     char buf[1024*16];
     int nread;
 
     /* Return early when the context has seen an error. */
     if (c->err)
-        return REDIS_ERR;
+        return VALKEY_ERR;
 
     nread = c->funcs->read(c, buf, sizeof(buf));
     if (nread < 0) {
-        return REDIS_ERR;
+        return VALKEY_ERR;
     }
-    if (nread > 0 && redisReaderFeed(c->reader, buf, nread) != REDIS_OK) {
-        __redisSetError(c, c->reader->err, c->reader->errstr);
-        return REDIS_ERR;
+    if (nread > 0 && valkeyReaderFeed(c->reader, buf, nread) != VALKEY_OK) {
+        __valkeySetError(c, c->reader->err, c->reader->errstr);
+        return VALKEY_ERR;
     }
-    return REDIS_OK;
+    return VALKEY_OK;
 }
 
 /* Write the output buffer to the socket.
  *
- * Returns REDIS_OK when the buffer is empty, or (a part of) the buffer was
+ * Returns VALKEY_OK when the buffer is empty, or (a part of) the buffer was
  * successfully written to the socket. When the buffer is empty after the
  * write operation, "done" is set to 1 (if given).
  *
- * Returns REDIS_ERR if an unrecoverable error occurred in the underlying
+ * Returns VALKEY_ERR if an unrecoverable error occurred in the underlying
  * c->funcs->write function.
  */
-int redisBufferWrite(redisContext *c, int *done) {
+int valkeyBufferWrite(valkeyContext *c, int *done) {
 
     /* Return early when the context has seen an error. */
     if (c->err)
-        return REDIS_ERR;
+        return VALKEY_ERR;
 
     if (sdslen(c->obuf) > 0) {
         ssize_t nwritten = c->funcs->write(c);
         if (nwritten < 0) {
-            return REDIS_ERR;
+            return VALKEY_ERR;
         } else if (nwritten > 0) {
             if (nwritten == (ssize_t)sdslen(c->obuf)) {
                 sdsfree(c->obuf);
@@ -1027,17 +1027,17 @@ int redisBufferWrite(redisContext *c, int *done) {
         }
     }
     if (done != NULL) *done = (sdslen(c->obuf) == 0);
-    return REDIS_OK;
+    return VALKEY_OK;
 
 oom:
-    __redisSetError(c, REDIS_ERR_OOM, "Out of memory");
-    return REDIS_ERR;
+    __valkeySetError(c, VALKEY_ERR_OOM, "Out of memory");
+    return VALKEY_ERR;
 }
 
 /* Internal helper that returns 1 if the reply was a RESP3 PUSH
  * message and we handled it with a user-provided callback. */
-static int redisHandledPushReply(redisContext *c, void *reply) {
-    if (reply && c->push_cb && redisIsPushReply(reply)) {
+static int valkeyHandledPushReply(valkeyContext *c, void *reply) {
+    if (reply && c->push_cb && valkeyIsPushReply(reply)) {
         c->push_cb(c->privdata, reply);
         return 1;
     }
@@ -1046,50 +1046,50 @@ static int redisHandledPushReply(redisContext *c, void *reply) {
 }
 
 /* Get a reply from our reader or set an error in the context. */
-int redisGetReplyFromReader(redisContext *c, void **reply) {
-    if (redisReaderGetReply(c->reader, reply) == REDIS_ERR) {
-        __redisSetError(c,c->reader->err,c->reader->errstr);
-        return REDIS_ERR;
+int valkeyGetReplyFromReader(valkeyContext *c, void **reply) {
+    if (valkeyReaderGetReply(c->reader, reply) == VALKEY_ERR) {
+        __valkeySetError(c,c->reader->err,c->reader->errstr);
+        return VALKEY_ERR;
     }
 
-    return REDIS_OK;
+    return VALKEY_OK;
 }
 
 /* Internal helper to get the next reply from our reader while handling
  * any PUSH messages we encounter along the way.  This is separate from
- * redisGetReplyFromReader so as to not change its behavior. */
-static int redisNextInBandReplyFromReader(redisContext *c, void **reply) {
+ * valkeyGetReplyFromReader so as to not change its behavior. */
+static int valkeyNextInBandReplyFromReader(valkeyContext *c, void **reply) {
     do {
-        if (redisGetReplyFromReader(c, reply) == REDIS_ERR)
-            return REDIS_ERR;
-    } while (redisHandledPushReply(c, *reply));
+        if (valkeyGetReplyFromReader(c, reply) == VALKEY_ERR)
+            return VALKEY_ERR;
+    } while (valkeyHandledPushReply(c, *reply));
 
-    return REDIS_OK;
+    return VALKEY_OK;
 }
 
-int redisGetReply(redisContext *c, void **reply) {
+int valkeyGetReply(valkeyContext *c, void **reply) {
     int wdone = 0;
     void *aux = NULL;
 
     /* Try to read pending replies */
-    if (redisNextInBandReplyFromReader(c,&aux) == REDIS_ERR)
-        return REDIS_ERR;
+    if (valkeyNextInBandReplyFromReader(c,&aux) == VALKEY_ERR)
+        return VALKEY_ERR;
 
     /* For the blocking context, flush output buffer and read reply */
-    if (aux == NULL && c->flags & REDIS_BLOCK) {
+    if (aux == NULL && c->flags & VALKEY_BLOCK) {
         /* Write until done */
         do {
-            if (redisBufferWrite(c,&wdone) == REDIS_ERR)
-                return REDIS_ERR;
+            if (valkeyBufferWrite(c,&wdone) == VALKEY_ERR)
+                return VALKEY_ERR;
         } while (!wdone);
 
         /* Read until there is a reply */
         do {
-            if (redisBufferRead(c) == REDIS_ERR)
-                return REDIS_ERR;
+            if (valkeyBufferRead(c) == VALKEY_ERR)
+                return VALKEY_ERR;
 
-            if (redisNextInBandReplyFromReader(c,&aux) == REDIS_ERR)
-                return REDIS_ERR;
+            if (valkeyNextInBandReplyFromReader(c,&aux) == VALKEY_ERR)
+                return VALKEY_ERR;
         } while (aux == NULL);
     }
 
@@ -1100,90 +1100,90 @@ int redisGetReply(redisContext *c, void **reply) {
         freeReplyObject(aux);
     }
 
-    return REDIS_OK;
+    return VALKEY_OK;
 }
 
 
-/* Helper function for the redisAppendCommand* family of functions.
+/* Helper function for the valkeyAppendCommand* family of functions.
  *
  * Write a formatted command to the output buffer. When this family
- * is used, you need to call redisGetReply yourself to retrieve
+ * is used, you need to call valkeyGetReply yourself to retrieve
  * the reply (or replies in pub/sub).
  */
-int __redisAppendCommand(redisContext *c, const char *cmd, size_t len) {
+int __valkeyAppendCommand(valkeyContext *c, const char *cmd, size_t len) {
     sds newbuf;
 
     newbuf = sdscatlen(c->obuf,cmd,len);
     if (newbuf == NULL) {
-        __redisSetError(c,REDIS_ERR_OOM,"Out of memory");
-        return REDIS_ERR;
+        __valkeySetError(c,VALKEY_ERR_OOM,"Out of memory");
+        return VALKEY_ERR;
     }
 
     c->obuf = newbuf;
-    return REDIS_OK;
+    return VALKEY_OK;
 }
 
-int redisAppendFormattedCommand(redisContext *c, const char *cmd, size_t len) {
+int valkeyAppendFormattedCommand(valkeyContext *c, const char *cmd, size_t len) {
 
-    if (__redisAppendCommand(c, cmd, len) != REDIS_OK) {
-        return REDIS_ERR;
+    if (__valkeyAppendCommand(c, cmd, len) != VALKEY_OK) {
+        return VALKEY_ERR;
     }
 
-    return REDIS_OK;
+    return VALKEY_OK;
 }
 
-int redisvAppendCommand(redisContext *c, const char *format, va_list ap) {
+int valkeyvAppendCommand(valkeyContext *c, const char *format, va_list ap) {
     char *cmd;
     int len;
 
-    len = redisvFormatCommand(&cmd,format,ap);
+    len = valkeyvFormatCommand(&cmd,format,ap);
     if (len == -1) {
-        __redisSetError(c,REDIS_ERR_OOM,"Out of memory");
-        return REDIS_ERR;
+        __valkeySetError(c,VALKEY_ERR_OOM,"Out of memory");
+        return VALKEY_ERR;
     } else if (len == -2) {
-        __redisSetError(c,REDIS_ERR_OTHER,"Invalid format string");
-        return REDIS_ERR;
+        __valkeySetError(c,VALKEY_ERR_OTHER,"Invalid format string");
+        return VALKEY_ERR;
     }
 
-    if (__redisAppendCommand(c,cmd,len) != REDIS_OK) {
-        hi_free(cmd);
-        return REDIS_ERR;
+    if (__valkeyAppendCommand(c,cmd,len) != VALKEY_OK) {
+        vk_free(cmd);
+        return VALKEY_ERR;
     }
 
-    hi_free(cmd);
-    return REDIS_OK;
+    vk_free(cmd);
+    return VALKEY_OK;
 }
 
-int redisAppendCommand(redisContext *c, const char *format, ...) {
+int valkeyAppendCommand(valkeyContext *c, const char *format, ...) {
     va_list ap;
     int ret;
 
     va_start(ap,format);
-    ret = redisvAppendCommand(c,format,ap);
+    ret = valkeyvAppendCommand(c,format,ap);
     va_end(ap);
     return ret;
 }
 
-int redisAppendCommandArgv(redisContext *c, int argc, const char **argv, const size_t *argvlen) {
+int valkeyAppendCommandArgv(valkeyContext *c, int argc, const char **argv, const size_t *argvlen) {
     sds cmd;
     long long len;
 
-    len = redisFormatSdsCommandArgv(&cmd,argc,argv,argvlen);
+    len = valkeyFormatSdsCommandArgv(&cmd,argc,argv,argvlen);
     if (len == -1) {
-        __redisSetError(c,REDIS_ERR_OOM,"Out of memory");
-        return REDIS_ERR;
+        __valkeySetError(c,VALKEY_ERR_OOM,"Out of memory");
+        return VALKEY_ERR;
     }
 
-    if (__redisAppendCommand(c,cmd,len) != REDIS_OK) {
+    if (__valkeyAppendCommand(c,cmd,len) != VALKEY_OK) {
         sdsfree(cmd);
-        return REDIS_ERR;
+        return VALKEY_ERR;
     }
 
     sdsfree(cmd);
-    return REDIS_OK;
+    return VALKEY_OK;
 }
 
-/* Helper function for the redisCommand* family of functions.
+/* Helper function for the valkeyCommand* family of functions.
  *
  * Write a formatted command to the output buffer. If the given context is
  * blocking, immediately read the reply into the "reply" pointer. When the
@@ -1194,33 +1194,33 @@ int redisAppendCommandArgv(redisContext *c, int argc, const char **argv, const s
  * otherwise. When NULL is returned in a blocking context, the error field
  * in the context will be set.
  */
-static void *__redisBlockForReply(redisContext *c) {
+static void *__valkeyBlockForReply(valkeyContext *c) {
     void *reply;
 
-    if (c->flags & REDIS_BLOCK) {
-        if (redisGetReply(c,&reply) != REDIS_OK)
+    if (c->flags & VALKEY_BLOCK) {
+        if (valkeyGetReply(c,&reply) != VALKEY_OK)
             return NULL;
         return reply;
     }
     return NULL;
 }
 
-void *redisvCommand(redisContext *c, const char *format, va_list ap) {
-    if (redisvAppendCommand(c,format,ap) != REDIS_OK)
+void *valkeyvCommand(valkeyContext *c, const char *format, va_list ap) {
+    if (valkeyvAppendCommand(c,format,ap) != VALKEY_OK)
         return NULL;
-    return __redisBlockForReply(c);
+    return __valkeyBlockForReply(c);
 }
 
-void *redisCommand(redisContext *c, const char *format, ...) {
+void *valkeyCommand(valkeyContext *c, const char *format, ...) {
     va_list ap;
     va_start(ap,format);
-    void *reply = redisvCommand(c,format,ap);
+    void *reply = valkeyvCommand(c,format,ap);
     va_end(ap);
     return reply;
 }
 
-void *redisCommandArgv(redisContext *c, int argc, const char **argv, const size_t *argvlen) {
-    if (redisAppendCommandArgv(c,argc,argv,argvlen) != REDIS_OK)
+void *valkeyCommandArgv(valkeyContext *c, int argc, const char **argv, const size_t *argvlen) {
+    if (valkeyAppendCommandArgv(c,argc,argv,argvlen) != VALKEY_OK)
         return NULL;
-    return __redisBlockForReply(c);
+    return __valkeyBlockForReply(c);
 }

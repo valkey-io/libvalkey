@@ -29,48 +29,48 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef __HIREDIS_ASYNC_H
-#define __HIREDIS_ASYNC_H
-#include "hiredis.h"
+#ifndef VALKEY_ASYNC_H
+#define VALKEY_ASYNC_H
+#include "valkey.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-struct redisAsyncContext; /* need forward declaration of redisAsyncContext */
+struct valkeyAsyncContext; /* need forward declaration of valkeyAsyncContext */
 struct dict; /* dictionary header is included in async.c */
 
 /* Reply callback prototype and container */
-typedef void (redisCallbackFn)(struct redisAsyncContext*, void*, void*);
-typedef struct redisCallback {
-    struct redisCallback *next; /* simple singly linked list */
-    redisCallbackFn *fn;
+typedef void (valkeyCallbackFn)(struct valkeyAsyncContext*, void*, void*);
+typedef struct valkeyCallback {
+    struct valkeyCallback *next; /* simple singly linked list */
+    valkeyCallbackFn *fn;
     int pending_subs;
     int unsubscribe_sent;
     void *privdata;
-} redisCallback;
+} valkeyCallback;
 
 /* List of callbacks for either regular replies or pub/sub */
-typedef struct redisCallbackList {
-    redisCallback *head, *tail;
-} redisCallbackList;
+typedef struct valkeyCallbackList {
+    valkeyCallback *head, *tail;
+} valkeyCallbackList;
 
 /* Connection callback prototypes */
-typedef void (redisDisconnectCallback)(const struct redisAsyncContext*, int status);
-typedef void (redisConnectCallback)(const struct redisAsyncContext*, int status);
-typedef void (redisConnectCallbackNC)(struct redisAsyncContext *, int status);
-typedef void(redisTimerCallback)(void *timer, void *privdata);
+typedef void (valkeyDisconnectCallback)(const struct valkeyAsyncContext*, int status);
+typedef void (valkeyConnectCallback)(const struct valkeyAsyncContext*, int status);
+typedef void (valkeyConnectCallbackNC)(struct valkeyAsyncContext *, int status);
+typedef void(valkeyTimerCallback)(void *timer, void *privdata);
 
 /* Context for an async connection to Redis */
-typedef struct redisAsyncContext {
+typedef struct valkeyAsyncContext {
     /* Hold the regular context, so it can be realloc'ed. */
-    redisContext c;
+    valkeyContext c;
 
     /* Setup error flags so they can be used directly. */
     int err;
     char *errstr;
 
-    /* Not used by hiredis */
+    /* Not used by libvalkey */
     void *data;
     void (*dataCleanup)(void *privdata);
 
@@ -89,15 +89,15 @@ typedef struct redisAsyncContext {
     } ev;
 
     /* Called when either the connection is terminated due to an error or per
-     * user request. The status is set accordingly (REDIS_OK, REDIS_ERR). */
-    redisDisconnectCallback *onDisconnect;
+     * user request. The status is set accordingly (VALKEY_OK, VALKEY_ERR). */
+    valkeyDisconnectCallback *onDisconnect;
 
     /* Called when the first write event was received. */
-    redisConnectCallback *onConnect;
-    redisConnectCallbackNC *onConnectNC;
+    valkeyConnectCallback *onConnect;
+    valkeyConnectCallbackNC *onConnectNC;
 
     /* Regular command callbacks */
-    redisCallbackList replies;
+    valkeyCallbackList replies;
 
     /* Address used for connect() */
     struct sockaddr *saddr;
@@ -105,45 +105,45 @@ typedef struct redisAsyncContext {
 
     /* Subscription callbacks */
     struct {
-        redisCallbackList replies;
+        valkeyCallbackList replies;
         struct dict *channels;
         struct dict *patterns;
         int pending_unsubs;
     } sub;
 
     /* Any configured RESP3 PUSH handler */
-    redisAsyncPushFn *push_cb;
-} redisAsyncContext;
+    valkeyAsyncPushFn *push_cb;
+} valkeyAsyncContext;
 
-/* Functions that proxy to hiredis */
-redisAsyncContext *redisAsyncConnectWithOptions(const redisOptions *options);
-redisAsyncContext *redisAsyncConnect(const char *ip, int port);
-redisAsyncContext *redisAsyncConnectBind(const char *ip, int port, const char *source_addr);
-redisAsyncContext *redisAsyncConnectBindWithReuse(const char *ip, int port,
+/* Functions that proxy to libvalkey */
+valkeyAsyncContext *valkeyAsyncConnectWithOptions(const valkeyOptions *options);
+valkeyAsyncContext *valkeyAsyncConnect(const char *ip, int port);
+valkeyAsyncContext *valkeyAsyncConnectBind(const char *ip, int port, const char *source_addr);
+valkeyAsyncContext *valkeyAsyncConnectBindWithReuse(const char *ip, int port,
                                                   const char *source_addr);
-redisAsyncContext *redisAsyncConnectUnix(const char *path);
-int redisAsyncSetConnectCallback(redisAsyncContext *ac, redisConnectCallback *fn);
-int redisAsyncSetConnectCallbackNC(redisAsyncContext *ac, redisConnectCallbackNC *fn);
-int redisAsyncSetDisconnectCallback(redisAsyncContext *ac, redisDisconnectCallback *fn);
+valkeyAsyncContext *valkeyAsyncConnectUnix(const char *path);
+int valkeyAsyncSetConnectCallback(valkeyAsyncContext *ac, valkeyConnectCallback *fn);
+int valkeyAsyncSetConnectCallbackNC(valkeyAsyncContext *ac, valkeyConnectCallbackNC *fn);
+int valkeyAsyncSetDisconnectCallback(valkeyAsyncContext *ac, valkeyDisconnectCallback *fn);
 
-redisAsyncPushFn *redisAsyncSetPushCallback(redisAsyncContext *ac, redisAsyncPushFn *fn);
-int redisAsyncSetTimeout(redisAsyncContext *ac, struct timeval tv);
-void redisAsyncDisconnect(redisAsyncContext *ac);
-void redisAsyncFree(redisAsyncContext *ac);
+valkeyAsyncPushFn *valkeyAsyncSetPushCallback(valkeyAsyncContext *ac, valkeyAsyncPushFn *fn);
+int valkeyAsyncSetTimeout(valkeyAsyncContext *ac, struct timeval tv);
+void valkeyAsyncDisconnect(valkeyAsyncContext *ac);
+void valkeyAsyncFree(valkeyAsyncContext *ac);
 
 /* Handle read/write events */
-void redisAsyncHandleRead(redisAsyncContext *ac);
-void redisAsyncHandleWrite(redisAsyncContext *ac);
-void redisAsyncHandleTimeout(redisAsyncContext *ac);
-void redisAsyncRead(redisAsyncContext *ac);
-void redisAsyncWrite(redisAsyncContext *ac);
+void valkeyAsyncHandleRead(valkeyAsyncContext *ac);
+void valkeyAsyncHandleWrite(valkeyAsyncContext *ac);
+void valkeyAsyncHandleTimeout(valkeyAsyncContext *ac);
+void valkeyAsyncRead(valkeyAsyncContext *ac);
+void valkeyAsyncWrite(valkeyAsyncContext *ac);
 
 /* Command functions for an async context. Write the command to the
  * output buffer and register the provided callback. */
-int redisvAsyncCommand(redisAsyncContext *ac, redisCallbackFn *fn, void *privdata, const char *format, va_list ap);
-int redisAsyncCommand(redisAsyncContext *ac, redisCallbackFn *fn, void *privdata, const char *format, ...);
-int redisAsyncCommandArgv(redisAsyncContext *ac, redisCallbackFn *fn, void *privdata, int argc, const char **argv, const size_t *argvlen);
-int redisAsyncFormattedCommand(redisAsyncContext *ac, redisCallbackFn *fn, void *privdata, const char *cmd, size_t len);
+int valkeyvAsyncCommand(valkeyAsyncContext *ac, valkeyCallbackFn *fn, void *privdata, const char *format, va_list ap);
+int valkeyAsyncCommand(valkeyAsyncContext *ac, valkeyCallbackFn *fn, void *privdata, const char *format, ...);
+int valkeyAsyncCommandArgv(valkeyAsyncContext *ac, valkeyCallbackFn *fn, void *privdata, int argc, const char **argv, const size_t *argvlen);
+int valkeyAsyncFormattedCommand(valkeyAsyncContext *ac, valkeyCallbackFn *fn, void *privdata, const char *cmd, size_t len);
 
 #ifdef __cplusplus
 }

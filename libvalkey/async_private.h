@@ -29,8 +29,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef __HIREDIS_ASYNC_PRIVATE_H
-#define __HIREDIS_ASYNC_PRIVATE_H
+#ifndef VALKEY_ASYNC_PRIVATE_H
+#define VALKEY_ASYNC_PRIVATE_H
 
 #define _EL_ADD_READ(ctx)                                         \
     do {                                                          \
@@ -53,23 +53,23 @@
         ctx->ev.cleanup = NULL; \
     } while(0)
 
-static inline void refreshTimeout(redisAsyncContext *ctx) {
-    #define REDIS_TIMER_ISSET(tvp) \
+static inline void refreshTimeout(valkeyAsyncContext *ctx) {
+    #define VALKEY_TIMER_ISSET(tvp) \
         (tvp && ((tvp)->tv_sec || (tvp)->tv_usec))
 
-    #define REDIS_EL_TIMER(ac, tvp) \
-        if ((ac)->ev.scheduleTimer && REDIS_TIMER_ISSET(tvp)) { \
+    #define VALKEY_EL_TIMER(ac, tvp) \
+        if ((ac)->ev.scheduleTimer && VALKEY_TIMER_ISSET(tvp)) { \
             (ac)->ev.scheduleTimer((ac)->ev.data, *(tvp)); \
         }
 
-    if (ctx->c.flags & REDIS_CONNECTED) {
-        REDIS_EL_TIMER(ctx, ctx->c.command_timeout);
+    if (ctx->c.flags & VALKEY_CONNECTED) {
+        VALKEY_EL_TIMER(ctx, ctx->c.command_timeout);
     } else {
-        REDIS_EL_TIMER(ctx, ctx->c.connect_timeout);
+        VALKEY_EL_TIMER(ctx, ctx->c.connect_timeout);
     }
 }
 
-void __redisAsyncDisconnect(redisAsyncContext *ac);
-void redisProcessCallbacks(redisAsyncContext *ac);
+void __valkeyAsyncDisconnect(valkeyAsyncContext *ac);
+void valkeyProcessCallbacks(valkeyAsyncContext *ac);
 
-#endif  /* __HIREDIS_ASYNC_PRIVATE_H */
+#endif  /* VALKEY_ASYNC_PRIVATE_H */

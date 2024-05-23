@@ -1,34 +1,34 @@
-#ifndef __HIREDIS_LIBUV_H__
-#define __HIREDIS_LIBUV_H__
+#ifndef VALKEY_LIBUV_H
+#define VALKEY_LIBUV_H
 #include <stdlib.h>
 #include <uv.h>
-#include "../hiredis.h"
+#include "../valkey.h"
 #include "../async.h"
 #include <string.h>
 
-typedef struct redisLibuvEvents {
-    redisAsyncContext* context;
+typedef struct valkeyLibuvEvents {
+    valkeyAsyncContext* context;
     uv_poll_t          handle;
     uv_timer_t         timer;
     int                events;
-} redisLibuvEvents;
+} valkeyLibuvEvents;
 
 
-static void redisLibuvPoll(uv_poll_t* handle, int status, int events) {
-    redisLibuvEvents* p = (redisLibuvEvents*)handle->data;
+static void valkeyLibuvPoll(uv_poll_t* handle, int status, int events) {
+    valkeyLibuvEvents* p = (valkeyLibuvEvents*)handle->data;
     int ev = (status ? p->events : events);
 
     if (p->context != NULL && (ev & UV_READABLE)) {
-        redisAsyncHandleRead(p->context);
+        valkeyAsyncHandleRead(p->context);
     }
     if (p->context != NULL && (ev & UV_WRITABLE)) {
-        redisAsyncHandleWrite(p->context);
+        valkeyAsyncHandleWrite(p->context);
     }
 }
 
 
-static void redisLibuvAddRead(void *privdata) {
-    redisLibuvEvents* p = (redisLibuvEvents*)privdata;
+static void valkeyLibuvAddRead(void *privdata) {
+    valkeyLibuvEvents* p = (valkeyLibuvEvents*)privdata;
 
     if (p->events & UV_READABLE) {
         return;
@@ -36,25 +36,25 @@ static void redisLibuvAddRead(void *privdata) {
 
     p->events |= UV_READABLE;
 
-    uv_poll_start(&p->handle, p->events, redisLibuvPoll);
+    uv_poll_start(&p->handle, p->events, valkeyLibuvPoll);
 }
 
 
-static void redisLibuvDelRead(void *privdata) {
-    redisLibuvEvents* p = (redisLibuvEvents*)privdata;
+static void valkeyLibuvDelRead(void *privdata) {
+    valkeyLibuvEvents* p = (valkeyLibuvEvents*)privdata;
 
     p->events &= ~UV_READABLE;
 
     if (p->events) {
-        uv_poll_start(&p->handle, p->events, redisLibuvPoll);
+        uv_poll_start(&p->handle, p->events, valkeyLibuvPoll);
     } else {
         uv_poll_stop(&p->handle);
     }
 }
 
 
-static void redisLibuvAddWrite(void *privdata) {
-    redisLibuvEvents* p = (redisLibuvEvents*)privdata;
+static void valkeyLibuvAddWrite(void *privdata) {
+    valkeyLibuvEvents* p = (valkeyLibuvEvents*)privdata;
 
     if (p->events & UV_WRITABLE) {
         return;
@@ -62,38 +62,38 @@ static void redisLibuvAddWrite(void *privdata) {
 
     p->events |= UV_WRITABLE;
 
-    uv_poll_start(&p->handle, p->events, redisLibuvPoll);
+    uv_poll_start(&p->handle, p->events, valkeyLibuvPoll);
 }
 
 
-static void redisLibuvDelWrite(void *privdata) {
-    redisLibuvEvents* p = (redisLibuvEvents*)privdata;
+static void valkeyLibuvDelWrite(void *privdata) {
+    valkeyLibuvEvents* p = (valkeyLibuvEvents*)privdata;
 
     p->events &= ~UV_WRITABLE;
 
     if (p->events) {
-        uv_poll_start(&p->handle, p->events, redisLibuvPoll);
+        uv_poll_start(&p->handle, p->events, valkeyLibuvPoll);
     } else {
         uv_poll_stop(&p->handle);
     }
 }
 
 static void on_timer_close(uv_handle_t *handle) {
-    redisLibuvEvents* p = (redisLibuvEvents*)handle->data;
+    valkeyLibuvEvents* p = (valkeyLibuvEvents*)handle->data;
     p->timer.data = NULL;
     if (!p->handle.data) {
         // both timer and handle are closed
-        hi_free(p);
+        vk_free(p);
     }
     // else, wait for `on_handle_close`
 }
 
 static void on_handle_close(uv_handle_t *handle) {
-    redisLibuvEvents* p = (redisLibuvEvents*)handle->data;
+    valkeyLibuvEvents* p = (valkeyLibuvEvents*)handle->data;
     p->handle.data = NULL;
     if (!p->timer.data) {
         // timer never started, or timer already destroyed
-        hi_free(p);
+        vk_free(p);
     }
     // else, wait for `on_timer_close`
 }
@@ -102,17 +102,17 @@ static void on_handle_close(uv_handle_t *handle) {
 // see: https://github.com/libuv/libuv/blob/v0.11.23/include/uv.h
 #if (UV_VERSION_MAJOR == 0 && UV_VERSION_MINOR < 11) || \
     (UV_VERSION_MAJOR == 0 && UV_VERSION_MINOR == 11 && UV_VERSION_PATCH < 23)
-static void redisLibuvTimeout(uv_timer_t *timer, int status) {
+static void valkeyLibuvTimeout(uv_timer_t *timer, int status) {
     (void)status; // unused
 #else
-static void redisLibuvTimeout(uv_timer_t *timer) {
+static void valkeyLibuvTimeout(uv_timer_t *timer) {
 #endif
-    redisLibuvEvents *e = (redisLibuvEvents*)timer->data;
-    redisAsyncHandleTimeout(e->context);
+    valkeyLibuvEvents *e = (valkeyLibuvEvents*)timer->data;
+    valkeyAsyncHandleTimeout(e->context);
 }
 
-static void redisLibuvSetTimeout(void *privdata, struct timeval tv) {
-    redisLibuvEvents* p = (redisLibuvEvents*)privdata;
+static void valkeyLibuvSetTimeout(void *privdata, struct timeval tv) {
+    valkeyLibuvEvents* p = (valkeyLibuvEvents*)privdata;
 
     uint64_t millsec = tv.tv_sec * 1000 + tv.tv_usec / 1000.0;
     if (!p->timer.data) {
@@ -124,11 +124,11 @@ static void redisLibuvSetTimeout(void *privdata, struct timeval tv) {
     }
     // updates the timeout if the timer has already started
     // or start the timer
-    uv_timer_start(&p->timer, redisLibuvTimeout, millsec, 0);
+    uv_timer_start(&p->timer, valkeyLibuvTimeout, millsec, 0);
 }
 
-static void redisLibuvCleanup(void *privdata) {
-    redisLibuvEvents* p = (redisLibuvEvents*)privdata;
+static void valkeyLibuvCleanup(void *privdata) {
+    valkeyLibuvEvents* p = (valkeyLibuvEvents*)privdata;
 
     p->context = NULL; // indicate that context might no longer exist
     if (p->timer.data) {
@@ -138,35 +138,35 @@ static void redisLibuvCleanup(void *privdata) {
 }
 
 
-static int redisLibuvAttach(redisAsyncContext* ac, uv_loop_t* loop) {
-    redisContext *c = &(ac->c);
+static int valkeyLibuvAttach(valkeyAsyncContext* ac, uv_loop_t* loop) {
+    valkeyContext *c = &(ac->c);
 
     if (ac->ev.data != NULL) {
-        return REDIS_ERR;
+        return VALKEY_ERR;
     }
 
-    ac->ev.addRead        = redisLibuvAddRead;
-    ac->ev.delRead        = redisLibuvDelRead;
-    ac->ev.addWrite       = redisLibuvAddWrite;
-    ac->ev.delWrite       = redisLibuvDelWrite;
-    ac->ev.cleanup        = redisLibuvCleanup;
-    ac->ev.scheduleTimer  = redisLibuvSetTimeout;
+    ac->ev.addRead        = valkeyLibuvAddRead;
+    ac->ev.delRead        = valkeyLibuvDelRead;
+    ac->ev.addWrite       = valkeyLibuvAddWrite;
+    ac->ev.delWrite       = valkeyLibuvDelWrite;
+    ac->ev.cleanup        = valkeyLibuvCleanup;
+    ac->ev.scheduleTimer  = valkeyLibuvSetTimeout;
 
-    redisLibuvEvents* p = (redisLibuvEvents*)hi_malloc(sizeof(*p));
+    valkeyLibuvEvents* p = (valkeyLibuvEvents*)vk_malloc(sizeof(*p));
     if (p == NULL)
-        return REDIS_ERR;
+        return VALKEY_ERR;
 
     memset(p, 0, sizeof(*p));
 
     if (uv_poll_init_socket(loop, &p->handle, c->fd) != 0) {
-        hi_free(p);
-        return REDIS_ERR;
+        vk_free(p);
+        return VALKEY_ERR;
     }
 
     ac->ev.data    = p;
     p->handle.data = p;
     p->context     = ac;
 
-    return REDIS_OK;
+    return VALKEY_OK;
 }
 #endif

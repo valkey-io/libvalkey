@@ -28,8 +28,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef HIREDIS_ALLOC_H
-#define HIREDIS_ALLOC_H
+#ifndef VALKEY_ALLOC_H
+#define VALKEY_ALLOC_H
 
 #include <stddef.h> /* for size_t */
 #include <stdint.h>
@@ -39,53 +39,53 @@ extern "C" {
 #endif
 
 /* Structure pointing to our actually configured allocators */
-typedef struct hiredisAllocFuncs {
+typedef struct valkeyAllocFuncs {
     void *(*mallocFn)(size_t);
     void *(*callocFn)(size_t,size_t);
     void *(*reallocFn)(void*,size_t);
     char *(*strdupFn)(const char*);
     void (*freeFn)(void*);
-} hiredisAllocFuncs;
+} valkeyAllocFuncs;
 
-hiredisAllocFuncs hiredisSetAllocators(hiredisAllocFuncs *ha);
-void hiredisResetAllocators(void);
+valkeyAllocFuncs valkeySetAllocators(valkeyAllocFuncs *fns);
+void valkeyResetAllocators(void);
 
 #ifndef _WIN32
 
-/* Hiredis' configured allocator function pointer struct */
-extern hiredisAllocFuncs hiredisAllocFns;
+/* valkey' configured allocator function pointer struct */
+extern valkeyAllocFuncs valkeyAllocFns;
 
-static inline void *hi_malloc(size_t size) {
-    return hiredisAllocFns.mallocFn(size);
+static inline void *vk_malloc(size_t size) {
+    return valkeyAllocFns.mallocFn(size);
 }
 
-static inline void *hi_calloc(size_t nmemb, size_t size) {
+static inline void *vk_calloc(size_t nmemb, size_t size) {
     /* Overflow check as the user can specify any arbitrary allocator */
     if (SIZE_MAX / size < nmemb)
         return NULL;
 
-    return hiredisAllocFns.callocFn(nmemb, size);
+    return valkeyAllocFns.callocFn(nmemb, size);
 }
 
-static inline void *hi_realloc(void *ptr, size_t size) {
-    return hiredisAllocFns.reallocFn(ptr, size);
+static inline void *vk_realloc(void *ptr, size_t size) {
+    return valkeyAllocFns.reallocFn(ptr, size);
 }
 
-static inline char *hi_strdup(const char *str) {
-    return hiredisAllocFns.strdupFn(str);
+static inline char *vk_strdup(const char *str) {
+    return valkeyAllocFns.strdupFn(str);
 }
 
-static inline void hi_free(void *ptr) {
-    hiredisAllocFns.freeFn(ptr);
+static inline void vk_free(void *ptr) {
+    valkeyAllocFns.freeFn(ptr);
 }
 
 #else
 
-void *hi_malloc(size_t size);
-void *hi_calloc(size_t nmemb, size_t size);
-void *hi_realloc(void *ptr, size_t size);
-char *hi_strdup(const char *str);
-void hi_free(void *ptr);
+void *vk_malloc(size_t size);
+void *vk_calloc(size_t nmemb, size_t size);
+void *vk_realloc(void *ptr, size_t size);
+char *vk_strdup(const char *str);
+void vk_free(void *ptr);
 
 #endif
 
@@ -93,4 +93,4 @@ void hi_free(void *ptr);
 }
 #endif
 
-#endif /* HIREDIS_ALLOC_H */
+#endif /* VALKEY_ALLOC_H */

@@ -48,50 +48,50 @@
 #include "sockcompat.h"
 #include "win32.h"
 
-/* Defined in hiredis.c */
-void __redisSetError(redisContext *c, int type, const char *str);
+/* Defined in valkey.c */
+void __valkeySetError(valkeyContext *c, int type, const char *str);
 
-int redisContextUpdateCommandTimeout(redisContext *c, const struct timeval *timeout);
+int valkeyContextUpdateCommandTimeout(valkeyContext *c, const struct timeval *timeout);
 
-void redisNetClose(redisContext *c) {
-    if (c && c->fd != REDIS_INVALID_FD) {
+void valkeyNetClose(valkeyContext *c) {
+    if (c && c->fd != VALKEY_INVALID_FD) {
         close(c->fd);
-        c->fd = REDIS_INVALID_FD;
+        c->fd = VALKEY_INVALID_FD;
     }
 }
 
-ssize_t redisNetRead(redisContext *c, char *buf, size_t bufcap) {
+ssize_t valkeyNetRead(valkeyContext *c, char *buf, size_t bufcap) {
     ssize_t nread = recv(c->fd, buf, bufcap, 0);
     if (nread == -1) {
-        if ((errno == EWOULDBLOCK && !(c->flags & REDIS_BLOCK)) || (errno == EINTR)) {
+        if ((errno == EWOULDBLOCK && !(c->flags & VALKEY_BLOCK)) || (errno == EINTR)) {
             /* Try again later */
             return 0;
-        } else if(errno == ETIMEDOUT && (c->flags & REDIS_BLOCK)) {
+        } else if(errno == ETIMEDOUT && (c->flags & VALKEY_BLOCK)) {
             /* especially in windows */
-            __redisSetError(c, REDIS_ERR_TIMEOUT, "recv timeout");
+            __valkeySetError(c, VALKEY_ERR_TIMEOUT, "recv timeout");
             return -1;
         } else {
-            __redisSetError(c, REDIS_ERR_IO, strerror(errno));
+            __valkeySetError(c, VALKEY_ERR_IO, strerror(errno));
             return -1;
         }
     } else if (nread == 0) {
-        __redisSetError(c, REDIS_ERR_EOF, "Server closed the connection");
+        __valkeySetError(c, VALKEY_ERR_EOF, "Server closed the connection");
         return -1;
     } else {
         return nread;
     }
 }
 
-ssize_t redisNetWrite(redisContext *c) {
+ssize_t valkeyNetWrite(valkeyContext *c) {
     ssize_t nwritten;
 
     nwritten = send(c->fd, c->obuf, sdslen(c->obuf), 0);
     if (nwritten < 0) {
-        if ((errno == EWOULDBLOCK && !(c->flags & REDIS_BLOCK)) || (errno == EINTR)) {
+        if ((errno == EWOULDBLOCK && !(c->flags & VALKEY_BLOCK)) || (errno == EINTR)) {
             /* Try again */
             return 0;
         } else {
-            __redisSetError(c, REDIS_ERR_IO, strerror(errno));
+            __valkeySetError(c, VALKEY_ERR_IO, strerror(errno));
             return -1;
         }
     }
@@ -99,7 +99,7 @@ ssize_t redisNetWrite(redisContext *c) {
     return nwritten;
 }
 
-static void __redisSetErrorFromErrno(redisContext *c, int type, const char *prefix) {
+static void __valkeySetErrorFromErrno(valkeyContext *c, int type, const char *prefix) {
     int errorno = errno;  /* snprintf() may change errno */
     char buf[128] = { 0 };
     size_t len = 0;
@@ -107,35 +107,35 @@ static void __redisSetErrorFromErrno(redisContext *c, int type, const char *pref
     if (prefix != NULL)
         len = snprintf(buf,sizeof(buf),"%s: ",prefix);
     strerror_r(errorno, (char *)(buf + len), sizeof(buf) - len);
-    __redisSetError(c,type,buf);
+    __valkeySetError(c,type,buf);
 }
 
-static int redisSetReuseAddr(redisContext *c) {
+static int valkeySetReuseAddr(valkeyContext *c) {
     int on = 1;
     if (setsockopt(c->fd, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on)) == -1) {
-        __redisSetErrorFromErrno(c,REDIS_ERR_IO,NULL);
-        redisNetClose(c);
-        return REDIS_ERR;
+        __valkeySetErrorFromErrno(c,VALKEY_ERR_IO,NULL);
+        valkeyNetClose(c);
+        return VALKEY_ERR;
     }
-    return REDIS_OK;
+    return VALKEY_OK;
 }
 
-static int redisCreateSocket(redisContext *c, int type) {
-    redisFD s;
-    if ((s = socket(type, SOCK_STREAM, 0)) == REDIS_INVALID_FD) {
-        __redisSetErrorFromErrno(c,REDIS_ERR_IO,NULL);
-        return REDIS_ERR;
+static int valkeyCreateSocket(valkeyContext *c, int type) {
+    valkeyFD s;
+    if ((s = socket(type, SOCK_STREAM, 0)) == VALKEY_INVALID_FD) {
+        __valkeySetErrorFromErrno(c,VALKEY_ERR_IO,NULL);
+        return VALKEY_ERR;
     }
     c->fd = s;
     if (type == AF_INET) {
-        if (redisSetReuseAddr(c) == REDIS_ERR) {
-            return REDIS_ERR;
+        if (valkeySetReuseAddr(c) == VALKEY_ERR) {
+            return VALKEY_ERR;
         }
     }
-    return REDIS_OK;
+    return VALKEY_OK;
 }
 
-static int redisSetBlocking(redisContext *c, int blocking) {
+static int valkeySetBlocking(valkeyContext *c, int blocking) {
 #ifndef _WIN32
     int flags;
 
@@ -143,9 +143,9 @@ static int redisSetBlocking(redisContext *c, int blocking) {
      * Note that fcntl(2) for F_GETFL and F_SETFL can't be
      * interrupted by a signal. */
     if ((flags = fcntl(c->fd, F_GETFL)) == -1) {
-        __redisSetErrorFromErrno(c,REDIS_ERR_IO,"fcntl(F_GETFL)");
-        redisNetClose(c);
-        return REDIS_ERR;
+        __valkeySetErrorFromErrno(c,VALKEY_ERR_IO,"fcntl(F_GETFL)");
+        valkeyNetClose(c);
+        return VALKEY_ERR;
     }
 
     if (blocking)
@@ -154,86 +154,86 @@ static int redisSetBlocking(redisContext *c, int blocking) {
         flags |= O_NONBLOCK;
 
     if (fcntl(c->fd, F_SETFL, flags) == -1) {
-        __redisSetErrorFromErrno(c,REDIS_ERR_IO,"fcntl(F_SETFL)");
-        redisNetClose(c);
-        return REDIS_ERR;
+        __valkeySetErrorFromErrno(c,VALKEY_ERR_IO,"fcntl(F_SETFL)");
+        valkeyNetClose(c);
+        return VALKEY_ERR;
     }
 #else
     u_long mode = blocking ? 0 : 1;
     if (ioctl(c->fd, FIONBIO, &mode) == -1) {
-        __redisSetErrorFromErrno(c, REDIS_ERR_IO, "ioctl(FIONBIO)");
-        redisNetClose(c);
-        return REDIS_ERR;
+        __valkeySetErrorFromErrno(c, VALKEY_ERR_IO, "ioctl(FIONBIO)");
+        valkeyNetClose(c);
+        return VALKEY_ERR;
     }
 #endif /* _WIN32 */
-    return REDIS_OK;
+    return VALKEY_OK;
 }
 
-int redisKeepAlive(redisContext *c, int interval) {
+int valkeyKeepAlive(valkeyContext *c, int interval) {
     int val = 1;
-    redisFD fd = c->fd;
+    valkeyFD fd = c->fd;
 
     /* TCP_KEEPALIVE makes no sense with AF_UNIX connections */
-    if (c->connection_type == REDIS_CONN_UNIX)
-        return REDIS_ERR;
+    if (c->connection_type == VALKEY_CONN_UNIX)
+        return VALKEY_ERR;
 
 #ifndef _WIN32
     if (setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, &val, sizeof(val)) == -1){
-        __redisSetError(c,REDIS_ERR_OTHER,strerror(errno));
-        return REDIS_ERR;
+        __valkeySetError(c,VALKEY_ERR_OTHER,strerror(errno));
+        return VALKEY_ERR;
     }
 
     val = interval;
 
 #if defined(__APPLE__) && defined(__MACH__)
     if (setsockopt(fd, IPPROTO_TCP, TCP_KEEPALIVE, &val, sizeof(val)) < 0) {
-        __redisSetError(c,REDIS_ERR_OTHER,strerror(errno));
-        return REDIS_ERR;
+        __valkeySetError(c,VALKEY_ERR_OTHER,strerror(errno));
+        return VALKEY_ERR;
     }
 #else
 #if defined(__GLIBC__) && !defined(__FreeBSD_kernel__)
     if (setsockopt(fd, IPPROTO_TCP, TCP_KEEPIDLE, &val, sizeof(val)) < 0) {
-        __redisSetError(c,REDIS_ERR_OTHER,strerror(errno));
-        return REDIS_ERR;
+        __valkeySetError(c,VALKEY_ERR_OTHER,strerror(errno));
+        return VALKEY_ERR;
     }
 
     val = interval/3;
     if (val == 0) val = 1;
     if (setsockopt(fd, IPPROTO_TCP, TCP_KEEPINTVL, &val, sizeof(val)) < 0) {
-        __redisSetError(c,REDIS_ERR_OTHER,strerror(errno));
-        return REDIS_ERR;
+        __valkeySetError(c,VALKEY_ERR_OTHER,strerror(errno));
+        return VALKEY_ERR;
     }
 
     val = 3;
     if (setsockopt(fd, IPPROTO_TCP, TCP_KEEPCNT, &val, sizeof(val)) < 0) {
-        __redisSetError(c,REDIS_ERR_OTHER,strerror(errno));
-        return REDIS_ERR;
+        __valkeySetError(c,VALKEY_ERR_OTHER,strerror(errno));
+        return VALKEY_ERR;
     }
 #endif
 #endif
 #else
     int res;
 
-    res = win32_redisKeepAlive(fd, interval * 1000);
+    res = win32_valkeyKeepAlive(fd, interval * 1000);
     if (res != 0) {
-        __redisSetError(c, REDIS_ERR_OTHER, strerror(res));
-        return REDIS_ERR;
+        __valkeySetError(c, VALKEY_ERR_OTHER, strerror(res));
+        return VALKEY_ERR;
     }
 #endif
-    return REDIS_OK;
+    return VALKEY_OK;
 }
 
-int redisSetTcpNoDelay(redisContext *c) {
+int valkeySetTcpNoDelay(valkeyContext *c) {
     int yes = 1;
     if (setsockopt(c->fd, IPPROTO_TCP, TCP_NODELAY, &yes, sizeof(yes)) == -1) {
-        __redisSetErrorFromErrno(c,REDIS_ERR_IO,"setsockopt(TCP_NODELAY)");
-        redisNetClose(c);
-        return REDIS_ERR;
+        __valkeySetErrorFromErrno(c,VALKEY_ERR_IO,"setsockopt(TCP_NODELAY)");
+        valkeyNetClose(c);
+        return VALKEY_ERR;
     }
-    return REDIS_OK;
+    return VALKEY_OK;
 }
 
-int redisContextSetTcpUserTimeout(redisContext *c, unsigned int timeout) {
+int valkeyContextSetTcpUserTimeout(valkeyContext *c, unsigned int timeout) {
     int res;
 #ifdef TCP_USER_TIMEOUT
     res = setsockopt(c->fd, IPPROTO_TCP, TCP_USER_TIMEOUT, &timeout, sizeof(timeout));
@@ -243,16 +243,16 @@ int redisContextSetTcpUserTimeout(redisContext *c, unsigned int timeout) {
     (void)timeout;
 #endif
     if (res == -1) {
-        __redisSetErrorFromErrno(c,REDIS_ERR_IO,"setsockopt(TCP_USER_TIMEOUT)");
-        redisNetClose(c);
-        return REDIS_ERR;
+        __valkeySetErrorFromErrno(c,VALKEY_ERR_IO,"setsockopt(TCP_USER_TIMEOUT)");
+        valkeyNetClose(c);
+        return VALKEY_ERR;
     }
-    return REDIS_OK;
+    return VALKEY_OK;
 }
 
 #define __MAX_MSEC (((LONG_MAX) - 999) / 1000)
 
-static int redisContextTimeoutMsec(redisContext *c, long *result)
+static int valkeyContextTimeoutMsec(valkeyContext *c, long *result)
 {
     const struct timeval *timeout = c->connect_timeout;
     long msec = -1;
@@ -260,9 +260,9 @@ static int redisContextTimeoutMsec(redisContext *c, long *result)
     /* Only use timeout when not NULL. */
     if (timeout != NULL) {
         if (timeout->tv_usec > 1000000 || timeout->tv_sec > __MAX_MSEC) {
-            __redisSetError(c, REDIS_ERR_IO, "Invalid timeout specified");
+            __valkeySetError(c, VALKEY_ERR_IO, "Invalid timeout specified");
             *result = msec;
-            return REDIS_ERR;
+            return VALKEY_ERR;
         }
 
         msec = (timeout->tv_sec * 1000) + ((timeout->tv_usec + 999) / 1000);
@@ -273,10 +273,10 @@ static int redisContextTimeoutMsec(redisContext *c, long *result)
     }
 
     *result = msec;
-    return REDIS_OK;
+    return VALKEY_OK;
 }
 
-static long redisPollMillis(void) {
+static long valkeyPollMillis(void) {
 #ifndef _MSC_VER
     struct timespec now;
     clock_gettime(CLOCK_MONOTONIC, &now);
@@ -288,49 +288,49 @@ static long redisPollMillis(void) {
 #endif
 }
 
-static int redisContextWaitReady(redisContext *c, long msec) {
+static int valkeyContextWaitReady(valkeyContext *c, long msec) {
     struct pollfd wfd;
     long end;
     int res;
 
     if (errno != EINPROGRESS) {
-        __redisSetErrorFromErrno(c,REDIS_ERR_IO,NULL);
-        redisNetClose(c);
-        return REDIS_ERR;
+        __valkeySetErrorFromErrno(c,VALKEY_ERR_IO,NULL);
+        valkeyNetClose(c);
+        return VALKEY_ERR;
     }
 
     wfd.fd = c->fd;
     wfd.events = POLLOUT;
-    end = msec >= 0 ? redisPollMillis() + msec : 0;
+    end = msec >= 0 ? valkeyPollMillis() + msec : 0;
 
     while ((res = poll(&wfd, 1, msec)) <= 0) {
         if (res < 0 && errno != EINTR) {
-            __redisSetErrorFromErrno(c, REDIS_ERR_IO, "poll(2)");
-            redisNetClose(c);
-            return REDIS_ERR;
-        } else if (res == 0 || (msec >= 0 && redisPollMillis() >= end)) {
+            __valkeySetErrorFromErrno(c, VALKEY_ERR_IO, "poll(2)");
+            valkeyNetClose(c);
+            return VALKEY_ERR;
+        } else if (res == 0 || (msec >= 0 && valkeyPollMillis() >= end)) {
             errno = ETIMEDOUT;
-            __redisSetErrorFromErrno(c, REDIS_ERR_IO, NULL);
-            redisNetClose(c);
-            return REDIS_ERR;
+            __valkeySetErrorFromErrno(c, VALKEY_ERR_IO, NULL);
+            valkeyNetClose(c);
+            return VALKEY_ERR;
         } else {
             /* res < 0 && errno == EINTR, try again */
         }
     }
 
-    if (redisCheckConnectDone(c, &res) != REDIS_OK || res == 0) {
-        redisCheckSocketError(c);
-        return REDIS_ERR;
+    if (valkeyCheckConnectDone(c, &res) != VALKEY_OK || res == 0) {
+        valkeyCheckSocketError(c);
+        return VALKEY_ERR;
     }
 
-    return REDIS_OK;
+    return VALKEY_OK;
 }
 
-int redisCheckConnectDone(redisContext *c, int *completed) {
+int valkeyCheckConnectDone(valkeyContext *c, int *completed) {
     int rc = connect(c->fd, (const struct sockaddr *)c->saddr, c->addrlen);
     if (rc == 0) {
         *completed = 1;
-        return REDIS_OK;
+        return VALKEY_OK;
     }
     int error = errno;
     if (error == EINPROGRESS) {
@@ -342,7 +342,7 @@ int redisCheckConnectDone(redisContext *c, int *completed) {
             if (so_error == 0) {
                 /* Socket is connected! */
                 *completed = 1;
-                return REDIS_OK;
+                return VALKEY_OK;
             }
             /* connection error; */
             errno = so_error;
@@ -352,23 +352,23 @@ int redisCheckConnectDone(redisContext *c, int *completed) {
     switch (error) {
     case EISCONN:
         *completed = 1;
-        return REDIS_OK;
+        return VALKEY_OK;
     case EALREADY:
     case EWOULDBLOCK:
         *completed = 0;
-        return REDIS_OK;
+        return VALKEY_OK;
     default:
-        return REDIS_ERR;
+        return VALKEY_ERR;
     }
 }
 
-int redisCheckSocketError(redisContext *c) {
+int valkeyCheckSocketError(valkeyContext *c) {
     int err = 0, errno_saved = errno;
     socklen_t errlen = sizeof(err);
 
     if (getsockopt(c->fd, SOL_SOCKET, SO_ERROR, &err, &errlen) == -1) {
-        __redisSetErrorFromErrno(c,REDIS_ERR_IO,"getsockopt(SO_ERROR)");
-        return REDIS_ERR;
+        __valkeySetErrorFromErrno(c,VALKEY_ERR_IO,"getsockopt(SO_ERROR)");
+        return VALKEY_ERR;
     }
 
     if (err == 0) {
@@ -377,78 +377,78 @@ int redisCheckSocketError(redisContext *c) {
 
     if (err) {
         errno = err;
-        __redisSetErrorFromErrno(c,REDIS_ERR_IO,NULL);
-        return REDIS_ERR;
+        __valkeySetErrorFromErrno(c,VALKEY_ERR_IO,NULL);
+        return VALKEY_ERR;
     }
 
-    return REDIS_OK;
+    return VALKEY_OK;
 }
 
-int redisContextSetTimeout(redisContext *c, const struct timeval tv) {
+int valkeyContextSetTimeout(valkeyContext *c, const struct timeval tv) {
     const void *to_ptr = &tv;
     size_t to_sz = sizeof(tv);
 
-    if (redisContextUpdateCommandTimeout(c, &tv) != REDIS_OK) {
-        __redisSetError(c, REDIS_ERR_OOM, "Out of memory");
-        return REDIS_ERR;
+    if (valkeyContextUpdateCommandTimeout(c, &tv) != VALKEY_OK) {
+        __valkeySetError(c, VALKEY_ERR_OOM, "Out of memory");
+        return VALKEY_ERR;
     }
     if (setsockopt(c->fd,SOL_SOCKET,SO_RCVTIMEO,to_ptr,to_sz) == -1) {
-        __redisSetErrorFromErrno(c,REDIS_ERR_IO,"setsockopt(SO_RCVTIMEO)");
-        return REDIS_ERR;
+        __valkeySetErrorFromErrno(c,VALKEY_ERR_IO,"setsockopt(SO_RCVTIMEO)");
+        return VALKEY_ERR;
     }
     if (setsockopt(c->fd,SOL_SOCKET,SO_SNDTIMEO,to_ptr,to_sz) == -1) {
-        __redisSetErrorFromErrno(c,REDIS_ERR_IO,"setsockopt(SO_SNDTIMEO)");
-        return REDIS_ERR;
+        __valkeySetErrorFromErrno(c,VALKEY_ERR_IO,"setsockopt(SO_SNDTIMEO)");
+        return VALKEY_ERR;
     }
-    return REDIS_OK;
+    return VALKEY_OK;
 }
 
-int redisContextUpdateConnectTimeout(redisContext *c, const struct timeval *timeout) {
+int valkeyContextUpdateConnectTimeout(valkeyContext *c, const struct timeval *timeout) {
     /* Same timeval struct, short circuit */
     if (c->connect_timeout == timeout)
-        return REDIS_OK;
+        return VALKEY_OK;
 
     /* Allocate context timeval if we need to */
     if (c->connect_timeout == NULL) {
-        c->connect_timeout = hi_malloc(sizeof(*c->connect_timeout));
+        c->connect_timeout = vk_malloc(sizeof(*c->connect_timeout));
         if (c->connect_timeout == NULL)
-            return REDIS_ERR;
+            return VALKEY_ERR;
     }
 
     memcpy(c->connect_timeout, timeout, sizeof(*c->connect_timeout));
-    return REDIS_OK;
+    return VALKEY_OK;
 }
 
-int redisContextUpdateCommandTimeout(redisContext *c, const struct timeval *timeout) {
+int valkeyContextUpdateCommandTimeout(valkeyContext *c, const struct timeval *timeout) {
     /* Same timeval struct, short circuit */
     if (c->command_timeout == timeout)
-        return REDIS_OK;
+        return VALKEY_OK;
 
     /* Allocate context timeval if we need to */
     if (c->command_timeout == NULL) {
-        c->command_timeout = hi_malloc(sizeof(*c->command_timeout));
+        c->command_timeout = vk_malloc(sizeof(*c->command_timeout));
         if (c->command_timeout == NULL)
-            return REDIS_ERR;
+            return VALKEY_ERR;
     }
 
     memcpy(c->command_timeout, timeout, sizeof(*c->command_timeout));
-    return REDIS_OK;
+    return VALKEY_OK;
 }
 
-static int _redisContextConnectTcp(redisContext *c, const char *addr, int port,
+static int _valkeyContextConnectTcp(valkeyContext *c, const char *addr, int port,
                                    const struct timeval *timeout,
                                    const char *source_addr) {
-    redisFD s;
+    valkeyFD s;
     int rv, n;
     char _port[6];  /* strlen("65535"); */
     struct addrinfo hints, *servinfo, *bservinfo, *p, *b;
-    int blocking = (c->flags & REDIS_BLOCK);
-    int reuseaddr = (c->flags & REDIS_REUSEADDR);
+    int blocking = (c->flags & VALKEY_BLOCK);
+    int reuseaddr = (c->flags & VALKEY_REUSEADDR);
     int reuses = 0;
     long timeout_msec = -1;
 
     servinfo = NULL;
-    c->connection_type = REDIS_CONN_TCP;
+    c->connection_type = VALKEY_CONN_TCP;
     c->tcp.port = port;
 
     /* We need to take possession of the passed parameters
@@ -459,31 +459,31 @@ static int _redisContextConnectTcp(redisContext *c, const char *addr, int port,
      * This is a bit ugly, but atleast it works and doesn't leak memory.
      **/
     if (c->tcp.host != addr) {
-        hi_free(c->tcp.host);
+        vk_free(c->tcp.host);
 
-        c->tcp.host = hi_strdup(addr);
+        c->tcp.host = vk_strdup(addr);
         if (c->tcp.host == NULL)
             goto oom;
     }
 
     if (timeout) {
-        if (redisContextUpdateConnectTimeout(c, timeout) == REDIS_ERR)
+        if (valkeyContextUpdateConnectTimeout(c, timeout) == VALKEY_ERR)
             goto oom;
     } else {
-        hi_free(c->connect_timeout);
+        vk_free(c->connect_timeout);
         c->connect_timeout = NULL;
     }
 
-    if (redisContextTimeoutMsec(c, &timeout_msec) != REDIS_OK) {
+    if (valkeyContextTimeoutMsec(c, &timeout_msec) != VALKEY_OK) {
         goto error;
     }
 
     if (source_addr == NULL) {
-        hi_free(c->tcp.source_addr);
+        vk_free(c->tcp.source_addr);
         c->tcp.source_addr = NULL;
     } else if (c->tcp.source_addr != source_addr) {
-        hi_free(c->tcp.source_addr);
-        c->tcp.source_addr = hi_strdup(source_addr);
+        vk_free(c->tcp.source_addr);
+        c->tcp.source_addr = vk_strdup(source_addr);
     }
 
     snprintf(_port, 6, "%d", port);
@@ -494,9 +494,9 @@ static int _redisContextConnectTcp(redisContext *c, const char *addr, int port,
     /* DNS lookup. To use dual stack, set both flags to prefer both IPv4 and
      * IPv6. By default, for historical reasons, we try IPv4 first and then we
      * try IPv6 only if no IPv4 address was found. */
-    if (c->flags & REDIS_PREFER_IPV6 && c->flags & REDIS_PREFER_IPV4)
+    if (c->flags & VALKEY_PREFER_IPV6 && c->flags & VALKEY_PREFER_IPV4)
         hints.ai_family = AF_UNSPEC;
-    else if (c->flags & REDIS_PREFER_IPV6)
+    else if (c->flags & VALKEY_PREFER_IPV6)
         hints.ai_family = AF_INET6;
     else
         hints.ai_family = AF_INET;
@@ -508,16 +508,16 @@ static int _redisContextConnectTcp(redisContext *c, const char *addr, int port,
         rv = getaddrinfo(c->tcp.host, _port, &hints, &servinfo);
     }
     if (rv != 0) {
-        __redisSetError(c, REDIS_ERR_OTHER, gai_strerror(rv));
-        return REDIS_ERR;
+        __valkeySetError(c, VALKEY_ERR_OTHER, gai_strerror(rv));
+        return VALKEY_ERR;
     }
     for (p = servinfo; p != NULL; p = p->ai_next) {
 addrretry:
-        if ((s = socket(p->ai_family,p->ai_socktype,p->ai_protocol)) == REDIS_INVALID_FD)
+        if ((s = socket(p->ai_family,p->ai_socktype,p->ai_protocol)) == VALKEY_INVALID_FD)
             continue;
 
         c->fd = s;
-        if (redisSetBlocking(c,0) != REDIS_OK)
+        if (valkeySetBlocking(c,0) != VALKEY_OK)
             goto error;
         if (c->tcp.source_addr) {
             int bound = 0;
@@ -525,7 +525,7 @@ addrretry:
             if ((rv = getaddrinfo(c->tcp.source_addr, NULL, &hints, &bservinfo)) != 0) {
                 char buf[128];
                 snprintf(buf,sizeof(buf),"Can't get addr: %s",gai_strerror(rv));
-                __redisSetError(c,REDIS_ERR_OTHER,buf);
+                __valkeySetError(c,VALKEY_ERR_OTHER,buf);
                 goto error;
             }
 
@@ -548,14 +548,14 @@ addrretry:
             if (!bound) {
                 char buf[128];
                 snprintf(buf,sizeof(buf),"Can't bind socket: %s",strerror(errno));
-                __redisSetError(c,REDIS_ERR_OTHER,buf);
+                __valkeySetError(c,VALKEY_ERR_OTHER,buf);
                 goto error;
             }
         }
 
         /* For repeat connection */
-        hi_free(c->saddr);
-        c->saddr = hi_malloc(p->ai_addrlen);
+        vk_free(c->saddr);
+        c->saddr = vk_malloc(p->ai_addrlen);
         if (c->saddr == NULL)
             goto oom;
 
@@ -564,7 +564,7 @@ addrretry:
 
         if (connect(s,p->ai_addr,p->ai_addrlen) == -1) {
             if (errno == EHOSTUNREACH) {
-                redisNetClose(c);
+                valkeyNetClose(c);
                 continue;
             } else if (errno == EINPROGRESS) {
                 if (blocking) {
@@ -575,92 +575,92 @@ addrretry:
                  * for `connect()`
                  */
             } else if (errno == EADDRNOTAVAIL && reuseaddr) {
-                if (++reuses >= REDIS_CONNECT_RETRIES) {
+                if (++reuses >= VALKEY_CONNECT_RETRIES) {
                     goto error;
                 } else {
-                    redisNetClose(c);
+                    valkeyNetClose(c);
                     goto addrretry;
                 }
             } else {
                 wait_for_ready:
-                if (redisContextWaitReady(c,timeout_msec) != REDIS_OK)
+                if (valkeyContextWaitReady(c,timeout_msec) != VALKEY_OK)
                     goto error;
-                if (redisSetTcpNoDelay(c) != REDIS_OK)
+                if (valkeySetTcpNoDelay(c) != VALKEY_OK)
                     goto error;
             }
         }
-        if (blocking && redisSetBlocking(c,1) != REDIS_OK)
+        if (blocking && valkeySetBlocking(c,1) != VALKEY_OK)
             goto error;
 
-        c->flags |= REDIS_CONNECTED;
-        rv = REDIS_OK;
+        c->flags |= VALKEY_CONNECTED;
+        rv = VALKEY_OK;
         goto end;
     }
     if (p == NULL) {
         char buf[128];
         snprintf(buf,sizeof(buf),"Can't create socket: %s",strerror(errno));
-        __redisSetError(c,REDIS_ERR_OTHER,buf);
+        __valkeySetError(c,VALKEY_ERR_OTHER,buf);
         goto error;
     }
 
 oom:
-    __redisSetError(c, REDIS_ERR_OOM, "Out of memory");
+    __valkeySetError(c, VALKEY_ERR_OOM, "Out of memory");
 error:
-    rv = REDIS_ERR;
+    rv = VALKEY_ERR;
 end:
     if(servinfo) {
         freeaddrinfo(servinfo);
     }
 
-    return rv;  // Need to return REDIS_OK if alright
+    return rv;  // Need to return VALKEY_OK if alright
 }
 
-int redisContextConnectTcp(redisContext *c, const char *addr, int port,
+int valkeyContextConnectTcp(valkeyContext *c, const char *addr, int port,
                            const struct timeval *timeout) {
-    return _redisContextConnectTcp(c, addr, port, timeout, NULL);
+    return _valkeyContextConnectTcp(c, addr, port, timeout, NULL);
 }
 
-int redisContextConnectBindTcp(redisContext *c, const char *addr, int port,
+int valkeyContextConnectBindTcp(valkeyContext *c, const char *addr, int port,
                                const struct timeval *timeout,
                                const char *source_addr) {
-    return _redisContextConnectTcp(c, addr, port, timeout, source_addr);
+    return _valkeyContextConnectTcp(c, addr, port, timeout, source_addr);
 }
 
-int redisContextConnectUnix(redisContext *c, const char *path, const struct timeval *timeout) {
+int valkeyContextConnectUnix(valkeyContext *c, const char *path, const struct timeval *timeout) {
 #ifndef _WIN32
-    int blocking = (c->flags & REDIS_BLOCK);
+    int blocking = (c->flags & VALKEY_BLOCK);
     struct sockaddr_un *sa;
     long timeout_msec = -1;
 
-    if (redisCreateSocket(c,AF_UNIX) < 0)
-        return REDIS_ERR;
-    if (redisSetBlocking(c,0) != REDIS_OK)
-        return REDIS_ERR;
+    if (valkeyCreateSocket(c,AF_UNIX) < 0)
+        return VALKEY_ERR;
+    if (valkeySetBlocking(c,0) != VALKEY_OK)
+        return VALKEY_ERR;
 
-    c->connection_type = REDIS_CONN_UNIX;
+    c->connection_type = VALKEY_CONN_UNIX;
     if (c->unix_sock.path != path) {
-        hi_free(c->unix_sock.path);
+        vk_free(c->unix_sock.path);
 
-        c->unix_sock.path = hi_strdup(path);
+        c->unix_sock.path = vk_strdup(path);
         if (c->unix_sock.path == NULL)
             goto oom;
     }
 
     if (timeout) {
-        if (redisContextUpdateConnectTimeout(c, timeout) == REDIS_ERR)
+        if (valkeyContextUpdateConnectTimeout(c, timeout) == VALKEY_ERR)
             goto oom;
     } else {
-        hi_free(c->connect_timeout);
+        vk_free(c->connect_timeout);
         c->connect_timeout = NULL;
     }
 
-    if (redisContextTimeoutMsec(c,&timeout_msec) != REDIS_OK)
-        return REDIS_ERR;
+    if (valkeyContextTimeoutMsec(c,&timeout_msec) != VALKEY_OK)
+        return VALKEY_ERR;
 
     /* Don't leak sockaddr if we're reconnecting */
-    if (c->saddr) hi_free(c->saddr);
+    if (c->saddr) vk_free(c->saddr);
 
-    sa = (struct sockaddr_un*)(c->saddr = hi_malloc(sizeof(struct sockaddr_un)));
+    sa = (struct sockaddr_un*)(c->saddr = vk_malloc(sizeof(struct sockaddr_un)));
     if (sa == NULL)
         goto oom;
 
@@ -671,24 +671,24 @@ int redisContextConnectUnix(redisContext *c, const char *path, const struct time
         if (errno == EINPROGRESS && !blocking) {
             /* This is ok. */
         } else {
-            if (redisContextWaitReady(c,timeout_msec) != REDIS_OK)
-                return REDIS_ERR;
+            if (valkeyContextWaitReady(c,timeout_msec) != VALKEY_OK)
+                return VALKEY_ERR;
         }
     }
 
     /* Reset socket to be blocking after connect(2). */
-    if (blocking && redisSetBlocking(c,1) != REDIS_OK)
-        return REDIS_ERR;
+    if (blocking && valkeySetBlocking(c,1) != VALKEY_OK)
+        return VALKEY_ERR;
 
-    c->flags |= REDIS_CONNECTED;
-    return REDIS_OK;
+    c->flags |= VALKEY_CONNECTED;
+    return VALKEY_OK;
 #else
     /* We currently do not support Unix sockets for Windows. */
     /* TODO(m): https://devblogs.microsoft.com/commandline/af_unix-comes-to-windows/ */
     errno = EPROTONOSUPPORT;
-    return REDIS_ERR;
+    return VALKEY_ERR;
 #endif /* _WIN32 */
 oom:
-    __redisSetError(c, REDIS_ERR_OOM, "Out of memory");
-    return REDIS_ERR;
+    __valkeySetError(c, VALKEY_ERR_OOM, "Out of memory");
+    return VALKEY_ERR;
 }
