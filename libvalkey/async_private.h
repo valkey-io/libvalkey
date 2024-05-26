@@ -69,7 +69,7 @@ static inline void refreshTimeout(valkeyAsyncContext *ctx) {
     }
 }
 
-void __valkeyAsyncDisconnect(valkeyAsyncContext *ac);
+void valkeyAsyncDisconnectInternal(valkeyAsyncContext *ac);
 void valkeyProcessCallbacks(valkeyAsyncContext *ac);
 
 #endif  /* VALKEY_ASYNC_PRIVATE_H */

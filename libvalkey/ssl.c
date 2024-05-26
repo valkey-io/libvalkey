@@ -61,7 +61,7 @@
 
 #define OPENSSL_1_1_0 0x10100000L
 
-void __valkeySetError(valkeyContext *c, int type, const char *str);
+void valkeySetError(valkeyContext *c, int type, const char *str);
 
 struct valkeySSLContext {
     /* Associated OpenSSL SSL_CTX as created by valkeyCreateSSLContext() */
@@ -354,13 +354,13 @@ error:
 
 static int valkeySSLConnect(valkeyContext *c, SSL *ssl) {
     if (c->privctx) {
-        __valkeySetError(c, VALKEY_ERR_OTHER, "valkeyContext was already associated");
+        valkeySetError(c, VALKEY_ERR_OTHER, "valkeyContext was already associated");
         return VALKEY_ERR;
     }
 
     valkeySSL *rssl = vk_calloc(1, sizeof(valkeySSL));
     if (rssl == NULL) {
-        __valkeySetError(c, VALKEY_ERR_OOM, "Out of memory");
+        valkeySetError(c, VALKEY_ERR_OOM, "Out of memory");
         return VALKEY_ERR;
     }
 
@@ -397,7 +397,7 @@ static int valkeySSLConnect(valkeyContext *c, SSL *ssl) {
             snprintf(err,sizeof(err)-1,"SSL_connect failed: %s",
                     ERR_reason_error_string(e));
         }
-        __valkeySetError(c, VALKEY_ERR_IO, err);
+        valkeySetError(c, VALKEY_ERR_IO, err);
     }
 
     vk_free(rssl);
@@ -431,13 +431,13 @@ int valkeyInitiateSSLWithContext(valkeyContext *c, valkeySSLContext *valkey_ssl_
 
     SSL *ssl = SSL_new(valkey_ssl_ctx->ssl_ctx);
     if (!ssl) {
-        __valkeySetError(c, VALKEY_ERR_OTHER, "Couldn't create new SSL instance");
+        valkeySetError(c, VALKEY_ERR_OTHER, "Couldn't create new SSL instance");
         goto error;
     }
 
     if (valkey_ssl_ctx->server_name) {
         if (!SSL_set_tlsext_host_name(ssl, valkey_ssl_ctx->server_name)) {
-            __valkeySetError(c, VALKEY_ERR_OTHER, "Failed to set server_name/SNI");
+            valkeySetError(c, VALKEY_ERR_OTHER, "Failed to set server_name/SNI");
             goto error;
         }
     }
@@ -492,7 +492,7 @@ static ssize_t valkeySSLRead(valkeyContext *c, char *buf, size_t bufcap) {
     if (nread > 0) {
         return nread;
     } else if (nread == 0) {
-        __valkeySetError(c, VALKEY_ERR_EOF, "Server closed the connection");
+        valkeySetError(c, VALKEY_ERR_EOF, "Server closed the connection");
         return -1;
     } else {
         int err = SSL_get_error(rssl->ssl, nread);
@@ -510,7 +510,7 @@ static ssize_t valkeySSLRead(valkeyContext *c, char *buf, size_t bufcap) {
                 if (errno == EAGAIN) {
                     msg = "Resource temporarily unavailable";
                 }
-                __valkeySetError(c, VALKEY_ERR_IO, msg);
+                valkeySetError(c, VALKEY_ERR_IO, msg);
                 return -1;
             }
         }
@@ -521,7 +521,7 @@ static ssize_t valkeySSLRead(valkeyContext *c, char *buf, size_t bufcap) {
         if (maybeCheckWant(rssl, err)) {
             return 0;
         } else {
-            __valkeySetError(c, VALKEY_ERR_IO, NULL);
+            valkeySetError(c, VALKEY_ERR_IO, NULL);
             return -1;
         }
     }
@@ -542,7 +542,7 @@ static ssize_t valkeySSLWrite(valkeyContext *c) {
         if ((c->flags & VALKEY_BLOCK) == 0 && maybeCheckWant(rssl, err)) {
             return 0;
         } else {
-            __valkeySetError(c, VALKEY_ERR_IO, NULL);
+            valkeySetError(c, VALKEY_ERR_IO, NULL);
             return -1;
         }
     }
@@ -563,7 +563,7 @@ static void valkeySSLAsyncRead(valkeyAsyncContext *ac) {
         rssl->pendingWrite = 0;
         rv = valkeyBufferWrite(c, &done);
         if (rv == VALKEY_ERR) {
-            __valkeyAsyncDisconnect(ac);
+            valkeyAsyncDisconnectInternal(ac);
             return;
         } else if (!done) {
             _EL_ADD_WRITE(ac);
@@ -572,7 +572,7 @@ static void valkeySSLAsyncRead(valkeyAsyncContext *ac) {
 
     rv = valkeyBufferRead(c);
     if (rv == VALKEY_ERR) {
-        __valkeyAsyncDisconnect(ac);
+        valkeyAsyncDisconnectInternal(ac);
     } else {
         _EL_ADD_READ(ac);
         valkeyProcessCallbacks(ac);
@@ -587,7 +587,7 @@ static void valkeySSLAsyncWrite(valkeyAsyncContext *ac) {
     rssl->pendingWrite = 0;
     rv = valkeyBufferWrite(c, &done);
     if (rv == VALKEY_ERR) {
-        __valkeyAsyncDisconnect(ac);
+        valkeyAsyncDisconnectInternal(ac);
         return;
     }
 

@@ -50,7 +50,7 @@
 /* Initial size of our nested reply stack and how much we grow it when needd */
 #define VALKEY_READER_STACK_SIZE 9
 
-static void __valkeyReaderSetError(valkeyReader *r, int type, const char *str) {
+static void valkeyReaderSetError(valkeyReader *r, int type, const char *str) {
     size_t len;
 
     if (r->reply != NULL && r->fn && r->fn->freeObject) {
@@ -98,17 +98,17 @@ static size_t chrtos(char *buf, size_t size, char byte) {
     return len;
 }
 
-static void __valkeyReaderSetErrorProtocolByte(valkeyReader *r, char byte) {
+static void valkeyReaderSetErrorProtocolByte(valkeyReader *r, char byte) {
     char cbuf[8], sbuf[128];
 
     chrtos(cbuf,sizeof(cbuf),byte);
     snprintf(sbuf,sizeof(sbuf),
         "Protocol error, got %s as reply type byte", cbuf);
-    __valkeyReaderSetError(r,VALKEY_ERR_PROTOCOL,sbuf);
+    valkeyReaderSetError(r,VALKEY_ERR_PROTOCOL,sbuf);
 }
 
-static void __valkeyReaderSetErrorOOM(valkeyReader *r) {
-    __valkeyReaderSetError(r,VALKEY_ERR_OOM,"Out of memory");
+static void valkeyReaderSetErrorOOM(valkeyReader *r) {
+    valkeyReaderSetError(r,VALKEY_ERR_OOM,"Out of memory");
 }
 
 static char *readBytes(valkeyReader *r, unsigned int bytes) {
@@ -277,7 +277,7 @@ static int processLineItem(valkeyReader *r) {
             long long v;
 
             if (string2ll(p, len, &v) == VALKEY_ERR) {
-                __valkeyReaderSetError(r,VALKEY_ERR_PROTOCOL,
+                valkeyReaderSetError(r,VALKEY_ERR_PROTOCOL,
                         "Bad integer value");
                 return VALKEY_ERR;
             }
@@ -292,7 +292,7 @@ static int processLineItem(valkeyReader *r) {
             double d;
 
             if ((size_t)len >= sizeof(buf)) {
-                __valkeyReaderSetError(r,VALKEY_ERR_PROTOCOL,
+                valkeyReaderSetError(r,VALKEY_ERR_PROTOCOL,
                         "Double value is too large");
                 return VALKEY_ERR;
             }
@@ -314,7 +314,7 @@ static int processLineItem(valkeyReader *r) {
                  * etc. We explicity handle our two allowed infinite cases and NaN
                  * above, so strtod() should only result in finite values. */
                 if (buf[0] == '\0' || eptr != &buf[len] || !isfinite(d)) {
-                    __valkeyReaderSetError(r,VALKEY_ERR_PROTOCOL,
+                    valkeyReaderSetError(r,VALKEY_ERR_PROTOCOL,
                             "Bad double value");
                     return VALKEY_ERR;
                 }
@@ -327,7 +327,7 @@ static int processLineItem(valkeyReader *r) {
             }
         } else if (cur->type == VALKEY_REPLY_NIL) {
             if (len != 0) {
-                __valkeyReaderSetError(r,VALKEY_ERR_PROTOCOL,
+                valkeyReaderSetError(r,VALKEY_ERR_PROTOCOL,
                         "Bad nil value");
                 return VALKEY_ERR;
             }
@@ -340,7 +340,7 @@ static int processLineItem(valkeyReader *r) {
             int bval;
 
             if (len != 1 || !strchr("tTfF", p[0])) {
-                __valkeyReaderSetError(r,VALKEY_ERR_PROTOCOL,
+                valkeyReaderSetError(r,VALKEY_ERR_PROTOCOL,
                         "Bad bool value");
                 return VALKEY_ERR;
             }
@@ -357,7 +357,7 @@ static int processLineItem(valkeyReader *r) {
                 /* XXX Consider: Allow leading '+'? Error on leading '0's? */
                 if (i == 0 && p[0] == '-') continue;
                 if (p[i] < '0' || p[i] > '9') {
-                    __valkeyReaderSetError(r,VALKEY_ERR_PROTOCOL,
+                    valkeyReaderSetError(r,VALKEY_ERR_PROTOCOL,
                             "Bad bignum value");
                     return VALKEY_ERR;
                 }
@@ -370,7 +370,7 @@ static int processLineItem(valkeyReader *r) {
             /* Type will be error or status. */
             for (int i = 0; i < len; i++) {
                 if (p[i] == '\r' || p[i] == '\n') {
-                    __valkeyReaderSetError(r,VALKEY_ERR_PROTOCOL,
+                    valkeyReaderSetError(r,VALKEY_ERR_PROTOCOL,
                             "Bad simple string value");
                     return VALKEY_ERR;
                 }
@@ -382,7 +382,7 @@ static int processLineItem(valkeyReader *r) {
         }
 
         if (obj == NULL) {
-            __valkeyReaderSetErrorOOM(r);
+            valkeyReaderSetErrorOOM(r);
             return VALKEY_ERR;
         }
 
@@ -410,13 +410,13 @@ static int processBulkItem(valkeyReader *r) {
         bytelen = s-(r->buf+r->pos)+2; /* include \r\n */
 
         if (string2ll(p, bytelen - 2, &len) == VALKEY_ERR) {
-            __valkeyReaderSetError(r,VALKEY_ERR_PROTOCOL,
+            valkeyReaderSetError(r,VALKEY_ERR_PROTOCOL,
                     "Bad bulk string length");
             return VALKEY_ERR;
         }
 
         if (len < -1 || (LLONG_MAX > SIZE_MAX && len > (long long)SIZE_MAX)) {
-            __valkeyReaderSetError(r,VALKEY_ERR_PROTOCOL,
+            valkeyReaderSetError(r,VALKEY_ERR_PROTOCOL,
                     "Bulk string length out of range");
             return VALKEY_ERR;
         }
@@ -435,7 +435,7 @@ static int processBulkItem(valkeyReader *r) {
                 if ((cur->type == VALKEY_REPLY_VERB && len < 4) ||
                     (cur->type == VALKEY_REPLY_VERB && s[5] != ':'))
                 {
-                    __valkeyReaderSetError(r,VALKEY_ERR_PROTOCOL,
+                    valkeyReaderSetError(r,VALKEY_ERR_PROTOCOL,
                             "Verbatim string 4 bytes of content type are "
                             "missing or incorrectly encoded.");
                     return VALKEY_ERR;
@@ -451,7 +451,7 @@ static int processBulkItem(valkeyReader *r) {
         /* Proceed when obj was created. */
         if (success) {
             if (obj == NULL) {
-                __valkeyReaderSetErrorOOM(r);
+                valkeyReaderSetErrorOOM(r);
                 return VALKEY_ERR;
             }
 
@@ -488,7 +488,7 @@ static int valkeyReaderGrow(valkeyReader *r) {
 
     return VALKEY_OK;
 oom:
-    __valkeyReaderSetErrorOOM(r);
+    valkeyReaderSetErrorOOM(r);
     return VALKEY_ERR;
 }
 
@@ -507,7 +507,7 @@ static int processAggregateItem(valkeyReader *r) {
 
     if ((p = readLine(r,&len)) != NULL) {
         if (string2ll(p, len, &elements) == VALKEY_ERR) {
-            __valkeyReaderSetError(r,VALKEY_ERR_PROTOCOL,
+            valkeyReaderSetError(r,VALKEY_ERR_PROTOCOL,
                     "Bad multi-bulk length");
             return VALKEY_ERR;
         }
@@ -517,7 +517,7 @@ static int processAggregateItem(valkeyReader *r) {
         if (elements < -1 || (LLONG_MAX > SIZE_MAX && elements > SIZE_MAX) ||
             (r->maxelements > 0 && elements > r->maxelements))
         {
-            __valkeyReaderSetError(r,VALKEY_ERR_PROTOCOL,
+            valkeyReaderSetError(r,VALKEY_ERR_PROTOCOL,
                     "Multi-bulk length out of range");
             return VALKEY_ERR;
         }
@@ -529,7 +529,7 @@ static int processAggregateItem(valkeyReader *r) {
                 obj = (void*)VALKEY_REPLY_NIL;
 
             if (obj == NULL) {
-                __valkeyReaderSetErrorOOM(r);
+                valkeyReaderSetErrorOOM(r);
                 return VALKEY_ERR;
             }
 
@@ -543,7 +543,7 @@ static int processAggregateItem(valkeyReader *r) {
                 obj = (void*)(uintptr_t)cur->type;
 
             if (obj == NULL) {
-                __valkeyReaderSetErrorOOM(r);
+                valkeyReaderSetErrorOOM(r);
                 return VALKEY_ERR;
             }
 
@@ -622,7 +622,7 @@ static int processItem(valkeyReader *r) {
                 cur->type = VALKEY_REPLY_BIGNUM;
                 break;
             default:
-                __valkeyReaderSetErrorProtocolByte(r,*p);
+                valkeyReaderSetErrorProtocolByte(r,*p);
                 return VALKEY_ERR;
             }
         } else {
@@ -735,7 +735,7 @@ int valkeyReaderFeed(valkeyReader *r, const char *buf, size_t len) {
 
     return VALKEY_OK;
 oom:
-    __valkeyReaderSetErrorOOM(r);
+    valkeyReaderSetErrorOOM(r);
     return VALKEY_ERR;
 }
 

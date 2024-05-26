@@ -688,7 +688,7 @@ void valkeyFreeCommand(char *cmd) {
     vk_free(cmd);
 }
 
-void __valkeySetError(valkeyContext *c, int type, const char *str) {
+void valkeySetError(valkeyContext *c, int type, const char *str) {
     size_t len;
 
     c->err = type;
@@ -788,7 +788,7 @@ int valkeyReconnect(valkeyContext *c) {
     c->reader = valkeyReaderCreate();
 
     if (c->obuf == NULL || c->reader == NULL) {
-        __valkeySetError(c, VALKEY_ERR_OOM, "Out of memory");
+        valkeySetError(c, VALKEY_ERR_OOM, "Out of memory");
         return VALKEY_ERR;
     }
 
@@ -801,7 +801,7 @@ int valkeyReconnect(valkeyContext *c) {
     } else {
         /* Something bad happened here and shouldn't have. There isn't
            enough information in the context to reconnect. */
-        __valkeySetError(c,VALKEY_ERR_OTHER,"Not enough information to reconnect");
+        valkeySetError(c,VALKEY_ERR_OTHER,"Not enough information to reconnect");
         ret = VALKEY_ERR;
     }
 
@@ -848,7 +848,7 @@ valkeyContext *valkeyConnectWithOptions(const valkeyOptions *options) {
 
     if (valkeyContextUpdateConnectTimeout(c, options->connect_timeout) != VALKEY_OK ||
         valkeyContextUpdateCommandTimeout(c, options->command_timeout) != VALKEY_OK) {
-        __valkeySetError(c, VALKEY_ERR_OOM, "Out of memory");
+        valkeySetError(c, VALKEY_ERR_OOM, "Out of memory");
         return c;
     }
 
@@ -990,7 +990,7 @@ int valkeyBufferRead(valkeyContext *c) {
         return VALKEY_ERR;
     }
     if (nread > 0 && valkeyReaderFeed(c->reader, buf, nread) != VALKEY_OK) {
-        __valkeySetError(c, c->reader->err, c->reader->errstr);
+        valkeySetError(c, c->reader->err, c->reader->errstr);
         return VALKEY_ERR;
     }
     return VALKEY_OK;
@@ -1030,7 +1030,7 @@ int valkeyBufferWrite(valkeyContext *c, int *done) {
     return VALKEY_OK;
 
 oom:
-    __valkeySetError(c, VALKEY_ERR_OOM, "Out of memory");
+    valkeySetError(c, VALKEY_ERR_OOM, "Out of memory");
     return VALKEY_ERR;
 }
 
@@ -1048,7 +1048,7 @@ static int valkeyHandledPushReply(valkeyContext *c, void *reply) {
 /* Get a reply from our reader or set an error in the context. */
 int valkeyGetReplyFromReader(valkeyContext *c, void **reply) {
     if (valkeyReaderGetReply(c->reader, reply) == VALKEY_ERR) {
-        __valkeySetError(c,c->reader->err,c->reader->errstr);
+        valkeySetError(c,c->reader->err,c->reader->errstr);
         return VALKEY_ERR;
     }
 
@@ -1110,12 +1110,12 @@ int valkeyGetReply(valkeyContext *c, void **reply) {
  * is used, you need to call valkeyGetReply yourself to retrieve
  * the reply (or replies in pub/sub).
  */
-int __valkeyAppendCommand(valkeyContext *c, const char *cmd, size_t len) {
+int valkeyAppendCmdLen(valkeyContext *c, const char *cmd, size_t len) {
     sds newbuf;
 
     newbuf = sdscatlen(c->obuf,cmd,len);
     if (newbuf == NULL) {
-        __valkeySetError(c,VALKEY_ERR_OOM,"Out of memory");
+        valkeySetError(c,VALKEY_ERR_OOM,"Out of memory");
         return VALKEY_ERR;
     }
 
@@ -1125,7 +1125,7 @@ int __valkeyAppendCommand(valkeyContext *c, const char *cmd, size_t len) {
 
 int valkeyAppendFormattedCommand(valkeyContext *c, const char *cmd, size_t len) {
 
-    if (__valkeyAppendCommand(c, cmd, len) != VALKEY_OK) {
+    if (valkeyAppendCmdLen(c, cmd, len) != VALKEY_OK) {
         return VALKEY_ERR;
     }
 
@@ -1138,14 +1138,14 @@ int valkeyvAppendCommand(valkeyContext *c, const char *format, va_list ap) {
 
     len = valkeyvFormatCommand(&cmd,format,ap);
     if (len == -1) {
-        __valkeySetError(c,VALKEY_ERR_OOM,"Out of memory");
+        valkeySetError(c,VALKEY_ERR_OOM,"Out of memory");
         return VALKEY_ERR;
     } else if (len == -2) {
-        __valkeySetError(c,VALKEY_ERR_OTHER,"Invalid format string");
+        valkeySetError(c,VALKEY_ERR_OTHER,"Invalid format string");
         return VALKEY_ERR;
     }
 
-    if (__valkeyAppendCommand(c,cmd,len) != VALKEY_OK) {
+    if (valkeyAppendCmdLen(c,cmd,len) != VALKEY_OK) {
         vk_free(cmd);
         return VALKEY_ERR;
     }
@@ -1170,11 +1170,11 @@ int valkeyAppendCommandArgv(valkeyContext *c, int argc, const char **argv, const
 
     len = valkeyFormatSdsCommandArgv(&cmd,argc,argv,argvlen);
     if (len == -1) {
-        __valkeySetError(c,VALKEY_ERR_OOM,"Out of memory");
+        valkeySetError(c,VALKEY_ERR_OOM,"Out of memory");
         return VALKEY_ERR;
     }
 
-    if (__valkeyAppendCommand(c,cmd,len) != VALKEY_OK) {
+    if (valkeyAppendCmdLen(c,cmd,len) != VALKEY_OK) {
         sdsfree(cmd);
         return VALKEY_ERR;
     }
@@ -1194,7 +1194,7 @@ int valkeyAppendCommandArgv(valkeyContext *c, int argc, const char **argv, const
  * otherwise. When NULL is returned in a blocking context, the error field
  * in the context will be set.
  */
-static void *__valkeyBlockForReply(valkeyContext *c) {
+static void *valkeyBlockForReply(valkeyContext *c) {
     void *reply;
 
     if (c->flags & VALKEY_BLOCK) {
@@ -1208,7 +1208,7 @@ static void *__valkeyBlockForReply(valkeyContext *c) {
 void *valkeyvCommand(valkeyContext *c, const char *format, va_list ap) {
     if (valkeyvAppendCommand(c,format,ap) != VALKEY_OK)
         return NULL;
-    return __valkeyBlockForReply(c);
+    return valkeyBlockForReply(c);
 }
 
 void *valkeyCommand(valkeyContext *c, const char *format, ...) {
@@ -1222,5 +1222,5 @@ void *valkeyCommand(valkeyContext *c, const char *format, ...) {
 void *valkeyCommandArgv(valkeyContext *c, int argc, const char **argv, const size_t *argvlen) {
     if (valkeyAppendCommandArgv(c,argc,argv,argvlen) != VALKEY_OK)
         return NULL;
-    return __valkeyBlockForReply(c);
+    return valkeyBlockForReply(c);
 }

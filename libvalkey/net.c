@@ -49,7 +49,7 @@
 #include "win32.h"
 
 /* Defined in valkey.c */
-void __valkeySetError(valkeyContext *c, int type, const char *str);
+void valkeySetError(valkeyContext *c, int type, const char *str);
 
 int valkeyContextUpdateCommandTimeout(valkeyContext *c, const struct timeval *timeout);
 
@@ -68,14 +68,14 @@ ssize_t valkeyNetRead(valkeyContext *c, char *buf, size_t bufcap) {
             return 0;
         } else if(errno == ETIMEDOUT && (c->flags & VALKEY_BLOCK)) {
             /* especially in windows */
-            __valkeySetError(c, VALKEY_ERR_TIMEOUT, "recv timeout");
+            valkeySetError(c, VALKEY_ERR_TIMEOUT, "recv timeout");
             return -1;
         } else {
-            __valkeySetError(c, VALKEY_ERR_IO, strerror(errno));
+            valkeySetError(c, VALKEY_ERR_IO, strerror(errno));
             return -1;
         }
     } else if (nread == 0) {
-        __valkeySetError(c, VALKEY_ERR_EOF, "Server closed the connection");
+        valkeySetError(c, VALKEY_ERR_EOF, "Server closed the connection");
         return -1;
     } else {
         return nread;
@@ -91,7 +91,7 @@ ssize_t valkeyNetWrite(valkeyContext *c) {
             /* Try again */
             return 0;
         } else {
-            __valkeySetError(c, VALKEY_ERR_IO, strerror(errno));
+            valkeySetError(c, VALKEY_ERR_IO, strerror(errno));
             return -1;
         }
     }
@@ -99,7 +99,7 @@ ssize_t valkeyNetWrite(valkeyContext *c) {
     return nwritten;
 }
 
-static void __valkeySetErrorFromErrno(valkeyContext *c, int type, const char *prefix) {
+static void valkeySetErrorFromErrno(valkeyContext *c, int type, const char *prefix) {
     int errorno = errno;  /* snprintf() may change errno */
     char buf[128] = { 0 };
     size_t len = 0;
@@ -107,13 +107,13 @@ static void __valkeySetErrorFromErrno(valkeyContext *c, int type, const char *pr
     if (prefix != NULL)
         len = snprintf(buf,sizeof(buf),"%s: ",prefix);
     strerror_r(errorno, (char *)(buf + len), sizeof(buf) - len);
-    __valkeySetError(c,type,buf);
+    valkeySetError(c,type,buf);
 }
 
 static int valkeySetReuseAddr(valkeyContext *c) {
     int on = 1;
     if (setsockopt(c->fd, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on)) == -1) {
-        __valkeySetErrorFromErrno(c,VALKEY_ERR_IO,NULL);
+        valkeySetErrorFromErrno(c,VALKEY_ERR_IO,NULL);
         valkeyNetClose(c);
         return VALKEY_ERR;
     }
@@ -123,7 +123,7 @@ static int valkeySetReuseAddr(valkeyContext *c) {
 static int valkeyCreateSocket(valkeyContext *c, int type) {
     valkeyFD s;
     if ((s = socket(type, SOCK_STREAM, 0)) == VALKEY_INVALID_FD) {
-        __valkeySetErrorFromErrno(c,VALKEY_ERR_IO,NULL);
+        valkeySetErrorFromErrno(c,VALKEY_ERR_IO,NULL);
         return VALKEY_ERR;
     }
     c->fd = s;
@@ -143,7 +143,7 @@ static int valkeySetBlocking(valkeyContext *c, int blocking) {
      * Note that fcntl(2) for F_GETFL and F_SETFL can't be
      * interrupted by a signal. */
     if ((flags = fcntl(c->fd, F_GETFL)) == -1) {
-        __valkeySetErrorFromErrno(c,VALKEY_ERR_IO,"fcntl(F_GETFL)");
+        valkeySetErrorFromErrno(c,VALKEY_ERR_IO,"fcntl(F_GETFL)");
         valkeyNetClose(c);
         return VALKEY_ERR;
     }
@@ -154,14 +154,14 @@ static int valkeySetBlocking(valkeyContext *c, int blocking) {
         flags |= O_NONBLOCK;
 
     if (fcntl(c->fd, F_SETFL, flags) == -1) {
-        __valkeySetErrorFromErrno(c,VALKEY_ERR_IO,"fcntl(F_SETFL)");
+        valkeySetErrorFromErrno(c,VALKEY_ERR_IO,"fcntl(F_SETFL)");
         valkeyNetClose(c);
         return VALKEY_ERR;
     }
 #else
     u_long mode = blocking ? 0 : 1;
     if (ioctl(c->fd, FIONBIO, &mode) == -1) {
-        __valkeySetErrorFromErrno(c, VALKEY_ERR_IO, "ioctl(FIONBIO)");
+        valkeySetErrorFromErrno(c, VALKEY_ERR_IO, "ioctl(FIONBIO)");
         valkeyNetClose(c);
         return VALKEY_ERR;
     }
@@ -179,7 +179,7 @@ int valkeyKeepAlive(valkeyContext *c, int interval) {
 
 #ifndef _WIN32
     if (setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, &val, sizeof(val)) == -1){
-        __valkeySetError(c,VALKEY_ERR_OTHER,strerror(errno));
+        valkeySetError(c,VALKEY_ERR_OTHER,strerror(errno));
         return VALKEY_ERR;
     }
 
@@ -187,26 +187,26 @@ int valkeyKeepAlive(valkeyContext *c, int interval) {
 
 #if defined(__APPLE__) && defined(__MACH__)
     if (setsockopt(fd, IPPROTO_TCP, TCP_KEEPALIVE, &val, sizeof(val)) < 0) {
-        __valkeySetError(c,VALKEY_ERR_OTHER,strerror(errno));
+        valkeySetError(c,VALKEY_ERR_OTHER,strerror(errno));
         return VALKEY_ERR;
     }
 #else
 #if defined(__GLIBC__) && !defined(__FreeBSD_kernel__)
     if (setsockopt(fd, IPPROTO_TCP, TCP_KEEPIDLE, &val, sizeof(val)) < 0) {
-        __valkeySetError(c,VALKEY_ERR_OTHER,strerror(errno));
+        valkeySetError(c,VALKEY_ERR_OTHER,strerror(errno));
         return VALKEY_ERR;
     }
 
     val = interval/3;
     if (val == 0) val = 1;
     if (setsockopt(fd, IPPROTO_TCP, TCP_KEEPINTVL, &val, sizeof(val)) < 0) {
-        __valkeySetError(c,VALKEY_ERR_OTHER,strerror(errno));
+        valkeySetError(c,VALKEY_ERR_OTHER,strerror(errno));
         return VALKEY_ERR;
     }
 
     val = 3;
     if (setsockopt(fd, IPPROTO_TCP, TCP_KEEPCNT, &val, sizeof(val)) < 0) {
-        __valkeySetError(c,VALKEY_ERR_OTHER,strerror(errno));
+        valkeySetError(c,VALKEY_ERR_OTHER,strerror(errno));
         return VALKEY_ERR;
     }
 #endif
@@ -216,7 +216,7 @@ int valkeyKeepAlive(valkeyContext *c, int interval) {
 
     res = win32_valkeyKeepAlive(fd, interval * 1000);
     if (res != 0) {
-        __valkeySetError(c, VALKEY_ERR_OTHER, strerror(res));
+        valkeySetError(c, VALKEY_ERR_OTHER, strerror(res));
         return VALKEY_ERR;
     }
 #endif
@@ -226,7 +226,7 @@ int valkeyKeepAlive(valkeyContext *c, int interval) {
 int valkeySetTcpNoDelay(valkeyContext *c) {
     int yes = 1;
     if (setsockopt(c->fd, IPPROTO_TCP, TCP_NODELAY, &yes, sizeof(yes)) == -1) {
-        __valkeySetErrorFromErrno(c,VALKEY_ERR_IO,"setsockopt(TCP_NODELAY)");
+        valkeySetErrorFromErrno(c,VALKEY_ERR_IO,"setsockopt(TCP_NODELAY)");
         valkeyNetClose(c);
         return VALKEY_ERR;
     }
@@ -243,7 +243,7 @@ int valkeyContextSetTcpUserTimeout(valkeyContext *c, unsigned int timeout) {
     (void)timeout;
 #endif
     if (res == -1) {
-        __valkeySetErrorFromErrno(c,VALKEY_ERR_IO,"setsockopt(TCP_USER_TIMEOUT)");
+        valkeySetErrorFromErrno(c,VALKEY_ERR_IO,"setsockopt(TCP_USER_TIMEOUT)");
         valkeyNetClose(c);
         return VALKEY_ERR;
     }
@@ -260,7 +260,7 @@ static int valkeyContextTimeoutMsec(valkeyContext *c, long *result)
     /* Only use timeout when not NULL. */
     if (timeout != NULL) {
         if (timeout->tv_usec > 1000000 || timeout->tv_sec > __MAX_MSEC) {
-            __valkeySetError(c, VALKEY_ERR_IO, "Invalid timeout specified");
+            valkeySetError(c, VALKEY_ERR_IO, "Invalid timeout specified");
             *result = msec;
             return VALKEY_ERR;
         }
@@ -294,7 +294,7 @@ static int valkeyContextWaitReady(valkeyContext *c, long msec) {
     int res;
 
     if (errno != EINPROGRESS) {
-        __valkeySetErrorFromErrno(c,VALKEY_ERR_IO,NULL);
+        valkeySetErrorFromErrno(c,VALKEY_ERR_IO,NULL);
         valkeyNetClose(c);
         return VALKEY_ERR;
     }
@@ -305,12 +305,12 @@ static int valkeyContextWaitReady(valkeyContext *c, long msec) {
 
     while ((res = poll(&wfd, 1, msec)) <= 0) {
         if (res < 0 && errno != EINTR) {
-            __valkeySetErrorFromErrno(c, VALKEY_ERR_IO, "poll(2)");
+            valkeySetErrorFromErrno(c, VALKEY_ERR_IO, "poll(2)");
             valkeyNetClose(c);
             return VALKEY_ERR;
         } else if (res == 0 || (msec >= 0 && valkeyPollMillis() >= end)) {
             errno = ETIMEDOUT;
-            __valkeySetErrorFromErrno(c, VALKEY_ERR_IO, NULL);
+            valkeySetErrorFromErrno(c, VALKEY_ERR_IO, NULL);
             valkeyNetClose(c);
             return VALKEY_ERR;
         } else {
@@ -367,7 +367,7 @@ int valkeyCheckSocketError(valkeyContext *c) {
     socklen_t errlen = sizeof(err);
 
     if (getsockopt(c->fd, SOL_SOCKET, SO_ERROR, &err, &errlen) == -1) {
-        __valkeySetErrorFromErrno(c,VALKEY_ERR_IO,"getsockopt(SO_ERROR)");
+        valkeySetErrorFromErrno(c,VALKEY_ERR_IO,"getsockopt(SO_ERROR)");
         return VALKEY_ERR;
     }
 
@@ -377,7 +377,7 @@ int valkeyCheckSocketError(valkeyContext *c) {
 
     if (err) {
         errno = err;
-        __valkeySetErrorFromErrno(c,VALKEY_ERR_IO,NULL);
+        valkeySetErrorFromErrno(c,VALKEY_ERR_IO,NULL);
         return VALKEY_ERR;
     }
 
@@ -389,15 +389,15 @@ int valkeyContextSetTimeout(valkeyContext *c, const struct timeval tv) {
     size_t to_sz = sizeof(tv);
 
     if (valkeyContextUpdateCommandTimeout(c, &tv) != VALKEY_OK) {
-        __valkeySetError(c, VALKEY_ERR_OOM, "Out of memory");
+        valkeySetError(c, VALKEY_ERR_OOM, "Out of memory");
         return VALKEY_ERR;
     }
     if (setsockopt(c->fd,SOL_SOCKET,SO_RCVTIMEO,to_ptr,to_sz) == -1) {
-        __valkeySetErrorFromErrno(c,VALKEY_ERR_IO,"setsockopt(SO_RCVTIMEO)");
+        valkeySetErrorFromErrno(c,VALKEY_ERR_IO,"setsockopt(SO_RCVTIMEO)");
         return VALKEY_ERR;
     }
     if (setsockopt(c->fd,SOL_SOCKET,SO_SNDTIMEO,to_ptr,to_sz) == -1) {
-        __valkeySetErrorFromErrno(c,VALKEY_ERR_IO,"setsockopt(SO_SNDTIMEO)");
+        valkeySetErrorFromErrno(c,VALKEY_ERR_IO,"setsockopt(SO_SNDTIMEO)");
         return VALKEY_ERR;
     }
     return VALKEY_OK;
@@ -508,7 +508,7 @@ static int _valkeyContextConnectTcp(valkeyContext *c, const char *addr, int port
         rv = getaddrinfo(c->tcp.host, _port, &hints, &servinfo);
     }
     if (rv != 0) {
-        __valkeySetError(c, VALKEY_ERR_OTHER, gai_strerror(rv));
+        valkeySetError(c, VALKEY_ERR_OTHER, gai_strerror(rv));
         return VALKEY_ERR;
     }
     for (p = servinfo; p != NULL; p = p->ai_next) {
@@ -525,7 +525,7 @@ addrretry:
             if ((rv = getaddrinfo(c->tcp.source_addr, NULL, &hints, &bservinfo)) != 0) {
                 char buf[128];
                 snprintf(buf,sizeof(buf),"Can't get addr: %s",gai_strerror(rv));
-                __valkeySetError(c,VALKEY_ERR_OTHER,buf);
+                valkeySetError(c,VALKEY_ERR_OTHER,buf);
                 goto error;
             }
 
@@ -548,7 +548,7 @@ addrretry:
             if (!bound) {
                 char buf[128];
                 snprintf(buf,sizeof(buf),"Can't bind socket: %s",strerror(errno));
-                __valkeySetError(c,VALKEY_ERR_OTHER,buf);
+                valkeySetError(c,VALKEY_ERR_OTHER,buf);
                 goto error;
             }
         }
@@ -599,12 +599,12 @@ addrretry:
     if (p == NULL) {
         char buf[128];
         snprintf(buf,sizeof(buf),"Can't create socket: %s",strerror(errno));
-        __valkeySetError(c,VALKEY_ERR_OTHER,buf);
+        valkeySetError(c,VALKEY_ERR_OTHER,buf);
         goto error;
     }
 
 oom:
-    __valkeySetError(c, VALKEY_ERR_OOM, "Out of memory");
+    valkeySetError(c, VALKEY_ERR_OOM, "Out of memory");
 error:
     rv = VALKEY_ERR;
 end:
@@ -689,6 +689,6 @@ int valkeyContextConnectUnix(valkeyContext *c, const char *path, const struct ti
     return VALKEY_ERR;
 #endif /* _WIN32 */
 oom:
-    __valkeySetError(c, VALKEY_ERR_OOM, "Out of memory");
+    valkeySetError(c, VALKEY_ERR_OOM, "Out of memory");
     return VALKEY_ERR;
 }
