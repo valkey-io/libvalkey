@@ -1,13 +1,13 @@
 @PACKAGE_INIT@
 
-set_and_check(hiredis_INCLUDEDIR "@PACKAGE_INCLUDE_INSTALL_DIR@")
+set_and_check(valkey_INCLUDEDIR "@PACKAGE_INCLUDE_INSTALL_DIR@")
 
-IF (NOT TARGET hiredis::@hiredis_export_name@)
-	INCLUDE(${CMAKE_CURRENT_LIST_DIR}/hiredis-targets.cmake)
+IF (NOT TARGET valkey::@valkey_export_name@)
+	INCLUDE(${CMAKE_CURRENT_LIST_DIR}/valkey-targets.cmake)
 ENDIF()
 
-SET(hiredis_LIBRARIES hiredis::@hiredis_export_name@)
-SET(hiredis_INCLUDE_DIRS ${hiredis_INCLUDEDIR})
+SET(valkey_LIBRARIES valkey::@valkey_export_name@)
+SET(valkey_INCLUDE_DIRS ${valkey_INCLUDEDIR})
 
-check_required_components(hiredis)
+check_required_components(valkey)
 
