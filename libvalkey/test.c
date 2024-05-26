@@ -111,9 +111,9 @@ static long long usec(void) {
         exit(1); \
     } while (1)
 
-/* Helper to extract Redis version information.  Aborts on any failure. */
-#define VALKEY_VERSION_FIELD "redis_version:"
-void get_valkey_version(valkeyContext *c, int *majorptr, int *minorptr) {
+/* Helper to extract server version information.  Aborts on any failure. */
+#define SERVER_VERSION_FIELD "redis_version:"
+void get_server_version(valkeyContext *c, int *majorptr, int *minorptr) {
     valkeyReply *reply;
     char *eptr, *s, *e;
     int major, minor;
@@ -121,10 +121,10 @@ void get_valkey_version(valkeyContext *c, int *majorptr, int *minorptr) {
     reply = valkeyCommand(c, "INFO");
     if (reply == NULL || c->err || reply->type != VALKEY_REPLY_STRING)
         goto abort;
-    if ((s = strstr(reply->str, VALKEY_VERSION_FIELD)) == NULL)
+    if ((s = strstr(reply->str, SERVER_VERSION_FIELD)) == NULL)
         goto abort;
 
-    s += strlen(VALKEY_VERSION_FIELD);
+    s += strlen(SERVER_VERSION_FIELD);
 
     /* We need a field terminator and at least 'x.y.z' (5) bytes of data */
     if ((e = strstr(s, "\r\n")) == NULL || (e - s) < 5)
@@ -144,7 +144,7 @@ void get_valkey_version(valkeyContext *c, int *majorptr, int *minorptr) {
 
 abort:
     freeReplyObject(reply);
-    fprintf(stderr, "Error:  Cannot determine Redis version, aborting\n");
+    fprintf(stderr, "Error:  Cannot determine server version, aborting\n");
     exit(1);
 }
 
@@ -922,8 +922,8 @@ static void test_allocator_injection(void) {
     valkeyReader *reader = valkeyReaderCreate();
     test_cond(reader == NULL);
 
-    /* Make sure hiredis itself protects against a non-overflow checking calloc */
-    test("hiredis calloc wrapper protects against overflow: ");
+    /* Make sure libvalkey itself protects against a non-overflow checking calloc */
+    test("libvalkey calloc wrapper protects against overflow: ");
     ha.callocFn = vk_calloc_insecure;
     valkeySetAllocators(&ha);
     ptr = vk_calloc((SIZE_MAX / sizeof(void*)) + 3, sizeof(void*));
@@ -1045,7 +1045,7 @@ static void test_resp3_push_handler(valkeyContext *c) {
     old = valkeySetPushCallback(c, push_handler);
     test("We can set a custom RESP3 PUSH handler: ");
     reply = valkeyCommand(c, "SET key:0 val:0");
-    /* We need another command because depending on the version of Redis, the
+    /* We need another command because depending on the server version, the
      * notification may be delivered after the command's reply. */
     assert(reply != NULL);
     freeReplyObject(reply);
@@ -1068,7 +1068,7 @@ static void test_resp3_push_handler(valkeyContext *c) {
     assert((reply = valkeyCommand(c, "GET key:0")) != NULL);
     freeReplyObject(reply);
     assert((reply = valkeyCommand(c, "SET key:0 invalid")) != NULL);
-    /* Depending on Redis version, we may receive either push notification or
+    /* Depending on server version, we may receive either push notification or
      * status reply. Both cases are valid. */
     if (reply->type == VALKEY_REPLY_STATUS) {
         freeReplyObject(reply);
@@ -1092,7 +1092,7 @@ static void test_resp3_push_handler(valkeyContext *c) {
     send_hello(c, 2);
 }
 
-valkeyOptions get_redis_tcp_options(struct config config) {
+valkeyOptions get_server_tcp_options(struct config config) {
     valkeyOptions options = {0};
     VALKEY_OPTIONS_SET_TCP(&options, config.tcp.host, config.tcp.port);
     return options;
@@ -1104,33 +1104,33 @@ static void test_resp3_push_options(struct config config) {
     valkeyOptions options;
 
     test("We set a default RESP3 handler for valkeyContext: ");
-    options = get_redis_tcp_options(config);
+    options = get_server_tcp_options(config);
     assert((c = valkeyConnectWithOptions(&options)) != NULL);
     test_cond(c->push_cb != NULL);
     valkeyFree(c);
 
     test("We don't set a default RESP3 push handler for valkeyAsyncContext: ");
-    options = get_redis_tcp_options(config);
+    options = get_server_tcp_options(config);
     assert((ac = valkeyAsyncConnectWithOptions(&options)) != NULL);
     test_cond(ac->c.push_cb == NULL);
     valkeyAsyncFree(ac);
 
     test("Our VALKEY_OPT_NO_PUSH_AUTOFREE flag works: ");
-    options = get_redis_tcp_options(config);
+    options = get_server_tcp_options(config);
     options.options |= VALKEY_OPT_NO_PUSH_AUTOFREE;
     assert((c = valkeyConnectWithOptions(&options)) != NULL);
     test_cond(c->push_cb == NULL);
     valkeyFree(c);
 
     test("We can use valkeyOptions to set a custom PUSH handler for valkeyContext: ");
-    options = get_redis_tcp_options(config);
+    options = get_server_tcp_options(config);
     options.push_cb = push_handler;
     assert((c = valkeyConnectWithOptions(&options)) != NULL);
     test_cond(c->push_cb == push_handler);
     valkeyFree(c);
 
     test("We can use valkeyOptions to set a custom PUSH handler for valkeyAsyncContext: ");
-    options = get_redis_tcp_options(config);
+    options = get_server_tcp_options(config);
     options.async_push_cb = push_handler_async;
     assert((ac = valkeyAsyncConnectWithOptions(&options)) != NULL);
     test_cond(ac->push_cb == push_handler_async);
@@ -1148,7 +1148,7 @@ static void test_privdata_hooks(struct config config) {
     valkeyContext *c;
 
     test("We can use valkeyOptions to set privdata: ");
-    options = get_redis_tcp_options(config);
+    options = get_server_tcp_options(config);
     VALKEY_OPTIONS_SET_PRIVDATA(&options, &data, free_privdata);
     assert((c = valkeyConnectWithOptions(&options)) != NULL);
     test_cond(c->privdata == &data);
@@ -1246,7 +1246,7 @@ static void test_blocking_connection(struct config config) {
     assert(valkeyAppendCommand(c, "PING") == VALKEY_OK);
     test_cond(valkeyGetReply(c, NULL) == VALKEY_OK);
 
-    get_valkey_version(c, &major, NULL);
+    get_server_version(c, &major, NULL);
     if (major >= 6) test_resp3_push_handler(c);
     test_resp3_push_options(config);
 
@@ -1262,7 +1262,7 @@ static int detect_debug_sleep(valkeyContext *c) {
 
     if (reply == NULL || c->err) {
         const char *cause = c->err ? c->errstr : "(none)";
-        fprintf(stderr, "Error testing for DEBUG SLEEP (Redis error: %s), exiting\n", cause);
+        fprintf(stderr, "Error testing for DEBUG SLEEP (server error: %s), exiting\n", cause);
         exit(-1);
     }
 
@@ -1315,7 +1315,7 @@ static void test_blocking_connection_timeouts(struct config config) {
 #endif
         freeReplyObject(reply);
 
-        // wait for the DEBUG SLEEP to complete so that Redis server is unblocked for the following tests
+        // wait for the DEBUG SLEEP to complete so that the server is unblocked for the following tests
         millisleep(3000);
     } else {
         test_skipped();
@@ -1346,7 +1346,7 @@ static void test_blocking_io_errors(struct config config) {
 
     /* Connect to target given by config. */
     c = do_connect(config);
-    get_valkey_version(c, &major, &minor);
+    get_server_version(c, &major, &minor);
 
     test("Returns I/O error when the connection is lost: ");
     reply = valkeyCommand(c,"QUIT");
@@ -1739,7 +1739,7 @@ static void test_pubsub_handling(struct config config) {
     evtimer_add(timeout, &timeout_tv);
 
     /* Connect */
-    valkeyOptions options = get_redis_tcp_options(config);
+    valkeyOptions options = get_server_tcp_options(config);
     valkeyAsyncContext *ac = valkeyAsyncConnectWithOptions(&options);
     assert(ac != NULL && ac->err == 0);
     valkeyLibeventAttach(ac,base);
@@ -1779,7 +1779,7 @@ static void test_pubsub_handling_resp3(struct config config) {
     evtimer_add(timeout, &timeout_tv);
 
     /* Connect */
-    valkeyOptions options = get_redis_tcp_options(config);
+    valkeyOptions options = get_server_tcp_options(config);
     valkeyAsyncContext *ac = valkeyAsyncConnectWithOptions(&options);
     assert(ac != NULL && ac->err == 0);
     valkeyLibeventAttach(ac,base);
@@ -1860,7 +1860,7 @@ static void test_command_timeout_during_pubsub(struct config config) {
     evtimer_add(timeout,&timeout_tv);
 
     /* Connect */
-    valkeyOptions options = get_redis_tcp_options(config);
+    valkeyOptions options = get_server_tcp_options(config);
     valkeyAsyncContext *ac = valkeyAsyncConnectWithOptions(&options);
     assert(ac != NULL && ac->err == 0);
     valkeyLibeventAttach(ac,base);
@@ -1965,7 +1965,7 @@ static void test_pubsub_multiple_channels(struct config config) {
     evtimer_add(timeout,&timeout_tv);
 
     /* Connect */
-    valkeyOptions options = get_redis_tcp_options(config);
+    valkeyOptions options = get_server_tcp_options(config);
     valkeyAsyncContext *ac = valkeyAsyncConnectWithOptions(&options);
     assert(ac != NULL && ac->err == 0);
     valkeyLibeventAttach(ac,base);
@@ -2042,7 +2042,7 @@ static void test_monitor(struct config config) {
     evtimer_add(timeout, &timeout_tv);
 
     /* Connect */
-    valkeyOptions options = get_redis_tcp_options(config);
+    valkeyOptions options = get_server_tcp_options(config);
     valkeyAsyncContext *ac = valkeyAsyncConnectWithOptions(&options);
     assert(ac != NULL && ac->err == 0);
     valkeyLibeventAttach(ac,base);
@@ -2263,9 +2263,7 @@ static void test_async_polling(struct config config) {
         valkeyPollTick(c, 0.1);
     test_cond(astest.pongs == 1);
 
-    /* Test a ping/pong after connection that didn't time out.
-     * see https://github.com/valkey/hiredis/issues/945
-     */
+    /* Test a ping/pong after connection that didn't time out. */
     if (config.type == CONN_TCP || config.type == CONN_SSL) {
         test("Async PING/PONG after connect timeout: ");
         config.connect_timeout.tv_usec = 10000; /* 10ms  */
@@ -2282,9 +2280,7 @@ static void test_async_polling(struct config config) {
         config = defaultconfig;
     }
 
-    /* Test disconnect from an on_connect callback
-     * see https://github.com/valkey/hiredis/issues/931
-     */
+    /* Test disconnect from an on_connect callback */
     test("Disconnect from onConnected callback (Issue #931): ");
     c = do_aconnect(config, ASTEST_ISSUE_931);
     while(astest.disconnects == 0)
@@ -2293,9 +2289,7 @@ static void test_async_polling(struct config config) {
     assert(astest.connects == 1);
     test_cond(astest.disconnects == 1);
 
-    /* Test ping/pong from an on_connect callback
-     * see https://github.com/valkey/hiredis/issues/931
-     */
+    /* Test ping/pong from an on_connect callback */
     test("Ping/Pong from onConnected callback (Issue #931): ");
     c = do_aconnect(config, ASTEST_ISSUE_931_PING);
     /* connect callback issues ping, response callback destroys context */
@@ -2436,7 +2430,7 @@ int main(int argc, char **argv) {
 
     int major;
     valkeyContext *c = do_connect(cfg);
-    get_redis_version(c, &major, NULL);
+    get_server_version(c, &major, NULL);
     disconnect(c, 0);
 
     test_pubsub_handling(cfg);

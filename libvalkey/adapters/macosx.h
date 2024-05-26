@@ -15,9 +15,9 @@ typedef struct {
     valkeyAsyncContext *context;
     CFSocketRef socketRef;
     CFRunLoopSourceRef sourceRef;
-} RedisRunLoop;
+} ValkeyRunLoop;
 
-static int freeRedisRunLoop(RedisRunLoop* valkeyRunLoop) {
+static int freeValkeyRunLoop(ValkeyRunLoop* valkeyRunLoop) {
     if( valkeyRunLoop != NULL ) {
         if( valkeyRunLoop->sourceRef != NULL ) {
             CFRunLoopSourceInvalidate(valkeyRunLoop->sourceRef);
@@ -33,28 +33,28 @@ static int freeRedisRunLoop(RedisRunLoop* valkeyRunLoop) {
 }
 
 static void valkeyMacOSAddRead(void *privdata) {
-    RedisRunLoop *valkeyRunLoop = (RedisRunLoop*)privdata;
+    ValkeyRunLoop *valkeyRunLoop = (ValkeyRunLoop*)privdata;
     CFSocketEnableCallBacks(valkeyRunLoop->socketRef, kCFSocketReadCallBack);
 }
 
 static void valkeyMacOSDelRead(void *privdata) {
-    RedisRunLoop *valkeyRunLoop = (RedisRunLoop*)privdata;
+    ValkeyRunLoop *valkeyRunLoop = (ValkeyRunLoop*)privdata;
     CFSocketDisableCallBacks(valkeyRunLoop->socketRef, kCFSocketReadCallBack);
 }
 
 static void valkeyMacOSAddWrite(void *privdata) {
-    RedisRunLoop *valkeyRunLoop = (RedisRunLoop*)privdata;
+    ValkeyRunLoop *valkeyRunLoop = (ValkeyRunLoop*)privdata;
     CFSocketEnableCallBacks(valkeyRunLoop->socketRef, kCFSocketWriteCallBack);
 }
 
 static void valkeyMacOSDelWrite(void *privdata) {
-    RedisRunLoop *valkeyRunLoop = (RedisRunLoop*)privdata;
+    ValkeyRunLoop *valkeyRunLoop = (ValkeyRunLoop*)privdata;
     CFSocketDisableCallBacks(valkeyRunLoop->socketRef, kCFSocketWriteCallBack);
 }
 
 static void valkeyMacOSCleanup(void *privdata) {
-    RedisRunLoop *valkeyRunLoop = (RedisRunLoop*)privdata;
-    freeRedisRunLoop(valkeyRunLoop);
+    ValkeyRunLoop *valkeyRunLoop = (ValkeyRunLoop*)privdata;
+    freeValkeyRunLoop(valkeyRunLoop);
 }
 
 static void valkeyMacOSAsyncCallback(CFSocketRef __unused s, CFSocketCallBackType callbackType, CFDataRef __unused address, const void __unused *data, void *info) {
@@ -80,7 +80,7 @@ static int valkeyMacOSAttach(valkeyAsyncContext *valkeyAsyncCtx, CFRunLoopRef ru
     /* Nothing should be attached when something is already attached */
     if( valkeyAsyncCtx->ev.data != NULL ) return VALKEY_ERR;
 
-    RedisRunLoop* valkeyRunLoop = (RedisRunLoop*) vk_calloc(1, sizeof(RedisRunLoop));
+    ValkeyRunLoop* valkeyRunLoop = (ValkeyRunLoop*) vk_calloc(1, sizeof(ValkeyRunLoop));
     if (valkeyRunLoop == NULL)
         return VALKEY_ERR;
 
@@ -101,10 +101,10 @@ static int valkeyMacOSAttach(valkeyAsyncContext *valkeyAsyncCtx, CFRunLoopRef ru
                                                        kCFSocketReadCallBack | kCFSocketWriteCallBack,
                                                        valkeyMacOSAsyncCallback,
                                                        &socketCtx);
-    if( !valkeyRunLoop->socketRef ) return freeRedisRunLoop(valkeyRunLoop);
+    if( !valkeyRunLoop->socketRef ) return freeValkeyRunLoop(valkeyRunLoop);
 
     valkeyRunLoop->sourceRef = CFSocketCreateRunLoopSource(NULL, valkeyRunLoop->socketRef, 0);
-    if( !valkeyRunLoop->sourceRef ) return freeRedisRunLoop(valkeyRunLoop);
+    if( !valkeyRunLoop->sourceRef ) return freeValkeyRunLoop(valkeyRunLoop);
 
     CFRunLoopAddSource(runLoop, valkeyRunLoop->sourceRef, kCFRunLoopDefaultMode);
 

@@ -64,7 +64,7 @@ typedef enum {
 
 /* Constants that mirror OpenSSL's verify modes. By default,
  * VALKEY_SSL_VERIFY_PEER is used with valkeyCreateSSLContext().
- * Some Redis clients disable peer verification if there are no
+ * Some clients disable peer verification if there are no
  * certificates specified.
  */
 #define VALKEY_SSL_VERIFY_NONE 0x00

@@ -46,7 +46,7 @@ static void assertReplyAndFree(valkeyContext *context, valkeyReply *reply, int t
 
     if (reply->type != type) {
         if (reply->type == VALKEY_REPLY_ERROR)
-            fprintf(stderr, "Redis Error: %s\n", reply->str);
+            fprintf(stderr, "Server Error: %s\n", reply->str);
 
         panicAbort("Expected reply type %d but got type %d", type, reply->type);
     }
@@ -63,7 +63,7 @@ static void enableClientTracking(valkeyContext *c) {
 
     if (reply->type != VALKEY_REPLY_MAP) {
         fprintf(stderr, "Error: Can't send HELLO 3 command.  Are you sure you're ");
-        fprintf(stderr, "connected to valkey-server >= 6.0.0?\nRedis error: %s\n",
+        fprintf(stderr, "connected to valkey-server >= 6.0.0?\Server error: %s\n",
                         reply->type == VALKEY_REPLY_ERROR ? reply->str : "(unknown)");
         exit(-1);
     }
@@ -97,7 +97,7 @@ void pushReplyHandler(void *privdata, void *r) {
 }
 
 /* We aren't actually freeing anything here, but it is included to show that we can
- * have hiredis call our data destructor when freeing the context */
+ * have libvalkey call our data destructor when freeing the context */
 void privdata_dtor(void *privdata) {
     unsigned int *icount = privdata;
     printf("privdata_dtor():  In context privdata dtor (invalidations: %u)\n", *icount);
@@ -115,7 +115,7 @@ int main(int argc, char **argv) {
     VALKEY_OPTIONS_SET_TCP(&o, hostname, port);
 
     /* Set our context privdata to the address of our invalidation counter.  Each
-     * time our PUSH handler is called, hiredis will pass the privdata for context.
+     * time our PUSH handler is called, libvalkey will pass the privdata for context.
      *
      * This could also be done after we create the context like so:
      *

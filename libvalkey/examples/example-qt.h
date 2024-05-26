@@ -23,7 +23,7 @@ class ExampleQt : public QObject {
     private:
         const char * m_value;
         valkeyAsyncContext * m_ctx;
-        RedisQtAdapter m_adapter;
+        ValkeyQtAdapter m_adapter;
 
     friend
     void getCallback(valkeyAsyncContext *, void *, void *);

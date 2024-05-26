@@ -61,7 +61,7 @@ typedef void (valkeyConnectCallback)(const struct valkeyAsyncContext*, int statu
 typedef void (valkeyConnectCallbackNC)(struct valkeyAsyncContext *, int status);
 typedef void(valkeyTimerCallback)(void *timer, void *privdata);
 
-/* Context for an async connection to Redis */
+/* Context for an async connection to Valkey */
 typedef struct valkeyAsyncContext {
     /* Hold the regular context, so it can be realloc'ed. */
     valkeyContext c;

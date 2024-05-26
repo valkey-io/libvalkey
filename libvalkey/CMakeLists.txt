@@ -72,7 +72,7 @@ CONFIGURE_FILE(hiredis.pc.in hiredis.pc @ONLY)
 
 set(CPACK_PACKAGE_VENDOR "Redis")
 set(CPACK_PACKAGE_DESCRIPTION "\
-Hiredis is a minimalistic C client library for the Redis database.
+Libvalkey is a minimalistic C client library for the Valkey, KeyDB, and Redis databases
 
 It is minimalistic because it just adds minimal support for the protocol, \
 but at the same time it uses a high level printf-alike API in order to make \

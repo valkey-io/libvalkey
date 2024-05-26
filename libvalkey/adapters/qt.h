@@ -28,51 +28,51 @@
 #include <QSocketNotifier>
 #include "../async.h"
 
-static void RedisQtAddRead(void *);
-static void RedisQtDelRead(void *);
-static void RedisQtAddWrite(void *);
-static void RedisQtDelWrite(void *);
-static void RedisQtCleanup(void *);
+static void ValkeyQtAddRead(void *);
+static void ValkeyQtDelRead(void *);
+static void ValkeyQtAddWrite(void *);
+static void ValkeyQtDelWrite(void *);
+static void ValkeyQtCleanup(void *);
 
-class RedisQtAdapter : public QObject {
+class ValkeyQtAdapter : public QObject {
 
     Q_OBJECT
 
     friend
-    void RedisQtAddRead(void * adapter) {
-        RedisQtAdapter * a = static_cast<RedisQtAdapter *>(adapter);
+    void ValkeyQtAddRead(void * adapter) {
+        ValkeyQtAdapter * a = static_cast<ValkeyQtAdapter *>(adapter);
         a->addRead();
     }
 
     friend
-    void RedisQtDelRead(void * adapter) {
-        RedisQtAdapter * a = static_cast<RedisQtAdapter *>(adapter);
+    void ValkeyQtDelRead(void * adapter) {
+        ValkeyQtAdapter * a = static_cast<ValkeyQtAdapter *>(adapter);
         a->delRead();
     }
 
     friend
-    void RedisQtAddWrite(void * adapter) {
-        RedisQtAdapter * a = static_cast<RedisQtAdapter *>(adapter);
+    void ValkeyQtAddWrite(void * adapter) {
+        ValkeyQtAdapter * a = static_cast<ValkeyQtAdapter *>(adapter);
         a->addWrite();
     }
 
     friend
-    void RedisQtDelWrite(void * adapter) {
-        RedisQtAdapter * a = static_cast<RedisQtAdapter *>(adapter);
+    void ValkeyQtDelWrite(void * adapter) {
+        ValkeyQtAdapter * a = static_cast<ValkeyQtAdapter *>(adapter);
         a->delWrite();
     }
 
     friend
-    void RedisQtCleanup(void * adapter) {
-        RedisQtAdapter * a = static_cast<RedisQtAdapter *>(adapter);
+    void ValkeyQtCleanup(void * adapter) {
+        ValkeyQtAdapter * a = static_cast<ValkeyQtAdapter *>(adapter);
         a->cleanup();
     }
 
     public:
-        RedisQtAdapter(QObject * parent = 0)
+        ValkeyQtAdapter(QObject * parent = 0)
             : QObject(parent), m_ctx(0), m_read(0), m_write(0) { }
 
-        ~RedisQtAdapter() {
+        ~ValkeyQtAdapter() {
             if (m_ctx != 0) {
                 m_ctx->ev.data = NULL;
             }
@@ -84,11 +84,11 @@ class RedisQtAdapter : public QObject {
             }
             m_ctx = ac;
             m_ctx->ev.data = this;
-            m_ctx->ev.addRead = RedisQtAddRead;
-            m_ctx->ev.delRead = RedisQtDelRead;
-            m_ctx->ev.addWrite = RedisQtAddWrite;
-            m_ctx->ev.delWrite = RedisQtDelWrite;
-            m_ctx->ev.cleanup = RedisQtCleanup;
+            m_ctx->ev.addRead = ValkeyQtAddRead;
+            m_ctx->ev.delRead = ValkeyQtDelRead;
+            m_ctx->ev.addWrite = ValkeyQtAddWrite;
+            m_ctx->ev.delWrite = ValkeyQtDelWrite;
+            m_ctx->ev.cleanup = ValkeyQtCleanup;
             return VALKEY_OK;
         }
 

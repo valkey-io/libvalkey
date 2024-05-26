@@ -242,7 +242,7 @@ static void *createDoubleObject(const valkeyReadTask *task, double value, char *
 
     /* The double reply also has the original protocol string representing a
      * double as a null terminated string. This way the caller does not need
-     * to format back for string conversion, especially since Redis does efforts
+     * to format back for string conversion, especially since Valkey does efforts
      * to make the string more human readable avoiding the calssical double
      * decimal string conversion artifacts. */
     memcpy(r->str, str, len);
@@ -557,7 +557,7 @@ cleanup:
     return error_type;
 }
 
-/* Format a command according to the Redis protocol. This function
+/* Format a command according to the RESP protocol. This function
  * takes a format similar to printf:
  *
  * %s represents a C null terminated string you want to interpolate
@@ -584,7 +584,7 @@ int valkeyFormatCommand(char **target, const char *format, ...) {
     return len;
 }
 
-/* Format a command according to the Redis protocol using an sds string and
+/* Format a command according to the RESP protocol using an sds string and
  * sdscatfmt for the processing of arguments. This function takes the
  * number of arguments, an array with arguments and an array with their
  * lengths. If the latter is set to NULL, strlen will be used to compute the
@@ -641,7 +641,7 @@ void valkeyFreeSdsCommand(sds cmd) {
     sdsfree(cmd);
 }
 
-/* Format a command according to the Redis protocol. This function takes the
+/* Format a command according to the RESP protocol. This function takes the
  * number of arguments, an array with arguments and an array with their
  * lengths. If the latter is set to NULL, strlen will be used to compute the
  * argument lengths.
@@ -876,7 +876,7 @@ valkeyContext *valkeyConnectWithOptions(const valkeyOptions *options) {
     return c;
 }
 
-/* Connect to a Redis instance. On error the field error in the returned
+/* Connect to a server instance. On error the field error in the returned
  * context will be set to the return value of the error function.
  * When no set of reply functions is given, the default set will be used. */
 valkeyContext *valkeyConnect(const char *ip, int port) {

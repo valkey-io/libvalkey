@@ -5,7 +5,7 @@
 
 OBJ=alloc.o net.o valkey.o sds.o async.o read.o sockcompat.o
 EXAMPLES=valkey-example valkey-example-libevent valkey-example-libev valkey-example-glib valkey-example-push valkey-example-poll
-TESTS=valkey-test
+TESTS=libvalkey-test
 LIBNAME=libvalkey
 PKGCONFNAME=valkey.pc
 
@@ -23,7 +23,7 @@ INSTALL_INCLUDE_PATH= $(DESTDIR)$(PREFIX)/$(INCLUDE_PATH)
 INSTALL_LIBRARY_PATH= $(DESTDIR)$(PREFIX)/$(LIBRARY_PATH)
 INSTALL_PKGCONF_PATH= $(INSTALL_LIBRARY_PATH)/$(PKGCONF_PATH)
 
-# redis-server configuration used for testing
+# valkey-server configuration used for testing
 VALKEY_PORT=56379
 VALKEY_SERVER=valkey-server
 define VALKEY_TEST_CONFIG
@@ -61,7 +61,7 @@ STLIB_MAKE_CMD=$(AR) rcs
 #################### SSL variables start ####################
 SSL_OBJ=ssl.o
 SSL_LIBNAME=libvalkey_ssl
-SSL_PKGCONFNAME=libvalkey_ssl.pc
+SSL_PKGCONFNAME=valkey_ssl.pc
 SSL_INSTALLNAME=install-ssl
 SSL_DYLIB_MINOR_NAME=$(SSL_LIBNAME).$(DYLIBSUFFIX).$(LIBVALKEY_SONAME)
 SSL_DYLIB_MAJOR_NAME=$(SSL_LIBNAME).$(DYLIBSUFFIX).$(LIBVALKEY_MAJOR)
@@ -146,7 +146,7 @@ ifeq ($(uname_S),Darwin)
   DYLIB_PLUGIN=-Wl,-undefined -Wl,dynamic_lookup
 endif
 
-all: dynamic static valkey-test pkgconfig
+all: dynamic static libvalkey-test pkgconfig
 
 dynamic: $(DYLIBNAME) $(SSL_DYLIB)
 
@@ -211,7 +211,7 @@ valkey-example-poll: examples/example-poll.c adapters/poll.h $(STLIBNAME)
 
 ifndef AE_DIR
 valkey-example-ae:
-	@echo "Please specify AE_DIR (e.g. <redis repository>/src)"
+	@echo "Please specify AE_DIR (e.g. <valkey repository>/src)"
 	@false
 else
 valkey-example-ae: examples/example-ae.c adapters/ae.h $(STLIBNAME)
@@ -258,16 +258,16 @@ ifeq ($(TEST_ASYNC),1)
     TEST_LDFLAGS += -levent
 endif
 
-valkey-test: test.o $(TEST_LIBS)
+libvalkey-test: test.o $(TEST_LIBS)
 	$(CC) -o $@ $(REAL_CFLAGS) -I. $^ $(REAL_LDFLAGS) $(TEST_LDFLAGS)
 
 valkey-%: %.o $(STLIBNAME)
 	$(CC) $(REAL_CFLAGS) -o $@ $< $(TEST_LIBS) $(REAL_LDFLAGS)
 
-test: valkey-test
-	./valkey-test
+test: libvalkey-test
+	./libvalkey-test
 
-check: valkey-test
+check: libvalkey-test
 	TEST_SSL=$(USE_SSL) ./test.sh
 
 .c.o:
@@ -290,7 +290,7 @@ $(PKGCONFNAME): valkey.h
 	@echo pkgincludedir=$(PREFIX)/$(INCLUDE_PATH) >> $@
 	@echo >> $@
 	@echo Name: valkey >> $@
-	@echo Description: Minimalistic C client library for Redis. >> $@
+	@echo Description: C client library for Valkey. >> $@
 	@echo Version: $(LIBVALKEY_MAJOR).$(LIBVALKEY_MINOR).$(LIBVALKEY_PATCH) >> $@
 	@echo Libs: -L\$${libdir} -lvalkey >> $@
 	@echo Cflags: -I\$${pkgincludedir} -I\$${includedir} -D_FILE_OFFSET_BITS=64 >> $@

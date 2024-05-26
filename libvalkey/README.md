@@ -89,7 +89,7 @@ There are several flags you may set in the `valkeyOptions` struct to change defa
 | VALKEY\_OPT\_PREFER\_IPV4<br>VALKEY\_OPT\_PREFER_IPV6<br>VALKEY\_OPT\_PREFER\_IP\_UNSPEC | Informs libvalkey to either prefer IPv4 or IPv6 when invoking [getaddrinfo](https://man7.org/linux/man-pages/man3/gai_strerror.3.html).  `VALKEY_OPT_PREFER_IP_UNSPEC` will cause libvalkey to specify `AF_UNSPEC` in the getaddrinfo call, which means both IPv4 and IPv6 addresses will be searched simultaneously.<br>Libvalkey prefers IPv4 by default. |
 | VALKEY\_OPT\_NO\_PUSH\_AUTOFREE | Tells libvalkey to not install the default RESP3 PUSH handler (which just intercepts and frees the replies).  This is useful in situations where you want to process these messages in-band. |
 | VALKEY\_OPT\_NOAUTOFREEREPLIES | **ASYNC**: tells libvalkey not to automatically invoke `freeReplyObject` after executing the reply callback. |
-| VALKEY\_OPT\_NOAUTOFREE | **ASYNC**: Tells libvalkey not to automatically free the `redisAsyncContext` on connection/communication failure, but only if the user makes an explicit call to `valkeyAsyncDisconnect` or `valkeyAsyncFree` |
+| VALKEY\_OPT\_NOAUTOFREE | **ASYNC**: Tells libvalkey not to automatically free the `valkeyAsyncContext` on connection/communication failure, but only if the user makes an explicit call to `valkeyAsyncDisconnect` or `valkeyAsyncFree` |
 
 *Note: A `valkeyContext` is not thread-safe.*
 
@@ -591,7 +591,7 @@ This requires OpenSSL development package (e.g. including header files to be
 available.
 
 When enabled, SSL/TLS support is built into extra `libvalkey_ssl.a` and
-`libhiredis_ssl.so` static/dynamic libraries. This leaves the original libraries
+`libvalkey_ssl.so` static/dynamic libraries. This leaves the original libraries
 unaffected so no additional dependencies are introduced.
 
 ### Using it
@@ -672,10 +672,10 @@ if (valkeyInitiateSSLWithContext(c, ssl_context) != VALKEY_OK) {
 ```
 
 ## RESP3 PUSH replies
-Redis 6.0 introduced PUSH replies with the reply-type `>`.  These messages are generated spontaneously and can arrive at any time, so must be handled using callbacks.
+`RESP3` introduced PUSH replies with the reply-type `>`.  These messages are generated spontaneously and can arrive at any time, so must be handled using callbacks.
 
 ### Default behavior
-Libvalkey installs handlers on `valkeyContext` and `valkeyAsyncContext` by default, which will intercept and free any PUSH replies detected.  This means existing code will work as-is after upgrading to Redis 6 and switching to `RESP3`.
+Libvalkey installs handlers on `valkeyContext` and `valkeyAsyncContext` by default, which will intercept and free any PUSH replies detected.  This means existing code will work as-is after upgrading to to `RESP3`.
 
 ### Custom PUSH handler prototypes
 The callback prototypes differ between `valkeyContext` and `valkeyAsyncContext`.
@@ -739,7 +739,7 @@ If you have a unique use-case where you don't want libvalkey to automatically in
 
 ## Allocator injection
 
-Libvalkey uses a pass-thru structure of function pointers defined in [alloc.h](https://github.com/redis/hiredis/blob/f5d25850/alloc.h#L41) that contain the currently configured allocation and deallocation functions.  By default they just point to libc (`malloc`, `calloc`, `realloc`, etc).
+Libvalkey uses a pass-thru structure of function pointers defined in [alloc.h](https://github.com/valkey-io/libvalkey/blob/main/alloc.h) that contain the currently configured allocation and deallocation functions.  By default they just point to libc (`malloc`, `calloc`, `realloc`, and `strdup`).
 
 ### Overriding
 

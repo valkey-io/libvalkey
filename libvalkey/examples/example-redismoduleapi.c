@@ -50,8 +50,6 @@ void disconnectCallback(const valkeyAsyncContext *c, int status) {
 }
 
 /*
- * This example requires Redis 7.0 or above.
- *
  * 1- Compile this file as a shared library. Directory of "valkeymodule.h" must
  *    be in the include path.
  *       gcc -fPIC -shared -I../../valkey/src/ -I.. example-valkeymoduleapi.c -o example-valkeymoduleapi.so
@@ -59,16 +57,10 @@ void disconnectCallback(const valkeyAsyncContext *c, int status) {
  * 2- Load module:
  *       valkey-server --loadmodule ./example-valkeymoduleapi.so value
  */
-int RedisModule_OnLoad(RedisModuleCtx *ctx, RedisModuleString **argv, int argc) {
-
-    int ret = RedisModule_Init(ctx, "example-valkeymoduleapi", 1, VALKEYMODULE_APIVER_1);
+int ValkeyModule_OnLoad(ValkeyModuleCtx *ctx, ValkeyModuleString **argv, int argc) {
+    int ret = ValkeyModule_Init(ctx, "example-valkeymoduleapi", 1, VALKEYMODULE_APIVER_1);
     if (ret != VALKEYMODULE_OK) {
         printf("error module init \n");
-        return VALKEYMODULE_ERR;
-    }
-
-    if (valkeyModuleCompatibilityCheck() != VALKEY_OK) {
-        printf("Redis 7.0 or above is required! \n");
         return VALKEYMODULE_ERR;
     }
 
@@ -80,9 +72,9 @@ int RedisModule_OnLoad(RedisModuleCtx *ctx, RedisModuleString **argv, int argc) 
     }
 
     size_t len;
-    const char *val = RedisModule_StringPtrLen(argv[argc-1], &len);
+    const char *val = ValkeyModule_StringPtrLen(argv[argc-1], &len);
 
-    RedisModuleCtx *module_ctx = RedisModule_GetDetachedThreadSafeContext(ctx);
+    ValkeyModuleCtx *module_ctx = ValkeyModule_GetDetachedThreadSafeContext(ctx);
     valkeyModuleAttach(c, module_ctx);
     valkeyAsyncSetConnectCallback(c,connectCallback);
     valkeyAsyncSetDisconnectCallback(c,disconnectCallback);
