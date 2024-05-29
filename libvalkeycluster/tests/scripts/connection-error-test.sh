@@ -12,8 +12,8 @@ testname=connection-error-test
 perl -we 'use sigtrap "handler", sub{exit}, "CONT"; sleep 1; die "timeout"' &
 syncpid1=$!;
 
-# Start simulated redis node #1
-timeout 5s ./simulated-redis.pl -p 7401 -d --sigcont $syncpid1 <<'EOF' &
+# Start simulated valkey node #1
+timeout 5s ./simulated-valkey.pl -p 7401 -d --sigcont $syncpid1 <<'EOF' &
 EXPECT CONNECT
 EXPECT ["CLUSTER", "SLOTS"]
 SEND [[0, 6000, ["127.0.0.1", 7401, "nodeid1"]],[6001, 16383, ["192.168.254.254", 9999, "nodeid2"]]]
@@ -80,9 +80,7 @@ if [ $clientexit -ne 0 ]; then
     exit $clientexit
 fi
 
-# Check the output from clusterclient, which depends on the hiredis version used.
-# hiredis v1.1.0
-expected1="OK
+expected="OK
 error: Timeout
 error: Timeout
 error: Timeout
@@ -91,17 +89,7 @@ OK
 OK
 OK"
 
-# hiredis < v1.1.0
-expected2="OK
-unknown error
-unknown error
-unknown error
-unknown error
-OK
-OK
-OK"
-
-cmp "$testname.out" <(echo "$expected1") || cmp "$testname.out" <(echo "$expected2") || exit 99
+cmp "$testname.out" <(echo "$expected") || exit 99
 
 # Clean up
 rm "$testname.out"

@@ -35,7 +35,7 @@
 #include <stdint.h>
 
 #include "adlist.h"
-#include <hiredis/hiredis.h>
+#include <valkey/valkey.h>
 
 typedef enum cmd_parse_result {
     CMD_PARSE_OK,     /* parsing ok */
@@ -49,15 +49,15 @@ typedef enum cmd_type {
     CMD_UNKNOWN,
 /* Request commands */
 #define COMMAND(_type, _name, _subname, _arity, _keymethod, _keypos)           \
-    CMD_REQ_REDIS_##_type,
+    CMD_REQ_VALKEY_##_type,
 #include "cmddef.h"
 #undef COMMAND
     /* Response types */
-    CMD_RSP_REDIS_STATUS, /* simple string */
-    CMD_RSP_REDIS_ERROR,
-    CMD_RSP_REDIS_INTEGER,
-    CMD_RSP_REDIS_BULK,
-    CMD_RSP_REDIS_MULTIBULK,
+    CMD_RSP_VALKEY_STATUS, /* simple string */
+    CMD_RSP_VALKEY_ERROR,
+    CMD_RSP_VALKEY_INTEGER,
+    CMD_RSP_VALKEY_BULK,
+    CMD_RSP_VALKEY_MULTIBULK,
     CMD_SENTINEL
 } cmd_type_t;
 
@@ -80,9 +80,9 @@ struct cmd {
     char *cmd;
     uint32_t clen; /* command length */
 
-    struct hiarray *keys; /* array of keypos, for req */
+    struct vkarray *keys; /* array of keypos, for req */
 
-    uint32_t narg; /* # arguments (redis) */
+    uint32_t narg; /* # arguments (valkey) */
 
     unsigned quit : 1;      /* quit request? */
     unsigned noforward : 1; /* not need forward (example: ping) */
@@ -98,12 +98,12 @@ struct cmd {
     struct cmd *
         *frag_seq; /* sequence of fragment command, map from keys to fragments*/
 
-    redisReply *reply;
+    valkeyReply *reply;
 
     hilist *sub_commands; /* just for pipeline and multi-key commands */
 };
 
-void redis_parse_cmd(struct cmd *r);
+void valkey_parse_cmd(struct cmd *r);
 
 struct cmd *command_get(void);
 void command_destroy(struct cmd *command);

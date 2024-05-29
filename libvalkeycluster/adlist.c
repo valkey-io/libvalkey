@@ -27,11 +27,11 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-#include <hiredis/alloc.h>
+#include <valkey/alloc.h>
 #include <stdlib.h>
 
 #include "adlist.h"
-#include "hiutil.h"
+#include "vkutil.h"
 
 /* Create a new list. The created list can be freed with
  * AlFreeList(), but private value of every node need to be freed
@@ -41,7 +41,7 @@
 hilist *listCreate(void) {
     struct hilist *list;
 
-    if ((list = hi_malloc(sizeof(*list))) == NULL)
+    if ((list = vk_malloc(sizeof(*list))) == NULL)
         return NULL;
     list->head = list->tail = NULL;
     list->len = 0;
@@ -64,10 +64,10 @@ void listRelease(hilist *list) {
         next = current->next;
         if (list->free)
             list->free(current->value);
-        hi_free(current);
+        vk_free(current);
         current = next;
     }
-    hi_free(list);
+    vk_free(list);
 }
 
 /* Add a new node to the list, to head, containing the specified 'value'
@@ -79,7 +79,7 @@ void listRelease(hilist *list) {
 hilist *listAddNodeHead(hilist *list, void *value) {
     listNode *node;
 
-    if ((node = hi_malloc(sizeof(*node))) == NULL)
+    if ((node = vk_malloc(sizeof(*node))) == NULL)
         return NULL;
     node->value = value;
     if (list->len == 0) {
@@ -104,7 +104,7 @@ hilist *listAddNodeHead(hilist *list, void *value) {
 hilist *listAddNodeTail(hilist *list, void *value) {
     listNode *node;
 
-    if ((node = hi_malloc(sizeof(*node))) == NULL)
+    if ((node = vk_malloc(sizeof(*node))) == NULL)
         return NULL;
     node->value = value;
     if (list->len == 0) {
@@ -124,7 +124,7 @@ hilist *listInsertNode(hilist *list, listNode *old_node, void *value,
                        int after) {
     listNode *node;
 
-    if ((node = hi_malloc(sizeof(*node))) == NULL)
+    if ((node = vk_malloc(sizeof(*node))) == NULL)
         return NULL;
     node->value = value;
     if (after) {
@@ -165,7 +165,7 @@ void listDelNode(hilist *list, listNode *node) {
         list->tail = node->prev;
     if (list->free)
         list->free(node->value);
-    hi_free(node);
+    vk_free(node);
     list->len--;
 }
 
@@ -176,7 +176,7 @@ void listDelNode(hilist *list, listNode *node) {
 listIter *listGetIterator(hilist *list, int direction) {
     listIter *iter;
 
-    if ((iter = hi_malloc(sizeof(*iter))) == NULL)
+    if ((iter = vk_malloc(sizeof(*iter))) == NULL)
         return NULL;
     if (direction == AL_START_HEAD)
         iter->next = list->head;
@@ -187,7 +187,7 @@ listIter *listGetIterator(hilist *list, int direction) {
 }
 
 /* Release the iterator memory */
-void listReleaseIterator(listIter *iter) { hi_free(iter); }
+void listReleaseIterator(listIter *iter) { vk_free(iter); }
 
 /* Create an iterator in the list private iterator structure */
 void listRewind(hilist *list, listIter *li) {

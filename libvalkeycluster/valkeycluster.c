@@ -34,7 +34,7 @@
 #include <assert.h>
 #include <ctype.h>
 #include <errno.h>
-#include <hiredis/alloc.h>
+#include <valkey/alloc.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -42,25 +42,25 @@
 #include "adlist.h"
 #include "command.h"
 #include "dict.h"
-#include "hiarray.h"
-#include "hircluster.h"
-#include "hiutil.h"
+#include "vkarray.h"
+#include "valkeycluster.h"
+#include "vkutil.h"
 #include "win32.h"
 
 // Cluster errors are offset by 100 to be sufficiently out of range of
-// standard Redis errors
-#define REDIS_ERR_CLUSTER_TOO_MANY_RETRIES 100
+// standard Valkey errors
+#define VALKEY_ERR_CLUSTER_TOO_MANY_RETRIES 100
 
-#define REDIS_ERROR_MOVED "MOVED"
-#define REDIS_ERROR_ASK "ASK"
-#define REDIS_ERROR_TRYAGAIN "TRYAGAIN"
-#define REDIS_ERROR_CLUSTERDOWN "CLUSTERDOWN"
+#define VALKEY_ERROR_MOVED "MOVED"
+#define VALKEY_ERROR_ASK "ASK"
+#define VALKEY_ERROR_TRYAGAIN "TRYAGAIN"
+#define VALKEY_ERROR_CLUSTERDOWN "CLUSTERDOWN"
 
-#define REDIS_STATUS_OK "OK"
+#define VALKEY_STATUS_OK "OK"
 
-#define REDIS_COMMAND_CLUSTER_NODES "CLUSTER NODES"
-#define REDIS_COMMAND_CLUSTER_SLOTS "CLUSTER SLOTS"
-#define REDIS_COMMAND_ASKING "ASKING"
+#define VALKEY_COMMAND_CLUSTER_NODES "CLUSTER NODES"
+#define VALKEY_COMMAND_CLUSTER_SLOTS "CLUSTER SLOTS"
+#define VALKEY_COMMAND_ASKING "ASKING"
 
 #define IP_PORT_SEPARATOR ':'
 
@@ -78,9 +78,9 @@
 #define SLOTMAP_UPDATE_ONGOING INT64_MAX
 
 typedef struct cluster_async_data {
-    redisClusterAsyncContext *acc;
+    valkeyClusterAsyncContext *acc;
     struct cmd *command;
-    redisClusterCallbackFn *callback;
+    valkeyClusterCallbackFn *callback;
     int retry_count;
     void *privdata;
 } cluster_async_data;
@@ -94,14 +94,14 @@ typedef enum CLUSTER_ERR_TYPE {
     CLUSTER_ERR_SENTINEL
 } CLUSTER_ERR_TYPE;
 
-static void freeRedisClusterNode(redisClusterNode *node);
+static void freeValkeyClusterNode(valkeyClusterNode *node);
 static void cluster_slot_destroy(cluster_slot *slot);
 static void cluster_open_slot_destroy(copen_slot *oslot);
-static int updateNodesAndSlotmap(redisClusterContext *cc, dict *nodes);
-static int updateSlotMapAsync(redisClusterAsyncContext *acc,
-                              redisAsyncContext *ac);
+static int updateNodesAndSlotmap(valkeyClusterContext *cc, dict *nodes);
+static int updateSlotMapAsync(valkeyClusterAsyncContext *acc,
+                              valkeyAsyncContext *ac);
 
-void listClusterNodeDestructor(void *val) { freeRedisClusterNode(val); }
+void listClusterNodeDestructor(void *val) { freeValkeyClusterNode(val); }
 
 void listClusterSlotDestructor(void *val) { cluster_slot_destroy(val); }
 
@@ -128,12 +128,12 @@ void dictSdsDestructor(void *privdata, void *val) {
 
 void dictClusterNodeDestructor(void *privdata, void *val) {
     DICT_NOTUSED(privdata);
-    freeRedisClusterNode(val);
+    freeValkeyClusterNode(val);
 }
 
 /* Cluster node hash table
- * maps node address (1.2.3.4:6379) to a redisClusterNode
- * Has ownership of redisClusterNode memory
+ * maps node address (1.2.3.4:6379) to a valkeyClusterNode
+ * Has ownership of valkeyClusterNode memory
  */
 dictType clusterNodesDictType = {
     dictSdsHash,              /* hash function */
@@ -145,8 +145,8 @@ dictType clusterNodesDictType = {
 };
 
 /* Referenced cluster node hash table
- * maps node id (437c719f5.....) to a redisClusterNode
- * No ownership of redisClusterNode memory
+ * maps node id (437c719f5.....) to a valkeyClusterNode
+ * No ownership of valkeyClusterNode memory
  */
 dictType clusterNodesRefDictType = {
     dictSdsHash,       /* hash function */
@@ -197,7 +197,7 @@ static unsigned int keyHashSlot(char *key, int keylen) {
     return crc16(key + s + 1, e - s - 1) & 0x3FFF;
 }
 
-static void __redisClusterSetError(redisClusterContext *cc, int type,
+static void __valkeyClusterSetError(valkeyClusterContext *cc, int type,
                                    const char *str) {
     size_t len;
 
@@ -212,34 +212,34 @@ static void __redisClusterSetError(redisClusterContext *cc, int type,
         memcpy(cc->errstr, str, len);
         cc->errstr[len] = '\0';
     } else {
-        /* Only REDIS_ERR_IO may lack a description! */
-        assert(type == REDIS_ERR_IO);
+        /* Only VALKEY_ERR_IO may lack a description! */
+        assert(type == VALKEY_ERR_IO);
         strerror_r(errno, cc->errstr, sizeof(cc->errstr));
     }
 }
 
-static int cluster_reply_error_type(redisReply *reply) {
+static int cluster_reply_error_type(valkeyReply *reply) {
 
     if (reply == NULL) {
-        return REDIS_ERR;
+        return VALKEY_ERR;
     }
 
-    if (reply->type == REDIS_REPLY_ERROR) {
-        if ((int)strlen(REDIS_ERROR_MOVED) < reply->len &&
-            memcmp(reply->str, REDIS_ERROR_MOVED, strlen(REDIS_ERROR_MOVED)) ==
+    if (reply->type == VALKEY_REPLY_ERROR) {
+        if ((int)strlen(VALKEY_ERROR_MOVED) < reply->len &&
+            memcmp(reply->str, VALKEY_ERROR_MOVED, strlen(VALKEY_ERROR_MOVED)) ==
                 0) {
             return CLUSTER_ERR_MOVED;
-        } else if ((int)strlen(REDIS_ERROR_ASK) < reply->len &&
-                   memcmp(reply->str, REDIS_ERROR_ASK,
-                          strlen(REDIS_ERROR_ASK)) == 0) {
+        } else if ((int)strlen(VALKEY_ERROR_ASK) < reply->len &&
+                   memcmp(reply->str, VALKEY_ERROR_ASK,
+                          strlen(VALKEY_ERROR_ASK)) == 0) {
             return CLUSTER_ERR_ASK;
-        } else if ((int)strlen(REDIS_ERROR_TRYAGAIN) < reply->len &&
-                   memcmp(reply->str, REDIS_ERROR_TRYAGAIN,
-                          strlen(REDIS_ERROR_TRYAGAIN)) == 0) {
+        } else if ((int)strlen(VALKEY_ERROR_TRYAGAIN) < reply->len &&
+                   memcmp(reply->str, VALKEY_ERROR_TRYAGAIN,
+                          strlen(VALKEY_ERROR_TRYAGAIN)) == 0) {
             return CLUSTER_ERR_TRYAGAIN;
-        } else if ((int)strlen(REDIS_ERROR_CLUSTERDOWN) < reply->len &&
-                   memcmp(reply->str, REDIS_ERROR_CLUSTERDOWN,
-                          strlen(REDIS_ERROR_CLUSTERDOWN)) == 0) {
+        } else if ((int)strlen(VALKEY_ERROR_CLUSTERDOWN) < reply->len &&
+                   memcmp(reply->str, VALKEY_ERROR_CLUSTERDOWN,
+                          strlen(VALKEY_ERROR_CLUSTERDOWN)) == 0) {
             return CLUSTER_ERR_CLUSTERDOWN;
         } else {
             return CLUSTER_ERR_SENTINEL;
@@ -250,13 +250,13 @@ static int cluster_reply_error_type(redisReply *reply) {
 }
 
 /* Create and initiate the cluster node structure */
-static redisClusterNode *createRedisClusterNode(void) {
+static valkeyClusterNode *createValkeyClusterNode(void) {
     /* use calloc to guarantee all fields are zeroed */
-    return hi_calloc(1, sizeof(redisClusterNode));
+    return vk_calloc(1, sizeof(valkeyClusterNode));
 }
 
 /* Cleanup the cluster node structure */
-static void freeRedisClusterNode(redisClusterNode *node) {
+static void freeValkeyClusterNode(valkeyClusterNode *node) {
     if (node == NULL) {
         return;
     }
@@ -264,14 +264,14 @@ static void freeRedisClusterNode(redisClusterNode *node) {
     sdsfree(node->name);
     sdsfree(node->addr);
     sdsfree(node->host);
-    redisFree(node->con);
+    valkeyFree(node->con);
 
     if (node->acon != NULL) {
         /* Detach this cluster node from the async context. This makes sure
-         * that redisAsyncFree() wont attempt to update the pointer via its
+         * that valkeyAsyncFree() wont attempt to update the pointer via its
          * dataCleanup and unlinkAsyncContextAndNode() */
         node->acon->data = NULL;
-        redisAsyncFree(node->acon);
+        valkeyAsyncFree(node->acon);
     }
     if (node->slots != NULL) {
         listRelease(node->slots);
@@ -282,33 +282,33 @@ static void freeRedisClusterNode(redisClusterNode *node) {
 
     copen_slot **oslot;
     if (node->migrating) {
-        while (hiarray_n(node->migrating)) {
-            oslot = hiarray_pop(node->migrating);
+        while (vkarray_n(node->migrating)) {
+            oslot = vkarray_pop(node->migrating);
             cluster_open_slot_destroy(*oslot);
         }
-        hiarray_destroy(node->migrating);
+        vkarray_destroy(node->migrating);
     }
     if (node->importing) {
-        while (hiarray_n(node->importing)) {
-            oslot = hiarray_pop(node->importing);
+        while (vkarray_n(node->importing)) {
+            oslot = vkarray_pop(node->importing);
             cluster_open_slot_destroy(*oslot);
         }
-        hiarray_destroy(node->importing);
+        vkarray_destroy(node->importing);
     }
-    hi_free(node);
+    vk_free(node);
 }
 
-static cluster_slot *cluster_slot_create(redisClusterNode *node) {
+static cluster_slot *cluster_slot_create(valkeyClusterNode *node) {
     cluster_slot *slot;
 
-    slot = hi_calloc(1, sizeof(*slot));
+    slot = vk_calloc(1, sizeof(*slot));
     if (slot == NULL) {
         return NULL;
     }
     slot->node = node;
 
     if (node != NULL) {
-        ASSERT(node->role == REDIS_ROLE_MASTER);
+        ASSERT(node->role == VALKEY_ROLE_MASTER);
         if (node->slots == NULL) {
             node->slots = listCreate();
             if (node->slots == NULL) {
@@ -328,30 +328,30 @@ static cluster_slot *cluster_slot_create(redisClusterNode *node) {
     return slot;
 }
 
-static int cluster_slot_ref_node(cluster_slot *slot, redisClusterNode *node) {
+static int cluster_slot_ref_node(cluster_slot *slot, valkeyClusterNode *node) {
     if (slot == NULL || node == NULL) {
-        return REDIS_ERR;
+        return VALKEY_ERR;
     }
 
-    if (node->role != REDIS_ROLE_MASTER) {
-        return REDIS_ERR;
+    if (node->role != VALKEY_ROLE_MASTER) {
+        return VALKEY_ERR;
     }
 
     if (node->slots == NULL) {
         node->slots = listCreate();
         if (node->slots == NULL) {
-            return REDIS_ERR;
+            return VALKEY_ERR;
         }
 
         node->slots->free = listClusterSlotDestructor;
     }
 
     if (listAddNodeTail(node->slots, slot) == NULL) {
-        return REDIS_ERR;
+        return VALKEY_ERR;
     }
     slot->node = node;
 
-    return REDIS_OK;
+    return VALKEY_OK;
 }
 
 static void cluster_slot_destroy(cluster_slot *slot) {
@@ -359,15 +359,15 @@ static void cluster_slot_destroy(cluster_slot *slot) {
     slot->end = 0;
     slot->node = NULL;
 
-    hi_free(slot);
+    vk_free(slot);
 }
 
 static copen_slot *cluster_open_slot_create(uint32_t slot_num, int migrate,
                                             sds remote_name,
-                                            redisClusterNode *node) {
+                                            valkeyClusterNode *node) {
     copen_slot *oslot;
 
-    oslot = hi_calloc(1, sizeof(*oslot));
+    oslot = vk_calloc(1, sizeof(*oslot));
     if (oslot == NULL) {
         return NULL;
     }
@@ -377,7 +377,7 @@ static copen_slot *cluster_open_slot_create(uint32_t slot_num, int migrate,
     oslot->node = node;
     oslot->remote_name = sdsdup(remote_name);
     if (oslot->remote_name == NULL) {
-        hi_free(oslot);
+        vk_free(oslot);
         return NULL;
     }
 
@@ -390,89 +390,89 @@ static void cluster_open_slot_destroy(copen_slot *oslot) {
     oslot->node = NULL;
     sdsfree(oslot->remote_name);
     oslot->remote_name = NULL;
-    hi_free(oslot);
+    vk_free(oslot);
 }
 
 /**
  * Handle password authentication in the synchronous API
  */
-static int authenticate(redisClusterContext *cc, redisContext *c) {
+static int authenticate(valkeyClusterContext *cc, valkeyContext *c) {
     if (cc == NULL || c == NULL) {
-        return REDIS_ERR;
+        return VALKEY_ERR;
     }
 
     // Skip if no password configured
     if (cc->password == NULL) {
-        return REDIS_OK;
+        return VALKEY_OK;
     }
 
-    redisReply *reply;
+    valkeyReply *reply;
     if (cc->username != NULL) {
-        reply = redisCommand(c, "AUTH %s %s", cc->username, cc->password);
+        reply = valkeyCommand(c, "AUTH %s %s", cc->username, cc->password);
     } else {
-        reply = redisCommand(c, "AUTH %s", cc->password);
+        reply = valkeyCommand(c, "AUTH %s", cc->password);
     }
 
     if (reply == NULL) {
-        __redisClusterSetError(cc, REDIS_ERR_OTHER,
+        __valkeyClusterSetError(cc, VALKEY_ERR_OTHER,
                                "Command AUTH reply error (NULL)");
         goto error;
     }
 
-    if (reply->type == REDIS_REPLY_ERROR) {
-        __redisClusterSetError(cc, REDIS_ERR_OTHER, reply->str);
+    if (reply->type == VALKEY_REPLY_ERROR) {
+        __valkeyClusterSetError(cc, VALKEY_ERR_OTHER, reply->str);
         goto error;
     }
 
     freeReplyObject(reply);
-    return REDIS_OK;
+    return VALKEY_OK;
 
 error:
     freeReplyObject(reply);
 
-    return REDIS_ERR;
+    return VALKEY_ERR;
 }
 
 /**
  * Return a new node with the "cluster slots" command reply.
  */
-static redisClusterNode *node_get_with_slots(redisClusterContext *cc,
-                                             redisReply *host_elem,
-                                             redisReply *port_elem,
+static valkeyClusterNode *node_get_with_slots(valkeyClusterContext *cc,
+                                             valkeyReply *host_elem,
+                                             valkeyReply *port_elem,
                                              uint8_t role) {
-    redisClusterNode *node = NULL;
+    valkeyClusterNode *node = NULL;
 
     if (host_elem == NULL || port_elem == NULL) {
         return NULL;
     }
 
-    if (host_elem->type != REDIS_REPLY_STRING || host_elem->len <= 0) {
-        __redisClusterSetError(cc, REDIS_ERR_OTHER,
+    if (host_elem->type != VALKEY_REPLY_STRING || host_elem->len <= 0) {
+        __valkeyClusterSetError(cc, VALKEY_ERR_OTHER,
                                "Command(cluster slots) reply error: "
                                "node ip is not string.");
         goto error;
     }
 
-    if (port_elem->type != REDIS_REPLY_INTEGER || port_elem->integer <= 0) {
-        __redisClusterSetError(cc, REDIS_ERR_OTHER,
+    if (port_elem->type != VALKEY_REPLY_INTEGER || port_elem->integer <= 0) {
+        __valkeyClusterSetError(cc, VALKEY_ERR_OTHER,
                                "Command(cluster slots) reply error: "
                                "node port is not integer.");
         goto error;
     }
 
-    if (!hi_valid_port((int)port_elem->integer)) {
-        __redisClusterSetError(cc, REDIS_ERR_OTHER,
+    if (!vk_valid_port((int)port_elem->integer)) {
+        __valkeyClusterSetError(cc, VALKEY_ERR_OTHER,
                                "Command(cluster slots) reply error: "
                                "node port is not valid.");
         goto error;
     }
 
-    node = createRedisClusterNode();
+    node = createValkeyClusterNode();
     if (node == NULL) {
         goto oom;
     }
 
-    if (role == REDIS_ROLE_MASTER) {
+    if (role == VALKEY_ROLE_MASTER) {
         node->slots = listCreate();
         if (node->slots == NULL) {
             goto oom;
@@ -500,14 +500,14 @@ static redisClusterNode *node_get_with_slots(redisClusterContext *cc,
     return node;
 
 oom:
-    __redisClusterSetError(cc, REDIS_ERR_OOM, "Out of memory");
+    __valkeyClusterSetError(cc, VALKEY_ERR_OOM, "Out of memory");
     // passthrough
 
 error:
     if (node != NULL) {
         sdsfree(node->addr);
         sdsfree(node->host);
-        hi_free(node);
+        vk_free(node);
     }
     return NULL;
 }
@@ -515,22 +515,22 @@ error:
 /**
  * Return a new node with the "cluster nodes" command reply.
  */
-static redisClusterNode *node_get_with_nodes(redisClusterContext *cc,
+static valkeyClusterNode *node_get_with_nodes(valkeyClusterContext *cc,
                                              sds *node_infos, int info_count,
                                              uint8_t role) {
     char *p = NULL;
-    redisClusterNode *node = NULL;
+    valkeyClusterNode *node = NULL;
 
     if (info_count < 8) {
         return NULL;
     }
 
-    node = createRedisClusterNode();
+    node = createValkeyClusterNode();
     if (node == NULL) {
         goto oom;
     }
 
-    if (role == REDIS_ROLE_MASTER) {
+    if (role == VALKEY_ROLE_MASTER) {
         node->slots = listCreate();
         if (node->slots == NULL) {
             goto oom;
@@ -555,8 +555,8 @@ static redisClusterNode *node_get_with_nodes(redisClusterContext *cc,
 
     /* Get the ip part */
     if ((p = strrchr(node->addr, IP_PORT_SEPARATOR)) == NULL) {
-        __redisClusterSetError(
-            cc, REDIS_ERR_OTHER,
+        __valkeyClusterSetError(
+            cc, VALKEY_ERR_OTHER,
             "server address is incorrect, port separator missing.");
         goto error;
     }
@@ -567,24 +567,24 @@ static redisClusterNode *node_get_with_nodes(redisClusterContext *cc,
     p++; // remove found separator character
 
     /* Get the port part */
-    node->port = hi_atoi(p, strlen(p));
+    node->port = vk_atoi(p, strlen(p));
 
     return node;
 
 oom:
-    __redisClusterSetError(cc, REDIS_ERR_OOM, "Out of memory");
+    __valkeyClusterSetError(cc, VALKEY_ERR_OOM, "Out of memory");
     // passthrough
 
 error:
-    freeRedisClusterNode(node);
+    freeValkeyClusterNode(node);
     return NULL;
 }
 
 static void cluster_nodes_swap_ctx(dict *nodes_f, dict *nodes_t) {
     dictEntry *de_f, *de_t;
-    redisClusterNode *node_f, *node_t;
-    redisContext *c;
-    redisAsyncContext *ac;
+    valkeyClusterNode *node_f, *node_t;
+    valkeyContext *c;
+    valkeyAsyncContext *ac;
 
     if (nodes_f == NULL || nodes_t == NULL) {
         return;
@@ -623,17 +623,17 @@ static void cluster_nodes_swap_ctx(dict *nodes_f, dict *nodes_t) {
     }
 }
 
-static int cluster_master_slave_mapping_with_name(redisClusterContext *cc,
+static int cluster_master_slave_mapping_with_name(valkeyClusterContext *cc,
                                                   dict **nodes,
-                                                  redisClusterNode *node,
+                                                  valkeyClusterNode *node,
                                                   sds master_name) {
     int ret;
     dictEntry *di;
-    redisClusterNode *node_old;
+    valkeyClusterNode *node_old;
     listNode *lnode;
 
     if (node == NULL || master_name == NULL) {
-        return REDIS_ERR;
+        return VALKEY_ERR;
     }
 
     if (*nodes == NULL) {
@@ -658,17 +658,17 @@ static int cluster_master_slave_mapping_with_name(redisClusterContext *cc,
     } else {
         node_old = dictGetEntryVal(di);
         if (node_old == NULL) {
-            __redisClusterSetError(cc, REDIS_ERR_OTHER, "dict get value null");
-            return REDIS_ERR;
+            __valkeyClusterSetError(cc, VALKEY_ERR_OTHER, "dict get value null");
+            return VALKEY_ERR;
         }
 
-        if (node->role == REDIS_ROLE_MASTER &&
-            node_old->role == REDIS_ROLE_MASTER) {
-            __redisClusterSetError(cc, REDIS_ERR_OTHER,
+        if (node->role == VALKEY_ROLE_MASTER &&
+            node_old->role == VALKEY_ROLE_MASTER) {
+            __valkeyClusterSetError(cc, VALKEY_ERR_OTHER,
                                    "two masters have the same name");
-            return REDIS_ERR;
-        } else if (node->role == REDIS_ROLE_MASTER &&
-                   node_old->role == REDIS_ROLE_SLAVE) {
+            return VALKEY_ERR;
+        } else if (node->role == VALKEY_ROLE_MASTER &&
+                   node_old->role == VALKEY_ROLE_SLAVE) {
             if (node->slaves == NULL) {
                 node->slaves = listCreate();
                 if (node->slaves == NULL) {
@@ -696,7 +696,7 @@ static int cluster_master_slave_mapping_with_name(redisClusterContext *cc,
             }
             dictSetHashVal(*nodes, di, node);
 
-        } else if (node->role == REDIS_ROLE_SLAVE) {
+        } else if (node->role == VALKEY_ROLE_SLAVE) {
             if (node_old->slaves == NULL) {
                 node_old->slaves = listCreate();
                 if (node_old->slaves == NULL) {
@@ -714,27 +714,27 @@ static int cluster_master_slave_mapping_with_name(redisClusterContext *cc,
         }
     }
 
-    return REDIS_OK;
+    return VALKEY_OK;
 
 oom:
-    __redisClusterSetError(cc, REDIS_ERR_OOM, "Out of memory");
-    return REDIS_ERR;
+    __valkeyClusterSetError(cc, VALKEY_ERR_OOM, "Out of memory");
+    return VALKEY_ERR;
 }
 
 /**
  * Parse the "cluster slots" command reply to nodes dict.
  */
-dict *parse_cluster_slots(redisClusterContext *cc, redisReply *reply,
+dict *parse_cluster_slots(valkeyClusterContext *cc, valkeyReply *reply,
                           int flags) {
     int ret;
     cluster_slot *slot = NULL;
     dict *nodes = NULL;
     dictEntry *den;
-    redisReply *elem_slots;
-    redisReply *elem_slots_begin, *elem_slots_end;
-    redisReply *elem_nodes;
-    redisReply *elem_ip, *elem_port;
-    redisClusterNode *master = NULL, *slave;
+    valkeyReply *elem_slots;
+    valkeyReply *elem_slots_begin, *elem_slots_end;
+    valkeyReply *elem_nodes;
+    valkeyReply *elem_ip, *elem_port;
+    valkeyClusterNode *master = NULL, *slave;
     uint32_t i, idx;
 
     if (reply == NULL) {
@@ -746,8 +746,8 @@ dict *parse_cluster_slots(redisClusterContext *cc, redisReply *reply,
         goto oom;
     }
 
-    if (reply->type != REDIS_REPLY_ARRAY || reply->elements <= 0) {
-        __redisClusterSetError(cc, REDIS_ERR_OTHER,
+    if (reply->type != VALKEY_REPLY_ARRAY || reply->elements <= 0) {
+        __valkeyClusterSetError(cc, VALKEY_ERR_OTHER,
                                "Command(cluster slots) reply error: "
                                "reply is not an array.");
         goto error;
@@ -755,8 +755,8 @@ dict *parse_cluster_slots(redisClusterContext *cc, redisReply *reply,
 
     for (i = 0; i < reply->elements; i++) {
         elem_slots = reply->element[i];
-        if (elem_slots->type != REDIS_REPLY_ARRAY || elem_slots->elements < 3) {
-            __redisClusterSetError(cc, REDIS_ERR_OTHER,
+        if (elem_slots->type != VALKEY_REPLY_ARRAY || elem_slots->elements < 3) {
+            __valkeyClusterSetError(cc, VALKEY_ERR_OTHER,
                                    "Command(cluster slots) reply error: "
                                    "first sub_reply is not an array.");
             goto error;
@@ -771,9 +771,9 @@ dict *parse_cluster_slots(redisClusterContext *cc, redisReply *reply,
         for (idx = 0; idx < elem_slots->elements; idx++) {
             if (idx == 0) {
                 elem_slots_begin = elem_slots->element[idx];
-                if (elem_slots_begin->type != REDIS_REPLY_INTEGER) {
-                    __redisClusterSetError(
-                        cc, REDIS_ERR_OTHER,
+                if (elem_slots_begin->type != VALKEY_REPLY_INTEGER) {
+                    __valkeyClusterSetError(
+                        cc, VALKEY_ERR_OTHER,
                         "Command(cluster slots) reply error: "
                         "slot begin is not an integer.");
                     goto error;
@@ -781,9 +781,9 @@ dict *parse_cluster_slots(redisClusterContext *cc, redisReply *reply,
                 slot->start = (int)(elem_slots_begin->integer);
             } else if (idx == 1) {
                 elem_slots_end = elem_slots->element[idx];
-                if (elem_slots_end->type != REDIS_REPLY_INTEGER) {
-                    __redisClusterSetError(
-                        cc, REDIS_ERR_OTHER,
+                if (elem_slots_end->type != VALKEY_REPLY_INTEGER) {
+                    __valkeyClusterSetError(
+                        cc, VALKEY_ERR_OTHER,
                         "Command(cluster slots) reply error: "
                         "slot end is not an integer.");
                     goto error;
@@ -792,18 +792,18 @@ dict *parse_cluster_slots(redisClusterContext *cc, redisReply *reply,
                 slot->end = (int)(elem_slots_end->integer);
 
                 if (slot->start > slot->end) {
-                    __redisClusterSetError(
-                        cc, REDIS_ERR_OTHER,
+                    __valkeyClusterSetError(
+                        cc, VALKEY_ERR_OTHER,
                         "Command(cluster slots) reply error: "
                         "slot begin is bigger than slot end.");
                     goto error;
                 }
             } else {
                 elem_nodes = elem_slots->element[idx];
-                if (elem_nodes->type != REDIS_REPLY_ARRAY ||
+                if (elem_nodes->type != VALKEY_REPLY_ARRAY ||
                     elem_nodes->elements < 2) {
-                    __redisClusterSetError(
-                        cc, REDIS_ERR_OTHER,
+                    __valkeyClusterSetError(
+                        cc, VALKEY_ERR_OTHER,
                         "Command(cluster slots) reply error: "
                         "nodes sub_reply is not an correct array.");
                     goto error;
@@ -813,10 +813,10 @@ dict *parse_cluster_slots(redisClusterContext *cc, redisReply *reply,
                 elem_port = elem_nodes->element[1];
 
                 if (elem_ip == NULL || elem_port == NULL ||
-                    elem_ip->type != REDIS_REPLY_STRING ||
-                    elem_port->type != REDIS_REPLY_INTEGER) {
-                    __redisClusterSetError(
-                        cc, REDIS_ERR_OTHER,
+                    elem_ip->type != VALKEY_REPLY_STRING ||
+                    elem_port->type != VALKEY_REPLY_INTEGER) {
+                    __valkeyClusterSetError(
+                        cc, VALKEY_ERR_OTHER,
                         "Command(cluster slots) reply error: "
                         "master ip or port is not correct.");
                     goto error;
@@ -840,7 +840,7 @@ dict *parse_cluster_slots(redisClusterContext *cc, redisReply *reply,
 
                         master = dictGetEntryVal(den);
                         ret = cluster_slot_ref_node(slot, master);
-                        if (ret != REDIS_OK) {
+                        if (ret != VALKEY_OK) {
                             goto oom;
                         }
 
@@ -849,33 +849,33 @@ dict *parse_cluster_slots(redisClusterContext *cc, redisReply *reply,
                     }
 
                     master = node_get_with_slots(cc, elem_ip, elem_port,
-                                                 REDIS_ROLE_MASTER);
+                                                 VALKEY_ROLE_MASTER);
                     if (master == NULL) {
                         goto error;
                     }
 
                     sds key = sdsnewlen(master->addr, sdslen(master->addr));
                     if (key == NULL) {
-                        freeRedisClusterNode(master);
+                        freeValkeyClusterNode(master);
                         goto oom;
                     }
 
                     ret = dictAdd(nodes, key, master);
                     if (ret != DICT_OK) {
                         sdsfree(key);
-                        freeRedisClusterNode(master);
+                        freeValkeyClusterNode(master);
                         goto oom;
                     }
 
                     ret = cluster_slot_ref_node(slot, master);
-                    if (ret != REDIS_OK) {
+                    if (ret != VALKEY_OK) {
                         goto oom;
                     }
 
                     slot = NULL;
-                } else if (flags & HIRCLUSTER_FLAG_ADD_SLAVE) {
+                } else if (flags & VALKEYCLUSTER_FLAG_ADD_SLAVE) {
                     slave = node_get_with_slots(cc, elem_ip, elem_port,
-                                                REDIS_ROLE_SLAVE);
+                                                VALKEY_ROLE_SLAVE);
                     if (slave == NULL) {
                         goto error;
                     }
@@ -883,7 +883,7 @@ dict *parse_cluster_slots(redisClusterContext *cc, redisReply *reply,
                     if (master->slaves == NULL) {
                         master->slaves = listCreate();
                         if (master->slaves == NULL) {
-                            freeRedisClusterNode(slave);
+                            freeValkeyClusterNode(slave);
                             goto oom;
                         }
 
@@ -891,7 +891,7 @@ dict *parse_cluster_slots(redisClusterContext *cc, redisReply *reply,
                     }
 
                     if (listAddNodeTail(master->slaves, slave) == NULL) {
-                        freeRedisClusterNode(slave);
+                        freeValkeyClusterNode(slave);
                         goto oom;
                     }
                 }
@@ -902,7 +902,7 @@ dict *parse_cluster_slots(redisClusterContext *cc, redisReply *reply,
     return nodes;
 
 oom:
-    __redisClusterSetError(cc, REDIS_ERR_OOM, "Out of memory");
+    __valkeyClusterSetError(cc, VALKEY_ERR_OOM, "Out of memory");
     // passthrough
 
 error:
@@ -918,12 +918,12 @@ error:
 /**
  * Parse the "cluster nodes" command reply to nodes dict.
  */
-dict *parse_cluster_nodes(redisClusterContext *cc, char *str, int str_len,
+dict *parse_cluster_nodes(valkeyClusterContext *cc, char *str, int str_len,
                           int flags) {
     int ret;
     dict *nodes = NULL;
     dict *nodes_name = NULL;
-    redisClusterNode *master, *slave;
+    valkeyClusterNode *master, *slave;
     cluster_slot *slot;
     char *pos, *start, *end, *line_start, *line_end;
     char *role;
@@ -955,7 +955,7 @@ dict *parse_cluster_nodes(redisClusterContext *cc, char *str, int str_len,
             }
 
             if (count_part < 8) {
-                __redisClusterSetError(cc, REDIS_ERR_OTHER,
+                __valkeyClusterSetError(cc, VALKEY_ERR_OTHER,
                                        "split cluster nodes error");
                 goto error;
             }
@@ -984,33 +984,33 @@ dict *parse_cluster_nodes(redisClusterContext *cc, char *str, int str_len,
             // add master node
             if (role_len >= 6 && memcmp(role, "master", 6) == 0) {
                 master = node_get_with_nodes(cc, part, count_part,
-                                             REDIS_ROLE_MASTER);
+                                             VALKEY_ROLE_MASTER);
                 if (master == NULL) {
                     goto error;
                 }
 
                 sds key = sdsnewlen(master->addr, sdslen(master->addr));
                 if (key == NULL) {
-                    freeRedisClusterNode(master);
+                    freeValkeyClusterNode(master);
                     goto oom;
                 }
 
                 ret = dictAdd(nodes, key, master);
                 if (ret != DICT_OK) {
                     // Key already exists, but possibly an OOM error
-                    __redisClusterSetError(
-                        cc, REDIS_ERR_OTHER,
+                    __valkeyClusterSetError(
+                        cc, VALKEY_ERR_OTHER,
                         "The address already exists in the nodes");
                     sdsfree(key);
-                    freeRedisClusterNode(master);
+                    freeValkeyClusterNode(master);
                     goto error;
                 }
 
-                if (flags & HIRCLUSTER_FLAG_ADD_SLAVE) {
+                if (flags & VALKEYCLUSTER_FLAG_ADD_SLAVE) {
                     ret = cluster_master_slave_mapping_with_name(
                         cc, &nodes_name, master, master->name);
-                    if (ret != REDIS_OK) {
-                        freeRedisClusterNode(master);
+                    if (ret != VALKEY_OK) {
+                        freeValkeyClusterNode(master);
                         goto error;
                     }
                 }
@@ -1023,19 +1023,19 @@ dict *parse_cluster_nodes(redisClusterContext *cc, char *str, int str_len,
                     }
 
                     if (count_slot_start_end == 1) {
-                        slot_start = hi_atoi(slot_start_end[0],
+                        slot_start = vk_atoi(slot_start_end[0],
                                              sdslen(slot_start_end[0]));
                         slot_end = slot_start;
                     } else if (count_slot_start_end == 2) {
-                        slot_start = hi_atoi(slot_start_end[0],
+                        slot_start = vk_atoi(slot_start_end[0],
                                              sdslen(slot_start_end[0]));
                         ;
-                        slot_end = hi_atoi(slot_start_end[1],
+                        slot_end = vk_atoi(slot_start_end[1],
                                            sdslen(slot_start_end[1]));
                         ;
                     } else {
                         // add open slot for master
-                        if (flags & HIRCLUSTER_FLAG_ADD_OPENSLOT &&
+                        if (flags & VALKEYCLUSTER_FLAG_ADD_OPENSLOT &&
                             count_slot_start_end == 3 &&
                             sdslen(slot_start_end[0]) > 1 &&
                             sdslen(slot_start_end[1]) == 1 &&
@@ -1051,26 +1051,26 @@ dict *parse_cluster_nodes(redisClusterContext *cc, char *str, int str_len,
 
                             if (slot_start_end[1][0] == '>') {
                                 oslot = cluster_open_slot_create(
-                                    hi_atoi(slot_start_end[0],
+                                    vk_atoi(slot_start_end[0],
                                             sdslen(slot_start_end[0])),
                                     1, slot_start_end[2], master);
                                 if (oslot == NULL) {
-                                    __redisClusterSetError(
-                                        cc, REDIS_ERR_OTHER,
+                                    __valkeyClusterSetError(
+                                        cc, VALKEY_ERR_OTHER,
                                         "create open slot error");
                                     goto error;
                                 }
 
                                 if (master->migrating == NULL) {
                                     master->migrating =
-                                        hiarray_create(1, sizeof(oslot));
+                                        vkarray_create(1, sizeof(oslot));
                                     if (master->migrating == NULL) {
                                         cluster_open_slot_destroy(oslot);
                                         goto oom;
                                     }
                                 }
 
-                                oslot_elem = hiarray_push(master->migrating);
+                                oslot_elem = vkarray_push(master->migrating);
                                 if (oslot_elem == NULL) {
                                     cluster_open_slot_destroy(oslot);
                                     goto oom;
@@ -1079,26 +1079,26 @@ dict *parse_cluster_nodes(redisClusterContext *cc, char *str, int str_len,
                                 *oslot_elem = oslot;
                             } else if (slot_start_end[1][0] == '<') {
                                 oslot = cluster_open_slot_create(
-                                    hi_atoi(slot_start_end[0],
+                                    vk_atoi(slot_start_end[0],
                                             sdslen(slot_start_end[0])),
                                     0, slot_start_end[2], master);
                                 if (oslot == NULL) {
-                                    __redisClusterSetError(
-                                        cc, REDIS_ERR_OTHER,
+                                    __valkeyClusterSetError(
+                                        cc, VALKEY_ERR_OTHER,
                                         "create open slot error");
                                     goto error;
                                 }
 
                                 if (master->importing == NULL) {
                                     master->importing =
-                                        hiarray_create(1, sizeof(oslot));
+                                        vkarray_create(1, sizeof(oslot));
                                     if (master->importing == NULL) {
                                         cluster_open_slot_destroy(oslot);
                                         goto oom;
                                     }
                                 }
 
-                                oslot_elem = hiarray_push(master->importing);
+                                oslot_elem = vkarray_push(master->importing);
                                 if (oslot_elem == NULL) {
                                     cluster_open_slot_destroy(oslot);
                                     goto oom;
@@ -1118,7 +1118,7 @@ dict *parse_cluster_nodes(redisClusterContext *cc, char *str, int str_len,
 
                     if (slot_start < 0 || slot_end < 0 ||
                         slot_start > slot_end ||
-                        slot_end >= REDIS_CLUSTER_SLOTS) {
+                        slot_end >= VALKEYCLUSTER_SLOTS) {
                         continue;
                     }
                     slot_ranges_found += 1;
@@ -1134,18 +1134,18 @@ dict *parse_cluster_nodes(redisClusterContext *cc, char *str, int str_len,
 
             }
             // add slave node
-            else if ((flags & HIRCLUSTER_FLAG_ADD_SLAVE) &&
+            else if ((flags & VALKEYCLUSTER_FLAG_ADD_SLAVE) &&
                      (role_len >= 5 && memcmp(role, "slave", 5) == 0)) {
                 slave =
-                    node_get_with_nodes(cc, part, count_part, REDIS_ROLE_SLAVE);
+                    node_get_with_nodes(cc, part, count_part, VALKEY_ROLE_SLAVE);
                 if (slave == NULL) {
                     goto error;
                 }
 
                 ret = cluster_master_slave_mapping_with_name(cc, &nodes_name,
                                                              slave, part[3]);
-                if (ret != REDIS_OK) {
-                    freeRedisClusterNode(slave);
+                if (ret != VALKEY_OK) {
+                    freeValkeyClusterNode(slave);
                     goto error;
                 }
             }
@@ -1161,7 +1161,7 @@ dict *parse_cluster_nodes(redisClusterContext *cc, char *str, int str_len,
     }
 
     if (slot_ranges_found == 0) {
-        __redisClusterSetError(cc, REDIS_ERR_OTHER, "No slot information");
+        __valkeyClusterSetError(cc, VALKEY_ERR_OTHER, "No slot information");
         goto error;
     }
 
@@ -1172,7 +1172,7 @@ dict *parse_cluster_nodes(redisClusterContext *cc, char *str, int str_len,
     return nodes;
 
 oom:
-    __redisClusterSetError(cc, REDIS_ERR_OOM, "Out of memory");
+    __valkeyClusterSetError(cc, VALKEY_ERR_OOM, "Out of memory");
     // passthrough
 
 error:
@@ -1188,50 +1188,50 @@ error:
 }
 
 /* Sends CLUSTER SLOTS or CLUSTER NODES to the node with context c. */
-static int clusterUpdateRouteSendCommand(redisClusterContext *cc,
-                                         redisContext *c) {
-    const char *cmd = (cc->flags & HIRCLUSTER_FLAG_ROUTE_USE_SLOTS ?
-                           REDIS_COMMAND_CLUSTER_SLOTS :
-                           REDIS_COMMAND_CLUSTER_NODES);
-    if (redisAppendCommand(c, cmd) != REDIS_OK) {
-        const char *msg = (cc->flags & HIRCLUSTER_FLAG_ROUTE_USE_SLOTS ?
+static int clusterUpdateRouteSendCommand(valkeyClusterContext *cc,
+                                         valkeyContext *c) {
+    const char *cmd = (cc->flags & VALKEYCLUSTER_FLAG_ROUTE_USE_SLOTS ?
+                           VALKEY_COMMAND_CLUSTER_SLOTS :
+                           VALKEY_COMMAND_CLUSTER_NODES);
+    if (valkeyAppendCommand(c, cmd) != VALKEY_OK) {
+        const char *msg = (cc->flags & VALKEYCLUSTER_FLAG_ROUTE_USE_SLOTS ?
                                "Command (cluster slots) send error." :
                                "Command (cluster nodes) send error.");
-        __redisClusterSetError(cc, c->err, msg);
-        return REDIS_ERR;
+        __valkeyClusterSetError(cc, c->err, msg);
+        return VALKEY_ERR;
     }
     /* Flush buffer to socket. */
-    if (redisBufferWrite(c, NULL) == REDIS_ERR)
-        return REDIS_ERR;
+    if (valkeyBufferWrite(c, NULL) == VALKEY_ERR)
+        return VALKEY_ERR;
 
-    return REDIS_OK;
+    return VALKEY_OK;
 }
 
 /* Receives and handles a CLUSTER SLOTS reply from node with context c. */
-static int handleClusterSlotsReply(redisClusterContext *cc, redisContext *c) {
-    redisReply *reply = NULL;
-    int result = redisGetReply(c, (void **)&reply);
-    if (result != REDIS_OK) {
-        if (c->err == REDIS_ERR_TIMEOUT) {
-            __redisClusterSetError(
+static int handleClusterSlotsReply(valkeyClusterContext *cc, valkeyContext *c) {
+    valkeyReply *reply = NULL;
+    int result = valkeyGetReply(c, (void **)&reply);
+    if (result != VALKEY_OK) {
+        if (c->err == VALKEY_ERR_TIMEOUT) {
+            __valkeyClusterSetError(
                 cc, c->err,
                 "Command (cluster slots) reply error (socket timeout)");
         } else {
-            __redisClusterSetError(
-                cc, REDIS_ERR_OTHER,
+            __valkeyClusterSetError(
+                cc, VALKEY_ERR_OTHER,
                 "Command (cluster slots) reply error (NULL).");
         }
-        return REDIS_ERR;
-    } else if (reply->type != REDIS_REPLY_ARRAY) {
-        if (reply->type == REDIS_REPLY_ERROR) {
-            __redisClusterSetError(cc, REDIS_ERR_OTHER, reply->str);
+        return VALKEY_ERR;
+    } else if (reply->type != VALKEY_REPLY_ARRAY) {
+        if (reply->type == VALKEY_REPLY_ERROR) {
+            __valkeyClusterSetError(cc, VALKEY_ERR_OTHER, reply->str);
         } else {
-            __redisClusterSetError(
-                cc, REDIS_ERR_OTHER,
+            __valkeyClusterSetError(
+                cc, VALKEY_ERR_OTHER,
                 "Command (cluster slots) reply error: type is not array.");
         }
         freeReplyObject(reply);
-        return REDIS_ERR;
+        return VALKEY_ERR;
     }
 
     dict *nodes = parse_cluster_slots(cc, reply, cc->flags);
@@ -1240,30 +1240,30 @@ static int handleClusterSlotsReply(redisClusterContext *cc, redisContext *c) {
 }
 
 /* Receives and handles a CLUSTER NODES reply from node with context c. */
-static int handleClusterNodesReply(redisClusterContext *cc, redisContext *c) {
-    redisReply *reply = NULL;
-    int result = redisGetReply(c, (void **)&reply);
-    if (result != REDIS_OK) {
-        if (c->err == REDIS_ERR_TIMEOUT) {
-            __redisClusterSetError(cc, c->err,
+static int handleClusterNodesReply(valkeyClusterContext *cc, valkeyContext *c) {
+    valkeyReply *reply = NULL;
+    int result = valkeyGetReply(c, (void **)&reply);
+    if (result != VALKEY_OK) {
+        if (c->err == VALKEY_ERR_TIMEOUT) {
+            __valkeyClusterSetError(cc, c->err,
                                    "Command (cluster nodes) reply error "
                                    "(socket timeout)");
         } else {
-            __redisClusterSetError(cc, REDIS_ERR_OTHER,
+            __valkeyClusterSetError(cc, VALKEY_ERR_OTHER,
                                    "Command (cluster nodes) reply error "
                                    "(NULL).");
         }
-        return REDIS_ERR;
-    } else if (reply->type != REDIS_REPLY_STRING) {
-        if (reply->type == REDIS_REPLY_ERROR) {
-            __redisClusterSetError(cc, REDIS_ERR_OTHER, reply->str);
+        return VALKEY_ERR;
+    } else if (reply->type != VALKEY_REPLY_STRING) {
+        if (reply->type == VALKEY_REPLY_ERROR) {
+            __valkeyClusterSetError(cc, VALKEY_ERR_OTHER, reply->str);
         } else {
-            __redisClusterSetError(cc, REDIS_ERR_OTHER,
+            __valkeyClusterSetError(cc, VALKEY_ERR_OTHER,
                                    "Command(cluster nodes) reply error: "
                                    "type is not string.");
         }
         freeReplyObject(reply);
-        return REDIS_ERR;
+        return VALKEY_ERR;
     }
 
     dict *nodes = parse_cluster_nodes(cc, reply->str, reply->len, cc->flags);
@@ -1273,9 +1273,9 @@ static int handleClusterNodesReply(redisClusterContext *cc, redisContext *c) {
 
 /* Receives and handles a CLUSTER SLOTS or CLUSTER NODES reply from node with
  * context c. */
-static int clusterUpdateRouteHandleReply(redisClusterContext *cc,
-                                         redisContext *c) {
-    if (cc->flags & HIRCLUSTER_FLAG_ROUTE_USE_SLOTS) {
+static int clusterUpdateRouteHandleReply(valkeyClusterContext *cc,
+                                         valkeyContext *c) {
+    if (cc->flags & VALKEYCLUSTER_FLAG_ROUTE_USE_SLOTS) {
         return handleClusterSlotsReply(cc, c);
     } else {
         return handleClusterNodesReply(cc, c);
@@ -1285,74 +1285,74 @@ static int clusterUpdateRouteHandleReply(redisClusterContext *cc,
 /**
  * Update route with the "cluster nodes" or "cluster slots" command reply.
  */
-static int cluster_update_route_by_addr(redisClusterContext *cc, const char *ip,
+static int cluster_update_route_by_addr(valkeyClusterContext *cc, const char *ip,
                                         int port) {
-    redisContext *c = NULL;
+    valkeyContext *c = NULL;
 
     if (cc == NULL) {
-        return REDIS_ERR;
+        return VALKEY_ERR;
     }
 
     if (ip == NULL || port <= 0) {
-        __redisClusterSetError(cc, REDIS_ERR_OTHER, "Ip or port error!");
+        __valkeyClusterSetError(cc, VALKEY_ERR_OTHER, "Ip or port error!");
         goto error;
     }
 
-    redisOptions options = {0};
-    REDIS_OPTIONS_SET_TCP(&options, ip, port);
+    valkeyOptions options = {0};
+    VALKEY_OPTIONS_SET_TCP(&options, ip, port);
     options.connect_timeout = cc->connect_timeout;
     options.command_timeout = cc->command_timeout;
 
-    c = redisConnectWithOptions(&options);
+    c = valkeyConnectWithOptions(&options);
     if (c == NULL) {
-        __redisClusterSetError(cc, REDIS_ERR_OOM, "Out of memory");
-        return REDIS_ERR;
+        __valkeyClusterSetError(cc, VALKEY_ERR_OOM, "Out of memory");
+        return VALKEY_ERR;
     }
 
     if (cc->on_connect) {
-        cc->on_connect(c, c->err ? REDIS_ERR : REDIS_OK);
+        cc->on_connect(c, c->err ? VALKEY_ERR : VALKEY_OK);
     }
 
     if (c->err) {
-        __redisClusterSetError(cc, c->err, c->errstr);
+        __valkeyClusterSetError(cc, c->err, c->errstr);
         goto error;
     }
 
-    if (cc->ssl && cc->ssl_init_fn(c, cc->ssl) != REDIS_OK) {
-        __redisClusterSetError(cc, c->err, c->errstr);
+    if (cc->ssl && cc->ssl_init_fn(c, cc->ssl) != VALKEY_OK) {
+        __valkeyClusterSetError(cc, c->err, c->errstr);
         goto error;
     }
 
-    if (authenticate(cc, c) != REDIS_OK) {
+    if (authenticate(cc, c) != VALKEY_OK) {
         goto error;
     }
 
-    if (clusterUpdateRouteSendCommand(cc, c) != REDIS_OK) {
+    if (clusterUpdateRouteSendCommand(cc, c) != VALKEY_OK) {
         goto error;
     }
 
-    if (clusterUpdateRouteHandleReply(cc, c) != REDIS_OK) {
+    if (clusterUpdateRouteHandleReply(cc, c) != VALKEY_OK) {
         goto error;
     }
 
-    redisFree(c);
-    return REDIS_OK;
+    valkeyFree(c);
+    return VALKEY_OK;
 
 error:
-    redisFree(c);
-    return REDIS_ERR;
+    valkeyFree(c);
+    return VALKEY_ERR;
 }
 
-/* Update known cluster nodes with a new collection of redisClusterNodes.
+/* Update known cluster nodes with a new collection of valkeyClusterNodes.
  * Will also update the slot-to-node lookup table for the new nodes. */
-static int updateNodesAndSlotmap(redisClusterContext *cc, dict *nodes) {
+static int updateNodesAndSlotmap(valkeyClusterContext *cc, dict *nodes) {
     if (nodes == NULL) {
-        return REDIS_ERR;
+        return VALKEY_ERR;
     }
 
-    /* Create a slot to redisClusterNode lookup table */
-    redisClusterNode **table;
-    table = hi_calloc(REDIS_CLUSTER_SLOTS, sizeof(redisClusterNode *));
+    /* Create a slot to valkeyClusterNode lookup table */
+    valkeyClusterNode **table;
+    table = vk_calloc(VALKEYCLUSTER_SLOTS, sizeof(valkeyClusterNode *));
     if (table == NULL) {
         goto oom;
     }
@@ -1362,9 +1362,9 @@ static int updateNodesAndSlotmap(redisClusterContext *cc, dict *nodes) {
 
     dictEntry *de;
     while ((de = dictNext(&di))) {
-        redisClusterNode *master = dictGetEntryVal(de);
-        if (master->role != REDIS_ROLE_MASTER) {
-            __redisClusterSetError(cc, REDIS_ERR_OTHER,
+        valkeyClusterNode *master = dictGetEntryVal(de);
+        if (master->role != VALKEY_ROLE_MASTER) {
+            __valkeyClusterSetError(cc, VALKEY_ERR_OTHER,
                                    "Node role must be master");
             goto error;
         }
@@ -1379,14 +1379,14 @@ static int updateNodesAndSlotmap(redisClusterContext *cc, dict *nodes) {
         listNode *ln;
         while ((ln = listNext(&li))) {
             cluster_slot *slot = listNodeValue(ln);
-            if (slot->start > slot->end || slot->end >= REDIS_CLUSTER_SLOTS) {
-                __redisClusterSetError(cc, REDIS_ERR_OTHER,
+            if (slot->start > slot->end || slot->end >= VALKEYCLUSTER_SLOTS) {
+                __valkeyClusterSetError(cc, VALKEY_ERR_OTHER,
                                        "Slot region for node is invalid");
                 goto error;
             }
             for (uint32_t i = slot->start; i <= slot->end; i++) {
                 if (table[i] != NULL) {
-                    __redisClusterSetError(cc, REDIS_ERR_OTHER,
+                    __valkeyClusterSetError(cc, VALKEY_ERR_OTHER,
                                            "Different node holds same slot");
                     goto error;
                 }
@@ -1399,13 +1399,13 @@ static int updateNodesAndSlotmap(redisClusterContext *cc, dict *nodes) {
      * removal of nodes might trigger user callbacks which may
      * send commands, which depend on the slot-to-node table. */
     if (cc->table != NULL) {
-        hi_free(cc->table);
+        vk_free(cc->table);
     }
     cc->table = table;
 
     cc->route_version++;
 
-    // Move all hiredis contexts in cc->nodes to nodes
+    // Move all libvalkey contexts in cc->nodes to nodes
     cluster_nodes_swap_ctx(cc->nodes, nodes);
 
     /* Replace cc->nodes before releasing the old dict since
@@ -1416,38 +1416,38 @@ static int updateNodesAndSlotmap(redisClusterContext *cc, dict *nodes) {
         dictRelease(oldnodes);
     }
     if (cc->event_callback != NULL) {
-        cc->event_callback(cc, HIRCLUSTER_EVENT_SLOTMAP_UPDATED,
+        cc->event_callback(cc, VALKEYCLUSTER_EVENT_SLOTMAP_UPDATED,
                            cc->event_privdata);
         if (cc->route_version == 1) {
             /* Special event the first time the slotmap was updated. */
-            cc->event_callback(cc, HIRCLUSTER_EVENT_READY, cc->event_privdata);
+            cc->event_callback(cc, VALKEYCLUSTER_EVENT_READY, cc->event_privdata);
         }
     }
     cc->need_update_route = 0;
-    return REDIS_OK;
+    return VALKEY_OK;
 
 oom:
-    __redisClusterSetError(cc, REDIS_ERR_OOM, "Out of memory");
+    __valkeyClusterSetError(cc, VALKEY_ERR_OOM, "Out of memory");
     // passthrough
 error:
-    hi_free(table);
+    vk_free(table);
     dictRelease(nodes);
-    return REDIS_ERR;
+    return VALKEY_ERR;
 }
 
-int redisClusterUpdateSlotmap(redisClusterContext *cc) {
+int valkeyClusterUpdateSlotmap(valkeyClusterContext *cc) {
     int ret;
     int flag_err_not_set = 1;
-    redisClusterNode *node;
+    valkeyClusterNode *node;
     dictEntry *de;
 
     if (cc == NULL) {
-        return REDIS_ERR;
+        return VALKEY_ERR;
     }
 
     if (cc->nodes == NULL) {
-        __redisClusterSetError(cc, REDIS_ERR_OTHER, "no server address");
-        return REDIS_ERR;
+        __valkeyClusterSetError(cc, VALKEY_ERR_OTHER, "no server address");
+        return VALKEY_ERR;
     }
 
     dictIterator di;
@@ -1460,28 +1460,28 @@ int redisClusterUpdateSlotmap(redisClusterContext *cc) {
         }
 
         ret = cluster_update_route_by_addr(cc, node->host, node->port);
-        if (ret == REDIS_OK) {
+        if (ret == VALKEY_OK) {
             if (cc->err) {
                 cc->err = 0;
                 memset(cc->errstr, '\0', strlen(cc->errstr));
             }
-            return REDIS_OK;
+            return VALKEY_OK;
         }
 
         flag_err_not_set = 0;
     }
 
     if (flag_err_not_set) {
-        __redisClusterSetError(cc, REDIS_ERR_OTHER, "no valid server address");
+        __valkeyClusterSetError(cc, VALKEY_ERR_OTHER, "no valid server address");
     }
 
-    return REDIS_ERR;
+    return VALKEY_ERR;
 }
 
-redisClusterContext *redisClusterContextInit(void) {
-    redisClusterContext *cc;
+valkeyClusterContext *valkeyClusterContextInit(void) {
+    valkeyClusterContext *cc;
 
-    cc = hi_calloc(1, sizeof(redisClusterContext));
+    cc = vk_calloc(1, sizeof(valkeyClusterContext));
     if (cc == NULL)
         return NULL;
 
@@ -1489,34 +1489,34 @@ redisClusterContext *redisClusterContextInit(void) {
     return cc;
 }
 
-void redisClusterFree(redisClusterContext *cc) {
+void valkeyClusterFree(valkeyClusterContext *cc) {
 
     if (cc == NULL)
         return;
 
     if (cc->event_callback) {
-        cc->event_callback(cc, HIRCLUSTER_EVENT_FREE_CONTEXT,
+        cc->event_callback(cc, VALKEYCLUSTER_EVENT_FREE_CONTEXT,
                            cc->event_privdata);
     }
 
     if (cc->connect_timeout) {
-        hi_free(cc->connect_timeout);
+        vk_free(cc->connect_timeout);
         cc->connect_timeout = NULL;
     }
 
     if (cc->command_timeout) {
-        hi_free(cc->command_timeout);
+        vk_free(cc->command_timeout);
         cc->command_timeout = NULL;
     }
 
     if (cc->table != NULL) {
-        hi_free(cc->table);
+        vk_free(cc->table);
         cc->table = NULL;
     }
 
     if (cc->nodes != NULL) {
         /* Clear cc->nodes before releasing the dict since the release procedure
-           might access cc->nodes. When a node and its hiredis context are freed
+           might access cc->nodes. When a node and its valkey context are freed
            all pending callbacks are executed. Clearing cc->nodes prevents a pending
            slotmap update command callback to trigger additional slotmap updates. */
         dict *nodes = cc->nodes;
@@ -1529,54 +1529,54 @@ void redisClusterFree(redisClusterContext *cc) {
     }
 
     if (cc->username != NULL) {
-        hi_free(cc->username);
+        vk_free(cc->username);
         cc->username = NULL;
     }
 
     if (cc->password != NULL) {
-        hi_free(cc->password);
+        vk_free(cc->password);
         cc->password = NULL;
     }
 
-    hi_free(cc);
+    vk_free(cc);
 }
 
-/* Connect to a Redis cluster. On error the field error in the returned
+/* Connect to a Valkey cluster. On error the field error in the returned
  * context will be set to the return value of the error function.
  * When no set of reply functions is given, the default set will be used. */
-static int _redisClusterConnect2(redisClusterContext *cc) {
+static int _valkeyClusterConnect2(valkeyClusterContext *cc) {
 
     if (cc->nodes == NULL || dictSize(cc->nodes) == 0) {
-        __redisClusterSetError(cc, REDIS_ERR_OTHER,
+        __valkeyClusterSetError(cc, VALKEY_ERR_OTHER,
                                "servers address does not set up");
-        return REDIS_ERR;
+        return VALKEY_ERR;
     }
 
-    return redisClusterUpdateSlotmap(cc);
+    return valkeyClusterUpdateSlotmap(cc);
 }
 
-/* Connect to a Redis cluster. On error the field error in the returned
+/* Connect to a Valkey cluster. On error the field error in the returned
  * context will be set to the return value of the error function.
  * When no set of reply functions is given, the default set will be used. */
-static redisClusterContext *_redisClusterConnect(redisClusterContext *cc,
+static valkeyClusterContext *_valkeyClusterConnect(valkeyClusterContext *cc,
                                                  const char *addrs) {
 
     int ret;
 
-    ret = redisClusterSetOptionAddNodes(cc, addrs);
-    if (ret != REDIS_OK) {
+    ret = valkeyClusterSetOptionAddNodes(cc, addrs);
+    if (ret != VALKEY_OK) {
         return cc;
     }
 
-    redisClusterUpdateSlotmap(cc);
+    valkeyClusterUpdateSlotmap(cc);
 
     return cc;
 }
 
-redisClusterContext *redisClusterConnect(const char *addrs, int flags) {
-    redisClusterContext *cc;
+valkeyClusterContext *valkeyClusterConnect(const char *addrs, int flags) {
+    valkeyClusterContext *cc;
 
-    cc = redisClusterContextInit();
+    cc = valkeyClusterContextInit();
 
     if (cc == NULL) {
         return NULL;
@@ -1584,15 +1584,15 @@ redisClusterContext *redisClusterConnect(const char *addrs, int flags) {
 
     cc->flags = flags;
 
-    return _redisClusterConnect(cc, addrs);
+    return _valkeyClusterConnect(cc, addrs);
 }
 
-redisClusterContext *redisClusterConnectWithTimeout(const char *addrs,
+valkeyClusterContext *valkeyClusterConnectWithTimeout(const char *addrs,
                                                     const struct timeval tv,
                                                     int flags) {
-    redisClusterContext *cc;
+    valkeyClusterContext *cc;
 
-    cc = redisClusterContextInit();
+    cc = valkeyClusterContextInit();
 
     if (cc == NULL) {
         return NULL;
@@ -1601,7 +1601,7 @@ redisClusterContext *redisClusterConnectWithTimeout(const char *addrs,
     cc->flags = flags;
 
     if (cc->connect_timeout == NULL) {
-        cc->connect_timeout = hi_malloc(sizeof(struct timeval));
+        cc->connect_timeout = vk_malloc(sizeof(struct timeval));
         if (cc->connect_timeout == NULL) {
             return NULL;
         }
@@ -1609,17 +1609,17 @@ redisClusterContext *redisClusterConnectWithTimeout(const char *addrs,
 
     memcpy(cc->connect_timeout, &tv, sizeof(struct timeval));
 
-    return _redisClusterConnect(cc, addrs);
+    return _valkeyClusterConnect(cc, addrs);
 }
 
-int redisClusterSetOptionAddNode(redisClusterContext *cc, const char *addr) {
+int valkeyClusterSetOptionAddNode(valkeyClusterContext *cc, const char *addr) {
     dictEntry *node_entry;
-    redisClusterNode *node = NULL;
+    valkeyClusterNode *node = NULL;
     int port, ret;
     sds ip = NULL;
 
     if (cc == NULL) {
-        return REDIS_ERR;
+        return VALKEY_ERR;
     }
 
     if (cc->nodes == NULL) {
@@ -1639,18 +1639,18 @@ int redisClusterSetOptionAddNode(redisClusterContext *cc, const char *addr) {
 
         char *p;
         if ((p = strrchr(addr, IP_PORT_SEPARATOR)) == NULL) {
-            __redisClusterSetError(
-                cc, REDIS_ERR_OTHER,
+            __valkeyClusterSetError(
+                cc, VALKEY_ERR_OTHER,
                 "server address is incorrect, port separator missing.");
-            return REDIS_ERR;
+            return VALKEY_ERR;
         }
         // p includes separator
 
         if (p - addr <= 0) { /* length until separator */
-            __redisClusterSetError(
-                cc, REDIS_ERR_OTHER,
+            __valkeyClusterSetError(
+                cc, VALKEY_ERR_OTHER,
                 "server address is incorrect, address part missing.");
-            return REDIS_ERR;
+            return VALKEY_ERR;
         }
 
         ip = sdsnewlen(addr, p - addr);
@@ -1660,20 +1660,20 @@ int redisClusterSetOptionAddNode(redisClusterContext *cc, const char *addr) {
         p++; // remove separator character
 
         if (strlen(p) <= 0) {
-            __redisClusterSetError(
-                cc, REDIS_ERR_OTHER,
+            __valkeyClusterSetError(
+                cc, VALKEY_ERR_OTHER,
                 "server address is incorrect, port part missing.");
             goto error;
         }
 
-        port = hi_atoi(p, strlen(p));
+        port = vk_atoi(p, strlen(p));
         if (port <= 0) {
-            __redisClusterSetError(cc, REDIS_ERR_OTHER,
+            __valkeyClusterSetError(cc, VALKEY_ERR_OTHER,
                                    "server port is incorrect");
             goto error;
         }
 
-        node = createRedisClusterNode();
+        node = createValkeyClusterNode();
         if (node == NULL) {
             goto oom;
         }
@@ -1697,187 +1697,187 @@ int redisClusterSetOptionAddNode(redisClusterContext *cc, const char *addr) {
         }
     }
 
-    return REDIS_OK;
+    return VALKEY_OK;
 
 oom:
-    __redisClusterSetError(cc, REDIS_ERR_OOM, "Out of memory");
+    __valkeyClusterSetError(cc, VALKEY_ERR_OOM, "Out of memory");
     // passthrough
 
 error:
     sdsfree(ip);
     if (node != NULL) {
         sdsfree(node->addr);
-        hi_free(node);
+        vk_free(node);
     }
-    return REDIS_ERR;
+    return VALKEY_ERR;
 }
 
-int redisClusterSetOptionAddNodes(redisClusterContext *cc, const char *addrs) {
+int valkeyClusterSetOptionAddNodes(valkeyClusterContext *cc, const char *addrs) {
     int ret;
     sds *address = NULL;
     int address_count = 0;
     int i;
 
     if (cc == NULL) {
-        return REDIS_ERR;
+        return VALKEY_ERR;
     }
 
     address = sdssplitlen(addrs, strlen(addrs), CLUSTER_ADDRESS_SEPARATOR,
                           strlen(CLUSTER_ADDRESS_SEPARATOR), &address_count);
     if (address == NULL) {
-        __redisClusterSetError(cc, REDIS_ERR_OOM, "Out of memory");
-        return REDIS_ERR;
+        __valkeyClusterSetError(cc, VALKEY_ERR_OOM, "Out of memory");
+        return VALKEY_ERR;
     }
 
     if (address_count <= 0) {
-        __redisClusterSetError(cc, REDIS_ERR_OTHER,
+        __valkeyClusterSetError(cc, VALKEY_ERR_OTHER,
                                "invalid server addresses (example format: "
                                "127.0.0.1:1234,127.0.0.2:5678)");
         sdsfreesplitres(address, address_count);
-        return REDIS_ERR;
+        return VALKEY_ERR;
     }
 
     for (i = 0; i < address_count; i++) {
-        ret = redisClusterSetOptionAddNode(cc, address[i]);
-        if (ret != REDIS_OK) {
+        ret = valkeyClusterSetOptionAddNode(cc, address[i]);
+        if (ret != VALKEY_OK) {
             sdsfreesplitres(address, address_count);
-            return REDIS_ERR;
+            return VALKEY_ERR;
         }
     }
 
     sdsfreesplitres(address, address_count);
 
-    return REDIS_OK;
+    return VALKEY_OK;
 }
 
 /* Deprecated function, option has no effect. */
-int redisClusterSetOptionConnectBlock(redisClusterContext *cc) {
+int valkeyClusterSetOptionConnectBlock(valkeyClusterContext *cc) {
     if (cc == NULL) {
-        return REDIS_ERR;
+        return VALKEY_ERR;
     }
-    return REDIS_OK;
+    return VALKEY_OK;
 }
 
 /* Deprecated function, option has no effect. */
-int redisClusterSetOptionConnectNonBlock(redisClusterContext *cc) {
+int valkeyClusterSetOptionConnectNonBlock(valkeyClusterContext *cc) {
     if (cc == NULL) {
-        return REDIS_ERR;
+        return VALKEY_ERR;
     }
-    return REDIS_OK;
+    return VALKEY_OK;
 }
 
 /**
  * Configure a username used during authentication, see
- * the Redis AUTH command.
+ * the Valkey AUTH command.
  * Disabled by default. Can be disabled again by providing an
  * empty string or a null pointer.
  */
-int redisClusterSetOptionUsername(redisClusterContext *cc,
+int valkeyClusterSetOptionUsername(valkeyClusterContext *cc,
                                   const char *username) {
     if (cc == NULL) {
-        return REDIS_ERR;
+        return VALKEY_ERR;
     }
 
     // Disabling option
     if (username == NULL || username[0] == '\0') {
-        hi_free(cc->username);
+        vk_free(cc->username);
         cc->username = NULL;
-        return REDIS_OK;
+        return VALKEY_OK;
     }
 
-    hi_free(cc->username);
-    cc->username = hi_strdup(username);
+    vk_free(cc->username);
+    cc->username = vk_strdup(username);
     if (cc->username == NULL) {
-        return REDIS_ERR;
+        return VALKEY_ERR;
     }
 
-    return REDIS_OK;
+    return VALKEY_OK;
 }
 
 /**
  * Configure a password used when connecting to password-protected
- * Redis instances. (See Redis AUTH command)
+ * Valkey instances. (See Valkey AUTH command)
  */
-int redisClusterSetOptionPassword(redisClusterContext *cc,
+int valkeyClusterSetOptionPassword(valkeyClusterContext *cc,
                                   const char *password) {
 
     if (cc == NULL) {
-        return REDIS_ERR;
+        return VALKEY_ERR;
     }
 
     // Disabling use of password
     if (password == NULL || password[0] == '\0') {
-        hi_free(cc->password);
+        vk_free(cc->password);
         cc->password = NULL;
-        return REDIS_OK;
+        return VALKEY_OK;
     }
 
-    hi_free(cc->password);
-    cc->password = hi_strdup(password);
+    vk_free(cc->password);
+    cc->password = vk_strdup(password);
     if (cc->password == NULL) {
-        return REDIS_ERR;
+        return VALKEY_ERR;
     }
 
-    return REDIS_OK;
+    return VALKEY_OK;
 }
 
-int redisClusterSetOptionParseSlaves(redisClusterContext *cc) {
+int valkeyClusterSetOptionParseSlaves(valkeyClusterContext *cc) {
 
     if (cc == NULL) {
-        return REDIS_ERR;
+        return VALKEY_ERR;
     }
 
-    cc->flags |= HIRCLUSTER_FLAG_ADD_SLAVE;
+    cc->flags |= VALKEYCLUSTER_FLAG_ADD_SLAVE;
 
-    return REDIS_OK;
+    return VALKEY_OK;
 }
 
-int redisClusterSetOptionParseOpenSlots(redisClusterContext *cc) {
+int valkeyClusterSetOptionParseOpenSlots(valkeyClusterContext *cc) {
 
     if (cc == NULL) {
-        return REDIS_ERR;
+        return VALKEY_ERR;
     }
 
-    cc->flags |= HIRCLUSTER_FLAG_ADD_OPENSLOT;
+    cc->flags |= VALKEYCLUSTER_FLAG_ADD_OPENSLOT;
 
-    return REDIS_OK;
+    return VALKEY_OK;
 }
 
-int redisClusterSetOptionRouteUseSlots(redisClusterContext *cc) {
+int valkeyClusterSetOptionRouteUseSlots(valkeyClusterContext *cc) {
 
     if (cc == NULL) {
-        return REDIS_ERR;
+        return VALKEY_ERR;
     }
 
-    cc->flags |= HIRCLUSTER_FLAG_ROUTE_USE_SLOTS;
+    cc->flags |= VALKEYCLUSTER_FLAG_ROUTE_USE_SLOTS;
 
-    return REDIS_OK;
+    return VALKEY_OK;
 }
 
-int redisClusterSetOptionConnectTimeout(redisClusterContext *cc,
+int valkeyClusterSetOptionConnectTimeout(valkeyClusterContext *cc,
                                         const struct timeval tv) {
 
     if (cc == NULL) {
-        return REDIS_ERR;
+        return VALKEY_ERR;
     }
 
     if (cc->connect_timeout == NULL) {
-        cc->connect_timeout = hi_malloc(sizeof(struct timeval));
+        cc->connect_timeout = vk_malloc(sizeof(struct timeval));
         if (cc->connect_timeout == NULL) {
-            __redisClusterSetError(cc, REDIS_ERR_OOM, "Out of memory");
-            return REDIS_ERR;
+            __valkeyClusterSetError(cc, VALKEY_ERR_OOM, "Out of memory");
+            return VALKEY_ERR;
         }
     }
 
     memcpy(cc->connect_timeout, &tv, sizeof(struct timeval));
 
-    return REDIS_OK;
+    return VALKEY_OK;
 }
 
-int redisClusterSetOptionTimeout(redisClusterContext *cc,
+int valkeyClusterSetOptionTimeout(valkeyClusterContext *cc,
                                  const struct timeval tv) {
     if (cc == NULL) {
-        return REDIS_ERR;
+        return VALKEY_ERR;
     }
 
     if (cc->command_timeout == NULL ||
@@ -1885,10 +1885,10 @@ int redisClusterSetOptionTimeout(redisClusterContext *cc,
         cc->command_timeout->tv_usec != tv.tv_usec) {
 
         if (cc->command_timeout == NULL) {
-            cc->command_timeout = hi_malloc(sizeof(struct timeval));
+            cc->command_timeout = vk_malloc(sizeof(struct timeval));
             if (cc->command_timeout == NULL) {
-                __redisClusterSetError(cc, REDIS_ERR_OOM, "Out of memory");
-                return REDIS_ERR;
+                __valkeyClusterSetError(cc, VALKEY_ERR_OOM, "Out of memory");
+                return VALKEY_ERR;
             }
         }
 
@@ -1897,7 +1897,7 @@ int redisClusterSetOptionTimeout(redisClusterContext *cc,
         /* Set timeout on already connected nodes */
         if (cc->nodes && dictSize(cc->nodes) > 0) {
             dictEntry *de;
-            redisClusterNode *node;
+            valkeyClusterNode *node;
 
             dictIterator di;
             dictInitIterator(&di, cc->nodes);
@@ -1905,14 +1905,14 @@ int redisClusterSetOptionTimeout(redisClusterContext *cc,
             while ((de = dictNext(&di)) != NULL) {
                 node = dictGetEntryVal(de);
                 if (node->acon) {
-                    redisAsyncSetTimeout(node->acon, tv);
+                    valkeyAsyncSetTimeout(node->acon, tv);
                 }
                 if (node->con && node->con->err == 0) {
-                    redisSetTimeout(node->con, tv);
+                    valkeySetTimeout(node->con, tv);
                 }
 
                 if (node->slaves && listLength(node->slaves) > 0) {
-                    redisClusterNode *slave;
+                    valkeyClusterNode *slave;
                     listNode *ln;
 
                     listIter li;
@@ -1921,10 +1921,10 @@ int redisClusterSetOptionTimeout(redisClusterContext *cc,
                     while ((ln = listNext(&li)) != NULL) {
                         slave = listNodeValue(ln);
                         if (slave->acon) {
-                            redisAsyncSetTimeout(slave->acon, tv);
+                            valkeyAsyncSetTimeout(slave->acon, tv);
                         }
                         if (slave->con && slave->con->err == 0) {
-                            redisSetTimeout(slave->con, tv);
+                            valkeySetTimeout(slave->con, tv);
                         }
                     }
                 }
@@ -1932,31 +1932,31 @@ int redisClusterSetOptionTimeout(redisClusterContext *cc,
         }
     }
 
-    return REDIS_OK;
+    return VALKEY_OK;
 }
 
-int redisClusterSetOptionMaxRetry(redisClusterContext *cc,
+int valkeyClusterSetOptionMaxRetry(valkeyClusterContext *cc,
                                   int max_retry_count) {
     if (cc == NULL || max_retry_count <= 0) {
-        return REDIS_ERR;
+        return VALKEY_ERR;
     }
 
     cc->max_retry_count = max_retry_count;
 
-    return REDIS_OK;
+    return VALKEY_OK;
 }
 
-int redisClusterConnect2(redisClusterContext *cc) {
+int valkeyClusterConnect2(valkeyClusterContext *cc) {
 
     if (cc == NULL) {
-        return REDIS_ERR;
+        return VALKEY_ERR;
     }
 
-    return _redisClusterConnect2(cc);
+    return _valkeyClusterConnect2(cc);
 }
 
-redisContext *ctx_get_by_node(redisClusterContext *cc, redisClusterNode *node) {
-    redisContext *c = NULL;
+valkeyContext *ctx_get_by_node(valkeyClusterContext *cc, valkeyClusterNode *node) {
+    valkeyContext *c = NULL;
     if (node == NULL) {
         return NULL;
     }
@@ -1964,14 +1964,14 @@ redisContext *ctx_get_by_node(redisClusterContext *cc, redisClusterNode *node) {
     c = node->con;
     if (c != NULL) {
         if (c->err) {
-            redisReconnect(c);
+            valkeyReconnect(c);
 
             if (cc->on_connect) {
-                cc->on_connect(c, c->err ? REDIS_ERR : REDIS_OK);
+                cc->on_connect(c, c->err ? VALKEY_ERR : VALKEY_OK);
             }
 
-            if (cc->ssl && cc->ssl_init_fn(c, cc->ssl) != REDIS_OK) {
-                __redisClusterSetError(cc, c->err, c->errstr);
+            if (cc->ssl && cc->ssl_init_fn(c, cc->ssl) != VALKEY_OK) {
+                __valkeyClusterSetError(cc, c->err, c->errstr);
             }
 
             authenticate(cc, c); // err and errstr handled in function
@@ -1984,35 +1984,35 @@ redisContext *ctx_get_by_node(redisClusterContext *cc, redisClusterNode *node) {
         return NULL;
     }
 
-    redisOptions options = {0};
-    REDIS_OPTIONS_SET_TCP(&options, node->host, node->port);
+    valkeyOptions options = {0};
+    VALKEY_OPTIONS_SET_TCP(&options, node->host, node->port);
     options.connect_timeout = cc->connect_timeout;
     options.command_timeout = cc->command_timeout;
 
-    c = redisConnectWithOptions(&options);
+    c = valkeyConnectWithOptions(&options);
     if (c == NULL) {
-        __redisClusterSetError(cc, REDIS_ERR_OOM, "Out of memory");
+        __valkeyClusterSetError(cc, VALKEY_ERR_OOM, "Out of memory");
         return NULL;
     }
 
     if (cc->on_connect) {
-        cc->on_connect(c, c->err ? REDIS_ERR : REDIS_OK);
+        cc->on_connect(c, c->err ? VALKEY_ERR : VALKEY_OK);
     }
 
     if (c->err) {
-        __redisClusterSetError(cc, c->err, c->errstr);
-        redisFree(c);
+        __valkeyClusterSetError(cc, c->err, c->errstr);
+        valkeyFree(c);
         return NULL;
     }
 
-    if (cc->ssl && cc->ssl_init_fn(c, cc->ssl) != REDIS_OK) {
-        __redisClusterSetError(cc, c->err, c->errstr);
-        redisFree(c);
+    if (cc->ssl && cc->ssl_init_fn(c, cc->ssl) != VALKEY_OK) {
+        __valkeyClusterSetError(cc, c->err, c->errstr);
+        valkeyFree(c);
         return NULL;
     }
 
-    if (authenticate(cc, c) != REDIS_OK) {
-        redisFree(c);
+    if (authenticate(cc, c) != VALKEY_OK) {
+        valkeyFree(c);
         return NULL;
     }
 
@@ -2021,24 +2021,24 @@ redisContext *ctx_get_by_node(redisClusterContext *cc, redisClusterNode *node) {
     return c;
 }
 
-static redisClusterNode *node_get_by_table(redisClusterContext *cc,
+static valkeyClusterNode *node_get_by_table(valkeyClusterContext *cc,
                                            uint32_t slot_num) {
     if (cc == NULL) {
         return NULL;
     }
 
-    if (slot_num >= REDIS_CLUSTER_SLOTS) {
-        __redisClusterSetError(cc, REDIS_ERR_OTHER, "invalid slot");
+    if (slot_num >= VALKEYCLUSTER_SLOTS) {
+        __valkeyClusterSetError(cc, VALKEY_ERR_OTHER, "invalid slot");
         return NULL;
     }
 
     if (cc->table == NULL) {
-        __redisClusterSetError(cc, REDIS_ERR_OTHER, "slotmap not available");
+        __valkeyClusterSetError(cc, VALKEY_ERR_OTHER, "slotmap not available");
         return NULL;
     }
 
     if (cc->table[slot_num] == NULL) {
-        __redisClusterSetError(cc, REDIS_ERR_OTHER,
+        __valkeyClusterSetError(cc, VALKEY_ERR_OTHER,
                                "slot not served by any node");
         return NULL;
     }
@@ -2046,57 +2046,57 @@ static redisClusterNode *node_get_by_table(redisClusterContext *cc,
     return cc->table[slot_num];
 }
 
-/* Helper function for the redisClusterAppendCommand* family of functions.
+/* Helper function for the valkeyClusterAppendCommand* family of functions.
  *
  * Write a formatted command to the output buffer. When this family
- * is used, you need to call redisGetReply yourself to retrieve
+ * is used, you need to call valkeyGetReply yourself to retrieve
  * the reply (or replies in pub/sub).
  */
-static int __redisClusterAppendCommand(redisClusterContext *cc,
+static int __valkeyClusterAppendCommand(valkeyClusterContext *cc,
                                        struct cmd *command) {
 
-    redisClusterNode *node;
-    redisContext *c = NULL;
+    valkeyClusterNode *node;
+    valkeyContext *c = NULL;
 
     if (cc == NULL || command == NULL) {
-        return REDIS_ERR;
+        return VALKEY_ERR;
     }
 
     node = node_get_by_table(cc, (uint32_t)command->slot_num);
     if (node == NULL) {
-        return REDIS_ERR;
+        return VALKEY_ERR;
     }
 
     c = ctx_get_by_node(cc, node);
     if (c == NULL) {
-        return REDIS_ERR;
+        return VALKEY_ERR;
     } else if (c->err) {
-        __redisClusterSetError(cc, c->err, c->errstr);
-        return REDIS_ERR;
+        __valkeyClusterSetError(cc, c->err, c->errstr);
+        return VALKEY_ERR;
     }
 
-    if (redisAppendFormattedCommand(c, command->cmd, command->clen) !=
-        REDIS_OK) {
-        __redisClusterSetError(cc, c->err, c->errstr);
-        return REDIS_ERR;
+    if (valkeyAppendFormattedCommand(c, command->cmd, command->clen) !=
+        VALKEY_OK) {
+        __valkeyClusterSetError(cc, c->err, c->errstr);
+        return VALKEY_ERR;
     }
 
-    return REDIS_OK;
+    return VALKEY_OK;
 }
 
-/* Helper functions for the redisClusterGetReply* family of functions.
+/* Helper functions for the valkeyClusterGetReply* family of functions.
  */
-static int __redisClusterGetReplyFromNode(redisClusterContext *cc,
-                                          redisClusterNode *node,
+static int __valkeyClusterGetReplyFromNode(valkeyClusterContext *cc,
+                                          valkeyClusterNode *node,
                                           void **reply) {
-    redisContext *c;
+    valkeyContext *c;
 
     if (cc == NULL || node == NULL || reply == NULL)
-        return REDIS_ERR;
+        return VALKEY_ERR;
 
     c = node->con;
     if (c == NULL) {
-        return REDIS_ERR;
+        return VALKEY_ERR;
     } else if (c->err) {
         if (cc->need_update_route == 0) {
             cc->retry_count++;
@@ -2105,42 +2105,42 @@ static int __redisClusterGetReplyFromNode(redisClusterContext *cc,
                 cc->retry_count = 0;
             }
         }
-        __redisClusterSetError(cc, c->err, c->errstr);
-        return REDIS_ERR;
+        __valkeyClusterSetError(cc, c->err, c->errstr);
+        return VALKEY_ERR;
     }
 
-    if (redisGetReply(c, reply) != REDIS_OK) {
-        __redisClusterSetError(cc, c->err, c->errstr);
-        return REDIS_ERR;
+    if (valkeyGetReply(c, reply) != VALKEY_OK) {
+        __valkeyClusterSetError(cc, c->err, c->errstr);
+        return VALKEY_ERR;
     }
 
     if (cluster_reply_error_type(*reply) == CLUSTER_ERR_MOVED)
         cc->need_update_route = 1;
 
-    return REDIS_OK;
+    return VALKEY_OK;
 }
 
-static int __redisClusterGetReply(redisClusterContext *cc, int slot_num,
+static int __valkeyClusterGetReply(valkeyClusterContext *cc, int slot_num,
                                   void **reply) {
-    redisClusterNode *node;
+    valkeyClusterNode *node;
 
     if (cc == NULL || slot_num < 0 || reply == NULL)
-        return REDIS_ERR;
+        return VALKEY_ERR;
 
     node = node_get_by_table(cc, (uint32_t)slot_num);
     if (node == NULL) {
-        return REDIS_ERR;
+        return VALKEY_ERR;
     }
 
-    return __redisClusterGetReplyFromNode(cc, node, reply);
+    return __valkeyClusterGetReplyFromNode(cc, node, reply);
 }
 
 /* Parses a MOVED or ASK error reply and returns the destination node. The slot
  * is returned by pointer, if provided. */
-static redisClusterNode *getNodeFromRedirectReply(redisClusterContext *cc,
-                                                  redisReply *reply,
+static valkeyClusterNode *getNodeFromRedirectReply(valkeyClusterContext *cc,
+                                                  valkeyReply *reply,
                                                   int *slotptr) {
-    redisClusterNode *node = NULL;
+    valkeyClusterNode *node = NULL;
     sds *part = NULL;
     int part_len = 0;
     char *p;
@@ -2151,19 +2151,19 @@ static redisClusterNode *getNodeFromRedirectReply(redisClusterContext *cc,
         goto oom;
     }
     if (part_len != 3) {
-        __redisClusterSetError(cc, REDIS_ERR_OTHER, "failed to parse redirect");
+        __valkeyClusterSetError(cc, VALKEY_ERR_OTHER, "failed to parse redirect");
         goto done;
     }
 
     /* Parse slot if requested. */
     if (slotptr != NULL) {
-        *slotptr = hi_atoi(part[1], sdslen(part[1]));
+        *slotptr = vk_atoi(part[1], sdslen(part[1]));
     }
 
     /* Find the last occurance of the port separator since
      * IPv6 addresses can contain ':' */
     if ((p = strrchr(part[2], IP_PORT_SEPARATOR)) == NULL) {
-        __redisClusterSetError(cc, REDIS_ERR_OTHER,
+        __valkeyClusterSetError(cc, VALKEY_ERR_OTHER,
                                "port separator missing in redirect");
         goto done;
     }
@@ -2171,7 +2171,7 @@ static redisClusterNode *getNodeFromRedirectReply(redisClusterContext *cc,
 
     /* Empty endpoint not supported yet */
     if (p - part[2] == 0) {
-        __redisClusterSetError(cc, REDIS_ERR_OTHER,
+        __valkeyClusterSetError(cc, VALKEY_ERR_OTHER,
                                "endpoint missing in redirect");
         goto done;
     }
@@ -2183,11 +2183,11 @@ static redisClusterNode *getNodeFromRedirectReply(redisClusterContext *cc,
     }
 
     /* Add this node since it was unknown */
-    node = createRedisClusterNode();
+    node = createValkeyClusterNode();
     if (node == NULL) {
         goto oom;
     }
-    node->role = REDIS_ROLE_MASTER;
+    node->role = VALKEY_ROLE_MASTER;
     node->addr = part[2];
     part[2] = NULL; /* Memory ownership moved */
 
@@ -2196,7 +2196,7 @@ static redisClusterNode *getNodeFromRedirectReply(redisClusterContext *cc,
         goto oom;
     }
     p++; // remove found separator character
-    node->port = hi_atoi(p, strlen(p));
+    node->port = vk_atoi(p, strlen(p));
 
     sds key = sdsnewlen(node->addr, sdslen(node->addr));
     if (key == NULL) {
@@ -2213,31 +2213,31 @@ done:
     return node;
 
 oom:
-    __redisClusterSetError(cc, REDIS_ERR_OOM, "Out of memory");
+    __valkeyClusterSetError(cc, VALKEY_ERR_OOM, "Out of memory");
     sdsfreesplitres(part, part_len);
     if (node != NULL) {
         sdsfree(node->addr);
         sdsfree(node->host);
-        hi_free(node);
+        vk_free(node);
     }
 
     return NULL;
 }
 
-static void *redis_cluster_command_execute(redisClusterContext *cc,
+static void *valkey_cluster_command_execute(valkeyClusterContext *cc,
                                            struct cmd *command) {
     void *reply = NULL;
-    redisClusterNode *node;
-    redisContext *c = NULL;
+    valkeyClusterNode *node;
+    valkeyContext *c = NULL;
     int error_type;
-    redisContext *c_updating_route = NULL;
+    valkeyContext *c_updating_route = NULL;
 
 retry:
 
     node = node_get_by_table(cc, (uint32_t)command->slot_num);
     if (node == NULL) {
         /* Update the slotmap since the slot is not served. */
-        if (redisClusterUpdateSlotmap(cc) != REDIS_OK) {
+        if (valkeyClusterUpdateSlotmap(cc) != VALKEY_OK) {
             goto error;
         }
         node = node_get_by_table(cc, (uint32_t)command->slot_num);
@@ -2251,7 +2251,7 @@ retry:
     if (c == NULL || c->err) {
         /* Failed to connect. Maybe there was a failover and this node is gone.
          * Update slotmap to find out. */
-        if (redisClusterUpdateSlotmap(cc) != REDIS_OK) {
+        if (valkeyClusterUpdateSlotmap(cc) != VALKEY_OK) {
             goto error;
         }
 
@@ -2263,7 +2263,7 @@ retry:
         if (c == NULL) {
             goto error;
         } else if (c->err) {
-            __redisClusterSetError(cc, c->err, c->errstr);
+            __valkeyClusterSetError(cc, c->err, c->errstr);
             goto error;
         }
     }
@@ -2271,25 +2271,25 @@ retry:
 moved_retry:
 ask_retry:
 
-    if (redisAppendFormattedCommand(c, command->cmd, command->clen) !=
-        REDIS_OK) {
-        __redisClusterSetError(cc, c->err, c->errstr);
+    if (valkeyAppendFormattedCommand(c, command->cmd, command->clen) !=
+        VALKEY_OK) {
+        __valkeyClusterSetError(cc, c->err, c->errstr);
         goto error;
     }
 
     /* If update slotmap has been scheduled, do that in the same pipeline. */
     if (cc->need_update_route && c_updating_route == NULL) {
-        if (clusterUpdateRouteSendCommand(cc, c) == REDIS_OK) {
+        if (clusterUpdateRouteSendCommand(cc, c) == VALKEY_OK) {
             c_updating_route = c;
         }
     }
 
-    if (redisGetReply(c, &reply) != REDIS_OK) {
-        __redisClusterSetError(cc, c->err, c->errstr);
+    if (valkeyGetReply(c, &reply) != VALKEY_OK) {
+        __valkeyClusterSetError(cc, c->err, c->errstr);
         /* We may need to update the slotmap if this node is removed from the
          * cluster, but the current request may have already timed out so we
          * schedule it for later. */
-        if (c->err != REDIS_ERR_OOM)
+        if (c->err != VALKEY_ERR_OOM)
             cc->need_update_route = 1;
         goto error;
     }
@@ -2298,7 +2298,7 @@ ask_retry:
     if (error_type > CLUSTER_NOT_ERR && error_type < CLUSTER_ERR_SENTINEL) {
         cc->retry_count++;
         if (cc->retry_count > cc->max_retry_count) {
-            __redisClusterSetError(cc, REDIS_ERR_CLUSTER_TOO_MANY_RETRIES,
+            __valkeyClusterSetError(cc, VALKEY_ERR_CLUSTER_TOO_MANY_RETRIES,
                                    "too many cluster retries");
             goto error;
         }
@@ -2321,11 +2321,11 @@ ask_retry:
             }
 
             if (c_updating_route == NULL) {
-                if (clusterUpdateRouteSendCommand(cc, c) == REDIS_OK) {
+                if (clusterUpdateRouteSendCommand(cc, c) == VALKEY_OK) {
                     /* Deferred update route using the node that sent the
                      * redirect. */
                     c_updating_route = c;
-                } else if (redisClusterUpdateSlotmap(cc) == REDIS_OK) {
+                } else if (valkeyClusterUpdateSlotmap(cc) == VALKEY_OK) {
                     /* Synchronous update route successful using new connection. */
                     cc->err = 0;
                     cc->errstr[0] = '\0';
@@ -2339,7 +2339,7 @@ ask_retry:
             if (c == NULL) {
                 goto error;
             } else if (c->err) {
-                __redisClusterSetError(cc, c->err, c->errstr);
+                __valkeyClusterSetError(cc, c->err, c->errstr);
                 goto error;
             }
 
@@ -2359,13 +2359,13 @@ ask_retry:
             if (c == NULL) {
                 goto error;
             } else if (c->err) {
-                __redisClusterSetError(cc, c->err, c->errstr);
+                __valkeyClusterSetError(cc, c->err, c->errstr);
                 goto error;
             }
 
-            reply = redisCommand(c, REDIS_COMMAND_ASKING);
+            reply = valkeyCommand(c, VALKEY_COMMAND_ASKING);
             if (reply == NULL) {
-                __redisClusterSetError(cc, c->err, c->errstr);
+                __valkeyClusterSetError(cc, c->err, c->errstr);
                 goto error;
             }
 
@@ -2400,11 +2400,11 @@ done:
     if (c_updating_route) {
         /* Deferred CLUSTER SLOTS or CLUSTER NODES in progress. Wait for the
          * reply and handle it. */
-        if (clusterUpdateRouteHandleReply(cc, c_updating_route) != REDIS_OK) {
+        if (clusterUpdateRouteHandleReply(cc, c_updating_route) != VALKEY_OK) {
             /* Clear error and update synchronously using another node. */
             cc->err = 0;
             cc->errstr[0] = '\0';
-            if (redisClusterUpdateSlotmap(cc) != REDIS_OK) {
+            if (valkeyClusterUpdateSlotmap(cc) != VALKEY_OK) {
                 /* Clear the reply to indicate failure. */
                 freeReplyObject(reply);
                 reply = NULL;
@@ -2415,7 +2415,7 @@ done:
     return reply;
 }
 
-static int command_pre_fragment(redisClusterContext *cc, struct cmd *command,
+static int command_pre_fragment(valkeyClusterContext *cc, struct cmd *command,
                                 hilist *commands) {
 
     struct keypos *kp, *sub_kp;
@@ -2433,26 +2433,26 @@ static int command_pre_fragment(redisClusterContext *cc, struct cmd *command,
         goto done;
     }
 
-    key_count = hiarray_n(command->keys);
+    key_count = vkarray_n(command->keys);
 
-    sub_commands = hi_calloc(REDIS_CLUSTER_SLOTS, sizeof(*sub_commands));
+    sub_commands = vk_calloc(VALKEYCLUSTER_SLOTS, sizeof(*sub_commands));
     if (sub_commands == NULL) {
         goto oom;
     }
 
-    command->frag_seq = hi_calloc(key_count, sizeof(*command->frag_seq));
+    command->frag_seq = vk_calloc(key_count, sizeof(*command->frag_seq));
     if (command->frag_seq == NULL) {
         goto oom;
     }
 
     // Fill sub_command with key, slot and command length (clen, only keylength)
     for (i = 0; i < key_count; i++) {
-        kp = hiarray_get(command->keys, i);
+        kp = vkarray_get(command->keys, i);
 
         slot_num = keyHashSlot(kp->start, kp->end - kp->start);
 
-        if (slot_num < 0 || slot_num >= REDIS_CLUSTER_SLOTS) {
-            __redisClusterSetError(cc, REDIS_ERR_OTHER,
+        if (slot_num < 0 || slot_num >= VALKEYCLUSTER_SLOTS) {
+            __valkeyClusterSetError(cc, VALKEY_ERR_OTHER,
                                    "keyHashSlot return error");
             goto done;
         }
@@ -2468,7 +2468,7 @@ static int command_pre_fragment(redisClusterContext *cc, struct cmd *command,
 
         sub_command->narg++;
 
-        sub_kp = hiarray_push(sub_command->keys);
+        sub_kp = vkarray_push(sub_command->keys);
         if (sub_kp == NULL) {
             goto oom;
         }
@@ -2483,7 +2483,7 @@ static int command_pre_fragment(redisClusterContext *cc, struct cmd *command,
 
         sub_command->slot_num = slot_num;
 
-        if (command->type == CMD_REQ_REDIS_MSET) {
+        if (command->type == CMD_REQ_VALKEY_MSET) {
             uint32_t len = 0;
             char *p;
 
@@ -2507,27 +2507,27 @@ static int command_pre_fragment(redisClusterContext *cc, struct cmd *command,
     }
 
     /* prepend command header */
-    for (i = 0; i < REDIS_CLUSTER_SLOTS; i++) {
+    for (i = 0; i < VALKEYCLUSTER_SLOTS; i++) {
         sub_command = sub_commands[i];
         if (sub_command == NULL) {
             continue;
         }
 
         idx = 0;
-        if (command->type == CMD_REQ_REDIS_MGET) {
+        if (command->type == CMD_REQ_VALKEY_MGET) {
             //"*%d\r\n$4\r\nmget\r\n"
 
             sub_command->clen += 5 * sub_command->narg;
 
             sub_command->narg++;
 
-            hi_itoa(num_str, sub_command->narg);
+            vk_itoa(num_str, sub_command->narg);
             num_str_len = (uint8_t)(strlen(num_str));
 
             sub_command->clen += 13 + num_str_len;
 
             sub_command->cmd =
-                hi_calloc(sub_command->clen, sizeof(*sub_command->cmd));
+                vk_calloc(sub_command->clen, sizeof(*sub_command->cmd));
             if (sub_command->cmd == NULL) {
                 goto oom;
             }
@@ -2538,10 +2538,10 @@ static int command_pre_fragment(redisClusterContext *cc, struct cmd *command,
             memcpy(sub_command->cmd + idx, "\r\n$4\r\nmget\r\n", 12);
             idx += 12;
 
-            for (j = 0; j < hiarray_n(sub_command->keys); j++) {
-                kp = hiarray_get(sub_command->keys, j);
+            for (j = 0; j < vkarray_n(sub_command->keys); j++) {
+                kp = vkarray_get(sub_command->keys, j);
                 key_len = (uint32_t)(kp->end - kp->start);
-                hi_itoa(num_str, key_len);
+                vk_itoa(num_str, key_len);
                 num_str_len = strlen(num_str);
 
                 sub_command->cmd[idx++] = '$';
@@ -2554,20 +2554,20 @@ static int command_pre_fragment(redisClusterContext *cc, struct cmd *command,
                 memcpy(sub_command->cmd + idx, CRLF, CRLF_LEN);
                 idx += CRLF_LEN;
             }
-        } else if (command->type == CMD_REQ_REDIS_DEL) {
+        } else if (command->type == CMD_REQ_VALKEY_DEL) {
             //"*%d\r\n$3\r\ndel\r\n"
 
             sub_command->clen += 5 * sub_command->narg;
 
             sub_command->narg++;
 
-            hi_itoa(num_str, sub_command->narg);
+            vk_itoa(num_str, sub_command->narg);
             num_str_len = (uint8_t)strlen(num_str);
 
             sub_command->clen += 12 + num_str_len;
 
             sub_command->cmd =
-                hi_calloc(sub_command->clen, sizeof(*sub_command->cmd));
+                vk_calloc(sub_command->clen, sizeof(*sub_command->cmd));
             if (sub_command->cmd == NULL) {
                 goto oom;
             }
@@ -2578,10 +2578,10 @@ static int command_pre_fragment(redisClusterContext *cc, struct cmd *command,
             memcpy(sub_command->cmd + idx, "\r\n$3\r\ndel\r\n", 11);
             idx += 11;
 
-            for (j = 0; j < hiarray_n(sub_command->keys); j++) {
-                kp = hiarray_get(sub_command->keys, j);
+            for (j = 0; j < vkarray_n(sub_command->keys); j++) {
+                kp = vkarray_get(sub_command->keys, j);
                 key_len = (uint32_t)(kp->end - kp->start);
-                hi_itoa(num_str, key_len);
+                vk_itoa(num_str, key_len);
                 num_str_len = strlen(num_str);
 
                 sub_command->cmd[idx++] = '$';
@@ -2594,20 +2594,20 @@ static int command_pre_fragment(redisClusterContext *cc, struct cmd *command,
                 memcpy(sub_command->cmd + idx, CRLF, CRLF_LEN);
                 idx += CRLF_LEN;
             }
-        } else if (command->type == CMD_REQ_REDIS_EXISTS) {
+        } else if (command->type == CMD_REQ_VALKEY_EXISTS) {
             //"*%d\r\n$6\r\nexists\r\n"
 
             sub_command->clen += 5 * sub_command->narg;
 
             sub_command->narg++;
 
-            hi_itoa(num_str, sub_command->narg);
+            vk_itoa(num_str, sub_command->narg);
             num_str_len = (uint8_t)strlen(num_str);
 
             sub_command->clen += 15 + num_str_len;
 
             sub_command->cmd =
-                hi_calloc(sub_command->clen, sizeof(*sub_command->cmd));
+                vk_calloc(sub_command->clen, sizeof(*sub_command->cmd));
             if (sub_command->cmd == NULL) {
                 goto oom;
             }
@@ -2618,10 +2618,10 @@ static int command_pre_fragment(redisClusterContext *cc, struct cmd *command,
             memcpy(sub_command->cmd + idx, "\r\n$6\r\nexists\r\n", 14);
             idx += 14;
 
-            for (j = 0; j < hiarray_n(sub_command->keys); j++) {
-                kp = hiarray_get(sub_command->keys, j);
+            for (j = 0; j < vkarray_n(sub_command->keys); j++) {
+                kp = vkarray_get(sub_command->keys, j);
                 key_len = (uint32_t)(kp->end - kp->start);
-                hi_itoa(num_str, key_len);
+                vk_itoa(num_str, key_len);
                 num_str_len = strlen(num_str);
 
                 sub_command->cmd[idx++] = '$';
@@ -2634,7 +2634,7 @@ static int command_pre_fragment(redisClusterContext *cc, struct cmd *command,
                 memcpy(sub_command->cmd + idx, CRLF, CRLF_LEN);
                 idx += CRLF_LEN;
             }
-        } else if (command->type == CMD_REQ_REDIS_MSET) {
+        } else if (command->type == CMD_REQ_VALKEY_MSET) {
             //"*%d\r\n$4\r\nmset\r\n"
 
             sub_command->clen += 3 * sub_command->narg;
@@ -2643,13 +2643,13 @@ static int command_pre_fragment(redisClusterContext *cc, struct cmd *command,
 
             sub_command->narg++;
 
-            hi_itoa(num_str, sub_command->narg);
+            vk_itoa(num_str, sub_command->narg);
             num_str_len = (uint8_t)strlen(num_str);
 
             sub_command->clen += 13 + num_str_len;
 
             sub_command->cmd =
-                hi_calloc(sub_command->clen, sizeof(*sub_command->cmd));
+                vk_calloc(sub_command->clen, sizeof(*sub_command->cmd));
             if (sub_command->cmd == NULL) {
                 goto oom;
             }
@@ -2660,10 +2660,10 @@ static int command_pre_fragment(redisClusterContext *cc, struct cmd *command,
             memcpy(sub_command->cmd + idx, "\r\n$4\r\nmset\r\n", 12);
             idx += 12;
 
-            for (j = 0; j < hiarray_n(sub_command->keys); j++) {
-                kp = hiarray_get(sub_command->keys, j);
+            for (j = 0; j < vkarray_n(sub_command->keys); j++) {
+                kp = vkarray_get(sub_command->keys, j);
                 key_len = (uint32_t)(kp->end - kp->start);
-                hi_itoa(num_str, key_len);
+                vk_itoa(num_str, key_len);
                 num_str_len = strlen(num_str);
 
                 sub_command->cmd[idx++] = '$';
@@ -2688,13 +2688,13 @@ static int command_pre_fragment(redisClusterContext *cc, struct cmd *command,
     }
 
 done:
-    hi_free(sub_commands);
+    vk_free(sub_commands);
 
     if (slot_num >= 0 && commands != NULL && listLength(commands) == 1) {
         listNode *list_node = listFirst(commands);
         listDelNode(commands, list_node);
         if (command->frag_seq) {
-            hi_free(command->frag_seq);
+            vk_free(command->frag_seq);
             command->frag_seq = NULL;
         }
 
@@ -2703,21 +2703,21 @@ done:
     return slot_num;
 
 oom:
-    __redisClusterSetError(cc, REDIS_ERR_OOM, "Out of memory");
+    __valkeyClusterSetError(cc, VALKEY_ERR_OOM, "Out of memory");
     if (sub_commands != NULL) {
-        for (i = 0; i < REDIS_CLUSTER_SLOTS; i++) {
+        for (i = 0; i < VALKEYCLUSTER_SLOTS; i++) {
             command_destroy(sub_commands[i]);
         }
     }
-    hi_free(sub_commands);
+    vk_free(sub_commands);
     return -1; // failing slot_num
 }
 
-static void *command_post_fragment(redisClusterContext *cc, struct cmd *command,
+static void *command_post_fragment(valkeyClusterContext *cc, struct cmd *command,
                                    hilist *commands) {
     struct cmd *sub_command;
     listNode *list_node;
-    redisReply *reply = NULL, *sub_reply;
+    valkeyReply *reply = NULL, *sub_reply;
     long long count = 0;
 
     listIter li;
@@ -2728,31 +2728,31 @@ static void *command_post_fragment(redisClusterContext *cc, struct cmd *command,
         reply = sub_command->reply;
         if (reply == NULL) {
             return NULL;
-        } else if (reply->type == REDIS_REPLY_ERROR) {
+        } else if (reply->type == VALKEY_REPLY_ERROR) {
             return reply;
         }
 
-        if (command->type == CMD_REQ_REDIS_MGET) {
-            if (reply->type != REDIS_REPLY_ARRAY) {
-                __redisClusterSetError(cc, REDIS_ERR_OTHER, "reply type error");
+        if (command->type == CMD_REQ_VALKEY_MGET) {
+            if (reply->type != VALKEY_REPLY_ARRAY) {
+                __valkeyClusterSetError(cc, VALKEY_ERR_OTHER, "reply type error");
                 return NULL;
             }
-        } else if (command->type == CMD_REQ_REDIS_DEL) {
-            if (reply->type != REDIS_REPLY_INTEGER) {
-                __redisClusterSetError(cc, REDIS_ERR_OTHER, "reply type error");
-                return NULL;
-            }
-            count += reply->integer;
-        } else if (command->type == CMD_REQ_REDIS_EXISTS) {
-            if (reply->type != REDIS_REPLY_INTEGER) {
-                __redisClusterSetError(cc, REDIS_ERR_OTHER, "reply type error");
+        } else if (command->type == CMD_REQ_VALKEY_DEL) {
+            if (reply->type != VALKEY_REPLY_INTEGER) {
+                __valkeyClusterSetError(cc, VALKEY_ERR_OTHER, "reply type error");
                 return NULL;
             }
             count += reply->integer;
-        } else if (command->type == CMD_REQ_REDIS_MSET) {
-            if (reply->type != REDIS_REPLY_STATUS || reply->len != 2 ||
-                strcmp(reply->str, REDIS_STATUS_OK) != 0) {
-                __redisClusterSetError(cc, REDIS_ERR_OTHER, "reply type error");
+        } else if (command->type == CMD_REQ_VALKEY_EXISTS) {
+            if (reply->type != VALKEY_REPLY_INTEGER) {
+                __valkeyClusterSetError(cc, VALKEY_ERR_OTHER, "reply type error");
+                return NULL;
+            }
+            count += reply->integer;
+        } else if (command->type == CMD_REQ_VALKEY_MSET) {
+            if (reply->type != VALKEY_REPLY_STATUS || reply->len != 2 ||
+                strcmp(reply->str, VALKEY_STATUS_OK) != 0) {
+                __valkeyClusterSetError(cc, VALKEY_ERR_OTHER, "reply type error");
                 return NULL;
             }
         } else {
@@ -2760,21 +2760,21 @@ static void *command_post_fragment(redisClusterContext *cc, struct cmd *command,
         }
     }
 
-    reply = hi_calloc(1, sizeof(*reply));
+    reply = vk_calloc(1, sizeof(*reply));
     if (reply == NULL) {
         goto oom;
     }
 
-    if (command->type == CMD_REQ_REDIS_MGET) {
+    if (command->type == CMD_REQ_VALKEY_MGET) {
         int i;
         uint32_t key_count;
 
-        reply->type = REDIS_REPLY_ARRAY;
+        reply->type = VALKEY_REPLY_ARRAY;
 
-        key_count = hiarray_n(command->keys);
+        key_count = vkarray_n(command->keys);
 
         reply->elements = key_count;
-        reply->element = hi_calloc(key_count, sizeof(*reply->element));
+        reply->element = vk_calloc(key_count, sizeof(*reply->element));
         if (reply->element == NULL) {
             goto oom;
         }
@@ -2783,17 +2783,17 @@ static void *command_post_fragment(redisClusterContext *cc, struct cmd *command,
             sub_reply = command->frag_seq[i]->reply; /* get it's reply */
             if (sub_reply == NULL) {
                 freeReplyObject(reply);
-                __redisClusterSetError(cc, REDIS_ERR_OTHER,
+                __valkeyClusterSetError(cc, VALKEY_ERR_OTHER,
                                        "sub reply is null");
                 return NULL;
             }
 
-            if (sub_reply->type == REDIS_REPLY_STRING) {
+            if (sub_reply->type == VALKEY_REPLY_STRING) {
                 reply->element[i] = sub_reply;
-            } else if (sub_reply->type == REDIS_REPLY_ARRAY) {
+            } else if (sub_reply->type == VALKEY_REPLY_ARRAY) {
                 if (sub_reply->elements == 0) {
                     freeReplyObject(reply);
-                    __redisClusterSetError(cc, REDIS_ERR_OTHER,
+                    __valkeyClusterSetError(cc, VALKEY_ERR_OTHER,
                                            "sub reply elements error");
                     return NULL;
                 }
@@ -2802,22 +2802,22 @@ static void *command_post_fragment(redisClusterContext *cc, struct cmd *command,
                 sub_reply->elements--;
             }
         }
-    } else if (command->type == CMD_REQ_REDIS_DEL) {
-        reply->type = REDIS_REPLY_INTEGER;
+    } else if (command->type == CMD_REQ_VALKEY_DEL) {
+        reply->type = VALKEY_REPLY_INTEGER;
         reply->integer = count;
-    } else if (command->type == CMD_REQ_REDIS_EXISTS) {
-        reply->type = REDIS_REPLY_INTEGER;
+    } else if (command->type == CMD_REQ_VALKEY_EXISTS) {
+        reply->type = VALKEY_REPLY_INTEGER;
         reply->integer = count;
-    } else if (command->type == CMD_REQ_REDIS_MSET) {
-        reply->type = REDIS_REPLY_STATUS;
-        uint32_t str_len = strlen(REDIS_STATUS_OK);
-        reply->str = hi_malloc((str_len + 1) * sizeof(char));
+    } else if (command->type == CMD_REQ_VALKEY_MSET) {
+        reply->type = VALKEY_REPLY_STATUS;
+        uint32_t str_len = strlen(VALKEY_STATUS_OK);
+        reply->str = vk_malloc((str_len + 1) * sizeof(char));
         if (reply->str == NULL) {
             goto oom;
         }
 
         reply->len = str_len;
-        memcpy(reply->str, REDIS_STATUS_OK, str_len);
+        memcpy(reply->str, VALKEY_STATUS_OK, str_len);
         reply->str[str_len] = '\0';
     } else {
         NOT_REACHED();
@@ -2827,7 +2827,7 @@ static void *command_post_fragment(redisClusterContext *cc, struct cmd *command,
 
 oom:
     freeReplyObject(reply);
-    __redisClusterSetError(cc, REDIS_ERR_OOM, "Out of memory");
+    __valkeyClusterSetError(cc, VALKEY_ERR_OOM, "Out of memory");
     return NULL;
 }
 
@@ -2835,11 +2835,11 @@ oom:
  * Split the command into subcommands by slot
  *
  * Returns slot_num
- * If slot_num < 0 or slot_num >=  REDIS_CLUSTER_SLOTS means this function runs
+ * If slot_num < 0 or slot_num >=  VALKEYCLUSTER_SLOTS means this function runs
  * error; Otherwise if  the commands > 1 , slot_num is the last subcommand slot
  * number.
  */
-static int command_format_by_slot(redisClusterContext *cc, struct cmd *command,
+static int command_format_by_slot(valkeyClusterContext *cc, struct cmd *command,
                                   hilist *commands) {
     struct keypos *kp;
     int key_count;
@@ -2850,24 +2850,24 @@ static int command_format_by_slot(redisClusterContext *cc, struct cmd *command,
         goto done;
     }
 
-    redis_parse_cmd(command);
+    valkey_parse_cmd(command);
     if (command->result == CMD_PARSE_ENOMEM) {
-        __redisClusterSetError(cc, REDIS_ERR_OOM, "Out of memory");
+        __valkeyClusterSetError(cc, VALKEY_ERR_OOM, "Out of memory");
         goto done;
     } else if (command->result != CMD_PARSE_OK) {
-        __redisClusterSetError(cc, REDIS_ERR_PROTOCOL, command->errstr);
+        __valkeyClusterSetError(cc, VALKEY_ERR_PROTOCOL, command->errstr);
         goto done;
     }
 
-    key_count = hiarray_n(command->keys);
+    key_count = vkarray_n(command->keys);
 
     if (key_count <= 0) {
-        __redisClusterSetError(
-            cc, REDIS_ERR_OTHER,
-            "No keys in command(must have keys for redis cluster mode)");
+        __valkeyClusterSetError(
+            cc, VALKEY_ERR_OTHER,
+            "No keys in command(must have keys for valkey cluster mode)");
         goto done;
     } else if (key_count == 1) {
-        kp = hiarray_get(command->keys, 0);
+        kp = vkarray_get(command->keys, 0);
         slot_num = keyHashSlot(kp->start, kp->end - kp->start);
         command->slot_num = slot_num;
 
@@ -2881,8 +2881,8 @@ done:
     return slot_num;
 }
 
-/* Deprecated function, replaced with redisClusterSetOptionMaxRetry() */
-void redisClusterSetMaxRedirect(redisClusterContext *cc, int max_retry_count) {
+/* Deprecated function, replaced with valkeyClusterSetOptionMaxRetry() */
+void valkeyClusterSetMaxRedirect(valkeyClusterContext *cc, int max_retry_count) {
     if (cc == NULL || max_retry_count <= 0) {
         return;
     }
@@ -2890,31 +2890,31 @@ void redisClusterSetMaxRedirect(redisClusterContext *cc, int max_retry_count) {
     cc->max_retry_count = max_retry_count;
 }
 
-int redisClusterSetConnectCallback(redisClusterContext *cc,
-                                   void(fn)(const redisContext *c,
+int valkeyClusterSetConnectCallback(valkeyClusterContext *cc,
+                                   void(fn)(const valkeyContext *c,
                                             int status)) {
     if (cc->on_connect == NULL) {
         cc->on_connect = fn;
-        return REDIS_OK;
+        return VALKEY_OK;
     }
-    return REDIS_ERR;
+    return VALKEY_ERR;
 }
 
-int redisClusterSetEventCallback(redisClusterContext *cc,
-                                 void(fn)(const redisClusterContext *cc,
+int valkeyClusterSetEventCallback(valkeyClusterContext *cc,
+                                 void(fn)(const valkeyClusterContext *cc,
                                           int event, void *privdata),
                                  void *privdata) {
     if (cc->event_callback == NULL) {
         cc->event_callback = fn;
         cc->event_privdata = privdata;
-        return REDIS_OK;
+        return VALKEY_OK;
     }
-    return REDIS_ERR;
+    return VALKEY_ERR;
 }
 
-void *redisClusterFormattedCommand(redisClusterContext *cc, char *cmd,
+void *valkeyClusterFormattedCommand(valkeyClusterContext *cc, char *cmd,
                                    int len) {
-    redisReply *reply = NULL;
+    valkeyReply *reply = NULL;
     int slot_num;
     struct cmd *command = NULL, *sub_command;
     hilist *commands = NULL;
@@ -2948,14 +2948,14 @@ void *redisClusterFormattedCommand(redisClusterContext *cc, char *cmd,
 
     if (slot_num < 0) {
         goto error;
-    } else if (slot_num >= REDIS_CLUSTER_SLOTS) {
-        __redisClusterSetError(cc, REDIS_ERR_OTHER, "slot_num is out of range");
+    } else if (slot_num >= VALKEYCLUSTER_SLOTS) {
+        __valkeyClusterSetError(cc, VALKEY_ERR_OTHER, "slot_num is out of range");
         goto error;
     }
 
     // all keys belong to one slot
     if (listLength(commands) == 0) {
-        reply = redis_cluster_command_execute(cc, command);
+        reply = valkey_cluster_command_execute(cc, command);
         goto done;
     }
 
@@ -2967,10 +2967,10 @@ void *redisClusterFormattedCommand(redisClusterContext *cc, char *cmd,
     while ((list_node = listNext(&li)) != NULL) {
         sub_command = list_node->value;
 
-        reply = redis_cluster_command_execute(cc, sub_command);
+        reply = valkey_cluster_command_execute(cc, sub_command);
         if (reply == NULL) {
             goto error;
-        } else if (reply->type == REDIS_REPLY_ERROR) {
+        } else if (reply->type == VALKEY_REPLY_ERROR) {
             goto done;
         }
 
@@ -2992,7 +2992,7 @@ done:
     return reply;
 
 oom:
-    __redisClusterSetError(cc, REDIS_ERR_OOM, "Out of memory");
+    __valkeyClusterSetError(cc, VALKEY_ERR_OOM, "Out of memory");
     // passthrough
 
 error:
@@ -3007,9 +3007,9 @@ error:
     return NULL;
 }
 
-void *redisClustervCommand(redisClusterContext *cc, const char *format,
+void *valkeyClustervCommand(valkeyClusterContext *cc, const char *format,
                            va_list ap) {
-    redisReply *reply;
+    valkeyReply *reply;
     char *cmd;
     int len;
 
@@ -3017,37 +3017,37 @@ void *redisClustervCommand(redisClusterContext *cc, const char *format,
         return NULL;
     }
 
-    len = redisvFormatCommand(&cmd, format, ap);
+    len = valkeyvFormatCommand(&cmd, format, ap);
 
     if (len == -1) {
-        __redisClusterSetError(cc, REDIS_ERR_OOM, "Out of memory");
+        __valkeyClusterSetError(cc, VALKEY_ERR_OOM, "Out of memory");
         return NULL;
     } else if (len == -2) {
-        __redisClusterSetError(cc, REDIS_ERR_OTHER, "Invalid format string");
+        __valkeyClusterSetError(cc, VALKEY_ERR_OTHER, "Invalid format string");
         return NULL;
     }
 
-    reply = redisClusterFormattedCommand(cc, cmd, len);
+    reply = valkeyClusterFormattedCommand(cc, cmd, len);
 
-    hi_free(cmd);
+    vk_free(cmd);
 
     return reply;
 }
 
-void *redisClusterCommand(redisClusterContext *cc, const char *format, ...) {
+void *valkeyClusterCommand(valkeyClusterContext *cc, const char *format, ...) {
     va_list ap;
-    redisReply *reply = NULL;
+    valkeyReply *reply = NULL;
 
     va_start(ap, format);
-    reply = redisClustervCommand(cc, format, ap);
+    reply = valkeyClustervCommand(cc, format, ap);
     va_end(ap);
 
     return reply;
 }
 
-void *redisClusterCommandToNode(redisClusterContext *cc, redisClusterNode *node,
+void *valkeyClusterCommandToNode(valkeyClusterContext *cc, valkeyClusterNode *node,
                                 const char *format, ...) {
-    redisContext *c;
+    valkeyContext *c;
     va_list ap;
     int ret;
     void *reply;
@@ -3057,7 +3057,7 @@ void *redisClusterCommandToNode(redisClusterContext *cc, redisClusterNode *node,
     if (c == NULL) {
         return NULL;
     } else if (c->err) {
-        __redisClusterSetError(cc, c->err, c->errstr);
+        __valkeyClusterSetError(cc, c->err, c->errstr);
         return NULL;
     }
 
@@ -3067,31 +3067,31 @@ void *redisClusterCommandToNode(redisClusterContext *cc, redisClusterNode *node,
     }
 
     va_start(ap, format);
-    ret = redisvAppendCommand(c, format, ap);
+    ret = valkeyvAppendCommand(c, format, ap);
     va_end(ap);
 
-    if (ret != REDIS_OK) {
-        __redisClusterSetError(cc, c->err, c->errstr);
+    if (ret != VALKEY_OK) {
+        __valkeyClusterSetError(cc, c->err, c->errstr);
         return NULL;
     }
 
     if (cc->need_update_route) {
         /* Pipeline slotmap update on the same connection. */
-        if (clusterUpdateRouteSendCommand(cc, c) == REDIS_OK) {
+        if (clusterUpdateRouteSendCommand(cc, c) == VALKEY_OK) {
             updating_slotmap = 1;
         }
     }
 
-    if (redisGetReply(c, &reply) != REDIS_OK) {
-        __redisClusterSetError(cc, c->err, c->errstr);
-        if (c->err != REDIS_ERR_OOM)
+    if (valkeyGetReply(c, &reply) != VALKEY_OK) {
+        __valkeyClusterSetError(cc, c->err, c->errstr);
+        if (c->err != VALKEY_ERR_OOM)
             cc->need_update_route = 1;
         return NULL;
     }
 
     if (updating_slotmap) {
         /* Handle reply from pipelined CLUSTER SLOTS or CLUSTER NODES. */
-        if (clusterUpdateRouteHandleReply(cc, c) != REDIS_OK) {
+        if (clusterUpdateRouteHandleReply(cc, c) != VALKEY_OK) {
             /* Ignore error. Update will be triggered on the next command. */
             cc->err = 0;
             cc->errstr[0] = '\0';
@@ -3101,26 +3101,26 @@ void *redisClusterCommandToNode(redisClusterContext *cc, redisClusterNode *node,
     return reply;
 }
 
-void *redisClusterCommandArgv(redisClusterContext *cc, int argc,
+void *valkeyClusterCommandArgv(valkeyClusterContext *cc, int argc,
                               const char **argv, const size_t *argvlen) {
-    redisReply *reply = NULL;
+    valkeyReply *reply = NULL;
     char *cmd;
     int len;
 
-    len = redisFormatCommandArgv(&cmd, argc, argv, argvlen);
+    len = valkeyFormatCommandArgv(&cmd, argc, argv, argvlen);
     if (len == -1) {
-        __redisClusterSetError(cc, REDIS_ERR_OOM, "Out of memory");
+        __valkeyClusterSetError(cc, VALKEY_ERR_OOM, "Out of memory");
         return NULL;
     }
 
-    reply = redisClusterFormattedCommand(cc, cmd, len);
+    reply = valkeyClusterFormattedCommand(cc, cmd, len);
 
-    hi_free(cmd);
+    vk_free(cmd);
 
     return reply;
 }
 
-int redisClusterAppendFormattedCommand(redisClusterContext *cc, char *cmd,
+int valkeyClusterAppendFormattedCommand(valkeyClusterContext *cc, char *cmd,
                                        int len) {
     int slot_num;
     struct cmd *command = NULL, *sub_command;
@@ -3154,15 +3154,15 @@ int redisClusterAppendFormattedCommand(redisClusterContext *cc, char *cmd,
 
     if (slot_num < 0) {
         goto error;
-    } else if (slot_num >= REDIS_CLUSTER_SLOTS) {
-        __redisClusterSetError(cc, REDIS_ERR_OTHER, "slot_num is out of range");
+    } else if (slot_num >= VALKEYCLUSTER_SLOTS) {
+        __valkeyClusterSetError(cc, VALKEY_ERR_OTHER, "slot_num is out of range");
         goto error;
     }
 
     // Append command(s)
     if (listLength(commands) == 0) {
         // All keys belong to one slot
-        if (__redisClusterAppendCommand(cc, command) != REDIS_OK) {
+        if (__valkeyClusterAppendCommand(cc, command) != VALKEY_OK) {
             goto error;
         }
     } else {
@@ -3175,7 +3175,7 @@ int redisClusterAppendFormattedCommand(redisClusterContext *cc, char *cmd,
         while ((list_node = listNext(&li)) != NULL) {
             sub_command = list_node->value;
 
-            if (__redisClusterAppendCommand(cc, sub_command) != REDIS_OK) {
+            if (__valkeyClusterAppendCommand(cc, sub_command) != VALKEY_OK) {
                 goto error;
             }
         }
@@ -3192,10 +3192,10 @@ int redisClusterAppendFormattedCommand(redisClusterContext *cc, char *cmd,
     if (listAddNodeTail(cc->requests, command) == NULL) {
         goto oom;
     }
-    return REDIS_OK;
+    return VALKEY_OK;
 
 oom:
-    __redisClusterSetError(cc, REDIS_ERR_OOM, "Out of memory");
+    __valkeyClusterSetError(cc, VALKEY_ERR_OOM, "Out of memory");
     // passthrough
 
 error:
@@ -3210,52 +3210,52 @@ error:
     /* Attention: mybe here we must pop the
       sub_commands that had append to the nodes.
       But now we do not handle it. */
-    return REDIS_ERR;
+    return VALKEY_ERR;
 }
 
-int redisClustervAppendCommand(redisClusterContext *cc, const char *format,
+int valkeyClustervAppendCommand(valkeyClusterContext *cc, const char *format,
                                va_list ap) {
     int ret;
     char *cmd;
     int len;
 
-    len = redisvFormatCommand(&cmd, format, ap);
+    len = valkeyvFormatCommand(&cmd, format, ap);
     if (len == -1) {
-        __redisClusterSetError(cc, REDIS_ERR_OOM, "Out of memory");
-        return REDIS_ERR;
+        __valkeyClusterSetError(cc, VALKEY_ERR_OOM, "Out of memory");
+        return VALKEY_ERR;
     } else if (len == -2) {
-        __redisClusterSetError(cc, REDIS_ERR_OTHER, "Invalid format string");
-        return REDIS_ERR;
+        __valkeyClusterSetError(cc, VALKEY_ERR_OTHER, "Invalid format string");
+        return VALKEY_ERR;
     }
 
-    ret = redisClusterAppendFormattedCommand(cc, cmd, len);
+    ret = valkeyClusterAppendFormattedCommand(cc, cmd, len);
 
-    hi_free(cmd);
+    vk_free(cmd);
 
     return ret;
 }
 
-int redisClusterAppendCommand(redisClusterContext *cc, const char *format,
+int valkeyClusterAppendCommand(valkeyClusterContext *cc, const char *format,
                               ...) {
 
     int ret;
     va_list ap;
 
     if (cc == NULL || format == NULL) {
-        return REDIS_ERR;
+        return VALKEY_ERR;
     }
 
     va_start(ap, format);
-    ret = redisClustervAppendCommand(cc, format, ap);
+    ret = valkeyClustervAppendCommand(cc, format, ap);
     va_end(ap);
 
     return ret;
 }
 
-int redisClusterAppendCommandToNode(redisClusterContext *cc,
-                                    redisClusterNode *node, const char *format,
+int valkeyClusterAppendCommandToNode(valkeyClusterContext *cc,
+                                    valkeyClusterNode *node, const char *format,
                                     ...) {
-    redisContext *c;
+    valkeyContext *c;
     va_list ap;
     struct cmd *command = NULL;
     char *cmd = NULL;
@@ -3271,35 +3271,35 @@ int redisClusterAppendCommandToNode(redisClusterContext *cc,
 
     c = ctx_get_by_node(cc, node);
     if (c == NULL) {
-        return REDIS_ERR;
+        return VALKEY_ERR;
     } else if (c->err) {
-        __redisClusterSetError(cc, c->err, c->errstr);
-        return REDIS_ERR;
+        __valkeyClusterSetError(cc, c->err, c->errstr);
+        return VALKEY_ERR;
     }
 
     /* Allocate cmd and encode the variadic command */
     va_start(ap, format);
-    len = redisvFormatCommand(&cmd, format, ap);
+    len = valkeyvFormatCommand(&cmd, format, ap);
     va_end(ap);
 
     if (len == -1) {
         goto oom;
     } else if (len == -2) {
-        __redisClusterSetError(cc, REDIS_ERR_OTHER, "Invalid format string");
-        return REDIS_ERR;
+        __valkeyClusterSetError(cc, VALKEY_ERR_OTHER, "Invalid format string");
+        return VALKEY_ERR;
     }
 
-    // Append the command to the outgoing hiredis buffer
-    if (redisAppendFormattedCommand(c, cmd, len) != REDIS_OK) {
-        __redisClusterSetError(cc, c->err, c->errstr);
-        hi_free(cmd);
-        return REDIS_ERR;
+    // Append the command to the outgoing valkey buffer
+    if (valkeyAppendFormattedCommand(c, cmd, len) != VALKEY_OK) {
+        __valkeyClusterSetError(cc, c->err, c->errstr);
+        vk_free(cmd);
+        return VALKEY_ERR;
     }
 
     // Keep the command in the outstanding request list
     command = command_get();
     if (command == NULL) {
-        hi_free(cmd);
+        vk_free(cmd);
         goto oom;
     }
     command->cmd = cmd;
@@ -3311,41 +3311,41 @@ int redisClusterAppendCommandToNode(redisClusterContext *cc,
     if (listAddNodeTail(cc->requests, command) == NULL)
         goto oom;
 
-    return REDIS_OK;
+    return VALKEY_OK;
 
 oom:
     command_destroy(command);
-    __redisClusterSetError(cc, REDIS_ERR_OOM, "Out of memory");
-    return REDIS_ERR;
+    __valkeyClusterSetError(cc, VALKEY_ERR_OOM, "Out of memory");
+    return VALKEY_ERR;
 }
 
-int redisClusterAppendCommandArgv(redisClusterContext *cc, int argc,
+int valkeyClusterAppendCommandArgv(valkeyClusterContext *cc, int argc,
                                   const char **argv, const size_t *argvlen) {
     int ret;
     char *cmd;
     int len;
 
-    len = redisFormatCommandArgv(&cmd, argc, argv, argvlen);
+    len = valkeyFormatCommandArgv(&cmd, argc, argv, argvlen);
     if (len == -1) {
-        __redisClusterSetError(cc, REDIS_ERR_OOM, "Out of memory");
-        return REDIS_ERR;
+        __valkeyClusterSetError(cc, VALKEY_ERR_OOM, "Out of memory");
+        return VALKEY_ERR;
     }
 
-    ret = redisClusterAppendFormattedCommand(cc, cmd, len);
+    ret = valkeyClusterAppendFormattedCommand(cc, cmd, len);
 
-    hi_free(cmd);
+    vk_free(cmd);
 
     return ret;
 }
 
-static int redisClusterSendAll(redisClusterContext *cc) {
+static int valkeyClusterSendAll(valkeyClusterContext *cc) {
     dictEntry *de;
-    redisClusterNode *node;
-    redisContext *c = NULL;
+    valkeyClusterNode *node;
+    valkeyContext *c = NULL;
     int wdone = 0;
 
     if (cc == NULL || cc->nodes == NULL) {
-        return REDIS_ERR;
+        return VALKEY_ERR;
     }
 
     dictIterator di;
@@ -3364,22 +3364,22 @@ static int redisClusterSendAll(redisClusterContext *cc) {
 
         /* Write until done */
         do {
-            if (redisBufferWrite(c, &wdone) == REDIS_ERR) {
-                return REDIS_ERR;
+            if (valkeyBufferWrite(c, &wdone) == VALKEY_ERR) {
+                return VALKEY_ERR;
             }
         } while (!wdone);
     }
 
-    return REDIS_OK;
+    return VALKEY_OK;
 }
 
-static int redisClusterClearAll(redisClusterContext *cc) {
+static int valkeyClusterClearAll(valkeyClusterContext *cc) {
     dictEntry *de;
-    redisClusterNode *node;
-    redisContext *c = NULL;
+    valkeyClusterNode *node;
+    valkeyContext *c = NULL;
 
     if (cc == NULL) {
-        return REDIS_ERR;
+        return VALKEY_ERR;
     }
 
     if (cc->err) {
@@ -3388,7 +3388,7 @@ static int redisClusterClearAll(redisClusterContext *cc) {
     }
 
     if (cc->nodes == NULL) {
-        return REDIS_ERR;
+        return VALKEY_ERR;
     }
 
     dictIterator di;
@@ -3405,14 +3405,14 @@ static int redisClusterClearAll(redisClusterContext *cc) {
             continue;
         }
 
-        redisFree(c);
+        valkeyFree(c);
         node->con = NULL;
     }
 
-    return REDIS_OK;
+    return VALKEY_OK;
 }
 
-int redisClusterGetReply(redisClusterContext *cc, void **reply) {
+int valkeyClusterGetReply(valkeyClusterContext *cc, void **reply) {
 
     struct cmd *command, *sub_command;
     hilist *commands = NULL;
@@ -3421,7 +3421,7 @@ int redisClusterGetReply(redisClusterContext *cc, void **reply) {
     void *sub_reply;
 
     if (cc == NULL || reply == NULL)
-        return REDIS_ERR;
+        return VALKEY_ERR;
 
     cc->err = 0;
     cc->errstr[0] = '\0';
@@ -3429,19 +3429,19 @@ int redisClusterGetReply(redisClusterContext *cc, void **reply) {
     *reply = NULL;
 
     if (cc->requests == NULL)
-        return REDIS_ERR; // No queued requests
+        return VALKEY_ERR; // No queued requests
 
     list_command = listFirst(cc->requests);
 
     // no more reply
     if (list_command == NULL) {
         *reply = NULL;
-        return REDIS_OK;
+        return VALKEY_OK;
     }
 
     command = list_command->value;
     if (command == NULL) {
-        __redisClusterSetError(cc, REDIS_ERR_OTHER,
+        __valkeyClusterSetError(cc, VALKEY_ERR_OTHER,
                                "command in the requests list is null");
         goto error;
     }
@@ -3450,7 +3450,7 @@ int redisClusterGetReply(redisClusterContext *cc, void **reply) {
     if (slot_num >= 0) {
         /* Command was sent via single slot */
         listDelNode(cc->requests, list_command);
-        return __redisClusterGetReply(cc, slot_num, reply);
+        return __valkeyClusterGetReply(cc, slot_num, reply);
 
     } else if (command->node_addr) {
         /* Command was sent to a single node */
@@ -3459,10 +3459,10 @@ int redisClusterGetReply(redisClusterContext *cc, void **reply) {
         de = dictFind(cc->nodes, command->node_addr);
         if (de != NULL) {
             listDelNode(cc->requests, list_command);
-            return __redisClusterGetReplyFromNode(cc, dictGetEntryVal(de),
+            return __valkeyClusterGetReplyFromNode(cc, dictGetEntryVal(de),
                                                   reply);
         } else {
-            __redisClusterSetError(cc, REDIS_ERR_OTHER,
+            __valkeyClusterSetError(cc, VALKEY_ERR_OTHER,
                                    "command was sent to a now unknown node");
             goto error;
         }
@@ -3470,7 +3470,7 @@ int redisClusterGetReply(redisClusterContext *cc, void **reply) {
 
     commands = command->sub_commands;
     if (commands == NULL) {
-        __redisClusterSetError(cc, REDIS_ERR_OTHER,
+        __valkeyClusterSetError(cc, VALKEY_ERR_OTHER,
                                "sub_commands in command is null");
         goto error;
     }
@@ -3483,18 +3483,18 @@ int redisClusterGetReply(redisClusterContext *cc, void **reply) {
     while ((list_sub_command = listNext(&li)) != NULL) {
         sub_command = list_sub_command->value;
         if (sub_command == NULL) {
-            __redisClusterSetError(cc, REDIS_ERR_OTHER, "sub_command is null");
+            __valkeyClusterSetError(cc, VALKEY_ERR_OTHER, "sub_command is null");
             goto error;
         }
 
         slot_num = sub_command->slot_num;
         if (slot_num < 0) {
-            __redisClusterSetError(cc, REDIS_ERR_OTHER,
+            __valkeyClusterSetError(cc, VALKEY_ERR_OTHER,
                                    "sub_command slot_num is less then zero");
             goto error;
         }
 
-        if (__redisClusterGetReply(cc, slot_num, &sub_reply) != REDIS_OK) {
+        if (__valkeyClusterGetReply(cc, slot_num, &sub_reply) != VALKEY_OK) {
             goto error;
         }
 
@@ -3507,19 +3507,19 @@ int redisClusterGetReply(redisClusterContext *cc, void **reply) {
     }
 
     listDelNode(cc->requests, list_command);
-    return REDIS_OK;
+    return VALKEY_OK;
 
 error:
 
     listDelNode(cc->requests, list_command);
-    return REDIS_ERR;
+    return VALKEY_ERR;
 }
 
 /**
  * Resets cluster state after pipeline. 
- * Resets Redis node connections if pipeline commands were not called beforehand.
+ * Resets Valkey node connections if pipeline commands were not called beforehand.
  */
-void redisClusterReset(redisClusterContext *cc) {
+void valkeyClusterReset(valkeyClusterContext *cc) {
     int status;
     void *reply;
 
@@ -3528,18 +3528,18 @@ void redisClusterReset(redisClusterContext *cc) {
     }
 
     if (cc->err) {
-        redisClusterClearAll(cc);
+        valkeyClusterClearAll(cc);
     } else {
         /* Write/flush each nodes output buffer to socket */
-        redisClusterSendAll(cc);
+        valkeyClusterSendAll(cc);
 
         /* Expect a reply for each pipelined request */
         do {
-            status = redisClusterGetReply(cc, &reply);
-            if (status == REDIS_OK) {
+            status = valkeyClusterGetReply(cc, &reply);
+            if (status == VALKEY_OK) {
                 freeReplyObject(reply);
             } else {
-                redisClusterClearAll(cc);
+                valkeyClusterClearAll(cc);
                 break;
             }
         } while (reply != NULL);
@@ -3551,8 +3551,8 @@ void redisClusterReset(redisClusterContext *cc) {
     }
 
     if (cc->need_update_route) {
-        status = redisClusterUpdateSlotmap(cc);
-        if (status != REDIS_OK) {
+        status = valkeyClusterUpdateSlotmap(cc);
+        if (status != VALKEY_OK) {
             /* Specific error already set */
             return;
         }
@@ -3560,9 +3560,9 @@ void redisClusterReset(redisClusterContext *cc) {
     }
 }
 
-/*############redis cluster async############*/
+/*############valkey cluster async############*/
 
-static void __redisClusterAsyncSetError(redisClusterAsyncContext *acc, int type,
+static void __valkeyClusterAsyncSetError(valkeyClusterAsyncContext *acc, int type,
                                         const char *str) {
 
     size_t len;
@@ -3574,28 +3574,28 @@ static void __redisClusterAsyncSetError(redisClusterAsyncContext *acc, int type,
         memcpy(acc->errstr, str, len);
         acc->errstr[len] = '\0';
     } else {
-        /* Only REDIS_ERR_IO may lack a description! */
-        assert(type == REDIS_ERR_IO);
+        /* Only VALKEY_ERR_IO may lack a description! */
+        assert(type == VALKEY_ERR_IO);
         strerror_r(errno, acc->errstr, sizeof(acc->errstr));
     }
 }
 
-static redisClusterAsyncContext *
-redisClusterAsyncInitialize(redisClusterContext *cc) {
-    redisClusterAsyncContext *acc;
+static valkeyClusterAsyncContext *
+valkeyClusterAsyncInitialize(valkeyClusterContext *cc) {
+    valkeyClusterAsyncContext *acc;
 
     if (cc == NULL) {
         return NULL;
     }
 
-    acc = hi_calloc(1, sizeof(redisClusterAsyncContext));
+    acc = vk_calloc(1, sizeof(valkeyClusterAsyncContext));
     if (acc == NULL)
         return NULL;
 
     acc->cc = cc;
 
     /* We want the error field to be accessible directly instead of requiring
-     * an indirection to the redisContext struct. */
+     * an indirection to the valkeyContext struct. */
     // TODO: really needed?
     acc->err = cc->err;
     memcpy(acc->errstr, cc->errstr, 128);
@@ -3605,7 +3605,7 @@ redisClusterAsyncInitialize(redisClusterContext *cc) {
 
 static cluster_async_data *cluster_async_data_create(void) {
     /* use calloc to guarantee all fields are zeroed */
-    return hi_calloc(1, sizeof(cluster_async_data));
+    return vk_calloc(1, sizeof(cluster_async_data));
 }
 
 static void cluster_async_data_free(cluster_async_data *cad) {
@@ -3615,21 +3615,21 @@ static void cluster_async_data_free(cluster_async_data *cad) {
 
     command_destroy(cad->command);
 
-    hi_free(cad);
+    vk_free(cad);
 }
 
 static void unlinkAsyncContextAndNode(void *data) {
-    redisClusterNode *node;
+    valkeyClusterNode *node;
 
     if (data) {
-        node = (redisClusterNode *)(data);
+        node = (valkeyClusterNode *)(data);
         node->acon = NULL;
     }
 }
 
-redisAsyncContext *actx_get_by_node(redisClusterAsyncContext *acc,
-                                    redisClusterNode *node) {
-    redisAsyncContext *ac;
+valkeyAsyncContext *actx_get_by_node(valkeyClusterAsyncContext *acc,
+                                    valkeyClusterNode *node) {
+    valkeyAsyncContext *ac;
     int ret;
 
     if (node == NULL) {
@@ -3641,12 +3641,12 @@ redisAsyncContext *actx_get_by_node(redisClusterAsyncContext *acc,
         if (ac->c.err == 0) {
             return ac;
         } else {
-            /* The cluster node has a hiredis context with errors. Hiredis
+            /* The cluster node has a valkey context with errors. Libvalkey
              * will asynchronously destruct the context and unlink it from
              * the cluster node object. Return an error until done.
              * An example scenario is when sending a command from a command
              * callback, which has a NULL reply due to a disconnect. */
-            __redisClusterAsyncSetError(acc, ac->c.err, ac->c.errstr);
+            __valkeyClusterAsyncSetError(acc, ac->c.err, ac->c.errstr);
             return NULL;
         }
     }
@@ -3654,75 +3654,73 @@ redisAsyncContext *actx_get_by_node(redisClusterAsyncContext *acc,
     // No async context exists, perform a connect
 
     if (node->host == NULL || node->port <= 0) {
-        __redisClusterAsyncSetError(acc, REDIS_ERR_OTHER,
+        __valkeyClusterAsyncSetError(acc, VALKEY_ERR_OTHER,
                                     "node host or port is error");
         return NULL;
     }
 
-    redisOptions options = {0};
-    REDIS_OPTIONS_SET_TCP(&options, node->host, node->port);
+    valkeyOptions options = {0};
+    VALKEY_OPTIONS_SET_TCP(&options, node->host, node->port);
     options.connect_timeout = acc->cc->connect_timeout;
     options.command_timeout = acc->cc->command_timeout;
 
-    node->lastConnectionAttempt = hi_usec_now();
+    node->lastConnectionAttempt = vk_usec_now();
 
-    ac = redisAsyncConnectWithOptions(&options);
+    ac = valkeyAsyncConnectWithOptions(&options);
     if (ac == NULL) {
-        __redisClusterAsyncSetError(acc, REDIS_ERR_OOM, "Out of memory");
+        __valkeyClusterAsyncSetError(acc, VALKEY_ERR_OOM, "Out of memory");
         return NULL;
     }
 
     if (ac->err) {
-        __redisClusterAsyncSetError(acc, ac->err, ac->errstr);
-        redisAsyncFree(ac);
+        __valkeyClusterAsyncSetError(acc, ac->err, ac->errstr);
+        valkeyAsyncFree(ac);
         return NULL;
     }
 
     if (acc->cc->ssl &&
-        acc->cc->ssl_init_fn(&ac->c, acc->cc->ssl) != REDIS_OK) {
-        __redisClusterAsyncSetError(acc, ac->c.err, ac->c.errstr);
-        redisAsyncFree(ac);
+        acc->cc->ssl_init_fn(&ac->c, acc->cc->ssl) != VALKEY_OK) {
+        __valkeyClusterAsyncSetError(acc, ac->c.err, ac->c.errstr);
+        valkeyAsyncFree(ac);
         return NULL;
     }
 
     // Authenticate when needed
     if (acc->cc->password != NULL) {
         if (acc->cc->username != NULL) {
-            ret = redisAsyncCommand(ac, NULL, NULL, "AUTH %s %s",
+            ret = valkeyAsyncCommand(ac, NULL, NULL, "AUTH %s %s",
                                     acc->cc->username, acc->cc->password);
         } else {
             ret =
-                redisAsyncCommand(ac, NULL, NULL, "AUTH %s", acc->cc->password);
+                valkeyAsyncCommand(ac, NULL, NULL, "AUTH %s", acc->cc->password);
         }
 
-        if (ret != REDIS_OK) {
-            __redisClusterAsyncSetError(acc, ac->c.err, ac->c.errstr);
-            redisAsyncFree(ac);
+        if (ret != VALKEY_OK) {
+            __valkeyClusterAsyncSetError(acc, ac->c.err, ac->c.errstr);
+            valkeyAsyncFree(ac);
             return NULL;
         }
     }
 
     if (acc->adapter) {
         ret = acc->attach_fn(ac, acc->adapter);
-        if (ret != REDIS_OK) {
-            __redisClusterAsyncSetError(acc, REDIS_ERR_OTHER,
+        if (ret != VALKEY_OK) {
+            __valkeyClusterAsyncSetError(acc, VALKEY_ERR_OTHER,
                                         "Failed to attach event adapter");
-            redisAsyncFree(ac);
+            valkeyAsyncFree(ac);
             return NULL;
         }
     }
 
     if (acc->onConnect) {
-        redisAsyncSetConnectCallback(ac, acc->onConnect);
+        valkeyAsyncSetConnectCallback(ac, acc->onConnect);
     }
-#ifndef HIRCLUSTER_NO_NONCONST_CONNECT_CB
     else if (acc->onConnectNC) {
-        redisAsyncSetConnectCallbackNC(ac, acc->onConnectNC);
+        valkeyAsyncSetConnectCallbackNC(ac, acc->onConnectNC);
     }
-#endif
 
     if (acc->onDisconnect) {
-        redisAsyncSetDisconnectCallback(ac, acc->onDisconnect);
+        valkeyAsyncSetDisconnectCallback(ac, acc->onDisconnect);
     }
 
     ac->data = node;
@@ -3732,90 +3730,86 @@ redisAsyncContext *actx_get_by_node(redisClusterAsyncContext *acc,
     return ac;
 }
 
-redisClusterAsyncContext *redisClusterAsyncContextInit(void) {
-    redisClusterContext *cc;
-    redisClusterAsyncContext *acc;
+valkeyClusterAsyncContext *valkeyClusterAsyncContextInit(void) {
+    valkeyClusterContext *cc;
+    valkeyClusterAsyncContext *acc;
 
-    cc = redisClusterContextInit();
+    cc = valkeyClusterContextInit();
     if (cc == NULL) {
         return NULL;
     }
 
-    acc = redisClusterAsyncInitialize(cc);
+    acc = valkeyClusterAsyncInitialize(cc);
     if (acc == NULL) {
-        redisClusterFree(cc);
+        valkeyClusterFree(cc);
         return NULL;
     }
 
     return acc;
 }
 
-redisClusterAsyncContext *redisClusterAsyncConnect(const char *addrs,
+valkeyClusterAsyncContext *valkeyClusterAsyncConnect(const char *addrs,
                                                    int flags) {
 
-    redisClusterContext *cc;
-    redisClusterAsyncContext *acc;
+    valkeyClusterContext *cc;
+    valkeyClusterAsyncContext *acc;
 
-    cc = redisClusterConnect(addrs, flags);
+    cc = valkeyClusterConnect(addrs, flags);
     if (cc == NULL) {
         return NULL;
     }
 
-    acc = redisClusterAsyncInitialize(cc);
+    acc = valkeyClusterAsyncInitialize(cc);
     if (acc == NULL) {
-        redisClusterFree(cc);
+        valkeyClusterFree(cc);
         return NULL;
     }
 
     return acc;
 }
 
-int redisClusterAsyncConnect2(redisClusterAsyncContext *acc) {
+int valkeyClusterAsyncConnect2(valkeyClusterAsyncContext *acc) {
     /* An adapter to an async event library is required. */
     if (acc->adapter == NULL) {
-        return REDIS_ERR;
+        return VALKEY_ERR;
     }
     return updateSlotMapAsync(acc, NULL /*any node*/);
 }
 
-int redisClusterAsyncSetConnectCallback(redisClusterAsyncContext *acc,
-                                        redisConnectCallback *fn) {
+int valkeyClusterAsyncSetConnectCallback(valkeyClusterAsyncContext *acc,
+                                        valkeyConnectCallback *fn) {
     if (acc->onConnect != NULL)
-        return REDIS_ERR;
-#ifndef HIRCLUSTER_NO_NONCONST_CONNECT_CB
+        return VALKEY_ERR;
     if (acc->onConnectNC != NULL)
-        return REDIS_ERR;
-#endif
+        return VALKEY_ERR;
     acc->onConnect = fn;
-    return REDIS_OK;
+    return VALKEY_OK;
 }
 
-#ifndef HIRCLUSTER_NO_NONCONST_CONNECT_CB
-int redisClusterAsyncSetConnectCallbackNC(redisClusterAsyncContext *acc,
-                                          redisConnectCallbackNC *fn) {
+int valkeyClusterAsyncSetConnectCallbackNC(valkeyClusterAsyncContext *acc,
+                                          valkeyConnectCallbackNC *fn) {
     if (acc->onConnectNC != NULL || acc->onConnect != NULL) {
-        return REDIS_ERR;
+        return VALKEY_ERR;
     }
     acc->onConnectNC = fn;
-    return REDIS_OK;
+    return VALKEY_OK;
 }
-#endif
 
-int redisClusterAsyncSetDisconnectCallback(redisClusterAsyncContext *acc,
-                                           redisDisconnectCallback *fn) {
+int valkeyClusterAsyncSetDisconnectCallback(valkeyClusterAsyncContext *acc,
+                                           valkeyDisconnectCallback *fn) {
     if (acc->onDisconnect == NULL) {
         acc->onDisconnect = fn;
-        return REDIS_OK;
+        return VALKEY_OK;
     }
-    return REDIS_ERR;
+    return VALKEY_ERR;
 }
 
 /* Reply callback function for CLUSTER SLOTS */
-void clusterSlotsReplyCallback(redisAsyncContext *ac, void *r, void *privdata) {
+void clusterSlotsReplyCallback(valkeyAsyncContext *ac, void *r, void *privdata) {
     UNUSED(ac);
-    redisReply *reply = (redisReply *)r;
-    redisClusterAsyncContext *acc = (redisClusterAsyncContext *)privdata;
-    acc->lastSlotmapUpdateAttempt = hi_usec_now();
+    valkeyReply *reply = (valkeyReply *)r;
+    valkeyClusterAsyncContext *acc = (valkeyClusterAsyncContext *)privdata;
+    acc->lastSlotmapUpdateAttempt = vk_usec_now();
 
     if (reply == NULL) {
         /* Retry using available nodes */
@@ -3823,19 +3817,19 @@ void clusterSlotsReplyCallback(redisAsyncContext *ac, void *r, void *privdata) {
         return;
     }
 
-    redisClusterContext *cc = acc->cc;
+    valkeyClusterContext *cc = acc->cc;
     dict *nodes = parse_cluster_slots(cc, reply, cc->flags);
-    if (updateNodesAndSlotmap(cc, nodes) != REDIS_OK) {
+    if (updateNodesAndSlotmap(cc, nodes) != VALKEY_OK) {
         /* Ignore failures for now */
     }
 }
 
 /* Reply callback function for CLUSTER NODES */
-void clusterNodesReplyCallback(redisAsyncContext *ac, void *r, void *privdata) {
+void clusterNodesReplyCallback(valkeyAsyncContext *ac, void *r, void *privdata) {
     UNUSED(ac);
-    redisReply *reply = (redisReply *)r;
-    redisClusterAsyncContext *acc = (redisClusterAsyncContext *)privdata;
-    acc->lastSlotmapUpdateAttempt = hi_usec_now();
+    valkeyReply *reply = (valkeyReply *)r;
+    valkeyClusterAsyncContext *acc = (valkeyClusterAsyncContext *)privdata;
+    acc->lastSlotmapUpdateAttempt = vk_usec_now();
 
     if (reply == NULL) {
         /* Retry using available nodes */
@@ -3843,16 +3837,16 @@ void clusterNodesReplyCallback(redisAsyncContext *ac, void *r, void *privdata) {
         return;
     }
 
-    redisClusterContext *cc = acc->cc;
+    valkeyClusterContext *cc = acc->cc;
     dict *nodes = parse_cluster_nodes(cc, reply->str, reply->len, cc->flags);
-    if (updateNodesAndSlotmap(cc, nodes) != REDIS_OK) {
+    if (updateNodesAndSlotmap(cc, nodes) != VALKEY_OK) {
         /* Ignore failures for now */
     }
 }
 
 #define nodeIsConnected(n)                                                     \
     ((n)->acon != NULL && (n)->acon->err == 0 &&                               \
-     (n)->acon->c.flags & REDIS_CONNECTED)
+     (n)->acon->c.flags & VALKEY_CONNECTED)
 
 /* Select a node.
  * Primarily selects a connected node found close to a randomly picked index of
@@ -3862,12 +3856,12 @@ void clusterNodesReplyCallback(redisAsyncContext *ac, void *r, void *privdata) {
  * If no connected node is found a node for which a connect has not been attempted
  * within throttle-time, and is found near the picked index, is selected.
  */
-static redisClusterNode *selectNode(dict *nodes) {
-    redisClusterNode *node, *selected = NULL;
+static valkeyClusterNode *selectNode(dict *nodes) {
+    valkeyClusterNode *node, *selected = NULL;
     dictIterator di;
     dictInitIterator(&di, nodes);
 
-    int64_t throttleLimit = hi_usec_now() - SLOTMAP_UPDATE_THROTTLE_USEC;
+    int64_t throttleLimit = vk_usec_now() - SLOTMAP_UPDATE_THROTTLE_USEC;
     unsigned long currentIndex = 0;
     unsigned long checkIndex = random() % dictSize(nodes);
 
@@ -3897,25 +3891,25 @@ static redisClusterNode *selectNode(dict *nodes) {
 
 /* Update the slot map by querying a selected cluster node. If ac is NULL, an
  * arbitrary connected node is selected. */
-static int updateSlotMapAsync(redisClusterAsyncContext *acc,
-                              redisAsyncContext *ac) {
+static int updateSlotMapAsync(valkeyClusterAsyncContext *acc,
+                              valkeyAsyncContext *ac) {
     if (acc->lastSlotmapUpdateAttempt == SLOTMAP_UPDATE_ONGOING) {
         /* Don't allow concurrent slot map updates. */
-        return REDIS_ERR;
+        return VALKEY_ERR;
     }
 
     if (ac == NULL) {
         if (acc->cc->nodes == NULL) {
-            __redisClusterAsyncSetError(acc, REDIS_ERR_OTHER, "no nodes added");
+            __valkeyClusterAsyncSetError(acc, VALKEY_ERR_OTHER, "no nodes added");
             goto error;
         }
 
-        redisClusterNode *node = selectNode(acc->cc->nodes);
+        valkeyClusterNode *node = selectNode(acc->cc->nodes);
         if (node == NULL) {
             goto error;
         }
 
-        /* Get hiredis context, connect if needed */
+        /* Get libvalkey context, connect if needed */
         ac = actx_get_by_node(acc, node);
     }
     if (ac == NULL)
@@ -3923,44 +3917,44 @@ static int updateSlotMapAsync(redisClusterAsyncContext *acc,
 
     /* Send a command depending of config */
     int status;
-    if (acc->cc->flags & HIRCLUSTER_FLAG_ROUTE_USE_SLOTS) {
-        status = redisAsyncCommand(ac, clusterSlotsReplyCallback, acc,
-                                   REDIS_COMMAND_CLUSTER_SLOTS);
+    if (acc->cc->flags & VALKEYCLUSTER_FLAG_ROUTE_USE_SLOTS) {
+        status = valkeyAsyncCommand(ac, clusterSlotsReplyCallback, acc,
+                                   VALKEY_COMMAND_CLUSTER_SLOTS);
     } else {
-        status = redisAsyncCommand(ac, clusterNodesReplyCallback, acc,
-                                   REDIS_COMMAND_CLUSTER_NODES);
+        status = valkeyAsyncCommand(ac, clusterNodesReplyCallback, acc,
+                                   VALKEY_COMMAND_CLUSTER_NODES);
     }
 
-    if (status == REDIS_OK) {
+    if (status == VALKEY_OK) {
         acc->lastSlotmapUpdateAttempt = SLOTMAP_UPDATE_ONGOING;
-        return REDIS_OK;
+        return VALKEY_OK;
     }
 
 error:
-    acc->lastSlotmapUpdateAttempt = hi_usec_now();
-    return REDIS_ERR;
+    acc->lastSlotmapUpdateAttempt = vk_usec_now();
+    return VALKEY_ERR;
 }
 
 /* Start a slotmap update if the throttling allows. */
-static void throttledUpdateSlotMapAsync(redisClusterAsyncContext *acc,
-                                        redisAsyncContext *ac) {
+static void throttledUpdateSlotMapAsync(valkeyClusterAsyncContext *acc,
+                                        valkeyAsyncContext *ac) {
     if (acc->lastSlotmapUpdateAttempt != SLOTMAP_UPDATE_ONGOING &&
         (acc->lastSlotmapUpdateAttempt + SLOTMAP_UPDATE_THROTTLE_USEC) <
-            hi_usec_now()) {
+            vk_usec_now()) {
         updateSlotMapAsync(acc, ac);
     }
 }
 
-static void redisClusterAsyncCallback(redisAsyncContext *ac, void *r,
+static void valkeyClusterAsyncCallback(valkeyAsyncContext *ac, void *r,
                                       void *privdata) {
     int ret;
-    redisReply *reply = r;
+    valkeyReply *reply = r;
     cluster_async_data *cad = privdata;
-    redisClusterAsyncContext *acc;
-    redisClusterContext *cc;
-    redisAsyncContext *ac_retry = NULL;
+    valkeyClusterAsyncContext *acc;
+    valkeyClusterContext *cc;
+    valkeyAsyncContext *ac_retry = NULL;
     int error_type;
-    redisClusterNode *node;
+    valkeyClusterNode *node;
     struct cmd *command;
 
     if (cad == NULL) {
@@ -3983,10 +3977,10 @@ static void redisClusterAsyncCallback(redisAsyncContext *ac, void *r,
     }
 
     if (reply == NULL) {
-        /* Copy reply specific error from hiredis */
-        __redisClusterAsyncSetError(acc, ac->err, ac->errstr);
+        /* Copy reply specific error from libvalkey */
+        __valkeyClusterAsyncSetError(acc, ac->err, ac->errstr);
 
-        node = (redisClusterNode *)ac->data;
+        node = (valkeyClusterNode *)ac->data;
         if (node == NULL)
             goto done; /* Node already removed from topology */
 
@@ -4004,7 +3998,7 @@ static void redisClusterAsyncCallback(redisAsyncContext *ac, void *r,
         cad->retry_count++;
         if (cad->retry_count > cc->max_retry_count) {
             cad->retry_count = 0;
-            __redisClusterAsyncSetError(acc, REDIS_ERR_CLUSTER_TOO_MANY_RETRIES,
+            __valkeyClusterAsyncSetError(acc, VALKEY_ERR_CLUSTER_TOO_MANY_RETRIES,
                                         "too many cluster retries");
             goto done;
         }
@@ -4017,7 +4011,7 @@ static void redisClusterAsyncCallback(redisAsyncContext *ac, void *r,
 
             node = getNodeFromRedirectReply(cc, reply, &slot);
             if (node == NULL) {
-                __redisClusterAsyncSetError(acc, cc->err, cc->errstr);
+                __valkeyClusterAsyncSetError(acc, cc->err, cc->errstr);
                 goto done;
             }
             /* Update the slot mapping entry for this slot. */
@@ -4030,7 +4024,7 @@ static void redisClusterAsyncCallback(redisAsyncContext *ac, void *r,
         case CLUSTER_ERR_ASK:
             node = getNodeFromRedirectReply(cc, reply, NULL);
             if (node == NULL) {
-                __redisClusterAsyncSetError(acc, cc->err, cc->errstr);
+                __valkeyClusterAsyncSetError(acc, cc->err, cc->errstr);
                 goto done;
             }
 
@@ -4040,8 +4034,8 @@ static void redisClusterAsyncCallback(redisAsyncContext *ac, void *r,
                 goto done;
             }
 
-            ret = redisAsyncCommand(ac_retry, NULL, NULL, REDIS_COMMAND_ASKING);
-            if (ret != REDIS_OK) {
+            ret = valkeyAsyncCommand(ac_retry, NULL, NULL, VALKEY_COMMAND_ASKING);
+            if (ret != VALKEY_OK) {
                 goto error;
             }
 
@@ -4084,9 +4078,9 @@ done:
 
 retry:
 
-    ret = redisAsyncFormattedCommand(ac_retry, redisClusterAsyncCallback, cad,
+    ret = valkeyAsyncFormattedCommand(ac_retry, valkeyClusterAsyncCallback, cad,
                                      command->cmd, command->clen);
-    if (ret != REDIS_OK) {
+    if (ret != VALKEY_OK) {
         goto error;
     }
 
@@ -4097,21 +4091,21 @@ error:
     cluster_async_data_free(cad);
 }
 
-int redisClusterAsyncFormattedCommand(redisClusterAsyncContext *acc,
-                                      redisClusterCallbackFn *fn,
+int valkeyClusterAsyncFormattedCommand(valkeyClusterAsyncContext *acc,
+                                      valkeyClusterCallbackFn *fn,
                                       void *privdata, char *cmd, int len) {
 
-    redisClusterContext *cc;
-    int status = REDIS_OK;
+    valkeyClusterContext *cc;
+    int status = VALKEY_OK;
     int slot_num;
-    redisClusterNode *node;
-    redisAsyncContext *ac;
+    valkeyClusterNode *node;
+    valkeyAsyncContext *ac;
     struct cmd *command = NULL;
     hilist *commands = NULL;
     cluster_async_data *cad;
 
     if (acc == NULL) {
-        return REDIS_ERR;
+        return VALKEY_ERR;
     }
 
     cc = acc->cc;
@@ -4131,7 +4125,7 @@ int redisClusterAsyncFormattedCommand(redisClusterAsyncContext *acc,
         goto oom;
     }
 
-    command->cmd = hi_calloc(len, sizeof(*command->cmd));
+    command->cmd = vk_calloc(len, sizeof(*command->cmd));
     if (command->cmd == NULL) {
         goto oom;
     }
@@ -4148,10 +4142,10 @@ int redisClusterAsyncFormattedCommand(redisClusterAsyncContext *acc,
     slot_num = command_format_by_slot(cc, command, commands);
 
     if (slot_num < 0) {
-        __redisClusterAsyncSetError(acc, cc->err, cc->errstr);
+        __valkeyClusterAsyncSetError(acc, cc->err, cc->errstr);
         goto error;
-    } else if (slot_num >= REDIS_CLUSTER_SLOTS) {
-        __redisClusterAsyncSetError(acc, REDIS_ERR_OTHER,
+    } else if (slot_num >= VALKEYCLUSTER_SLOTS) {
+        __valkeyClusterAsyncSetError(acc, VALKEY_ERR_OTHER,
                                     "slot_num is out of range");
         goto error;
     }
@@ -4160,8 +4154,8 @@ int redisClusterAsyncFormattedCommand(redisClusterAsyncContext *acc,
     if (listLength(commands) > 0) {
         ASSERT(listLength(commands) != 1);
 
-        __redisClusterAsyncSetError(
-            acc, REDIS_ERR_OTHER,
+        __valkeyClusterAsyncSetError(
+            acc, VALKEY_ERR_OTHER,
             "Asynchronous API now not support multi-key command");
         goto error;
     }
@@ -4172,7 +4166,7 @@ int redisClusterAsyncFormattedCommand(redisClusterAsyncContext *acc,
         throttledUpdateSlotMapAsync(acc, NULL);
 
         /* node_get_by_table() has set the error on cc. */
-        __redisClusterAsyncSetError(acc, cc->err, cc->errstr);
+        __valkeyClusterAsyncSetError(acc, cc->err, cc->errstr);
         goto error;
     }
 
@@ -4192,9 +4186,9 @@ int redisClusterAsyncFormattedCommand(redisClusterAsyncContext *acc,
     cad->callback = fn;
     cad->privdata = privdata;
 
-    status = redisAsyncFormattedCommand(ac, redisClusterAsyncCallback, cad, cmd,
+    status = valkeyAsyncFormattedCommand(ac, valkeyClusterAsyncCallback, cad, cmd,
                                         len);
-    if (status != REDIS_OK) {
+    if (status != VALKEY_OK) {
         goto error;
     }
 
@@ -4202,10 +4196,10 @@ int redisClusterAsyncFormattedCommand(redisClusterAsyncContext *acc,
         listRelease(commands);
     }
 
-    return REDIS_OK;
+    return VALKEY_OK;
 
 oom:
-    __redisClusterAsyncSetError(acc, REDIS_ERR_OOM, "Out of memory");
+    __valkeyClusterAsyncSetError(acc, VALKEY_ERR_OOM, "Out of memory");
     // passthrough
 
 error:
@@ -4213,16 +4207,16 @@ error:
     if (commands != NULL) {
         listRelease(commands);
     }
-    return REDIS_ERR;
+    return VALKEY_ERR;
 }
 
-int redisClusterAsyncFormattedCommandToNode(redisClusterAsyncContext *acc,
-                                            redisClusterNode *node,
-                                            redisClusterCallbackFn *fn,
+int valkeyClusterAsyncFormattedCommandToNode(valkeyClusterAsyncContext *acc,
+                                            valkeyClusterNode *node,
+                                            valkeyClusterCallbackFn *fn,
                                             void *privdata, char *cmd,
                                             int len) {
-    redisClusterContext *cc;
-    redisAsyncContext *ac;
+    valkeyClusterContext *cc;
+    valkeyAsyncContext *ac;
     int status;
     cluster_async_data *cad = NULL;
     struct cmd *command = NULL;
@@ -4230,7 +4224,7 @@ int redisClusterAsyncFormattedCommandToNode(redisClusterAsyncContext *acc,
     ac = actx_get_by_node(acc, node);
     if (ac == NULL) {
         /* Specific error already set */
-        return REDIS_ERR;
+        return VALKEY_ERR;
     }
 
     cc = acc->cc;
@@ -4250,7 +4244,7 @@ int redisClusterAsyncFormattedCommandToNode(redisClusterAsyncContext *acc,
         goto oom;
     }
 
-    command->cmd = hi_calloc(len, sizeof(*command->cmd));
+    command->cmd = vk_calloc(len, sizeof(*command->cmd));
     if (command->cmd == NULL) {
         goto oom;
     }
@@ -4267,66 +4261,66 @@ int redisClusterAsyncFormattedCommandToNode(redisClusterAsyncContext *acc,
     cad->privdata = privdata;
     cad->retry_count = NO_RETRY;
 
-    status = redisAsyncFormattedCommand(ac, redisClusterAsyncCallback, cad, cmd,
+    status = valkeyAsyncFormattedCommand(ac, valkeyClusterAsyncCallback, cad, cmd,
                                         len);
-    if (status != REDIS_OK)
+    if (status != VALKEY_OK)
         goto error;
 
-    return REDIS_OK;
+    return VALKEY_OK;
 
 oom:
-    __redisClusterAsyncSetError(acc, REDIS_ERR_OTHER, "Out of memory");
+    __valkeyClusterAsyncSetError(acc, VALKEY_ERR_OTHER, "Out of memory");
     // passthrough
 
 error:
     command_destroy(command);
-    return REDIS_ERR;
+    return VALKEY_ERR;
 }
 
-int redisClustervAsyncCommand(redisClusterAsyncContext *acc,
-                              redisClusterCallbackFn *fn, void *privdata,
+int valkeyClustervAsyncCommand(valkeyClusterAsyncContext *acc,
+                              valkeyClusterCallbackFn *fn, void *privdata,
                               const char *format, va_list ap) {
     int ret;
     char *cmd;
     int len;
 
     if (acc == NULL) {
-        return REDIS_ERR;
+        return VALKEY_ERR;
     }
 
-    len = redisvFormatCommand(&cmd, format, ap);
+    len = valkeyvFormatCommand(&cmd, format, ap);
     if (len == -1) {
-        __redisClusterAsyncSetError(acc, REDIS_ERR_OOM, "Out of memory");
-        return REDIS_ERR;
+        __valkeyClusterAsyncSetError(acc, VALKEY_ERR_OOM, "Out of memory");
+        return VALKEY_ERR;
     } else if (len == -2) {
-        __redisClusterAsyncSetError(acc, REDIS_ERR_OTHER,
+        __valkeyClusterAsyncSetError(acc, VALKEY_ERR_OTHER,
                                     "Invalid format string");
-        return REDIS_ERR;
+        return VALKEY_ERR;
     }
 
-    ret = redisClusterAsyncFormattedCommand(acc, fn, privdata, cmd, len);
+    ret = valkeyClusterAsyncFormattedCommand(acc, fn, privdata, cmd, len);
 
-    hi_free(cmd);
+    vk_free(cmd);
 
     return ret;
 }
 
-int redisClusterAsyncCommand(redisClusterAsyncContext *acc,
-                             redisClusterCallbackFn *fn, void *privdata,
+int valkeyClusterAsyncCommand(valkeyClusterAsyncContext *acc,
+                             valkeyClusterCallbackFn *fn, void *privdata,
                              const char *format, ...) {
     int ret;
     va_list ap;
 
     va_start(ap, format);
-    ret = redisClustervAsyncCommand(acc, fn, privdata, format, ap);
+    ret = valkeyClustervAsyncCommand(acc, fn, privdata, format, ap);
     va_end(ap);
 
     return ret;
 }
 
-int redisClusterAsyncCommandToNode(redisClusterAsyncContext *acc,
-                                   redisClusterNode *node,
-                                   redisClusterCallbackFn *fn, void *privdata,
+int valkeyClusterAsyncCommandToNode(valkeyClusterAsyncContext *acc,
+                                   valkeyClusterNode *node,
+                                   valkeyClusterCallbackFn *fn, void *privdata,
                                    const char *format, ...) {
     int ret;
     va_list ap;
@@ -4335,48 +4329,48 @@ int redisClusterAsyncCommandToNode(redisClusterAsyncContext *acc,
 
     /* Allocate cmd and encode the variadic command */
     va_start(ap, format);
-    len = redisvFormatCommand(&cmd, format, ap);
+    len = valkeyvFormatCommand(&cmd, format, ap);
     va_end(ap);
 
     if (len == -1) {
-        __redisClusterAsyncSetError(acc, REDIS_ERR_OTHER, "Out of memory");
-        return REDIS_ERR;
+        __valkeyClusterAsyncSetError(acc, VALKEY_ERR_OTHER, "Out of memory");
+        return VALKEY_ERR;
     } else if (len == -2) {
-        __redisClusterAsyncSetError(acc, REDIS_ERR_OTHER,
+        __valkeyClusterAsyncSetError(acc, VALKEY_ERR_OTHER,
                                     "Invalid format string");
-        return REDIS_ERR;
+        return VALKEY_ERR;
     }
 
-    ret = redisClusterAsyncFormattedCommandToNode(acc, node, fn, privdata, cmd,
+    ret = valkeyClusterAsyncFormattedCommandToNode(acc, node, fn, privdata, cmd,
                                                   len);
-    hi_free(cmd);
+    vk_free(cmd);
     return ret;
 }
 
-int redisClusterAsyncCommandArgv(redisClusterAsyncContext *acc,
-                                 redisClusterCallbackFn *fn, void *privdata,
+int valkeyClusterAsyncCommandArgv(valkeyClusterAsyncContext *acc,
+                                 valkeyClusterCallbackFn *fn, void *privdata,
                                  int argc, const char **argv,
                                  const size_t *argvlen) {
     int ret;
     char *cmd;
     int len;
 
-    len = redisFormatCommandArgv(&cmd, argc, argv, argvlen);
+    len = valkeyFormatCommandArgv(&cmd, argc, argv, argvlen);
     if (len == -1) {
-        __redisClusterAsyncSetError(acc, REDIS_ERR_OOM, "Out of memory");
-        return REDIS_ERR;
+        __valkeyClusterAsyncSetError(acc, VALKEY_ERR_OOM, "Out of memory");
+        return VALKEY_ERR;
     }
 
-    ret = redisClusterAsyncFormattedCommand(acc, fn, privdata, cmd, len);
+    ret = valkeyClusterAsyncFormattedCommand(acc, fn, privdata, cmd, len);
 
-    hi_free(cmd);
+    vk_free(cmd);
 
     return ret;
 }
 
-int redisClusterAsyncCommandArgvToNode(redisClusterAsyncContext *acc,
-                                       redisClusterNode *node,
-                                       redisClusterCallbackFn *fn,
+int valkeyClusterAsyncCommandArgvToNode(valkeyClusterAsyncContext *acc,
+                                       valkeyClusterNode *node,
+                                       valkeyClusterCallbackFn *fn,
                                        void *privdata, int argc,
                                        const char **argv,
                                        const size_t *argvlen) {
@@ -4385,25 +4379,25 @@ int redisClusterAsyncCommandArgvToNode(redisClusterAsyncContext *acc,
     char *cmd;
     int len;
 
-    len = redisFormatCommandArgv(&cmd, argc, argv, argvlen);
+    len = valkeyFormatCommandArgv(&cmd, argc, argv, argvlen);
     if (len == -1) {
-        __redisClusterAsyncSetError(acc, REDIS_ERR_OOM, "Out of memory");
-        return REDIS_ERR;
+        __valkeyClusterAsyncSetError(acc, VALKEY_ERR_OOM, "Out of memory");
+        return VALKEY_ERR;
     }
 
-    ret = redisClusterAsyncFormattedCommandToNode(acc, node, fn, privdata, cmd,
+    ret = valkeyClusterAsyncFormattedCommandToNode(acc, node, fn, privdata, cmd,
                                                   len);
 
-    hi_free(cmd);
+    vk_free(cmd);
 
     return ret;
 }
 
-void redisClusterAsyncDisconnect(redisClusterAsyncContext *acc) {
-    redisClusterContext *cc;
-    redisAsyncContext *ac;
+void valkeyClusterAsyncDisconnect(valkeyClusterAsyncContext *acc) {
+    valkeyClusterContext *cc;
+    valkeyAsyncContext *ac;
     dictEntry *de;
-    redisClusterNode *node;
+    valkeyClusterNode *node;
 
     if (acc == NULL) {
         return;
@@ -4427,12 +4421,12 @@ void redisClusterAsyncDisconnect(redisClusterAsyncContext *acc) {
             continue;
         }
 
-        redisAsyncDisconnect(ac);
+        valkeyAsyncDisconnect(ac);
     }
 }
 
-void redisClusterAsyncFree(redisClusterAsyncContext *acc) {
-    redisClusterContext *cc;
+void valkeyClusterAsyncFree(valkeyClusterAsyncContext *acc) {
+    valkeyClusterContext *cc;
 
     if (acc == NULL) {
         return;
@@ -4440,14 +4434,14 @@ void redisClusterAsyncFree(redisClusterAsyncContext *acc) {
 
     cc = acc->cc;
 
-    redisClusterFree(cc);
+    valkeyClusterFree(cc);
 
-    hi_free(acc);
+    vk_free(acc);
 }
 
 /* Initiate an iterator for iterating over current cluster nodes */
-void redisClusterInitNodeIterator(redisClusterNodeIterator *iter,
-                                  redisClusterContext *cc) {
+void valkeyClusterInitNodeIterator(valkeyClusterNodeIterator *iter,
+                                  valkeyClusterContext *cc) {
     iter->cc = cc;
     iter->route_version = cc->route_version;
     dictInitIterator(&iter->di, cc->nodes);
@@ -4457,7 +4451,7 @@ void redisClusterInitNodeIterator(redisClusterNodeIterator *iter,
 /* Get next node from the iterator
  * The iterator will restart if the routing table is updated
  * before all nodes have been iterated. */
-redisClusterNode *redisClusterNodeNext(redisClusterNodeIterator *iter) {
+valkeyClusterNode *valkeyClusterNodeNext(valkeyClusterNodeIterator *iter) {
     if (iter->retries_left <= 0)
         return NULL;
 
@@ -4478,11 +4472,11 @@ redisClusterNode *redisClusterNodeNext(redisClusterNodeIterator *iter) {
 }
 
 /* Get hash slot for given key string, which can include hash tags */
-unsigned int redisClusterGetSlotByKey(char *key) {
+unsigned int valkeyClusterGetSlotByKey(char *key) {
     return keyHashSlot(key, strlen(key));
 }
 
 /* Get node that handles given key string, which can include hash tags */
-redisClusterNode *redisClusterGetNodeByKey(redisClusterContext *cc, char *key) {
+valkeyClusterNode *valkeyClusterGetNodeByKey(valkeyClusterContext *cc, char *key) {
     return node_get_by_table(cc, keyHashSlot(key, strlen(key)));
 }

@@ -28,34 +28,34 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef __HIREDIS_CLUSTER_GLIB_H__
-#define __HIREDIS_CLUSTER_GLIB_H__
+#ifndef __VALKEYCLUSTER_GLIB_H__
+#define __VALKEYCLUSTER_GLIB_H__
 
-#include "../hircluster.h"
-#include <hiredis/adapters/glib.h>
+#include "../valkeycluster.h"
+#include <valkey/adapters/glib.h>
 
-typedef struct redisClusterGlibAdapter {
+typedef struct valkeyClusterGlibAdapter {
     GMainContext *context;
-} redisClusterGlibAdapter;
+} valkeyClusterGlibAdapter;
 
-static int redisGlibAttach_link(redisAsyncContext *ac, void *adapter) {
-    GMainContext *context = ((redisClusterGlibAdapter *)adapter)->context;
-    if (g_source_attach(redis_source_new(ac), context) > 0) {
-        return REDIS_OK;
+static int valkeyGlibAttach_link(valkeyAsyncContext *ac, void *adapter) {
+    GMainContext *context = ((valkeyClusterGlibAdapter *)adapter)->context;
+    if (g_source_attach(valkey_source_new(ac), context) > 0) {
+        return VALKEY_OK;
     }
-    return REDIS_ERR;
+    return VALKEY_ERR;
 }
 
-static int redisClusterGlibAttach(redisClusterAsyncContext *acc,
-                                  redisClusterGlibAdapter *adapter) {
+static int valkeyClusterGlibAttach(valkeyClusterAsyncContext *acc,
+                                  valkeyClusterGlibAdapter *adapter) {
     if (acc == NULL || adapter == NULL) {
-        return REDIS_ERR;
+        return VALKEY_ERR;
     }
 
     acc->adapter = adapter;
-    acc->attach_fn = redisGlibAttach_link;
+    acc->attach_fn = valkeyGlibAttach_link;
 
-    return REDIS_OK;
+    return VALKEY_OK;
 }
 
 #endif

@@ -10,7 +10,7 @@ perl -we 'use sigtrap "handler", sub{exit}, "CONT"; sleep 1; die "timeout"' &
 syncpid=$!
 
 # Start simulated server
-timeout 5s ./simulated-redis.pl -p 7400 -d --sigcont $syncpid <<'EOF' &
+timeout 5s ./simulated-valkey.pl -p 7400 -d --sigcont $syncpid <<'EOF' &
 EXPECT CONNECT
 EXPECT ["CLUSTER", "SLOTS"]
 SEND -ERR This instance has cluster support disabled

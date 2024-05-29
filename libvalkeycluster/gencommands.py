@@ -3,16 +3,16 @@
 # Copyright (C) 2023 Viktor Soderqvist <viktor dot soderqvist at est dot tech>
 # This file is released under the BSD license, see the COPYING file
 
-# This script generates cmddef.h from the JSON files in the Redis repo
+# This script generates cmddef.h from the JSON files in the Valkey repo
 # describing the commands. This is done manually when commands have been added
-# to Redis or when you want add more commands implemented in modules, etc.
+# to Valkey or when you want add more commands implemented in modules, etc.
 #
-# Usage: ./gencommands.py path/to/redis/src/commands/*.json > cmddef.h
+# Usage: ./gencommands.py path/to/valkey/src/commands/*.json > cmddef.h
 #
 # Alternatively, the output of the script utils/generate-commands-json.py (which
-# fetches the command metadata from a running Redis node) or the file
-# commands.json from the redis-doc repo can be used as input to this script:
-# https://github.com/redis/redis-doc/blob/master/commands.json
+# fetches the command metadata from a running Valkey node) or the file
+# commands.json from the valkey-doc repo can be used as input to this script:
+# https://github.com/valkey-io/valkey-doc/blob/master/commands.json
 #
 # Additional JSON files can be added to extend support for custom commands. The
 # JSON file format is not fully documented but hopefully the format can be
@@ -20,9 +20,9 @@
 # the source code of this script to see what it does.
 #
 # The key specifications part is documented here:
-# https://redis.io/docs/reference/key-specs/
+# https://valkey.io/docs/reference/key-specs/
 #
-# The discussion where this JSON format was added in Redis is here:
+# The discussion where this JSON format was added in Valkey is here:
 # https://github.com/redis/redis/issues/9359
 #
 # For convenience, files on the output format like cmddef.h can also be used as
@@ -83,7 +83,7 @@ def firstkey(props):
     # indicated by a keyword like KEYS or STREAMS).
     begin_search = props["key_specs"][0]["begin_search"]
     if "index" in begin_search:
-        # Redis source JSON files have this syntax
+        # Valkey source JSON files have this syntax
         pos = begin_search["index"]["pos"]
     elif begin_search.get("type") == "index" and "spec" in begin_search:
         # generate-commands-json.py returns this syntax
@@ -94,7 +94,7 @@ def firstkey(props):
     find_keys = props["key_specs"][0]["find_keys"]
     if "range" in find_keys or find_keys.get("type") == "range":
         # The first key is the arg at index pos.
-        # Redis source JSON files have this syntax:
+        # Valkey source JSON files have this syntax:
         #     "find_keys": {
         #         "range": {...}
         #     }
@@ -106,7 +106,7 @@ def firstkey(props):
         return ("INDEX", pos)
     elif "keynum" in find_keys:
         # The arg at pos is the number of keys and the next arg is the first key
-        # Redis source JSON files have this syntax
+        # Valkey source JSON files have this syntax
         assert find_keys["keynum"]["keynumidx"] == 0
         assert find_keys["keynum"]["firstkey"] == 1
         return ("KEYNUM", pos)
@@ -210,17 +210,17 @@ def generate_c_code(commands):
 # MAIN
 
 if len(sys.argv) < 2 or sys.argv[1] == "--help":
-    print("Usage: %s path/to/redis/src/commands/*.json > cmddef.h" % sys.argv[0])
+    print("Usage: %s path/to/valkey/src/commands/*.json > cmddef.h" % sys.argv[0])
     exit(1)
 
 # Find all JSON files
 filenames = []
 for filename in sys.argv[1:]:
     if os.path.isdir(filename):
-        # A redis repo root dir (accepted for backward compatibility)
+        # A valkey repo root dir (accepted for backward compatibility)
         jsondir = os.path.join(filename, "src", "commands")
         if not os.path.isdir(jsondir):
-            print("The directory %s is not a Redis source directory." % filename)
+            print("The directory %s is not a Valkey source directory." % filename)
             exit(1)
 
         filenames += glob.glob(os.path.join(jsondir, "*.json"))

@@ -28,27 +28,27 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef __HIREDIS_CLUSTER_AE_H__
-#define __HIREDIS_CLUSTER_AE_H__
+#ifndef __VALKEYCLUSTER_AE_H__
+#define __VALKEYCLUSTER_AE_H__
 
-#include "../hircluster.h"
-#include <hiredis/adapters/ae.h>
+#include "../valkeycluster.h"
+#include <valkey/adapters/ae.h>
 
-static int redisAeAttach_link(redisAsyncContext *ac, void *base) {
-    return redisAeAttach((aeEventLoop *)base, ac);
+static int valkeyAeAttach_link(valkeyAsyncContext *ac, void *base) {
+    return valkeyAeAttach((aeEventLoop *)base, ac);
 }
 
-static int redisClusterAeAttach(aeEventLoop *loop,
-                                redisClusterAsyncContext *acc) {
+static int valkeyClusterAeAttach(aeEventLoop *loop,
+                                valkeyClusterAsyncContext *acc) {
 
     if (acc == NULL || loop == NULL) {
-        return REDIS_ERR;
+        return VALKEY_ERR;
     }
 
     acc->adapter = loop;
-    acc->attach_fn = redisAeAttach_link;
+    acc->attach_fn = valkeyAeAttach_link;
 
-    return REDIS_OK;
+    return VALKEY_OK;
 }
 
 #endif

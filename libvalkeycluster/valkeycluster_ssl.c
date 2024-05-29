@@ -26,21 +26,21 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-#include "hircluster_ssl.h"
+#include "valkeycluster_ssl.h"
 
-static int redisClusterInitiateSSLWithContext(redisContext *c,
-                                              void *redis_ssl_ctx) {
-    return redisInitiateSSLWithContext(c, redis_ssl_ctx);
+static int valkeyClusterInitiateSSLWithContext(valkeyContext *c,
+                                              void *valkey_ssl_ctx) {
+    return valkeyInitiateSSLWithContext(c, valkey_ssl_ctx);
 }
 
-int redisClusterSetOptionEnableSSL(redisClusterContext *cc,
-                                   redisSSLContext *ssl) {
+int valkeyClusterSetOptionEnableSSL(valkeyClusterContext *cc,
+                                   valkeySSLContext *ssl) {
     if (cc == NULL || ssl == NULL) {
-        return REDIS_ERR;
+        return VALKEY_ERR;
     }
 
     cc->ssl = ssl;
-    cc->ssl_init_fn = &redisClusterInitiateSSLWithContext;
+    cc->ssl_init_fn = &valkeyClusterInitiateSSLWithContext;
 
-    return REDIS_OK;
+    return VALKEY_OK;
 }

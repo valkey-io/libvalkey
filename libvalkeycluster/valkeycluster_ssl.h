@@ -29,8 +29,8 @@
 #ifndef __HIRCLUSTER_SSL_H
 #define __HIRCLUSTER_SSL_H
 
-#include "hircluster.h"
-#include <hiredis/hiredis_ssl.h>
+#include "valkeycluster.h"
+#include <valkey/valkey_ssl.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -39,8 +39,8 @@ extern "C" {
 /**
  * Configuration option to enable SSL/TLS negotiation on a context.
  */
-int redisClusterSetOptionEnableSSL(redisClusterContext *cc,
-                                   redisSSLContext *ssl);
+int valkeyClusterSetOptionEnableSSL(valkeyClusterContext *cc,
+                                   valkeySSLContext *ssl);
 
 #ifdef __cplusplus
 }

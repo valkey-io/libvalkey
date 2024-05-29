@@ -34,7 +34,7 @@
  */
 
 #include "adapters/libevent.h"
-#include "hircluster.h"
+#include "valkeycluster.h"
 #include "test_utils.h"
 #include <assert.h>
 #include <stdio.h>
@@ -52,16 +52,16 @@ int send_to_all = 0;
 
 void sendNextCommand(int, short, void *);
 
-void printReply(const redisReply *reply) {
+void printReply(const valkeyReply *reply) {
     switch (reply->type) {
-    case REDIS_REPLY_ERROR:
-    case REDIS_REPLY_STATUS:
-    case REDIS_REPLY_STRING:
-    case REDIS_REPLY_VERB:
-    case REDIS_REPLY_BIGNUM:
+    case VALKEY_REPLY_ERROR:
+    case VALKEY_REPLY_STATUS:
+    case VALKEY_REPLY_STRING:
+    case VALKEY_REPLY_VERB:
+    case VALKEY_REPLY_BIGNUM:
         printf("%s\n", reply->str);
         break;
-    case REDIS_REPLY_INTEGER:
+    case VALKEY_REPLY_INTEGER:
         printf("%lld\n", reply->integer);
         break;
     default:
@@ -69,8 +69,8 @@ void printReply(const redisReply *reply) {
     }
 }
 
-void replyCallback(redisClusterAsyncContext *acc, void *r, void *privdata) {
-    redisReply *reply = (redisReply *)r;
+void replyCallback(valkeyClusterAsyncContext *acc, void *r, void *privdata) {
+    valkeyReply *reply = (valkeyReply *)r;
     intptr_t cmd_id = (intptr_t)privdata; /* Id to corresponding cmd */
 
     if (reply == NULL) {
@@ -82,8 +82,8 @@ void replyCallback(redisClusterAsyncContext *acc, void *r, void *privdata) {
 
         if (resend_failed_cmd) {
             printf("resend '%s'\n", cmd_history[cmd_id]);
-            if (redisClusterAsyncCommand(acc, replyCallback, (void *)cmd_id,
-                                         cmd_history[cmd_id]) != REDIS_OK)
+            if (valkeyClusterAsyncCommand(acc, replyCallback, (void *)cmd_id,
+                                         cmd_history[cmd_id]) != VALKEY_OK)
                 printf("send error\n");
             return;
         }
@@ -101,7 +101,7 @@ void replyCallback(redisClusterAsyncContext *acc, void *r, void *privdata) {
 void sendNextCommand(int fd, short kind, void *arg) {
     UNUSED(fd);
     UNUSED(kind);
-    redisClusterAsyncContext *acc = arg;
+    valkeyClusterAsyncContext *acc = arg;
     int async = 0;
 
     char cmd[CMD_SIZE];
@@ -143,21 +143,21 @@ void sendNextCommand(int fd, short kind, void *arg) {
         strcpy(cmd_history[num_running], cmd);
 
         if (send_to_all) {
-            nodeIterator ni;
-            initNodeIterator(&ni, acc->cc);
+            valkeyClusterNodeIterator ni;
+            valkeyClusterInitNodeIterator(&ni, acc->cc);
 
-            redisClusterNode *node;
-            while ((node = nodeNext(&ni)) != NULL) {
-                int status = redisClusterAsyncCommandToNode(
+            valkeyClusterNode *node;
+            while ((node = valkeyClusterNodeNext(&ni)) != NULL) {
+                int status = valkeyClusterAsyncCommandToNode(
                     acc, node, replyCallback, (void *)((intptr_t)num_running),
                     cmd);
-                ASSERT_MSG(status == REDIS_OK, acc->errstr);
+                ASSERT_MSG(status == VALKEY_OK, acc->errstr);
                 num_running++;
             }
         } else {
-            int status = redisClusterAsyncCommand(
+            int status = valkeyClusterAsyncCommand(
                 acc, replyCallback, (void *)((intptr_t)num_running), cmd);
-            if (status == REDIS_OK) {
+            if (status == VALKEY_OK) {
                 num_running++;
             } else {
                 printf("error: %s\n", acc->errstr);
@@ -175,21 +175,21 @@ void sendNextCommand(int fd, short kind, void *arg) {
     }
 
     /* Disconnect if nothing is left to read from stdin */
-    redisClusterAsyncDisconnect(acc);
+    valkeyClusterAsyncDisconnect(acc);
 }
 
-void eventCallback(const redisClusterContext *cc, int event, void *privdata) {
+void eventCallback(const valkeyClusterContext *cc, int event, void *privdata) {
     (void)cc;
     (void)privdata;
     char *e = NULL;
     switch (event) {
-    case HIRCLUSTER_EVENT_SLOTMAP_UPDATED:
+    case VALKEYCLUSTER_EVENT_SLOTMAP_UPDATED:
         e = "slotmap-updated";
         break;
-    case HIRCLUSTER_EVENT_READY:
+    case VALKEYCLUSTER_EVENT_READY:
         e = "ready";
         break;
-    case HIRCLUSTER_EVENT_FREE_CONTEXT:
+    case VALKEYCLUSTER_EVENT_FREE_CONTEXT:
         e = "free-context";
         break;
     default:
@@ -221,34 +221,34 @@ int main(int argc, char **argv) {
     const char *initnode = argv[optind];
     struct timeval timeout = {0, 500000};
 
-    redisClusterAsyncContext *acc = redisClusterAsyncContextInit();
+    valkeyClusterAsyncContext *acc = valkeyClusterAsyncContextInit();
     assert(acc);
-    redisClusterSetOptionAddNodes(acc->cc, initnode);
-    redisClusterSetOptionTimeout(acc->cc, timeout);
-    redisClusterSetOptionConnectTimeout(acc->cc, timeout);
-    redisClusterSetOptionMaxRetry(acc->cc, 1);
+    valkeyClusterSetOptionAddNodes(acc->cc, initnode);
+    valkeyClusterSetOptionTimeout(acc->cc, timeout);
+    valkeyClusterSetOptionConnectTimeout(acc->cc, timeout);
+    valkeyClusterSetOptionMaxRetry(acc->cc, 1);
     if (use_cluster_slots) {
-        redisClusterSetOptionRouteUseSlots(acc->cc);
+        valkeyClusterSetOptionRouteUseSlots(acc->cc);
     }
     if (show_events) {
-        redisClusterSetEventCallback(acc->cc, eventCallback, NULL);
+        valkeyClusterSetEventCallback(acc->cc, eventCallback, NULL);
     }
 
-    if (redisClusterConnect2(acc->cc) != REDIS_OK) {
+    if (valkeyClusterConnect2(acc->cc) != VALKEY_OK) {
         printf("Connect error: %s\n", acc->cc->errstr);
         exit(2);
     }
 
     struct event_base *base = event_base_new();
-    int status = redisClusterLibeventAttach(acc, base);
-    assert(status == REDIS_OK);
+    int status = valkeyClusterLibeventAttach(acc, base);
+    assert(status == VALKEY_OK);
 
     /* Schedule a read from stdin and send next command */
     event_base_once(acc->adapter, -1, EV_TIMEOUT, sendNextCommand, acc, NULL);
 
     event_base_dispatch(base);
 
-    redisClusterAsyncFree(acc);
+    valkeyClusterAsyncFree(acc);
     event_base_free(base);
     return 0;
 }

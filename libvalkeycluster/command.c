@@ -30,7 +30,7 @@
  */
 #include <ctype.h>
 #include <errno.h>
-#include <hiredis/alloc.h>
+#include <valkey/alloc.h>
 #ifndef _WIN32
 #include <alloca.h>
 #include <strings.h>
@@ -40,8 +40,8 @@
 #include <string.h>
 
 #include "command.h"
-#include "hiarray.h"
-#include "hiutil.h"
+#include "vkarray.h"
+#include "vkutil.h"
 #include "win32.h"
 
 #define LF (uint8_t)10
@@ -65,10 +65,10 @@ typedef struct {
     int8_t arity;              /* Arity, neg number means min num args */
 } cmddef;
 
-/* Populate the table with code in cmddef.h generated from Redis JSON files. */
-static cmddef redis_commands[] = {
+/* Populate the table with code in cmddef.h generated from Valkey JSON files. */
+static cmddef valkey_commands[] = {
 #define COMMAND(_type, _name, _subname, _arity, _keymethod, _keypos)           \
-    {.type = CMD_REQ_REDIS_##_type,                                            \
+    {.type = CMD_REQ_VALKEY_##_type,                                           \
      .name = _name,                                                            \
      .subname = _subname,                                                      \
      .firstkeymethod = KEYPOS_##_keymethod,                                    \
@@ -92,9 +92,9 @@ static inline void to_upper(char *dst, const char *src, uint32_t len) {
  * to lookup the command. The function returns CMD_UNKNOWN on failure. On
  * success, the command type is returned and *firstkey and *arity are
  * populated. */
-cmddef *redis_lookup_cmd(const char *arg0, uint32_t arg0_len, const char *arg1,
-                         uint32_t arg1_len) {
-    int num_commands = sizeof(redis_commands) / sizeof(cmddef);
+cmddef *valkey_lookup_cmd(const char *arg0, uint32_t arg0_len, const char *arg1,
+                          uint32_t arg1_len) {
+    int num_commands = sizeof(valkey_commands) / sizeof(cmddef);
     /* Compare command name in uppercase. */
     char *cmd = alloca(arg0_len);
     to_upper(cmd, arg0, arg0_len);
@@ -103,7 +103,7 @@ cmddef *redis_lookup_cmd(const char *arg0, uint32_t arg0_len, const char *arg1,
     int left = 0, right = num_commands - 1;
     while (left <= right) {
         int i = (left + right) / 2;
-        cmddef *c = &redis_commands[i];
+        cmddef *c = &valkey_commands[i];
 
         int cmp = strncmp(c->name, cmd, arg0_len);
         if (cmp == 0 && strlen(c->name) > arg0_len)
@@ -137,15 +137,15 @@ cmddef *redis_lookup_cmd(const char *arg0, uint32_t arg0_len, const char *arg1,
 }
 
 /*
- * Return true, if the redis command is a vector command accepting one or
+ * Return true, if the valkey command is a vector command accepting one or
  * more keys, otherwise return false
  * Format: command key [ key ... ]
  */
-static int redis_argx(struct cmd *r) {
+static int valkey_argx(struct cmd *r) {
     switch (r->type) {
-    case CMD_REQ_REDIS_EXISTS:
-    case CMD_REQ_REDIS_MGET:
-    case CMD_REQ_REDIS_DEL:
+    case CMD_REQ_VALKEY_EXISTS:
+    case CMD_REQ_VALKEY_MGET:
+    case CMD_REQ_VALKEY_DEL:
         return 1;
 
     default:
@@ -156,13 +156,13 @@ static int redis_argx(struct cmd *r) {
 }
 
 /*
- * Return true, if the redis command is a vector command accepting one or
+ * Return true, if the valkey command is a vector command accepting one or
  * more key-value pairs, otherwise return false
  * Format: command key value [ key value ... ]
  */
-static int redis_argkvx(struct cmd *r) {
+static int valkey_argkvx(struct cmd *r) {
     switch (r->type) {
-    case CMD_REQ_REDIS_MSET:
+    case CMD_REQ_VALKEY_MSET:
         return 1;
 
     default:
@@ -176,7 +176,7 @@ static int redis_argkvx(struct cmd *r) {
  * Returns the remaining of the input after consuming the bulk string. The
  * pointers *str and *len are pointed to the parsed string and its length. On
  * parse error, NULL is returned. */
-char *redis_parse_bulk(char *p, char *end, char **str, uint32_t *len) {
+char *valkey_parse_bulk(char *p, char *end, char **str, uint32_t *len) {
     uint32_t length = 0;
     if (p >= end || *p++ != '$')
         return NULL;
@@ -200,7 +200,7 @@ char *redis_parse_bulk(char *p, char *end, char **str, uint32_t *len) {
 }
 
 static inline int push_keypos(struct cmd *r, char *arg, uint32_t arglen) {
-    struct keypos *kpos = hiarray_push(r->keys);
+    struct keypos *kpos = vkarray_push(r->keys);
     if (kpos == NULL)
         return 0;
     kpos->start = arg;
@@ -208,31 +208,7 @@ static inline int push_keypos(struct cmd *r, char *arg, uint32_t arglen) {
     return 1;
 }
 
-/*
- * Reference: http://redis.io/topics/protocol
- *
- * Redis >= 1.2 uses the unified protocol to send requests to the Redis
- * server. In the unified protocol all the arguments sent to the server
- * are binary safe and every request has the following general form:
- *
- *   *<number of arguments> CR LF
- *   $<number of bytes of argument 1> CR LF
- *   <argument data> CR LF
- *   ...
- *   $<number of bytes of argument N> CR LF
- *   <argument data> CR LF
- *
- * Before the unified request protocol, redis protocol for requests supported
- * the following commands
- * 1). Inline commands: simple commands where arguments are just space
- *     separated strings. No binary safeness is possible.
- * 2). Bulk commands: bulk commands are exactly like inline commands, but
- *     the last argument is handled in a special way in order to allow for
- *     a binary-safe last argument.
- *
- * only supports the Redis unified protocol for requests.
- */
-void redis_parse_cmd(struct cmd *r) {
+void valkey_parse_cmd(struct cmd *r) {
     ASSERT(r->cmd != NULL && r->clen > 0);
     char *p = r->cmd;
     char *end = r->cmd + r->clen;
@@ -261,17 +237,17 @@ void redis_parse_cmd(struct cmd *r) {
     r->narg = rnarg;
 
     /* Parse the first two args. */
-    if ((p = redis_parse_bulk(p, end, &arg0, &arg0_len)) == NULL)
+    if ((p = valkey_parse_bulk(p, end, &arg0, &arg0_len)) == NULL)
         goto error;
     argidx++;
     if (rnarg > 1) {
-        if ((p = redis_parse_bulk(p, end, &arg1, &arg1_len)) == NULL)
+        if ((p = valkey_parse_bulk(p, end, &arg1, &arg1_len)) == NULL)
             goto error;
         argidx++;
     }
 
     /* Lookup command. */
-    if ((info = redis_lookup_cmd(arg0, arg0_len, arg1, arg1_len)) == NULL)
+    if ((info = valkey_lookup_cmd(arg0, arg0_len, arg1, arg1_len)) == NULL)
         goto error; /* Command not found. */
     r->type = info->type;
 
@@ -292,14 +268,14 @@ void redis_parse_cmd(struct cmd *r) {
         /* Keyword-based first key position */
         const char *keyword;
         int startfrom;
-        if (r->type == CMD_REQ_REDIS_XREAD) {
+        if (r->type == CMD_REQ_VALKEY_XREAD) {
             keyword = "STREAMS";
             startfrom = 1;
-        } else if (r->type == CMD_REQ_REDIS_XREADGROUP) {
+        } else if (r->type == CMD_REQ_VALKEY_XREADGROUP) {
             keyword = "STREAMS";
             startfrom = 4;
         } else {
-            /* Not reached, but can be reached if Redis adds more commands. */
+            /* Not reached, but can be reached if Valkey adds more commands. */
             goto error;
         }
 
@@ -307,13 +283,13 @@ void redis_parse_cmd(struct cmd *r) {
         arg = arg1;
         arglen = arg1_len;
         while (argidx < (int)rnarg - 1) {
-            if ((p = redis_parse_bulk(p, end, &arg, &arglen)) == NULL)
+            if ((p = valkey_parse_bulk(p, end, &arg, &arglen)) == NULL)
                 goto error; /* Keyword not provided, thus no keys. */
             if (argidx++ < startfrom)
                 continue; /* Keyword can't appear in a position before 'startfrom' */
             if (!strncasecmp(keyword, arg, arglen)) {
                 /* Keyword found. Now the first key is the next arg. */
-                if ((p = redis_parse_bulk(p, end, &arg, &arglen)) == NULL)
+                if ((p = valkey_parse_bulk(p, end, &arg, &arglen)) == NULL)
                     goto error;
                 if (!push_keypos(r, arg, arglen))
                     goto oom;
@@ -329,7 +305,7 @@ void redis_parse_cmd(struct cmd *r) {
     arg = arg1;
     arglen = arg1_len;
     for (; argidx < info->firstkeypos; argidx++) {
-        if ((p = redis_parse_bulk(p, end, &arg, &arglen)) == NULL)
+        if ((p = valkey_parse_bulk(p, end, &arg, &arglen)) == NULL)
             goto error;
     }
 
@@ -341,14 +317,14 @@ void redis_parse_cmd(struct cmd *r) {
         if (!strncmp("0", arg, arglen))
             goto done; /* No args. */
         /* One or more args. The first key is the arg after the 'numkeys' arg. */
-        if ((p = redis_parse_bulk(p, end, &arg, &arglen)) == NULL)
+        if ((p = valkey_parse_bulk(p, end, &arg, &arglen)) == NULL)
             goto error;
         argidx++;
     }
 
     /* Now arg is the first key and arglen is its length. */
 
-    if (info->type == CMD_REQ_REDIS_MIGRATE && arglen == 0 &&
+    if (info->type == CMD_REQ_VALKEY_MIGRATE && arglen == 0 &&
         info->firstkeymethod == KEYPOS_INDEX && info->firstkeypos == 3) {
         /* MIGRATE host port <key | ""> destination-db timeout [COPY] [REPLACE]
          * [[AUTH password] | [AUTH2 username password]] [KEYS key [key ...]]
@@ -363,15 +339,15 @@ void redis_parse_cmd(struct cmd *r) {
         goto oom;
 
     /* Special commands where we want all keys (not only the first key). */
-    if (redis_argx(r) || redis_argkvx(r)) {
+    if (valkey_argx(r) || valkey_argkvx(r)) {
         /* argx:   MGET key [ key ... ] */
         /* argkvx: MSET key value [ key value ... ] */
-        if (redis_argkvx(r) && rnarg % 2 == 0)
+        if (valkey_argkvx(r) && rnarg % 2 == 0)
             goto error;
         for (uint32_t i = 2; i < rnarg; i++) {
-            if ((p = redis_parse_bulk(p, end, &arg, &arglen)) == NULL)
+            if ((p = valkey_parse_bulk(p, end, &arg, &arglen)) == NULL)
                 goto error;
-            if (redis_argkvx(r) && i % 2 == 0)
+            if (valkey_argkvx(r) && i % 2 == 0)
                 continue; /* not a key */
             if (!push_keypos(r, arg, arglen))
                 goto oom;
@@ -388,7 +364,7 @@ error:
     errno = EINVAL;
     size_t errmaxlen = 100; /* Enough for the error messages below. */
     if (r->errstr == NULL) {
-        r->errstr = hi_malloc(errmaxlen);
+        r->errstr = vk_malloc(errmaxlen);
         if (r->errstr == NULL) {
             goto oom;
         }
@@ -415,7 +391,7 @@ oom:
 
 struct cmd *command_get(void) {
     struct cmd *command;
-    command = hi_malloc(sizeof(struct cmd));
+    command = vk_malloc(sizeof(struct cmd));
     if (command == NULL) {
         return NULL;
     }
@@ -436,9 +412,9 @@ struct cmd *command_get(void) {
     command->sub_commands = NULL;
     command->node_addr = NULL;
 
-    command->keys = hiarray_create(1, sizeof(struct keypos));
+    command->keys = vkarray_create(1, sizeof(struct keypos));
     if (command->keys == NULL) {
-        hi_free(command);
+        vk_free(command);
         return NULL;
     }
 
@@ -451,23 +427,23 @@ void command_destroy(struct cmd *command) {
     }
 
     if (command->cmd != NULL) {
-        hi_free(command->cmd);
+        vk_free(command->cmd);
         command->cmd = NULL;
     }
 
     if (command->errstr != NULL) {
-        hi_free(command->errstr);
+        vk_free(command->errstr);
         command->errstr = NULL;
     }
 
     if (command->keys != NULL) {
         command->keys->nelem = 0;
-        hiarray_destroy(command->keys);
+        vkarray_destroy(command->keys);
         command->keys = NULL;
     }
 
     if (command->frag_seq != NULL) {
-        hi_free(command->frag_seq);
+        vk_free(command->frag_seq);
         command->frag_seq = NULL;
     }
 
@@ -482,5 +458,5 @@ void command_destroy(struct cmd *command) {
         command->node_addr = NULL;
     }
 
-    hi_free(command);
+    vk_free(command);
 }

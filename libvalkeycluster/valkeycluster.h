@@ -34,45 +34,38 @@
 #define __HIRCLUSTER_H
 
 #include "dict.h"
-#include <hiredis/async.h>
-#include <hiredis/hiredis.h>
+#include <valkey/async.h>
+#include <valkey/valkey.h>
 
 #define UNUSED(x) (void)(x)
 
-#define HIREDIS_CLUSTER_MAJOR 0
-#define HIREDIS_CLUSTER_MINOR 13
-#define HIREDIS_CLUSTER_PATCH 0
-#define HIREDIS_CLUSTER_SONAME 0.13
+#define LIBVALKEYCLUSTER_MAJOR 0
+#define LIBVALKEYCLUSTER_MINOR 14
+#define LIBVALKEYCLUSTER_PATCH 0
+#define LIBVALKEYCLUSTER_SONAME 0.14
 
-#define REDIS_CLUSTER_SLOTS 16384
+#define VALKEYCLUSTER_SLOTS 16384
 
-#define REDIS_ROLE_NULL 0
-#define REDIS_ROLE_MASTER 1
-#define REDIS_ROLE_SLAVE 2
+#define VALKEY_ROLE_NULL 0
+#define VALKEY_ROLE_MASTER 1
+#define VALKEY_ROLE_SLAVE 2
 
 /* Configuration flags */
-#define HIRCLUSTER_FLAG_NULL 0x0
+#define VALKEYCLUSTER_FLAG_NULL 0x0
 /* Flag to enable parsing of slave nodes. Currently not used, but the
    information is added to its master node structure. */
-#define HIRCLUSTER_FLAG_ADD_SLAVE 0x1000
+#define VALKEYCLUSTER_FLAG_ADD_SLAVE 0x1000
 /* Flag to enable parsing of importing/migrating slots for master nodes.
  * Only applicable when 'cluster nodes' command is used for route updates. */
-#define HIRCLUSTER_FLAG_ADD_OPENSLOT 0x2000
+#define VALKEYCLUSTER_FLAG_ADD_OPENSLOT 0x2000
 /* Flag to enable routing table updates using the command 'cluster slots'.
  * Default is the 'cluster nodes' command. */
-#define HIRCLUSTER_FLAG_ROUTE_USE_SLOTS 0x4000
+#define VALKEYCLUSTER_FLAG_ROUTE_USE_SLOTS 0x4000
 
-/* Events, for redisClusterSetEventCallback() */
-#define HIRCLUSTER_EVENT_SLOTMAP_UPDATED 1
-#define HIRCLUSTER_EVENT_READY 2
-#define HIRCLUSTER_EVENT_FREE_CONTEXT 3
-
-/* The non-const connect callback API is not available when:
- *  - using hiredis prior v.1.1.0; or
- *  - built on Windows since hiredis_cluster.def can't have conditional definitions. */
-#if !(HIREDIS_MAJOR >= 1 && HIREDIS_MINOR >= 1) || _WIN32
-#define HIRCLUSTER_NO_NONCONST_CONNECT_CB
-#endif
+/* Events, for valkeyClusterSetEventCallback() */
+#define VALKEYCLUSTER_EVENT_SLOTMAP_UPDATED 1
+#define VALKEYCLUSTER_EVENT_READY 2
+#define VALKEYCLUSTER_EVENT_FREE_CONTEXT 3
 
 #ifdef __cplusplus
 extern "C" {
@@ -80,13 +73,13 @@ extern "C" {
 
 struct dict;
 struct hilist;
-struct redisClusterAsyncContext;
+struct valkeyClusterAsyncContext;
 
-typedef int(adapterAttachFn)(redisAsyncContext *, void *);
-typedef int(sslInitFn)(redisContext *, void *);
-typedef void(redisClusterCallbackFn)(struct redisClusterAsyncContext *, void *,
+typedef int(adapterAttachFn)(valkeyAsyncContext *, void *);
+typedef int(sslInitFn)(valkeyContext *, void *);
+typedef void(valkeyClusterCallbackFn)(struct valkeyClusterAsyncContext *, void *,
                                      void *);
-typedef struct redisClusterNode {
+typedef struct valkeyClusterNode {
     sds name;
     sds addr;
     sds host;
@@ -94,30 +87,30 @@ typedef struct redisClusterNode {
     uint8_t role;
     uint8_t pad;
     int failure_count; /* consecutive failing attempts in async */
-    redisContext *con;
-    redisAsyncContext *acon;
+    valkeyContext *con;
+    valkeyAsyncContext *acon;
     int64_t lastConnectionAttempt; /* Timestamp */
     struct hilist *slots;
     struct hilist *slaves;
-    struct hiarray *migrating; /* copen_slot[] */
-    struct hiarray *importing; /* copen_slot[] */
-} redisClusterNode;
+    struct vkarray *migrating; /* copen_slot[] */
+    struct vkarray *importing; /* copen_slot[] */
+} valkeyClusterNode;
 
 typedef struct cluster_slot {
     uint32_t start;
     uint32_t end;
-    redisClusterNode *node; /* master that this slot region belong to */
+    valkeyClusterNode *node; /* master that this slot region belong to */
 } cluster_slot;
 
 typedef struct copen_slot {
     uint32_t slot_num; /* slot number */
     int migrate;       /* migrating or importing? */
     sds remote_name;   /* name of node this slot migrating to/importing from */
-    redisClusterNode *node; /* master that this slot belong to */
+    valkeyClusterNode *node; /* master that this slot belong to */
 } copen_slot;
 
-/* Context for accessing a Redis Cluster */
-typedef struct redisClusterContext {
+/* Context for accessing a Valkey Cluster */
+typedef struct valkeyClusterContext {
     int err;          /* Error flags, 0 when there is no error */
     char errstr[128]; /* String representation of error when applicable */
 
@@ -129,28 +122,28 @@ typedef struct redisClusterContext {
     char *username;                  /* Authenticate using user */
     char *password;                  /* Authentication password */
 
-    struct dict *nodes;       /* Known redisClusterNode's */
+    struct dict *nodes;       /* Known valkeyClusterNode's */
     uint64_t route_version;   /* Increased when the node lookup table changes */
-    redisClusterNode **table; /* redisClusterNode lookup table */
+    valkeyClusterNode **table; /* valkeyClusterNode lookup table */
 
     struct hilist *requests; /* Outstanding commands (Pipelining) */
 
     int retry_count;       /* Current number of failing attempts */
-    int need_update_route; /* Indicator for redisClusterReset() (Pipel.) */
+    int need_update_route; /* Indicator for valkeyClusterReset() (Pipel.) */
 
-    void *ssl; /* Pointer to a redisSSLContext when using SSL/TLS. */
+    void *ssl; /* Pointer to a valkeySSLContext when using SSL/TLS. */
     sslInitFn *ssl_init_fn; /* Func ptr for SSL context initiation */
 
-    void (*on_connect)(const struct redisContext *c, int status);
-    void (*event_callback)(const struct redisClusterContext *cc, int event,
+    void (*on_connect)(const struct valkeyContext *c, int status);
+    void (*event_callback)(const struct valkeyClusterContext *cc, int event,
                            void *privdata);
     void *event_privdata;
 
-} redisClusterContext;
+} valkeyClusterContext;
 
-/* Context for accessing a Redis Cluster asynchronously */
-typedef struct redisClusterAsyncContext {
-    redisClusterContext *cc;
+/* Context for accessing a Valkey Cluster asynchronously */
+typedef struct valkeyClusterAsyncContext {
+    valkeyClusterContext *cc;
 
     int err;          /* Error flags, 0 when there is no error */
     char errstr[128]; /* String representation of error when applicable */
@@ -161,75 +154,73 @@ typedef struct redisClusterAsyncContext {
     adapterAttachFn *attach_fn; /* Func ptr for attaching the async library */
 
     /* Called when either the connection is terminated due to an error or per
-     * user request. The status is set accordingly (REDIS_OK, REDIS_ERR). */
-    redisDisconnectCallback *onDisconnect;
+     * user request. The status is set accordingly (VALKEY_OK, VALKEY_ERR). */
+    valkeyDisconnectCallback *onDisconnect;
 
     /* Called when the first write event was received. */
-    redisConnectCallback *onConnect;
-#ifndef HIRCLUSTER_NO_NONCONST_CONNECT_CB
-    redisConnectCallbackNC *onConnectNC;
-#endif
+    valkeyConnectCallback *onConnect;
+    valkeyConnectCallbackNC *onConnectNC;
 
-} redisClusterAsyncContext;
+} valkeyClusterAsyncContext;
 
-typedef struct redisClusterNodeIterator {
-    redisClusterContext *cc;
+typedef struct valkeyClusterNodeIterator {
+    valkeyClusterContext *cc;
     uint64_t route_version;
     int retries_left;
     dictIterator di;
-} redisClusterNodeIterator;
+} valkeyClusterNodeIterator;
 
 /*
  * Synchronous API
  */
 
-redisClusterContext *redisClusterConnect(const char *addrs, int flags);
-redisClusterContext *redisClusterConnectWithTimeout(const char *addrs,
+valkeyClusterContext *valkeyClusterConnect(const char *addrs, int flags);
+valkeyClusterContext *valkeyClusterConnectWithTimeout(const char *addrs,
                                                     const struct timeval tv,
                                                     int flags);
-int redisClusterConnect2(redisClusterContext *cc);
+int valkeyClusterConnect2(valkeyClusterContext *cc);
 
-redisClusterContext *redisClusterContextInit(void);
-void redisClusterFree(redisClusterContext *cc);
+valkeyClusterContext *valkeyClusterContextInit(void);
+void valkeyClusterFree(valkeyClusterContext *cc);
 
 /* Configuration options */
-int redisClusterSetOptionAddNode(redisClusterContext *cc, const char *addr);
-int redisClusterSetOptionAddNodes(redisClusterContext *cc, const char *addrs);
+int valkeyClusterSetOptionAddNode(valkeyClusterContext *cc, const char *addr);
+int valkeyClusterSetOptionAddNodes(valkeyClusterContext *cc, const char *addrs);
 /* Deprecated function, option has no effect. */
-int redisClusterSetOptionConnectBlock(redisClusterContext *cc);
+int valkeyClusterSetOptionConnectBlock(valkeyClusterContext *cc);
 /* Deprecated function, option has no effect. */
-int redisClusterSetOptionConnectNonBlock(redisClusterContext *cc);
-int redisClusterSetOptionUsername(redisClusterContext *cc,
+int valkeyClusterSetOptionConnectNonBlock(valkeyClusterContext *cc);
+int valkeyClusterSetOptionUsername(valkeyClusterContext *cc,
                                   const char *username);
-int redisClusterSetOptionPassword(redisClusterContext *cc,
+int valkeyClusterSetOptionPassword(valkeyClusterContext *cc,
                                   const char *password);
-int redisClusterSetOptionParseSlaves(redisClusterContext *cc);
-int redisClusterSetOptionParseOpenSlots(redisClusterContext *cc);
-int redisClusterSetOptionRouteUseSlots(redisClusterContext *cc);
-int redisClusterSetOptionConnectTimeout(redisClusterContext *cc,
+int valkeyClusterSetOptionParseSlaves(valkeyClusterContext *cc);
+int valkeyClusterSetOptionParseOpenSlots(valkeyClusterContext *cc);
+int valkeyClusterSetOptionRouteUseSlots(valkeyClusterContext *cc);
+int valkeyClusterSetOptionConnectTimeout(valkeyClusterContext *cc,
                                         const struct timeval tv);
-int redisClusterSetOptionTimeout(redisClusterContext *cc,
+int valkeyClusterSetOptionTimeout(valkeyClusterContext *cc,
                                  const struct timeval tv);
-int redisClusterSetOptionMaxRetry(redisClusterContext *cc, int max_retry_count);
-/* Deprecated function, replaced with redisClusterSetOptionMaxRetry() */
-void redisClusterSetMaxRedirect(redisClusterContext *cc,
+int valkeyClusterSetOptionMaxRetry(valkeyClusterContext *cc, int max_retry_count);
+/* Deprecated function, replaced with valkeyClusterSetOptionMaxRetry() */
+void valkeyClusterSetMaxRedirect(valkeyClusterContext *cc,
                                 int max_redirect_count);
 /* A hook for connect and reconnect attempts, e.g. for applying additional
  * socket options. This is called just after connect, before TLS handshake and
- * Redis authentication.
+ * Valkey authentication.
  *
- * On successful connection, `status` is set to `REDIS_OK` and the file
+ * On successful connection, `status` is set to `VALKEY_OK` and the file
  * descriptor can be accessed as `c->fd` to apply socket options.
  *
  * On failed connection attempt, this callback is called with `status` set to
- * `REDIS_ERR`. The `err` field in the `redisContext` can be used to find out
+ * `VALKEY_ERR`. The `err` field in the `valkeyContext` can be used to find out
  * the cause of the error. */
-int redisClusterSetConnectCallback(redisClusterContext *cc,
-                                   void(fn)(const redisContext *c, int status));
+int valkeyClusterSetConnectCallback(valkeyClusterContext *cc,
+                                   void(fn)(const valkeyContext *c, int status));
 
 /* A hook for events. */
-int redisClusterSetEventCallback(redisClusterContext *cc,
-                                 void(fn)(const redisClusterContext *cc,
+int valkeyClusterSetEventCallback(valkeyClusterContext *cc,
+                                 void(fn)(const valkeyClusterContext *cc,
                                           int event, void *privdata),
                                  void *privdata);
 
@@ -239,130 +230,118 @@ int redisClusterSetEventCallback(redisClusterContext *cc,
  */
 
 /* Variadic commands (like printf) */
-void *redisClusterCommand(redisClusterContext *cc, const char *format, ...);
-void *redisClusterCommandToNode(redisClusterContext *cc, redisClusterNode *node,
+void *valkeyClusterCommand(valkeyClusterContext *cc, const char *format, ...);
+void *valkeyClusterCommandToNode(valkeyClusterContext *cc, valkeyClusterNode *node,
                                 const char *format, ...);
 /* Variadic using va_list */
-void *redisClustervCommand(redisClusterContext *cc, const char *format,
+void *valkeyClustervCommand(valkeyClusterContext *cc, const char *format,
                            va_list ap);
 /* Using argc and argv */
-void *redisClusterCommandArgv(redisClusterContext *cc, int argc,
+void *valkeyClusterCommandArgv(valkeyClusterContext *cc, int argc,
                               const char **argv, const size_t *argvlen);
-/* Send a Redis protocol encoded string */
-void *redisClusterFormattedCommand(redisClusterContext *cc, char *cmd, int len);
+/* Send a Valkey protocol encoded string */
+void *valkeyClusterFormattedCommand(valkeyClusterContext *cc, char *cmd, int len);
 
 /* Pipelining
  * The following functions will write a command to the output buffer.
- * A call to `redisClusterGetReply()` will flush all commands in the output
+ * A call to `valkeyClusterGetReply()` will flush all commands in the output
  * buffer and read until it has a reply from the first command in the buffer.
  */
 
 /* Variadic commands (like printf) */
-int redisClusterAppendCommand(redisClusterContext *cc, const char *format, ...);
-int redisClusterAppendCommandToNode(redisClusterContext *cc,
-                                    redisClusterNode *node, const char *format,
+int valkeyClusterAppendCommand(valkeyClusterContext *cc, const char *format, ...);
+int valkeyClusterAppendCommandToNode(valkeyClusterContext *cc,
+                                    valkeyClusterNode *node, const char *format,
                                     ...);
 /* Variadic using va_list */
-int redisClustervAppendCommand(redisClusterContext *cc, const char *format,
+int valkeyClustervAppendCommand(valkeyClusterContext *cc, const char *format,
                                va_list ap);
 /* Using argc and argv */
-int redisClusterAppendCommandArgv(redisClusterContext *cc, int argc,
+int valkeyClusterAppendCommandArgv(valkeyClusterContext *cc, int argc,
                                   const char **argv, const size_t *argvlen);
-/* Use a Redis protocol encoded string as command */
-int redisClusterAppendFormattedCommand(redisClusterContext *cc, char *cmd,
+/* Use a Valkey protocol encoded string as command */
+int valkeyClusterAppendFormattedCommand(valkeyClusterContext *cc, char *cmd,
                                        int len);
 /* Flush output buffer and return first reply */
-int redisClusterGetReply(redisClusterContext *cc, void **reply);
+int valkeyClusterGetReply(valkeyClusterContext *cc, void **reply);
 
 /* Reset context after a performed pipelining */
-void redisClusterReset(redisClusterContext *cc);
+void valkeyClusterReset(valkeyClusterContext *cc);
 
 /* Update the slotmap by querying any node. */
-int redisClusterUpdateSlotmap(redisClusterContext *cc);
+int valkeyClusterUpdateSlotmap(valkeyClusterContext *cc);
 
 /* Internal functions */
-redisContext *ctx_get_by_node(redisClusterContext *cc, redisClusterNode *node);
-struct dict *parse_cluster_nodes(redisClusterContext *cc, char *str,
+valkeyContext *ctx_get_by_node(valkeyClusterContext *cc, valkeyClusterNode *node);
+struct dict *parse_cluster_nodes(valkeyClusterContext *cc, char *str,
                                  int str_len, int flags);
-struct dict *parse_cluster_slots(redisClusterContext *cc, redisReply *reply,
+struct dict *parse_cluster_slots(valkeyClusterContext *cc, valkeyReply *reply,
                                  int flags);
 
 /*
  * Asynchronous API
  */
 
-redisClusterAsyncContext *redisClusterAsyncContextInit(void);
-void redisClusterAsyncFree(redisClusterAsyncContext *acc);
+valkeyClusterAsyncContext *valkeyClusterAsyncContextInit(void);
+void valkeyClusterAsyncFree(valkeyClusterAsyncContext *acc);
 
-int redisClusterAsyncSetConnectCallback(redisClusterAsyncContext *acc,
-                                        redisConnectCallback *fn);
-#ifndef HIRCLUSTER_NO_NONCONST_CONNECT_CB
-int redisClusterAsyncSetConnectCallbackNC(redisClusterAsyncContext *acc,
-                                          redisConnectCallbackNC *fn);
-#endif
-int redisClusterAsyncSetDisconnectCallback(redisClusterAsyncContext *acc,
-                                           redisDisconnectCallback *fn);
+int valkeyClusterAsyncSetConnectCallback(valkeyClusterAsyncContext *acc,
+                                        valkeyConnectCallback *fn);
+int valkeyClusterAsyncSetConnectCallbackNC(valkeyClusterAsyncContext *acc,
+                                          valkeyConnectCallbackNC *fn);
+int valkeyClusterAsyncSetDisconnectCallback(valkeyClusterAsyncContext *acc,
+                                           valkeyDisconnectCallback *fn);
 
 /* Connect and update slotmap, will block until complete. */
-redisClusterAsyncContext *redisClusterAsyncConnect(const char *addrs,
+valkeyClusterAsyncContext *valkeyClusterAsyncConnect(const char *addrs,
                                                    int flags);
 /* Connect and update slotmap asynchronously using configured event engine. */
-int redisClusterAsyncConnect2(redisClusterAsyncContext *acc);
-void redisClusterAsyncDisconnect(redisClusterAsyncContext *acc);
+int valkeyClusterAsyncConnect2(valkeyClusterAsyncContext *acc);
+void valkeyClusterAsyncDisconnect(valkeyClusterAsyncContext *acc);
 
 /* Commands */
-int redisClusterAsyncCommand(redisClusterAsyncContext *acc,
-                             redisClusterCallbackFn *fn, void *privdata,
+int valkeyClusterAsyncCommand(valkeyClusterAsyncContext *acc,
+                             valkeyClusterCallbackFn *fn, void *privdata,
                              const char *format, ...);
-int redisClusterAsyncCommandToNode(redisClusterAsyncContext *acc,
-                                   redisClusterNode *node,
-                                   redisClusterCallbackFn *fn, void *privdata,
+int valkeyClusterAsyncCommandToNode(valkeyClusterAsyncContext *acc,
+                                   valkeyClusterNode *node,
+                                   valkeyClusterCallbackFn *fn, void *privdata,
                                    const char *format, ...);
-int redisClustervAsyncCommand(redisClusterAsyncContext *acc,
-                              redisClusterCallbackFn *fn, void *privdata,
+int valkeyClustervAsyncCommand(valkeyClusterAsyncContext *acc,
+                              valkeyClusterCallbackFn *fn, void *privdata,
                               const char *format, va_list ap);
-int redisClusterAsyncCommandArgv(redisClusterAsyncContext *acc,
-                                 redisClusterCallbackFn *fn, void *privdata,
+int valkeyClusterAsyncCommandArgv(valkeyClusterAsyncContext *acc,
+                                 valkeyClusterCallbackFn *fn, void *privdata,
                                  int argc, const char **argv,
                                  const size_t *argvlen);
-int redisClusterAsyncCommandArgvToNode(redisClusterAsyncContext *acc,
-                                       redisClusterNode *node,
-                                       redisClusterCallbackFn *fn,
+int valkeyClusterAsyncCommandArgvToNode(valkeyClusterAsyncContext *acc,
+                                       valkeyClusterNode *node,
+                                       valkeyClusterCallbackFn *fn,
                                        void *privdata, int argc,
                                        const char **argv,
                                        const size_t *argvlen);
 
-/* Use a Redis protocol encoded string as command */
-int redisClusterAsyncFormattedCommand(redisClusterAsyncContext *acc,
-                                      redisClusterCallbackFn *fn,
+/* Use a Valkey protocol encoded string as command */
+int valkeyClusterAsyncFormattedCommand(valkeyClusterAsyncContext *acc,
+                                      valkeyClusterCallbackFn *fn,
                                       void *privdata, char *cmd, int len);
-int redisClusterAsyncFormattedCommandToNode(redisClusterAsyncContext *acc,
-                                            redisClusterNode *node,
-                                            redisClusterCallbackFn *fn,
+int valkeyClusterAsyncFormattedCommandToNode(valkeyClusterAsyncContext *acc,
+                                            valkeyClusterNode *node,
+                                            valkeyClusterCallbackFn *fn,
                                             void *privdata, char *cmd, int len);
 
 /* Internal functions */
-redisAsyncContext *actx_get_by_node(redisClusterAsyncContext *acc,
-                                    redisClusterNode *node);
+valkeyAsyncContext *actx_get_by_node(valkeyClusterAsyncContext *acc,
+                                    valkeyClusterNode *node);
 
 /* Cluster node iterator functions */
-void redisClusterInitNodeIterator(redisClusterNodeIterator *iter,
-                                  redisClusterContext *cc);
-redisClusterNode *redisClusterNodeNext(redisClusterNodeIterator *iter);
+void valkeyClusterInitNodeIterator(valkeyClusterNodeIterator *iter,
+                                  valkeyClusterContext *cc);
+valkeyClusterNode *valkeyClusterNodeNext(valkeyClusterNodeIterator *iter);
 
 /* Helper functions */
-unsigned int redisClusterGetSlotByKey(char *key);
-redisClusterNode *redisClusterGetNodeByKey(redisClusterContext *cc, char *key);
-
-/* Old names of renamed functions and types, kept for backward compatibility. */
-#ifndef HIRCLUSTER_NO_OLD_NAMES
-#define cluster_update_route redisClusterUpdateSlotmap
-#define initNodeIterator redisClusterInitNodeIterator
-#define nodeNext redisClusterNodeNext
-#define redisClusterConnectNonBlock redisClusterConnect
-typedef struct redisClusterNode cluster_node;
-typedef struct redisClusterNodeIterator nodeIterator;
-#endif
+unsigned int valkeyClusterGetSlotByKey(char *key);
+valkeyClusterNode *valkeyClusterGetNodeByKey(valkeyClusterContext *cc, char *key);
 
 #ifdef __cplusplus
 }

@@ -28,27 +28,27 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef __HIREDIS_CLUSTER_LIBUV_H__
-#define __HIREDIS_CLUSTER_LIBUV_H__
+#ifndef __LIBVALKEYCLUSTER_LIBUV_H__
+#define __LIBVALKEYCLUSTER_LIBUV_H__
 
-#include "../hircluster.h"
-#include <hiredis/adapters/libuv.h>
+#include "../valkeycluster.h"
+#include <valkey/adapters/libuv.h>
 
-static int redisLibuvAttach_link(redisAsyncContext *ac, void *loop) {
-    return redisLibuvAttach(ac, (uv_loop_t *)loop);
+static int valkeyLibuvAttach_link(valkeyAsyncContext *ac, void *loop) {
+    return valkeyLibuvAttach(ac, (uv_loop_t *)loop);
 }
 
-static int redisClusterLibuvAttach(redisClusterAsyncContext *acc,
+static int valkeyClusterLibuvAttach(valkeyClusterAsyncContext *acc,
                                    uv_loop_t *loop) {
 
     if (acc == NULL || loop == NULL) {
-        return REDIS_ERR;
+        return VALKEY_ERR;
     }
 
     acc->adapter = loop;
-    acc->attach_fn = redisLibuvAttach_link;
+    acc->attach_fn = valkeyLibuvAttach_link;
 
-    return REDIS_OK;
+    return VALKEY_OK;
 }
 
 #endif

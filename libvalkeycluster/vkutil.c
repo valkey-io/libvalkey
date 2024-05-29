@@ -30,7 +30,7 @@
  */
 #include <errno.h>
 #include <fcntl.h>
-#include <hiredis/alloc.h>
+#include <valkey/alloc.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -44,15 +44,15 @@
 #include <sys/time.h>
 #endif
 
-#ifdef HI_HAVE_BACKTRACE
+#ifdef VK_HAVE_BACKTRACE
 #include <execinfo.h>
 #endif
 
-#include "hiutil.h"
+#include "vkutil.h"
 #include "win32.h"
 
 #ifndef _WIN32
-int hi_set_blocking(int sd) {
+int vk_set_blocking(int sd) {
     int flags;
 
     flags = fcntl(sd, F_GETFL, 0);
@@ -63,7 +63,7 @@ int hi_set_blocking(int sd) {
     return fcntl(sd, F_SETFL, flags & ~O_NONBLOCK);
 }
 
-int hi_set_nonblocking(int sd) {
+int vk_set_nonblocking(int sd) {
     int flags;
 
     flags = fcntl(sd, F_GETFL, 0);
@@ -74,7 +74,7 @@ int hi_set_nonblocking(int sd) {
     return fcntl(sd, F_SETFL, flags | O_NONBLOCK);
 }
 
-int hi_set_reuseaddr(int sd) {
+int vk_set_reuseaddr(int sd) {
     int reuse;
     socklen_t len;
 
@@ -92,7 +92,7 @@ int hi_set_reuseaddr(int sd) {
  * option must use readv() or writev() to do data transfer in bulk and
  * hence avoid the overhead of small packets.
  */
-int hi_set_tcpnodelay(int sd) {
+int vk_set_tcpnodelay(int sd) {
     int nodelay;
     socklen_t len;
 
@@ -102,7 +102,7 @@ int hi_set_tcpnodelay(int sd) {
     return setsockopt(sd, IPPROTO_TCP, TCP_NODELAY, &nodelay, len);
 }
 
-int hi_set_linger(int sd, int timeout) {
+int vk_set_linger(int sd, int timeout) {
     struct linger linger;
     socklen_t len;
 
@@ -114,7 +114,7 @@ int hi_set_linger(int sd, int timeout) {
     return setsockopt(sd, SOL_SOCKET, SO_LINGER, &linger, len);
 }
 
-int hi_set_sndbuf(int sd, int size) {
+int vk_set_sndbuf(int sd, int size) {
     socklen_t len;
 
     len = sizeof(size);
@@ -122,7 +122,7 @@ int hi_set_sndbuf(int sd, int size) {
     return setsockopt(sd, SOL_SOCKET, SO_SNDBUF, &size, len);
 }
 
-int hi_set_rcvbuf(int sd, int size) {
+int vk_set_rcvbuf(int sd, int size) {
     socklen_t len;
 
     len = sizeof(size);
@@ -130,7 +130,7 @@ int hi_set_rcvbuf(int sd, int size) {
     return setsockopt(sd, SOL_SOCKET, SO_RCVBUF, &size, len);
 }
 
-int hi_get_soerror(int sd) {
+int vk_get_soerror(int sd) {
     int status, err;
     socklen_t len;
 
@@ -145,7 +145,7 @@ int hi_get_soerror(int sd) {
     return status;
 }
 
-int hi_get_sndbuf(int sd) {
+int vk_get_sndbuf(int sd) {
     int status, size;
     socklen_t len;
 
@@ -160,7 +160,7 @@ int hi_get_sndbuf(int sd) {
     return size;
 }
 
-int hi_get_rcvbuf(int sd) {
+int vk_get_rcvbuf(int sd) {
     int status, size;
     socklen_t len;
 
@@ -176,7 +176,7 @@ int hi_get_rcvbuf(int sd) {
 }
 #endif
 
-int _hi_atoi(uint8_t *line, size_t n) {
+int _vk_atoi(uint8_t *line, size_t n) {
     int value;
 
     if (n == 0) {
@@ -198,7 +198,7 @@ int _hi_atoi(uint8_t *line, size_t n) {
     return value;
 }
 
-void _hi_itoa(uint8_t *s, int num) {
+void _vk_itoa(uint8_t *s, int num) {
     uint8_t c;
     uint8_t sign = 0;
 
@@ -238,7 +238,7 @@ void _hi_itoa(uint8_t *s, int num) {
     }
 }
 
-int hi_valid_port(int n) {
+int vk_valid_port(int n) {
     if (n < 1 || n > UINT16_MAX) {
         return 0;
     }
@@ -261,8 +261,8 @@ int _uint_len(uint32_t num) {
     return n;
 }
 
-void hi_stacktrace(int skip_count) {
-#ifdef HI_HAVE_BACKTRACE
+void vk_stacktrace(int skip_count) {
+#ifdef VK_HAVE_BACKTRACE
     void *stack[64];
     char **symbols;
     int size, i, j;
@@ -279,14 +279,14 @@ void hi_stacktrace(int skip_count) {
         printf("[%d] %s\n", j, symbols[i]);
     }
 
-    hi_free(symbols);
+    vk_free(symbols);
 #else
     (void)skip_count;
 #endif
 }
 
-void hi_stacktrace_fd(int fd) {
-#ifdef HI_HAVE_BACKTRACE
+void vk_stacktrace_fd(int fd) {
+#ifdef VK_HAVE_BACKTRACE
     void *stack[64];
     int size;
 
@@ -297,12 +297,12 @@ void hi_stacktrace_fd(int fd) {
 #endif
 }
 
-void hi_assert(const char *cond, const char *file, int line, int panic) {
+void vk_assert(const char *cond, const char *file, int line, int panic) {
 
     printf("File: %s Line: %d: %s\n", file, line, cond);
 
     if (panic) {
-        hi_stacktrace(1);
+        vk_stacktrace(1);
         abort();
     }
     abort();
@@ -312,7 +312,7 @@ void hi_assert(const char *cond, const char *file, int line, int panic) {
 /*
  * Send n bytes on a blocking descriptor
  */
-ssize_t _hi_sendn(int sd, const void *vptr, size_t n) {
+ssize_t _vk_sendn(int sd, const void *vptr, size_t n) {
     size_t nleft;
     ssize_t nsend;
     const char *ptr;
@@ -341,7 +341,7 @@ ssize_t _hi_sendn(int sd, const void *vptr, size_t n) {
 /*
  * Recv n bytes from a blocking descriptor
  */
-ssize_t _hi_recvn(int sd, void *vptr, size_t n) {
+ssize_t _vk_recvn(int sd, void *vptr, size_t n) {
     size_t nleft;
     ssize_t nrecv;
     char *ptr;
@@ -371,7 +371,7 @@ ssize_t _hi_recvn(int sd, void *vptr, size_t n) {
 /*
  * Return the current time in microseconds since Epoch
  */
-int64_t hi_usec_now(void) {
+int64_t vk_usec_now(void) {
     int64_t usec;
 #ifdef _WIN32
     LARGE_INTEGER counter, frequency;
@@ -400,4 +400,4 @@ int64_t hi_usec_now(void) {
 /*
  * Return the current time in milliseconds since Epoch
  */
-int64_t hi_msec_now(void) { return hi_usec_now() / 1000LL; }
+int64_t vk_msec_now(void) { return vk_usec_now() / 1000LL; }

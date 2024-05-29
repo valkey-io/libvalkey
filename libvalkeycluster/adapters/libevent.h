@@ -28,27 +28,27 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef __HIREDIS_CLUSTER_LIBEVENT_H__
-#define __HIREDIS_CLUSTER_LIBEVENT_H__
+#ifndef __LIBVALKEYCLUSTER_LIBEVENT_H__
+#define __LIBVALKEYCLUSTER_LIBEVENT_H__
 
-#include "../hircluster.h"
-#include <hiredis/adapters/libevent.h>
+#include "../valkeycluster.h"
+#include <valkey/adapters/libevent.h>
 
-static int redisLibeventAttach_link(redisAsyncContext *ac, void *base) {
-    return redisLibeventAttach(ac, (struct event_base *)base);
+static int valkeyLibeventAttach_link(valkeyAsyncContext *ac, void *base) {
+    return valkeyLibeventAttach(ac, (struct event_base *)base);
 }
 
-static int redisClusterLibeventAttach(redisClusterAsyncContext *acc,
+static int valkeyClusterLibeventAttach(valkeyClusterAsyncContext *acc,
                                       struct event_base *base) {
 
     if (acc == NULL || base == NULL) {
-        return REDIS_ERR;
+        return VALKEY_ERR;
     }
 
     acc->adapter = base;
-    acc->attach_fn = redisLibeventAttach_link;
+    acc->attach_fn = valkeyLibeventAttach_link;
 
-    return REDIS_OK;
+    return VALKEY_OK;
 }
 
 #endif

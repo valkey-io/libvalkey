@@ -29,25 +29,25 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-#include <hiredis/alloc.h>
+#include <valkey/alloc.h>
 #include <stdlib.h>
 
-#include "hiarray.h"
-#include "hiutil.h"
+#include "vkarray.h"
+#include "vkutil.h"
 
-struct hiarray *hiarray_create(uint32_t n, size_t size) {
-    struct hiarray *a;
+struct vkarray *vkarray_create(uint32_t n, size_t size) {
+    struct vkarray *a;
 
     ASSERT(n != 0 && size != 0);
 
-    a = hi_malloc(sizeof(*a));
+    a = vk_malloc(sizeof(*a));
     if (a == NULL) {
         return NULL;
     }
 
-    a->elem = hi_malloc(n * size);
+    a->elem = vk_malloc(n * size);
     if (a->elem == NULL) {
-        hi_free(a);
+        vk_free(a);
         return NULL;
     }
 
@@ -58,19 +58,19 @@ struct hiarray *hiarray_create(uint32_t n, size_t size) {
     return a;
 }
 
-void hiarray_destroy(struct hiarray *a) {
-    hiarray_deinit(a);
-    hi_free(a);
+void vkarray_destroy(struct vkarray *a) {
+    vkarray_deinit(a);
+    vk_free(a);
 }
 
-void hiarray_deinit(struct hiarray *a) {
+void vkarray_deinit(struct vkarray *a) {
     ASSERT(a->nelem == 0);
 
-    hi_free(a->elem);
+    vk_free(a->elem);
     a->elem = NULL;
 }
 
-uint32_t hiarray_idx(struct hiarray *a, void *elem) {
+uint32_t vkarray_idx(struct vkarray *a, void *elem) {
     uint8_t *p, *q;
     uint32_t off, idx;
 
@@ -87,7 +87,7 @@ uint32_t hiarray_idx(struct hiarray *a, void *elem) {
     return idx;
 }
 
-void *hiarray_push(struct hiarray *a) {
+void *vkarray_push(struct vkarray *a) {
     void *elem, *new;
     size_t size;
 
@@ -95,7 +95,7 @@ void *hiarray_push(struct hiarray *a) {
 
         /* the array is full; allocate new array */
         size = a->size * a->nalloc;
-        new = hi_realloc(a->elem, 2 * size);
+        new = vk_realloc(a->elem, 2 * size);
         if (new == NULL) {
             return NULL;
         }
@@ -110,7 +110,7 @@ void *hiarray_push(struct hiarray *a) {
     return elem;
 }
 
-void *hiarray_pop(struct hiarray *a) {
+void *vkarray_pop(struct vkarray *a) {
     void *elem;
 
     ASSERT(a->nelem != 0);
@@ -121,7 +121,7 @@ void *hiarray_pop(struct hiarray *a) {
     return elem;
 }
 
-void *hiarray_get(struct hiarray *a, uint32_t idx) {
+void *vkarray_get(struct vkarray *a, uint32_t idx) {
     void *elem;
 
     ASSERT(a->nelem != 0);
@@ -132,14 +132,14 @@ void *hiarray_get(struct hiarray *a, uint32_t idx) {
     return elem;
 }
 
-void *hiarray_top(struct hiarray *a) {
+void *vkarray_top(struct vkarray *a) {
     ASSERT(a->nelem != 0);
 
-    return hiarray_get(a, a->nelem - 1);
+    return vkarray_get(a, a->nelem - 1);
 }
 
-void hiarray_swap(struct hiarray *a, struct hiarray *b) {
-    struct hiarray tmp;
+void vkarray_swap(struct vkarray *a, struct vkarray *b) {
+    struct vkarray tmp;
 
     tmp = *a;
     *a = *b;
@@ -150,7 +150,7 @@ void hiarray_swap(struct hiarray *a, struct hiarray *b) {
  * Sort nelem elements of the array in ascending order based on the
  * compare comparator.
  */
-void hiarray_sort(struct hiarray *a, hiarray_compare_t compare) {
+void vkarray_sort(struct vkarray *a, vkarray_compare_t compare) {
     ASSERT(a->nelem != 0);
 
     qsort(a->elem, a->nelem, a->size, compare);
@@ -160,21 +160,21 @@ void hiarray_sort(struct hiarray *a, hiarray_compare_t compare) {
  * Calls the func once for each element in the array as long as func returns
  * success. On failure short-circuits and returns the error status.
  */
-int hiarray_each(struct hiarray *a, hiarray_each_t func, void *data) {
+int vkarray_each(struct vkarray *a, vkarray_each_t func, void *data) {
     uint32_t i, nelem;
 
-    ASSERT(hiarray_n(a) != 0);
+    ASSERT(vkarray_n(a) != 0);
     ASSERT(func != NULL);
 
-    for (i = 0, nelem = hiarray_n(a); i < nelem; i++) {
-        void *elem = hiarray_get(a, i);
+    for (i = 0, nelem = vkarray_n(a); i < nelem; i++) {
+        void *elem = vkarray_get(a, i);
         rstatus_t status;
 
         status = func(elem, data);
-        if (status != HI_OK) {
+        if (status != VK_OK) {
             return status;
         }
     }
 
-    return HI_OK;
+    return VK_OK;
 }

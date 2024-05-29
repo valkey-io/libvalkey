@@ -1,4 +1,4 @@
-#include "hircluster.h"
+#include "valkeycluster.h"
 #include "test_utils.h"
 #include "win32.h"
 #include <assert.h>
@@ -11,33 +11,33 @@
 // Successful connection an IPv6 cluster
 void test_successful_ipv6_connection(void) {
 
-    redisClusterContext *cc = redisClusterContextInit();
+    valkeyClusterContext *cc = valkeyClusterContextInit();
     assert(cc);
 
     int status;
     struct timeval timeout = {0, 500000}; // 0.5s
-    status = redisClusterSetOptionConnectTimeout(cc, timeout);
-    ASSERT_MSG(status == REDIS_OK, cc->errstr);
+    status = valkeyClusterSetOptionConnectTimeout(cc, timeout);
+    ASSERT_MSG(status == VALKEY_OK, cc->errstr);
 
-    status = redisClusterSetOptionAddNodes(cc, CLUSTER_NODE_IPV6);
-    ASSERT_MSG(status == REDIS_OK, cc->errstr);
+    status = valkeyClusterSetOptionAddNodes(cc, CLUSTER_NODE_IPV6);
+    ASSERT_MSG(status == VALKEY_OK, cc->errstr);
 
-    status = redisClusterSetOptionRouteUseSlots(cc);
-    ASSERT_MSG(status == REDIS_OK, cc->errstr);
+    status = valkeyClusterSetOptionRouteUseSlots(cc);
+    ASSERT_MSG(status == VALKEY_OK, cc->errstr);
 
-    status = redisClusterConnect2(cc);
-    ASSERT_MSG(status == REDIS_OK, cc->errstr);
+    status = valkeyClusterConnect2(cc);
+    ASSERT_MSG(status == VALKEY_OK, cc->errstr);
 
-    redisReply *reply;
-    reply = (redisReply *)redisClusterCommand(cc, "SET key_ipv6 value");
+    valkeyReply *reply;
+    reply = (valkeyReply *)valkeyClusterCommand(cc, "SET key_ipv6 value");
     CHECK_REPLY_OK(cc, reply);
     freeReplyObject(reply);
 
-    reply = (redisReply *)redisClusterCommand(cc, "GET key_ipv6");
+    reply = (valkeyReply *)valkeyClusterCommand(cc, "GET key_ipv6");
     CHECK_REPLY_STR(cc, reply, "value");
     freeReplyObject(reply);
 
-    redisClusterFree(cc);
+    valkeyClusterFree(cc);
 }
 
 int main(void) {

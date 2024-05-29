@@ -34,7 +34,7 @@
  */
 
 #include <assert.h>
-#include <hiredis/alloc.h>
+#include <valkey/alloc.h>
 #include <limits.h>
 #include <stdlib.h>
 
@@ -72,7 +72,7 @@ static void _dictReset(dict *ht) {
 
 /* Create a new hash table */
 dict *dictCreate(dictType *type, void *privDataPtr) {
-    dict *ht = hi_malloc(sizeof(*ht));
+    dict *ht = vk_malloc(sizeof(*ht));
     if (ht == NULL)
         return NULL;
 
@@ -101,7 +101,7 @@ int dictExpand(dict *ht, unsigned long size) {
     _dictInit(&n, ht->type, ht->privdata);
     n.size = realsize;
     n.sizemask = realsize - 1;
-    n.table = hi_calloc(realsize, sizeof(dictEntry *));
+    n.table = vk_calloc(realsize, sizeof(dictEntry *));
     if (n.table == NULL)
         return DICT_ERR;
 
@@ -131,7 +131,7 @@ int dictExpand(dict *ht, unsigned long size) {
         }
     }
     assert(ht->used == 0);
-    hi_free(ht->table);
+    vk_free(ht->table);
 
     /* Remap the new hashtable in the old */
     *ht = n;
@@ -149,7 +149,7 @@ int dictAdd(dict *ht, void *key, void *val) {
         return DICT_ERR;
 
     /* Allocates the memory and stores key */
-    entry = hi_malloc(sizeof(*entry));
+    entry = vk_malloc(sizeof(*entry));
     if (entry == NULL)
         return DICT_ERR;
 
@@ -177,13 +177,13 @@ static int _dictClear(dict *ht) {
             nextHe = he->next;
             dictFreeEntryKey(ht, he);
             dictFreeEntryVal(ht, he);
-            hi_free(he);
+            vk_free(he);
             ht->used--;
             he = nextHe;
         }
     }
     /* Free the table and the allocated cache structure */
-    hi_free(ht->table);
+    vk_free(ht->table);
     /* Re-initialize the table */
     _dictReset(ht);
     return DICT_OK; /* never fails */
@@ -192,7 +192,7 @@ static int _dictClear(dict *ht) {
 /* Clear & Release the hash table */
 void dictRelease(dict *ht) {
     _dictClear(ht);
-    hi_free(ht);
+    vk_free(ht);
 }
 
 dictEntry *dictFind(dict *ht, const void *key) {

@@ -11,8 +11,8 @@ syncpid1=$!;
 perl -we 'use sigtrap "handler", sub{exit}, "CONT"; sleep 1; die "timeout"' &
 syncpid2=$!;
 
-# Start simulated redis node #1
-timeout 5s ./simulated-redis.pl -p 7400 -d --sigcont $syncpid1 <<'EOF' &
+# Start simulated valkey node #1
+timeout 5s ./simulated-valkey.pl -p 7400 -d --sigcont $syncpid1 <<'EOF' &
 EXPECT CONNECT
 EXPECT ["CLUSTER", "NODES"]
 SEND "e495df74528a0946d03bb931cbfc6c9edb975448 127.0.0.1:7400@17400 myself,master - 0 1677668806000 1 connected 0-16383\n"
@@ -29,8 +29,8 @@ EXPECT CLOSE
 EOF
 server1=$!
 
-# Start simulated redis node #2
-timeout 5s ./simulated-redis.pl -p 7401 -d --sigcont $syncpid2 <<'EOF' &
+# Start simulated valkey node #2
+timeout 5s ./simulated-valkey.pl -p 7401 -d --sigcont $syncpid2 <<'EOF' &
 EXPECT CONNECT
 EXPECT ["ASKING"]
 SEND +OK

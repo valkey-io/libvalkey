@@ -14,22 +14,22 @@
  *   2 - Client failed to get initial slotmap from given "HOST:PORT".
  */
 
-#include "hircluster.h"
+#include "valkeycluster.h"
 #include "win32.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-void printReply(const redisReply *reply) {
+void printReply(const valkeyReply *reply) {
     switch (reply->type) {
-    case REDIS_REPLY_ERROR:
-    case REDIS_REPLY_STATUS:
-    case REDIS_REPLY_STRING:
-    case REDIS_REPLY_VERB:
-    case REDIS_REPLY_BIGNUM:
+    case VALKEY_REPLY_ERROR:
+    case VALKEY_REPLY_STATUS:
+    case VALKEY_REPLY_STRING:
+    case VALKEY_REPLY_VERB:
+    case VALKEY_REPLY_BIGNUM:
         printf("%s\n", reply->str);
         break;
-    case REDIS_REPLY_INTEGER:
+    case VALKEY_REPLY_INTEGER:
         printf("%lld\n", reply->integer);
         break;
     default:
@@ -37,18 +37,18 @@ void printReply(const redisReply *reply) {
     }
 }
 
-void eventCallback(const redisClusterContext *cc, int event, void *privdata) {
+void eventCallback(const valkeyClusterContext *cc, int event, void *privdata) {
     (void)cc;
     (void)privdata;
     char *e = NULL;
     switch (event) {
-    case HIRCLUSTER_EVENT_SLOTMAP_UPDATED:
+    case VALKEYCLUSTER_EVENT_SLOTMAP_UPDATED:
         e = "slotmap-updated";
         break;
-    case HIRCLUSTER_EVENT_READY:
+    case VALKEYCLUSTER_EVENT_READY:
         e = "ready";
         break;
-    case HIRCLUSTER_EVENT_FREE_CONTEXT:
+    case VALKEYCLUSTER_EVENT_FREE_CONTEXT:
         e = "free-context";
         break;
     default:
@@ -84,17 +84,17 @@ int main(int argc, char **argv) {
 
     struct timeval timeout = {1, 500000}; // 1.5s
 
-    redisClusterContext *cc = redisClusterContextInit();
-    redisClusterSetOptionAddNodes(cc, initnode);
-    redisClusterSetOptionConnectTimeout(cc, timeout);
+    valkeyClusterContext *cc = valkeyClusterContextInit();
+    valkeyClusterSetOptionAddNodes(cc, initnode);
+    valkeyClusterSetOptionConnectTimeout(cc, timeout);
     if (use_cluster_slots) {
-        redisClusterSetOptionRouteUseSlots(cc);
+        valkeyClusterSetOptionRouteUseSlots(cc);
     }
     if (show_events) {
-        redisClusterSetEventCallback(cc, eventCallback, NULL);
+        valkeyClusterSetEventCallback(cc, eventCallback, NULL);
     }
 
-    if (redisClusterConnect2(cc) != REDIS_OK) {
+    if (valkeyClusterConnect2(cc) != VALKEY_OK) {
         printf("Connect error: %s\n", cc->errstr);
         exit(2);
     }
@@ -116,13 +116,13 @@ int main(int argc, char **argv) {
         }
 
         if (send_to_all) {
-            nodeIterator ni;
-            initNodeIterator(&ni, cc);
+            valkeyClusterNodeIterator ni;
+            valkeyClusterInitNodeIterator(&ni, cc);
 
-            redisClusterNode *node;
-            while ((node = nodeNext(&ni)) != NULL) {
-                redisReply *reply =
-                    redisClusterCommandToNode(cc, node, command);
+            valkeyClusterNode *node;
+            while ((node = valkeyClusterNodeNext(&ni)) != NULL) {
+                valkeyReply *reply =
+                    valkeyClusterCommandToNode(cc, node, command);
                 if (!reply || cc->err) {
                     printf("error: %s\n", cc->errstr);
                 } else {
@@ -135,7 +135,7 @@ int main(int argc, char **argv) {
                 }
             }
         } else {
-            redisReply *reply = redisClusterCommand(cc, command);
+            valkeyReply *reply = valkeyClusterCommand(cc, command);
             if (!reply || cc->err) {
                 printf("error: %s\n", cc->errstr);
             } else {
@@ -145,6 +145,6 @@ int main(int argc, char **argv) {
         }
     }
 
-    redisClusterFree(cc);
+    valkeyClusterFree(cc);
     return 0;
 }

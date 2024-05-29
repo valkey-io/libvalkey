@@ -1,4 +1,4 @@
-/* Testcases that simulates allocation failures during hiredis-cluster API calls
+/* Testcases that simulates allocation failures during libvalkeycluster API calls
  * which verifies the handling of out of memory scenarios (OOM).
  *
  * These testcases overrides the default allocators by injecting own functions
@@ -8,7 +8,7 @@
  * count the number of calls before it start to return OOM failures, like
  * malloc() returning NULL.
  *
- * Tests will call a hiredis-cluster API-function while iterating on a number,
+ * Tests will call a libvalkeycluster API-function while iterating on a number,
  * the number of successful allocations during the call before it hits an OOM.
  * The result and the error code is then checked to show "Out of memory".
  * As a last step the correct number of allocations is prepared to get a
@@ -25,7 +25,7 @@
  *   and error of running with increased/decreased `i` until the edge is found.
  */
 #include "adapters/libevent.h"
-#include "hircluster.h"
+#include "valkeycluster.h"
 #include "test_utils.h"
 #include "win32.h"
 #include <assert.h>
@@ -40,7 +40,7 @@ int successfulAllocations = 0;
 bool assertWhenAllocFail = false; // Enable for troubleshooting
 
 // A configurable OOM failing malloc()
-static void *hi_malloc_fail(size_t size) {
+static void *vk_malloc_fail(size_t size) {
     if (successfulAllocations > 0) {
         --successfulAllocations;
         return malloc(size);
@@ -50,7 +50,7 @@ static void *hi_malloc_fail(size_t size) {
 }
 
 // A  configurable OOM failing calloc()
-static void *hi_calloc_fail(size_t nmemb, size_t size) {
+static void *vk_calloc_fail(size_t nmemb, size_t size) {
     if (successfulAllocations > 0) {
         --successfulAllocations;
         return calloc(nmemb, size);
@@ -60,7 +60,7 @@ static void *hi_calloc_fail(size_t nmemb, size_t size) {
 }
 
 // A  configurable OOM failing realloc()
-static void *hi_realloc_fail(void *ptr, size_t size) {
+static void *vk_realloc_fail(void *ptr, size_t size) {
     if (successfulAllocations > 0) {
         --successfulAllocations;
         return realloc(ptr, size);
@@ -73,14 +73,14 @@ static void *hi_realloc_fail(void *ptr, size_t size) {
  * Configures the allocator functions with the number of allocations
  * that will succeed before simulating an out of memory scenario.
  * Additionally it resets errors in the cluster context. */
-void prepare_allocation_test(redisClusterContext *cc,
+void prepare_allocation_test(valkeyClusterContext *cc,
                              int _successfulAllocations) {
     successfulAllocations = _successfulAllocations;
     cc->err = 0;
     memset(cc->errstr, '\0', strlen(cc->errstr));
 }
 
-void prepare_allocation_test_async(redisClusterAsyncContext *acc,
+void prepare_allocation_test_async(valkeyClusterAsyncContext *acc,
                                    int _successfulAllocations) {
     successfulAllocations = _successfulAllocations;
     acc->err = 0;
@@ -88,11 +88,11 @@ void prepare_allocation_test_async(redisClusterAsyncContext *acc,
 }
 
 /* Helper */
-redisClusterNode *getNodeByPort(redisClusterContext *cc, int port) {
-    redisClusterNodeIterator ni;
-    redisClusterInitNodeIterator(&ni, cc);
-    redisClusterNode *node;
-    while ((node = redisClusterNodeNext(&ni)) != NULL) {
+valkeyClusterNode *getNodeByPort(valkeyClusterContext *cc, int port) {
+    valkeyClusterNodeIterator ni;
+    valkeyClusterInitNodeIterator(&ni, cc);
+    valkeyClusterNode *node;
+    while ((node = valkeyClusterNodeNext(&ni)) != NULL) {
         if (node->port == port)
             return node;
     }
@@ -103,25 +103,25 @@ redisClusterNode *getNodeByPort(redisClusterContext *cc, int port) {
 /* Test of allocation handling in the blocking API */
 void test_alloc_failure_handling(void) {
     int result;
-    hiredisAllocFuncs ha = {
-        .mallocFn = hi_malloc_fail,
-        .callocFn = hi_calloc_fail,
-        .reallocFn = hi_realloc_fail,
+    valkeyAllocFuncs ha = {
+        .mallocFn = vk_malloc_fail,
+        .callocFn = vk_calloc_fail,
+        .reallocFn = vk_realloc_fail,
         .strdupFn = strdup,
         .freeFn = free,
     };
     // Override allocators
-    hiredisSetAllocators(&ha);
+    valkeySetAllocators(&ha);
 
     // Context init
-    redisClusterContext *cc;
+    valkeyClusterContext *cc;
     {
         successfulAllocations = 0;
-        cc = redisClusterContextInit();
+        cc = valkeyClusterContextInit();
         assert(cc == NULL);
 
         successfulAllocations = 1;
-        cc = redisClusterContextInit();
+        cc = valkeyClusterContextInit();
         assert(cc);
     }
 
@@ -129,14 +129,14 @@ void test_alloc_failure_handling(void) {
     {
         for (int i = 0; i < 9; ++i) {
             prepare_allocation_test(cc, i);
-            result = redisClusterSetOptionAddNodes(cc, CLUSTER_NODE);
-            assert(result == REDIS_ERR);
+            result = valkeyClusterSetOptionAddNodes(cc, CLUSTER_NODE);
+            assert(result == VALKEY_ERR);
             ASSERT_STR_EQ(cc->errstr, "Out of memory");
         }
 
         prepare_allocation_test(cc, 9);
-        result = redisClusterSetOptionAddNodes(cc, CLUSTER_NODE);
-        assert(result == REDIS_OK);
+        result = valkeyClusterSetOptionAddNodes(cc, CLUSTER_NODE);
+        assert(result == VALKEY_OK);
     }
 
     // Set connect timeout
@@ -144,13 +144,13 @@ void test_alloc_failure_handling(void) {
         struct timeval timeout = {0, 500000};
 
         prepare_allocation_test(cc, 0);
-        result = redisClusterSetOptionConnectTimeout(cc, timeout);
-        assert(result == REDIS_ERR);
+        result = valkeyClusterSetOptionConnectTimeout(cc, timeout);
+        assert(result == VALKEY_ERR);
         ASSERT_STR_EQ(cc->errstr, "Out of memory");
 
         prepare_allocation_test(cc, 1);
-        result = redisClusterSetOptionConnectTimeout(cc, timeout);
-        assert(result == REDIS_OK);
+        result = valkeyClusterSetOptionConnectTimeout(cc, timeout);
+        assert(result == VALKEY_OK);
     }
 
     // Set request timeout
@@ -158,207 +158,207 @@ void test_alloc_failure_handling(void) {
         struct timeval timeout = {0, 500000};
 
         prepare_allocation_test(cc, 0);
-        result = redisClusterSetOptionTimeout(cc, timeout);
-        assert(result == REDIS_ERR);
+        result = valkeyClusterSetOptionTimeout(cc, timeout);
+        assert(result == VALKEY_ERR);
         ASSERT_STR_EQ(cc->errstr, "Out of memory");
 
         prepare_allocation_test(cc, 1);
-        result = redisClusterSetOptionTimeout(cc, timeout);
-        assert(result == REDIS_OK);
+        result = valkeyClusterSetOptionTimeout(cc, timeout);
+        assert(result == VALKEY_OK);
     }
 
     // Connect
     {
         for (int i = 0; i < 128; ++i) {
             prepare_allocation_test(cc, i);
-            result = redisClusterConnect2(cc);
-            assert(result == REDIS_ERR);
+            result = valkeyClusterConnect2(cc);
+            assert(result == VALKEY_ERR);
         }
 
         prepare_allocation_test(cc, 128);
-        result = redisClusterConnect2(cc);
-        assert(result == REDIS_OK);
+        result = valkeyClusterConnect2(cc);
+        assert(result == VALKEY_OK);
     }
 
     // Command
     {
-        redisReply *reply;
+        valkeyReply *reply;
         const char *cmd = "SET key value";
 
         for (int i = 0; i < 36; ++i) {
             prepare_allocation_test(cc, i);
-            reply = (redisReply *)redisClusterCommand(cc, cmd);
+            reply = (valkeyReply *)valkeyClusterCommand(cc, cmd);
             assert(reply == NULL);
             ASSERT_STR_EQ(cc->errstr, "Out of memory");
         }
 
         prepare_allocation_test(cc, 36);
-        reply = (redisReply *)redisClusterCommand(cc, cmd);
+        reply = (valkeyReply *)valkeyClusterCommand(cc, cmd);
         CHECK_REPLY_OK(cc, reply);
         freeReplyObject(reply);
     }
 
     // Multi key command
     {
-        redisReply *reply;
+        valkeyReply *reply;
         const char *cmd = "MSET key1 v1 key2 v2 key3 v3";
 
         for (int i = 0; i < 77; ++i) {
             prepare_allocation_test(cc, i);
-            reply = (redisReply *)redisClusterCommand(cc, cmd);
+            reply = (valkeyReply *)valkeyClusterCommand(cc, cmd);
             assert(reply == NULL);
             ASSERT_STR_EQ(cc->errstr, "Out of memory");
         }
 
         // Multi-key commands
         prepare_allocation_test(cc, 77);
-        reply = (redisReply *)redisClusterCommand(cc, cmd);
+        reply = (valkeyReply *)valkeyClusterCommand(cc, cmd);
         CHECK_REPLY_OK(cc, reply);
         freeReplyObject(reply);
     }
 
     // Command to node
     {
-        redisReply *reply;
+        valkeyReply *reply;
         const char *cmd = "SET key value";
 
-        redisClusterNode *node = redisClusterGetNodeByKey(cc, "key");
+        valkeyClusterNode *node = valkeyClusterGetNodeByKey(cc, "key");
         assert(node);
 
         // OOM failing commands
         for (int i = 0; i < 32; ++i) {
             prepare_allocation_test(cc, i);
-            reply = redisClusterCommandToNode(cc, node, cmd);
+            reply = valkeyClusterCommandToNode(cc, node, cmd);
             assert(reply == NULL);
             ASSERT_STR_EQ(cc->errstr, "Out of memory");
         }
 
         // Successful command
         prepare_allocation_test(cc, 32);
-        reply = redisClusterCommandToNode(cc, node, cmd);
+        reply = valkeyClusterCommandToNode(cc, node, cmd);
         CHECK_REPLY_OK(cc, reply);
         freeReplyObject(reply);
     }
 
     // Append command
     {
-        redisReply *reply;
+        valkeyReply *reply;
         const char *cmd = "SET foo one";
 
         for (int i = 0; i < 37; ++i) {
             prepare_allocation_test(cc, i);
-            result = redisClusterAppendCommand(cc, cmd);
-            assert(result == REDIS_ERR);
+            result = valkeyClusterAppendCommand(cc, cmd);
+            assert(result == VALKEY_ERR);
             ASSERT_STR_EQ(cc->errstr, "Out of memory");
 
-            redisClusterReset(cc);
+            valkeyClusterReset(cc);
         }
 
         for (int i = 0; i < 4; ++i) {
-            // Appended command lost when receiving error from hiredis
+            // Appended command lost when receiving error from valkey
             // during a GetReply, needs a new append for each test loop
             prepare_allocation_test(cc, 37);
-            result = redisClusterAppendCommand(cc, cmd);
-            assert(result == REDIS_OK);
+            result = valkeyClusterAppendCommand(cc, cmd);
+            assert(result == VALKEY_OK);
 
             prepare_allocation_test(cc, i);
-            result = redisClusterGetReply(cc, (void *)&reply);
-            assert(result == REDIS_ERR);
+            result = valkeyClusterGetReply(cc, (void *)&reply);
+            assert(result == VALKEY_ERR);
             ASSERT_STR_EQ(cc->errstr, "Out of memory");
 
-            redisClusterReset(cc);
+            valkeyClusterReset(cc);
         }
 
         prepare_allocation_test(cc, 37);
-        result = redisClusterAppendCommand(cc, cmd);
-        assert(result == REDIS_OK);
+        result = valkeyClusterAppendCommand(cc, cmd);
+        assert(result == VALKEY_OK);
 
         prepare_allocation_test(cc, 4);
-        result = redisClusterGetReply(cc, (void *)&reply);
-        assert(result == REDIS_OK);
+        result = valkeyClusterGetReply(cc, (void *)&reply);
+        assert(result == VALKEY_OK);
         CHECK_REPLY_OK(cc, reply);
         freeReplyObject(reply);
     }
 
     // Append multi-key command
     {
-        redisReply *reply;
+        valkeyReply *reply;
         const char *cmd = "MSET key1 val1 key2 val2 key3 val3";
 
         for (int i = 0; i < 90; ++i) {
             prepare_allocation_test(cc, i);
-            result = redisClusterAppendCommand(cc, cmd);
-            assert(result == REDIS_ERR);
+            result = valkeyClusterAppendCommand(cc, cmd);
+            assert(result == VALKEY_ERR);
             ASSERT_STR_EQ(cc->errstr, "Out of memory");
 
-            redisClusterReset(cc);
+            valkeyClusterReset(cc);
         }
 
         for (int i = 0; i < 12; ++i) {
             prepare_allocation_test(cc, 90);
-            result = redisClusterAppendCommand(cc, cmd);
-            assert(result == REDIS_OK);
+            result = valkeyClusterAppendCommand(cc, cmd);
+            assert(result == VALKEY_OK);
 
             prepare_allocation_test(cc, i);
-            result = redisClusterGetReply(cc, (void *)&reply);
-            assert(result == REDIS_ERR);
+            result = valkeyClusterGetReply(cc, (void *)&reply);
+            assert(result == VALKEY_ERR);
             ASSERT_STR_EQ(cc->errstr, "Out of memory");
 
-            redisClusterReset(cc);
+            valkeyClusterReset(cc);
         }
 
         prepare_allocation_test(cc, 90);
-        result = redisClusterAppendCommand(cc, cmd);
-        assert(result == REDIS_OK);
+        result = valkeyClusterAppendCommand(cc, cmd);
+        assert(result == VALKEY_OK);
 
         prepare_allocation_test(cc, 12);
-        result = redisClusterGetReply(cc, (void *)&reply);
-        assert(result == REDIS_OK);
+        result = valkeyClusterGetReply(cc, (void *)&reply);
+        assert(result == VALKEY_OK);
         CHECK_REPLY_OK(cc, reply);
         freeReplyObject(reply);
     }
 
     // Append command to node
     {
-        redisReply *reply;
+        valkeyReply *reply;
         const char *cmd = "SET foo one";
 
-        redisClusterNode *node = redisClusterGetNodeByKey(cc, "foo");
+        valkeyClusterNode *node = valkeyClusterGetNodeByKey(cc, "foo");
         assert(node);
 
         // OOM failing appends
         for (int i = 0; i < 37; ++i) {
             prepare_allocation_test(cc, i);
-            result = redisClusterAppendCommandToNode(cc, node, cmd);
-            assert(result == REDIS_ERR);
+            result = valkeyClusterAppendCommandToNode(cc, node, cmd);
+            assert(result == VALKEY_ERR);
             ASSERT_STR_EQ(cc->errstr, "Out of memory");
 
-            redisClusterReset(cc);
+            valkeyClusterReset(cc);
         }
 
         // OOM failing GetResults
         for (int i = 0; i < 4; ++i) {
             // First a successful append
             prepare_allocation_test(cc, 37);
-            result = redisClusterAppendCommandToNode(cc, node, cmd);
-            assert(result == REDIS_OK);
+            result = valkeyClusterAppendCommandToNode(cc, node, cmd);
+            assert(result == VALKEY_OK);
 
             prepare_allocation_test(cc, i);
-            result = redisClusterGetReply(cc, (void *)&reply);
-            assert(result == REDIS_ERR);
+            result = valkeyClusterGetReply(cc, (void *)&reply);
+            assert(result == VALKEY_ERR);
             ASSERT_STR_EQ(cc->errstr, "Out of memory");
 
-            redisClusterReset(cc);
+            valkeyClusterReset(cc);
         }
 
         // Successful append and GetReply
         prepare_allocation_test(cc, 37);
-        result = redisClusterAppendCommandToNode(cc, node, cmd);
-        assert(result == REDIS_OK);
+        result = valkeyClusterAppendCommandToNode(cc, node, cmd);
+        assert(result == VALKEY_OK);
 
         prepare_allocation_test(cc, 4);
-        result = redisClusterGetReply(cc, (void *)&reply);
-        assert(result == REDIS_OK);
+        result = valkeyClusterGetReply(cc, (void *)&reply);
+        assert(result == VALKEY_OK);
         CHECK_REPLY_OK(cc, reply);
         freeReplyObject(reply);
     }
@@ -371,42 +371,42 @@ void test_alloc_failure_handling(void) {
         prepare_allocation_test(cc, 1000);
 
         /* Get the source information for the migration. */
-        unsigned int slot = redisClusterGetSlotByKey("foo");
-        redisClusterNode *srcNode = redisClusterGetNodeByKey(cc, "foo");
+        unsigned int slot = valkeyClusterGetSlotByKey("foo");
+        valkeyClusterNode *srcNode = valkeyClusterGetNodeByKey(cc, "foo");
         int srcPort = srcNode->port;
 
         /* Get a destination node to migrate the slot to. */
-        redisClusterNode *dstNode;
-        redisClusterNodeIterator ni;
-        redisClusterInitNodeIterator(&ni, cc);
-        while ((dstNode = redisClusterNodeNext(&ni)) != NULL) {
+        valkeyClusterNode *dstNode;
+        valkeyClusterNodeIterator ni;
+        valkeyClusterInitNodeIterator(&ni, cc);
+        while ((dstNode = valkeyClusterNodeNext(&ni)) != NULL) {
             if (dstNode != srcNode)
                 break;
         }
         assert(dstNode && dstNode != srcNode);
         int dstPort = dstNode->port;
 
-        redisReply *reply, *replySrcId, *replyDstId;
+        valkeyReply *reply, *replySrcId, *replyDstId;
 
         /* Get node id's */
-        replySrcId = redisClusterCommandToNode(cc, srcNode, "CLUSTER MYID");
-        CHECK_REPLY_TYPE(replySrcId, REDIS_REPLY_STRING);
+        replySrcId = valkeyClusterCommandToNode(cc, srcNode, "CLUSTER MYID");
+        CHECK_REPLY_TYPE(replySrcId, VALKEY_REPLY_STRING);
 
-        replyDstId = redisClusterCommandToNode(cc, dstNode, "CLUSTER MYID");
-        CHECK_REPLY_TYPE(replyDstId, REDIS_REPLY_STRING);
+        replyDstId = valkeyClusterCommandToNode(cc, dstNode, "CLUSTER MYID");
+        CHECK_REPLY_TYPE(replyDstId, VALKEY_REPLY_STRING);
 
         /* Migrate slot */
-        reply = redisClusterCommandToNode(cc, srcNode,
+        reply = valkeyClusterCommandToNode(cc, srcNode,
                                           "CLUSTER SETSLOT %d MIGRATING %s",
                                           slot, replyDstId->str);
         CHECK_REPLY_OK(cc, reply);
         freeReplyObject(reply);
-        reply = redisClusterCommandToNode(cc, dstNode,
+        reply = valkeyClusterCommandToNode(cc, dstNode,
                                           "CLUSTER SETSLOT %d IMPORTING %s",
                                           slot, replySrcId->str);
         CHECK_REPLY_OK(cc, reply);
         freeReplyObject(reply);
-        reply = redisClusterCommandToNode(
+        reply = valkeyClusterCommandToNode(
             cc, srcNode, "MIGRATE 127.0.0.1 %d foo 0 5000", dstPort);
         CHECK_REPLY_OK(cc, reply);
         freeReplyObject(reply);
@@ -414,14 +414,14 @@ void test_alloc_failure_handling(void) {
         /* Test ASK reply handling with OOM */
         for (int i = 0; i < 50; ++i) {
             prepare_allocation_test(cc, i);
-            reply = redisClusterCommand(cc, "GET foo");
+            reply = valkeyClusterCommand(cc, "GET foo");
             assert(reply == NULL);
             ASSERT_STR_EQ(cc->errstr, "Out of memory");
         }
 
         /* Test ASK reply handling without OOM */
         prepare_allocation_test(cc, 50);
-        reply = redisClusterCommand(cc, "GET foo");
+        reply = valkeyClusterCommand(cc, "GET foo");
         CHECK_REPLY_STR(cc, reply, "one");
         freeReplyObject(reply);
 
@@ -429,13 +429,13 @@ void test_alloc_failure_handling(void) {
          * allowing a high number of allocations. */
         prepare_allocation_test(cc, 1000);
         /* Fetch the nodes again, in case the slotmap has been reloaded. */
-        srcNode = redisClusterGetNodeByKey(cc, "foo");
+        srcNode = valkeyClusterGetNodeByKey(cc, "foo");
         dstNode = getNodeByPort(cc, dstPort);
-        reply = redisClusterCommandToNode(
+        reply = valkeyClusterCommandToNode(
             cc, srcNode, "CLUSTER SETSLOT %d NODE %s", slot, replyDstId->str);
         CHECK_REPLY_OK(cc, reply);
         freeReplyObject(reply);
-        reply = redisClusterCommandToNode(
+        reply = valkeyClusterCommandToNode(
             cc, dstNode, "CLUSTER SETSLOT %d NODE %s", slot, replyDstId->str);
         CHECK_REPLY_OK(cc, reply);
         freeReplyObject(reply);
@@ -443,14 +443,14 @@ void test_alloc_failure_handling(void) {
         /* Test MOVED reply handling with OOM */
         for (int i = 0; i < 34; ++i) {
             prepare_allocation_test(cc, i);
-            reply = redisClusterCommand(cc, "GET foo");
+            reply = valkeyClusterCommand(cc, "GET foo");
             assert(reply == NULL);
             ASSERT_STR_EQ(cc->errstr, "Out of memory");
         }
 
         /* Test MOVED reply handling without OOM */
         prepare_allocation_test(cc, 34);
-        reply = redisClusterCommand(cc, "GET foo");
+        reply = valkeyClusterCommand(cc, "GET foo");
         CHECK_REPLY_STR(cc, reply, "one");
         freeReplyObject(reply);
 
@@ -463,25 +463,25 @@ void test_alloc_failure_handling(void) {
         /* Migrate back slot, required by the next testcase. Skip OOM testing
          * during these final steps by allowing a high number of allocations. */
         prepare_allocation_test(cc, 1000);
-        reply = redisClusterCommandToNode(cc, dstNode,
+        reply = valkeyClusterCommandToNode(cc, dstNode,
                                           "CLUSTER SETSLOT %d MIGRATING %s",
                                           slot, replySrcId->str);
         CHECK_REPLY_OK(cc, reply);
         freeReplyObject(reply);
-        reply = redisClusterCommandToNode(cc, srcNode,
+        reply = valkeyClusterCommandToNode(cc, srcNode,
                                           "CLUSTER SETSLOT %d IMPORTING %s",
                                           slot, replyDstId->str);
         CHECK_REPLY_OK(cc, reply);
         freeReplyObject(reply);
-        reply = redisClusterCommandToNode(
+        reply = valkeyClusterCommandToNode(
             cc, dstNode, "MIGRATE 127.0.0.1 %d foo 0 5000", srcPort);
         CHECK_REPLY_OK(cc, reply);
         freeReplyObject(reply);
-        reply = redisClusterCommandToNode(
+        reply = valkeyClusterCommandToNode(
             cc, dstNode, "CLUSTER SETSLOT %d NODE %s", slot, replySrcId->str);
         CHECK_REPLY_OK(cc, reply);
         freeReplyObject(reply);
-        reply = redisClusterCommandToNode(
+        reply = valkeyClusterCommandToNode(
             cc, srcNode, "CLUSTER SETSLOT %d NODE %s", slot, replySrcId->str);
         CHECK_REPLY_OK(cc, reply);
         freeReplyObject(reply);
@@ -490,8 +490,8 @@ void test_alloc_failure_handling(void) {
         freeReplyObject(replyDstId);
     }
 
-    redisClusterFree(cc);
-    hiredisResetAllocators();
+    valkeyClusterFree(cc);
+    valkeyResetAllocators();
 }
 
 //------------------------------------------------------------------------------
@@ -504,103 +504,103 @@ typedef struct ExpectedResult {
     bool disconnect;
 } ExpectedResult;
 
-// Callback for Redis connects and disconnects
-void callbackExpectOk(const redisAsyncContext *ac, int status) {
+// Callback for Valkey connects and disconnects
+void callbackExpectOk(const valkeyAsyncContext *ac, int status) {
     UNUSED(ac);
-    assert(status == REDIS_OK);
+    assert(status == VALKEY_OK);
 }
 
-// Callback for async commands, verifies the redisReply
-void commandCallback(redisClusterAsyncContext *cc, void *r, void *privdata) {
-    redisReply *reply = (redisReply *)r;
+// Callback for async commands, verifies the valkeyReply
+void commandCallback(valkeyClusterAsyncContext *cc, void *r, void *privdata) {
+    valkeyReply *reply = (valkeyReply *)r;
     ExpectedResult *expect = (ExpectedResult *)privdata;
     assert(reply != NULL);
     assert(reply->type == expect->type);
     assert(strcmp(reply->str, expect->str) == 0);
 
     if (expect->disconnect) {
-        redisClusterAsyncDisconnect(cc);
+        valkeyClusterAsyncDisconnect(cc);
     }
 }
 
 // Test of allocation handling in async context
 void test_alloc_failure_handling_async(void) {
     int result;
-    hiredisAllocFuncs ha = {
-        .mallocFn = hi_malloc_fail,
-        .callocFn = hi_calloc_fail,
-        .reallocFn = hi_realloc_fail,
+    valkeyAllocFuncs ha = {
+        .mallocFn = vk_malloc_fail,
+        .callocFn = vk_calloc_fail,
+        .reallocFn = vk_realloc_fail,
         .strdupFn = strdup,
         .freeFn = free,
     };
     // Override allocators
-    hiredisSetAllocators(&ha);
+    valkeySetAllocators(&ha);
 
     // Context init
-    redisClusterAsyncContext *acc;
+    valkeyClusterAsyncContext *acc;
     {
         for (int i = 0; i < 2; ++i) {
             successfulAllocations = 0;
-            acc = redisClusterAsyncContextInit();
+            acc = valkeyClusterAsyncContextInit();
             assert(acc == NULL);
         }
         successfulAllocations = 2;
-        acc = redisClusterAsyncContextInit();
+        acc = valkeyClusterAsyncContextInit();
         assert(acc);
     }
 
     // Set callbacks
     {
         prepare_allocation_test_async(acc, 0);
-        result = redisClusterAsyncSetConnectCallback(acc, callbackExpectOk);
-        assert(result == REDIS_OK);
-        result = redisClusterAsyncSetDisconnectCallback(acc, callbackExpectOk);
-        assert(result == REDIS_OK);
+        result = valkeyClusterAsyncSetConnectCallback(acc, callbackExpectOk);
+        assert(result == VALKEY_OK);
+        result = valkeyClusterAsyncSetDisconnectCallback(acc, callbackExpectOk);
+        assert(result == VALKEY_OK);
     }
 
     // Add nodes
     {
         for (int i = 0; i < 9; ++i) {
             prepare_allocation_test(acc->cc, i);
-            result = redisClusterSetOptionAddNodes(acc->cc, CLUSTER_NODE);
-            assert(result == REDIS_ERR);
+            result = valkeyClusterSetOptionAddNodes(acc->cc, CLUSTER_NODE);
+            assert(result == VALKEY_ERR);
             ASSERT_STR_EQ(acc->cc->errstr, "Out of memory");
         }
 
         prepare_allocation_test(acc->cc, 9);
-        result = redisClusterSetOptionAddNodes(acc->cc, CLUSTER_NODE);
-        assert(result == REDIS_OK);
+        result = valkeyClusterSetOptionAddNodes(acc->cc, CLUSTER_NODE);
+        assert(result == VALKEY_OK);
     }
 
     // Connect
     {
         for (int i = 0; i < 126; ++i) {
             prepare_allocation_test(acc->cc, i);
-            result = redisClusterConnect2(acc->cc);
-            assert(result == REDIS_ERR);
+            result = valkeyClusterConnect2(acc->cc);
+            assert(result == VALKEY_ERR);
         }
 
         prepare_allocation_test(acc->cc, 126);
-        result = redisClusterConnect2(acc->cc);
-        assert(result == REDIS_OK);
+        result = valkeyClusterConnect2(acc->cc);
+        assert(result == VALKEY_OK);
     }
 
     struct event_base *base = event_base_new();
     assert(base);
 
     successfulAllocations = 0;
-    result = redisClusterLibeventAttach(acc, base);
-    assert(result == REDIS_OK);
+    result = valkeyClusterLibeventAttach(acc, base);
+    assert(result == VALKEY_OK);
 
     // Async command 1
-    ExpectedResult r1 = {.type = REDIS_REPLY_STATUS, .str = "OK"};
+    ExpectedResult r1 = {.type = VALKEY_REPLY_STATUS, .str = "OK"};
     {
         const char *cmd1 = "SET foo one";
 
         for (int i = 0; i < 38; ++i) {
             prepare_allocation_test_async(acc, i);
-            result = redisClusterAsyncCommand(acc, commandCallback, &r1, cmd1);
-            assert(result == REDIS_ERR);
+            result = valkeyClusterAsyncCommand(acc, commandCallback, &r1, cmd1);
+            assert(result == VALKEY_ERR);
             if (i != 36) {
                 ASSERT_STR_EQ(acc->errstr, "Out of memory");
             } else {
@@ -609,35 +609,33 @@ void test_alloc_failure_handling_async(void) {
         }
 
         prepare_allocation_test_async(acc, 38);
-        result = redisClusterAsyncCommand(acc, commandCallback, &r1, cmd1);
-        ASSERT_MSG(result == REDIS_OK, acc->errstr);
+        result = valkeyClusterAsyncCommand(acc, commandCallback, &r1, cmd1);
+        ASSERT_MSG(result == VALKEY_OK, acc->errstr);
     }
 
     // Async command 2
     ExpectedResult r2 = {
-        .type = REDIS_REPLY_STRING, .str = "one", .disconnect = true};
+        .type = VALKEY_REPLY_STRING, .str = "one", .disconnect = true};
     {
         const char *cmd2 = "GET foo";
 
         for (int i = 0; i < 15; ++i) {
             prepare_allocation_test_async(acc, i);
-            result = redisClusterAsyncCommand(acc, commandCallback, &r2, cmd2);
-            assert(result == REDIS_ERR);
+            result = valkeyClusterAsyncCommand(acc, commandCallback, &r2, cmd2);
+            assert(result == VALKEY_ERR);
             ASSERT_STR_EQ(acc->errstr, "Out of memory");
         }
 
-        /* Due to an issue in hiredis 1.0.0 iteration 15 is avoided.
-           The issue (that triggers an assert) is corrected on master:
-           https://github.com/redis/hiredis/commit/4bba72103c93eaaa8a6e07176e60d46ab277cf8a
-         */
+        /* Skip iteration 15, errstr not set by libvalkey when valkeyFormatSdsCommandArgv() fails. */
+
         prepare_allocation_test_async(acc, 16);
-        result = redisClusterAsyncCommand(acc, commandCallback, &r2, cmd2);
-        ASSERT_MSG(result == REDIS_OK, acc->errstr);
+        result = valkeyClusterAsyncCommand(acc, commandCallback, &r2, cmd2);
+        ASSERT_MSG(result == VALKEY_OK, acc->errstr);
     }
 
     prepare_allocation_test_async(acc, 7);
     event_base_dispatch(base);
-    redisClusterAsyncFree(acc);
+    valkeyClusterAsyncFree(acc);
     event_base_free(base);
 }
 
