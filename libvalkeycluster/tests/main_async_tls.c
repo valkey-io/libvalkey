@@ -59,7 +59,7 @@ int main(int argc, char **argv) {
 
     valkeyInitOpenSSL();
     ssl = valkeyCreateSSLContext("ca.crt", NULL, "client.crt", "client.key",
-                                NULL, &ssl_error);
+                                 NULL, &ssl_error);
     if (!ssl) {
         printf("SSL Context error: %s\n", valkeySSLContextGetError(ssl_error));
         exit(1);
@@ -84,13 +84,13 @@ int main(int argc, char **argv) {
 
     int status;
     status = valkeyClusterAsyncCommand(acc, setCallback, (char *)"THE_ID",
-                                      "SET %s %s", "key", "value");
+                                       "SET %s %s", "key", "value");
     if (status != VALKEY_OK) {
         printf("error: err=%d errstr=%s\n", acc->err, acc->errstr);
     }
 
     status = valkeyClusterAsyncCommand(acc, getCallback, (char *)"THE_ID",
-                                      "GET %s", "key");
+                                       "GET %s", "key");
     if (status != VALKEY_OK) {
         printf("error: err=%d errstr=%s\n", acc->err, acc->errstr);
     }

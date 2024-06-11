@@ -14,7 +14,7 @@ int main(int argc, char **argv) {
 
     valkeyInitOpenSSL();
     ssl = valkeyCreateSSLContext("ca.crt", NULL, "client.crt", "client.key",
-                                NULL, &ssl_error);
+                                 NULL, &ssl_error);
     if (!ssl) {
         printf("SSL Context error: %s\n", valkeySSLContextGetError(ssl_error));
         exit(1);
@@ -43,7 +43,8 @@ int main(int argc, char **argv) {
     printf("SET: %s\n", reply->str);
     freeReplyObject(reply);
 
-    valkeyReply *reply2 = (valkeyReply *)valkeyClusterCommand(cc, "GET %s", "key");
+    valkeyReply *reply2 =
+        (valkeyReply *)valkeyClusterCommand(cc, "GET %s", "key");
     if (!reply2) {
         printf("Reply missing: %s\n", cc->errstr);
         exit(-1);

@@ -1,6 +1,6 @@
 #include "adapters/libevent.h"
-#include "valkeycluster.h"
 #include "test_utils.h"
+#include "valkeycluster.h"
 
 #include <assert.h>
 #include <stdbool.h>
@@ -588,7 +588,7 @@ void test_async_command_timeout(void) {
     ExpectedResult r = {
         .noreply = true, .errstr = "Timeout", .disconnect = true};
     status = valkeyClusterAsyncCommandToNode(acc, node, commandCallback, &r,
-                                            "DEBUG SLEEP 0.2");
+                                             "DEBUG SLEEP 0.2");
     assert(status == VALKEY_OK);
 
     event_base_dispatch(base);

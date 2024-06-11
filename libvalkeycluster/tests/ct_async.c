@@ -1,6 +1,6 @@
 #include "adapters/libevent.h"
-#include "valkeycluster.h"
 #include "test_utils.h"
+#include "valkeycluster.h"
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -48,20 +48,20 @@ void eventCallback(const valkeyClusterContext *cc, int event, void *privdata) {
     if (event == VALKEYCLUSTER_EVENT_READY) {
         int status;
         status = valkeyClusterAsyncCommand(acc, setCallback, (char *)"ID",
-                                          "SET key12345 value");
+                                           "SET key12345 value");
         ASSERT_MSG(status == VALKEY_OK, acc->errstr);
 
         /* This command will trigger a disconnect in its reply callback. */
         status = valkeyClusterAsyncCommand(acc, getCallback, (char *)"ID",
-                                          "GET key12345");
+                                           "GET key12345");
         ASSERT_MSG(status == VALKEY_OK, acc->errstr);
 
         status = valkeyClusterAsyncCommand(acc, setCallback, (char *)"ID",
-                                          "SET key23456 value2");
+                                           "SET key23456 value2");
         ASSERT_MSG(status == VALKEY_OK, acc->errstr);
 
         status = valkeyClusterAsyncCommand(acc, getCallback, (char *)"ID",
-                                          "GET key23456");
+                                           "GET key23456");
         ASSERT_MSG(status == VALKEY_OK, acc->errstr);
     }
 }

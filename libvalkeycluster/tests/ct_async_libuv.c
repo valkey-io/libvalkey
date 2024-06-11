@@ -1,6 +1,6 @@
 #include "adapters/libuv.h"
-#include "valkeycluster.h"
 #include "test_utils.h"
+#include "valkeycluster.h"
 #include <assert.h>
 
 #define CLUSTER_NODE "127.0.0.1:7000"
@@ -48,7 +48,7 @@ int main(int argc, char **argv) {
     valkeyClusterAsyncSetDisconnectCallback(acc, disconnectCallback);
 
     status = valkeyClusterAsyncCommand(acc, setCallback, (char *)"ID",
-                                      "SET key value");
+                                       "SET key value");
     ASSERT_MSG(status == VALKEY_OK, acc->errstr);
 
     status =

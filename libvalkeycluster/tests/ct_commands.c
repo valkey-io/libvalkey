@@ -1,5 +1,5 @@
-#include "valkeycluster.h"
 #include "test_utils.h"
+#include "valkeycluster.h"
 #include "win32.h"
 #include <assert.h>
 #include <stdio.h>
@@ -26,7 +26,8 @@ void test_exists(valkeyClusterContext *cc) {
     CHECK_REPLY_OK(cc, reply);
     freeReplyObject(reply);
 
-    reply = (valkeyReply *)valkeyClusterCommand(cc, "EXISTS key1 key2 nosuchkey");
+    reply =
+        (valkeyReply *)valkeyClusterCommand(cc, "EXISTS key1 key2 nosuchkey");
     CHECK_REPLY_INT(cc, reply, 2);
     freeReplyObject(reply);
 }
@@ -118,8 +119,8 @@ void test_hset_hget_hdel_hexists(valkeyClusterContext *cc) {
     freeReplyObject(reply);
 
     // Set second hash field
-    reply =
-        (valkeyReply *)valkeyClusterCommand(cc, "HSET myhash field3 hsetvalue3");
+    reply = (valkeyReply *)valkeyClusterCommand(
+        cc, "HSET myhash field3 hsetvalue3");
     CHECK_REPLY_INT(cc, reply, 1); // Set 1 field
     freeReplyObject(reply);
 
@@ -179,7 +180,7 @@ void test_eval(valkeyClusterContext *cc) {
 
     // Single key, string response
     reply = (valkeyReply *)valkeyClusterCommand(cc, "eval %s 1 %s",
-                                              "return KEYS[1]", "key1");
+                                                "return KEYS[1]", "key1");
     CHECK_REPLY_STR(cc, reply, "key1");
     freeReplyObject(reply);
 
@@ -328,12 +329,14 @@ void test_xgroup(valkeyClusterContext *cc) {
     CHECK_REPLY_TYPE(r, VALKEY_REPLY_INTEGER);
     freeReplyObject(r);
 
-    r = valkeyClusterCommand(cc, "XGROUP CREATE mystream consumer-group-name 0");
+    r = valkeyClusterCommand(cc,
+                             "XGROUP CREATE mystream consumer-group-name 0");
     CHECK_REPLY_OK(cc, r);
     freeReplyObject(r);
 
     /* Attempting to create an already existing group gives error */
-    r = valkeyClusterCommand(cc, "XGROUP CREATE mystream consumer-group-name 0");
+    r = valkeyClusterCommand(cc,
+                             "XGROUP CREATE mystream consumer-group-name 0");
     CHECK_REPLY_ERROR(cc, r, "BUSYGROUP");
     freeReplyObject(r);
 
@@ -382,7 +385,8 @@ void test_xinfo(valkeyClusterContext *cc) {
     CHECK_REPLY_TYPE(r, VALKEY_REPLY_ARRAY);
     freeReplyObject(r);
 
-    r = valkeyClusterCommand(cc, "XINFO CONSUMERS mystream consumer-group-name");
+    r = valkeyClusterCommand(cc,
+                             "XINFO CONSUMERS mystream consumer-group-name");
     CHECK_REPLY_TYPE(r, VALKEY_REPLY_ARRAY);
     freeReplyObject(r);
 }

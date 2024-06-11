@@ -1,6 +1,6 @@
-#include <valkeycluster/valkeycluster.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <valkeycluster/valkeycluster.h>
 
 int main(int argc, char **argv) {
     UNUSED(argc);
@@ -23,7 +23,8 @@ int main(int argc, char **argv) {
     printf("SET: %s\n", reply->str);
     freeReplyObject(reply);
 
-    valkeyReply *reply2 = (valkeyReply *)valkeyClusterCommand(cc, "GET %s", "key");
+    valkeyReply *reply2 =
+        (valkeyReply *)valkeyClusterCommand(cc, "GET %s", "key");
     printf("GET: %s\n", reply2->str);
     freeReplyObject(reply2);
 

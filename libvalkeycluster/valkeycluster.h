@@ -77,8 +77,8 @@ struct valkeyClusterAsyncContext;
 
 typedef int(adapterAttachFn)(valkeyAsyncContext *, void *);
 typedef int(sslInitFn)(valkeyContext *, void *);
-typedef void(valkeyClusterCallbackFn)(struct valkeyClusterAsyncContext *, void *,
-                                     void *);
+typedef void(valkeyClusterCallbackFn)(struct valkeyClusterAsyncContext *,
+                                      void *, void *);
 typedef struct valkeyClusterNode {
     sds name;
     sds addr;
@@ -122,8 +122,8 @@ typedef struct valkeyClusterContext {
     char *username;                  /* Authenticate using user */
     char *password;                  /* Authentication password */
 
-    struct dict *nodes;       /* Known valkeyClusterNode's */
-    uint64_t route_version;   /* Increased when the node lookup table changes */
+    struct dict *nodes;     /* Known valkeyClusterNode's */
+    uint64_t route_version; /* Increased when the node lookup table changes */
     valkeyClusterNode **table; /* valkeyClusterNode lookup table */
 
     struct hilist *requests; /* Outstanding commands (Pipelining) */
@@ -176,8 +176,8 @@ typedef struct valkeyClusterNodeIterator {
 
 valkeyClusterContext *valkeyClusterConnect(const char *addrs, int flags);
 valkeyClusterContext *valkeyClusterConnectWithTimeout(const char *addrs,
-                                                    const struct timeval tv,
-                                                    int flags);
+                                                      const struct timeval tv,
+                                                      int flags);
 int valkeyClusterConnect2(valkeyClusterContext *cc);
 
 valkeyClusterContext *valkeyClusterContextInit(void);
@@ -191,20 +191,21 @@ int valkeyClusterSetOptionConnectBlock(valkeyClusterContext *cc);
 /* Deprecated function, option has no effect. */
 int valkeyClusterSetOptionConnectNonBlock(valkeyClusterContext *cc);
 int valkeyClusterSetOptionUsername(valkeyClusterContext *cc,
-                                  const char *username);
+                                   const char *username);
 int valkeyClusterSetOptionPassword(valkeyClusterContext *cc,
-                                  const char *password);
+                                   const char *password);
 int valkeyClusterSetOptionParseSlaves(valkeyClusterContext *cc);
 int valkeyClusterSetOptionParseOpenSlots(valkeyClusterContext *cc);
 int valkeyClusterSetOptionRouteUseSlots(valkeyClusterContext *cc);
 int valkeyClusterSetOptionConnectTimeout(valkeyClusterContext *cc,
-                                        const struct timeval tv);
+                                         const struct timeval tv);
 int valkeyClusterSetOptionTimeout(valkeyClusterContext *cc,
-                                 const struct timeval tv);
-int valkeyClusterSetOptionMaxRetry(valkeyClusterContext *cc, int max_retry_count);
+                                  const struct timeval tv);
+int valkeyClusterSetOptionMaxRetry(valkeyClusterContext *cc,
+                                   int max_retry_count);
 /* Deprecated function, replaced with valkeyClusterSetOptionMaxRetry() */
 void valkeyClusterSetMaxRedirect(valkeyClusterContext *cc,
-                                int max_redirect_count);
+                                 int max_redirect_count);
 /* A hook for connect and reconnect attempts, e.g. for applying additional
  * socket options. This is called just after connect, before TLS handshake and
  * Valkey authentication.
@@ -216,13 +217,14 @@ void valkeyClusterSetMaxRedirect(valkeyClusterContext *cc,
  * `VALKEY_ERR`. The `err` field in the `valkeyContext` can be used to find out
  * the cause of the error. */
 int valkeyClusterSetConnectCallback(valkeyClusterContext *cc,
-                                   void(fn)(const valkeyContext *c, int status));
+                                    void(fn)(const valkeyContext *c,
+                                             int status));
 
 /* A hook for events. */
 int valkeyClusterSetEventCallback(valkeyClusterContext *cc,
-                                 void(fn)(const valkeyClusterContext *cc,
-                                          int event, void *privdata),
-                                 void *privdata);
+                                  void(fn)(const valkeyClusterContext *cc,
+                                           int event, void *privdata),
+                                  void *privdata);
 
 /* Blocking
  * The following functions will block for a reply, or return NULL if there was
@@ -231,16 +233,18 @@ int valkeyClusterSetEventCallback(valkeyClusterContext *cc,
 
 /* Variadic commands (like printf) */
 void *valkeyClusterCommand(valkeyClusterContext *cc, const char *format, ...);
-void *valkeyClusterCommandToNode(valkeyClusterContext *cc, valkeyClusterNode *node,
-                                const char *format, ...);
+void *valkeyClusterCommandToNode(valkeyClusterContext *cc,
+                                 valkeyClusterNode *node, const char *format,
+                                 ...);
 /* Variadic using va_list */
 void *valkeyClustervCommand(valkeyClusterContext *cc, const char *format,
-                           va_list ap);
+                            va_list ap);
 /* Using argc and argv */
 void *valkeyClusterCommandArgv(valkeyClusterContext *cc, int argc,
-                              const char **argv, const size_t *argvlen);
+                               const char **argv, const size_t *argvlen);
 /* Send a Valkey protocol encoded string */
-void *valkeyClusterFormattedCommand(valkeyClusterContext *cc, char *cmd, int len);
+void *valkeyClusterFormattedCommand(valkeyClusterContext *cc, char *cmd,
+                                    int len);
 
 /* Pipelining
  * The following functions will write a command to the output buffer.
@@ -249,19 +253,20 @@ void *valkeyClusterFormattedCommand(valkeyClusterContext *cc, char *cmd, int len
  */
 
 /* Variadic commands (like printf) */
-int valkeyClusterAppendCommand(valkeyClusterContext *cc, const char *format, ...);
+int valkeyClusterAppendCommand(valkeyClusterContext *cc, const char *format,
+                               ...);
 int valkeyClusterAppendCommandToNode(valkeyClusterContext *cc,
-                                    valkeyClusterNode *node, const char *format,
-                                    ...);
+                                     valkeyClusterNode *node,
+                                     const char *format, ...);
 /* Variadic using va_list */
 int valkeyClustervAppendCommand(valkeyClusterContext *cc, const char *format,
-                               va_list ap);
+                                va_list ap);
 /* Using argc and argv */
 int valkeyClusterAppendCommandArgv(valkeyClusterContext *cc, int argc,
-                                  const char **argv, const size_t *argvlen);
+                                   const char **argv, const size_t *argvlen);
 /* Use a Valkey protocol encoded string as command */
 int valkeyClusterAppendFormattedCommand(valkeyClusterContext *cc, char *cmd,
-                                       int len);
+                                        int len);
 /* Flush output buffer and return first reply */
 int valkeyClusterGetReply(valkeyClusterContext *cc, void **reply);
 
@@ -272,7 +277,8 @@ void valkeyClusterReset(valkeyClusterContext *cc);
 int valkeyClusterUpdateSlotmap(valkeyClusterContext *cc);
 
 /* Internal functions */
-valkeyContext *ctx_get_by_node(valkeyClusterContext *cc, valkeyClusterNode *node);
+valkeyContext *ctx_get_by_node(valkeyClusterContext *cc,
+                               valkeyClusterNode *node);
 struct dict *parse_cluster_nodes(valkeyClusterContext *cc, char *str,
                                  int str_len, int flags);
 struct dict *parse_cluster_slots(valkeyClusterContext *cc, valkeyReply *reply,
@@ -286,62 +292,64 @@ valkeyClusterAsyncContext *valkeyClusterAsyncContextInit(void);
 void valkeyClusterAsyncFree(valkeyClusterAsyncContext *acc);
 
 int valkeyClusterAsyncSetConnectCallback(valkeyClusterAsyncContext *acc,
-                                        valkeyConnectCallback *fn);
+                                         valkeyConnectCallback *fn);
 int valkeyClusterAsyncSetConnectCallbackNC(valkeyClusterAsyncContext *acc,
-                                          valkeyConnectCallbackNC *fn);
+                                           valkeyConnectCallbackNC *fn);
 int valkeyClusterAsyncSetDisconnectCallback(valkeyClusterAsyncContext *acc,
-                                           valkeyDisconnectCallback *fn);
+                                            valkeyDisconnectCallback *fn);
 
 /* Connect and update slotmap, will block until complete. */
 valkeyClusterAsyncContext *valkeyClusterAsyncConnect(const char *addrs,
-                                                   int flags);
+                                                     int flags);
 /* Connect and update slotmap asynchronously using configured event engine. */
 int valkeyClusterAsyncConnect2(valkeyClusterAsyncContext *acc);
 void valkeyClusterAsyncDisconnect(valkeyClusterAsyncContext *acc);
 
 /* Commands */
 int valkeyClusterAsyncCommand(valkeyClusterAsyncContext *acc,
-                             valkeyClusterCallbackFn *fn, void *privdata,
-                             const char *format, ...);
-int valkeyClusterAsyncCommandToNode(valkeyClusterAsyncContext *acc,
-                                   valkeyClusterNode *node,
-                                   valkeyClusterCallbackFn *fn, void *privdata,
-                                   const char *format, ...);
-int valkeyClustervAsyncCommand(valkeyClusterAsyncContext *acc,
                               valkeyClusterCallbackFn *fn, void *privdata,
-                              const char *format, va_list ap);
+                              const char *format, ...);
+int valkeyClusterAsyncCommandToNode(valkeyClusterAsyncContext *acc,
+                                    valkeyClusterNode *node,
+                                    valkeyClusterCallbackFn *fn, void *privdata,
+                                    const char *format, ...);
+int valkeyClustervAsyncCommand(valkeyClusterAsyncContext *acc,
+                               valkeyClusterCallbackFn *fn, void *privdata,
+                               const char *format, va_list ap);
 int valkeyClusterAsyncCommandArgv(valkeyClusterAsyncContext *acc,
-                                 valkeyClusterCallbackFn *fn, void *privdata,
-                                 int argc, const char **argv,
-                                 const size_t *argvlen);
+                                  valkeyClusterCallbackFn *fn, void *privdata,
+                                  int argc, const char **argv,
+                                  const size_t *argvlen);
 int valkeyClusterAsyncCommandArgvToNode(valkeyClusterAsyncContext *acc,
-                                       valkeyClusterNode *node,
-                                       valkeyClusterCallbackFn *fn,
-                                       void *privdata, int argc,
-                                       const char **argv,
-                                       const size_t *argvlen);
+                                        valkeyClusterNode *node,
+                                        valkeyClusterCallbackFn *fn,
+                                        void *privdata, int argc,
+                                        const char **argv,
+                                        const size_t *argvlen);
 
 /* Use a Valkey protocol encoded string as command */
 int valkeyClusterAsyncFormattedCommand(valkeyClusterAsyncContext *acc,
-                                      valkeyClusterCallbackFn *fn,
-                                      void *privdata, char *cmd, int len);
+                                       valkeyClusterCallbackFn *fn,
+                                       void *privdata, char *cmd, int len);
 int valkeyClusterAsyncFormattedCommandToNode(valkeyClusterAsyncContext *acc,
-                                            valkeyClusterNode *node,
-                                            valkeyClusterCallbackFn *fn,
-                                            void *privdata, char *cmd, int len);
+                                             valkeyClusterNode *node,
+                                             valkeyClusterCallbackFn *fn,
+                                             void *privdata, char *cmd,
+                                             int len);
 
 /* Internal functions */
 valkeyAsyncContext *actx_get_by_node(valkeyClusterAsyncContext *acc,
-                                    valkeyClusterNode *node);
+                                     valkeyClusterNode *node);
 
 /* Cluster node iterator functions */
 void valkeyClusterInitNodeIterator(valkeyClusterNodeIterator *iter,
-                                  valkeyClusterContext *cc);
+                                   valkeyClusterContext *cc);
 valkeyClusterNode *valkeyClusterNodeNext(valkeyClusterNodeIterator *iter);
 
 /* Helper functions */
 unsigned int valkeyClusterGetSlotByKey(char *key);
-valkeyClusterNode *valkeyClusterGetNodeByKey(valkeyClusterContext *cc, char *key);
+valkeyClusterNode *valkeyClusterGetNodeByKey(valkeyClusterContext *cc,
+                                             char *key);
 
 #ifdef __cplusplus
 }

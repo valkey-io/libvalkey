@@ -1,9 +1,9 @@
 /* Some unit tests that don't require Valkey to be running. */
 
 #include "command.h"
-#include "vkarray.h"
-#include "valkeycluster.h"
 #include "test_utils.h"
+#include "valkeycluster.h"
+#include "vkarray.h"
 #include "win32.h"
 #include <assert.h>
 #include <stdio.h>
@@ -151,8 +151,8 @@ void test_valkey_parse_cmd_xreadgroup_ok(void) {
 
 void test_valkey_parse_cmd_xread_ok(void) {
     struct cmd *c = command_get();
-    int len = valkeyFormatCommand(&c->cmd,
-                                 "XREAD BLOCK 42 STREAMS mystream another $ $");
+    int len = valkeyFormatCommand(
+        &c->cmd, "XREAD BLOCK 42 STREAMS mystream another $ $");
     ASSERT_MSG(len >= 0, "Format command error");
     c->clen = len;
     valkey_parse_cmd(c);

@@ -10,8 +10,8 @@
  */
 
 #include "adapters/libevent.h"
-#include "valkeycluster.h"
 #include "test_utils.h"
+#include "valkeycluster.h"
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -29,7 +29,8 @@ void connectToValkey(valkeyClusterAsyncContext *acc) {
     int status = valkeyClusterConnect2(acc->cc);
     if (status == VALKEY_OK) {
         // cluster mode
-    } else if (acc->cc->err && strcmp(acc->cc->errstr, VALKEY_ENOCLUSTER) == 0) {
+    } else if (acc->cc->err &&
+               strcmp(acc->cc->errstr, VALKEY_ENOCLUSTER) == 0) {
         printf("[no cluster]\n");
         acc->cc->err = 0;
         memset(acc->cc->errstr, '\0', strlen(acc->cc->errstr));
@@ -81,7 +82,7 @@ void sendNextCommand(int fd, short kind, void *arg) {
 
         // coverity[tainted_scalar]
         int status = valkeyClusterAsyncCommandToNode(acc, node, replyCallback,
-                                                    NULL, command);
+                                                     NULL, command);
         ASSERT_MSG(status == VALKEY_OK, acc->errstr);
     } else {
         // disconnect if nothing is left to read from stdin

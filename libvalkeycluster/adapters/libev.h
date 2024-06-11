@@ -39,7 +39,7 @@ static int valkeyLibevAttach_link(valkeyAsyncContext *ac, void *loop) {
 }
 
 static int valkeyClusterLibevAttach(valkeyClusterAsyncContext *acc,
-                                   struct ev_loop *loop) {
+                                    struct ev_loop *loop) {
     if (loop == NULL || acc == NULL) {
         return VALKEY_ERR;
     }

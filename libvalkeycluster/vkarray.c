@@ -29,8 +29,8 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-#include <valkey/alloc.h>
 #include <stdlib.h>
+#include <valkey/alloc.h>
 
 #include "vkarray.h"
 #include "vkutil.h"

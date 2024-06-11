@@ -34,8 +34,8 @@
  */
 
 #include "adapters/libevent.h"
-#include "valkeycluster.h"
 #include "test_utils.h"
+#include "valkeycluster.h"
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -83,7 +83,7 @@ void replyCallback(valkeyClusterAsyncContext *acc, void *r, void *privdata) {
         if (resend_failed_cmd) {
             printf("resend '%s'\n", cmd_history[cmd_id]);
             if (valkeyClusterAsyncCommand(acc, replyCallback, (void *)cmd_id,
-                                         cmd_history[cmd_id]) != VALKEY_OK)
+                                          cmd_history[cmd_id]) != VALKEY_OK)
                 printf("send error\n");
             return;
         }

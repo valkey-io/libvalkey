@@ -1,6 +1,6 @@
 #include "adapters/libevent.h"
-#include "valkeycluster.h"
 #include "test_utils.h"
+#include "valkeycluster.h"
 
 #include <assert.h>
 #include <stdbool.h>
@@ -69,7 +69,8 @@ void test_pipeline_with_multinode_commands(void) {
     status = valkeyClusterConnect2(cc);
     ASSERT_MSG(status == VALKEY_OK, cc->errstr);
 
-    status = valkeyClusterAppendCommand(cc, "MSET key1 Hello key2 World key3 !");
+    status =
+        valkeyClusterAppendCommand(cc, "MSET key1 Hello key2 World key3 !");
     ASSERT_MSG(status == VALKEY_OK, cc->errstr);
 
     status = valkeyClusterAppendCommand(cc, "MGET key1 key2 key3");
@@ -139,11 +140,13 @@ void test_async_pipeline(void) {
     assert(status == VALKEY_OK);
 
     ExpectedResult r1 = {.type = VALKEY_REPLY_STATUS, .str = "OK"};
-    status = valkeyClusterAsyncCommand(acc, commandCallback, &r1, "SET foo six");
+    status =
+        valkeyClusterAsyncCommand(acc, commandCallback, &r1, "SET foo six");
     ASSERT_MSG(status == VALKEY_OK, acc->errstr);
 
     ExpectedResult r2 = {.type = VALKEY_REPLY_STATUS, .str = "OK"};
-    status = valkeyClusterAsyncCommand(acc, commandCallback, &r2, "SET bar ten");
+    status =
+        valkeyClusterAsyncCommand(acc, commandCallback, &r2, "SET bar ten");
     ASSERT_MSG(status == VALKEY_OK, acc->errstr);
 
     ExpectedResult r3 = {.type = VALKEY_REPLY_STRING, .str = "six"};

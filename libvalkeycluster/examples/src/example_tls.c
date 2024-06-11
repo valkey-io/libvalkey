@@ -1,9 +1,9 @@
+#include <stdio.h>
+#include <stdlib.h>
 #include <valkey/valkey.h>
 #include <valkey/valkey_ssl.h>
 #include <valkeycluster/valkeycluster.h>
 #include <valkeycluster/valkeycluster_ssl.h>
-#include <stdio.h>
-#include <stdlib.h>
 
 #define CLUSTER_NODE_TLS "127.0.0.1:7301"
 
@@ -16,7 +16,7 @@ int main(int argc, char **argv) {
 
     valkeyInitOpenSSL();
     ssl = valkeyCreateSSLContext("ca.crt", NULL, "client.crt", "client.key",
-                                NULL, &ssl_error);
+                                 NULL, &ssl_error);
     if (!ssl) {
         printf("SSL Context error: %s\n", valkeySSLContextGetError(ssl_error));
         exit(1);
@@ -46,7 +46,8 @@ int main(int argc, char **argv) {
     printf("SET: %s\n", reply->str);
     freeReplyObject(reply);
 
-    valkeyReply *reply2 = (valkeyReply *)valkeyClusterCommand(cc, "GET %s", "key");
+    valkeyReply *reply2 =
+        (valkeyReply *)valkeyClusterCommand(cc, "GET %s", "key");
     if (!reply2) {
         printf("Reply missing: %s\n", cc->errstr);
         exit(-1);

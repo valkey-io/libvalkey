@@ -34,9 +34,9 @@
  */
 
 #include <assert.h>
-#include <valkey/alloc.h>
 #include <limits.h>
 #include <stdlib.h>
+#include <valkey/alloc.h>
 
 #include "dict.h"
 

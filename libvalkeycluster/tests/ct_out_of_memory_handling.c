@@ -25,8 +25,8 @@
  *   and error of running with increased/decreased `i` until the edge is found.
  */
 #include "adapters/libevent.h"
-#include "valkeycluster.h"
 #include "test_utils.h"
+#include "valkeycluster.h"
 #include "win32.h"
 #include <assert.h>
 #include <stdbool.h>
@@ -397,13 +397,13 @@ void test_alloc_failure_handling(void) {
 
         /* Migrate slot */
         reply = valkeyClusterCommandToNode(cc, srcNode,
-                                          "CLUSTER SETSLOT %d MIGRATING %s",
-                                          slot, replyDstId->str);
+                                           "CLUSTER SETSLOT %d MIGRATING %s",
+                                           slot, replyDstId->str);
         CHECK_REPLY_OK(cc, reply);
         freeReplyObject(reply);
         reply = valkeyClusterCommandToNode(cc, dstNode,
-                                          "CLUSTER SETSLOT %d IMPORTING %s",
-                                          slot, replySrcId->str);
+                                           "CLUSTER SETSLOT %d IMPORTING %s",
+                                           slot, replySrcId->str);
         CHECK_REPLY_OK(cc, reply);
         freeReplyObject(reply);
         reply = valkeyClusterCommandToNode(
@@ -464,13 +464,13 @@ void test_alloc_failure_handling(void) {
          * during these final steps by allowing a high number of allocations. */
         prepare_allocation_test(cc, 1000);
         reply = valkeyClusterCommandToNode(cc, dstNode,
-                                          "CLUSTER SETSLOT %d MIGRATING %s",
-                                          slot, replySrcId->str);
+                                           "CLUSTER SETSLOT %d MIGRATING %s",
+                                           slot, replySrcId->str);
         CHECK_REPLY_OK(cc, reply);
         freeReplyObject(reply);
         reply = valkeyClusterCommandToNode(cc, srcNode,
-                                          "CLUSTER SETSLOT %d IMPORTING %s",
-                                          slot, replyDstId->str);
+                                           "CLUSTER SETSLOT %d IMPORTING %s",
+                                           slot, replyDstId->str);
         CHECK_REPLY_OK(cc, reply);
         freeReplyObject(reply);
         reply = valkeyClusterCommandToNode(

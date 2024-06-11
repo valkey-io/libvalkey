@@ -30,12 +30,12 @@
  */
 #include <errno.h>
 #include <fcntl.h>
-#include <valkey/alloc.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>
+#include <valkey/alloc.h>
 
 #ifndef _WIN32
 #include <netinet/in.h>

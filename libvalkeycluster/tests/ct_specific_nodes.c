@@ -1,6 +1,6 @@
 #include "adapters/libevent.h"
-#include "valkeycluster.h"
 #include "test_utils.h"
+#include "valkeycluster.h"
 
 #include <assert.h>
 #include <stdbool.h>
@@ -120,8 +120,8 @@ void test_streams(valkeyClusterContext *cc) {
     freeReplyObject(reply);
 
     /* Read from the stream */
-    reply =
-        valkeyClusterCommandToNode(cc, node, "XREAD COUNT 2 STREAMS mystream 0");
+    reply = valkeyClusterCommandToNode(cc, node,
+                                       "XREAD COUNT 2 STREAMS mystream 0");
     CHECK_REPLY_ARRAY(cc, reply, 1); /* Reply from a single stream */
 
     /* Verify the reply from stream */
@@ -154,7 +154,7 @@ void test_streams(valkeyClusterContext *cc) {
 
     /* Create a consumer group */
     reply = valkeyClusterCommandToNode(cc, node,
-                                      "XGROUP CREATE mystream mygroup1 0");
+                                       "XGROUP CREATE mystream mygroup1 0");
     CHECK_REPLY_OK(cc, reply);
     freeReplyObject(reply);
 
@@ -167,9 +167,10 @@ void test_streams(valkeyClusterContext *cc) {
     }
 
     /* Blocking read of consumer group */
-    reply = valkeyClusterCommandToNode(cc, node,
-                                      "XREADGROUP GROUP mygroup1 myconsumer123 "
-                                      "COUNT 2 BLOCK 200 STREAMS mystream 0");
+    reply =
+        valkeyClusterCommandToNode(cc, node,
+                                   "XREADGROUP GROUP mygroup1 myconsumer123 "
+                                   "COUNT 2 BLOCK 200 STREAMS mystream 0");
     CHECK_REPLY_TYPE(reply, VALKEY_REPLY_ARRAY);
     freeReplyObject(reply);
 
@@ -344,7 +345,7 @@ void test_async_to_single_node(void) {
 
     ExpectedResult r1 = {.type = VALKEY_REPLY_INTEGER, .disconnect = true};
     status = valkeyClusterAsyncCommandToNode(acc, node, commandCallback, &r1,
-                                            "DBSIZE");
+                                             "DBSIZE");
     ASSERT_MSG(status == VALKEY_OK, acc->errstr);
 
     event_base_dispatch(base);
@@ -416,9 +417,9 @@ void test_async_command_argv_to_single_node(void) {
     assert(node);
 
     ExpectedResult r1 = {.type = VALKEY_REPLY_INTEGER, .disconnect = true};
-    status = valkeyClusterAsyncCommandArgvToNode(acc, node, commandCallback, &r1,
-                                                1, (const char *[]){"DBSIZE"},
-                                                (size_t[]){6});
+    status = valkeyClusterAsyncCommandArgvToNode(
+        acc, node, commandCallback, &r1, 1, (const char *[]){"DBSIZE"},
+        (size_t[]){6});
     ASSERT_MSG(status == VALKEY_OK, acc->errstr);
 
     event_base_dispatch(base);
@@ -452,15 +453,16 @@ void test_async_to_all_nodes(void) {
     valkeyClusterNode *node;
     while ((node = valkeyClusterNodeNext(&ni)) != NULL) {
 
-        status = valkeyClusterAsyncCommandToNode(acc, node, commandCallback, &r1,
-                                                "DBSIZE");
+        status = valkeyClusterAsyncCommandToNode(acc, node, commandCallback,
+                                                 &r1, "DBSIZE");
         ASSERT_MSG(status == VALKEY_OK, acc->errstr);
     }
 
     // Normal command to trigger disconnect
     ExpectedResult r2 = {
         .type = VALKEY_REPLY_STATUS, .str = "OK", .disconnect = true};
-    status = valkeyClusterAsyncCommand(acc, commandCallback, &r2, "SET foo bar");
+    status =
+        valkeyClusterAsyncCommand(acc, commandCallback, &r2, "SET foo bar");
 
     event_base_dispatch(base);
 
@@ -490,24 +492,24 @@ void test_async_transaction(void) {
 
     ExpectedResult r1 = {.type = VALKEY_REPLY_STATUS, .str = "OK"};
     status = valkeyClusterAsyncCommandToNode(acc, node, commandCallback, &r1,
-                                            "MULTI");
+                                             "MULTI");
     ASSERT_MSG(status == VALKEY_OK, acc->errstr);
 
     ExpectedResult r2 = {.type = VALKEY_REPLY_STATUS, .str = "QUEUED"};
     status = valkeyClusterAsyncCommandToNode(acc, node, commandCallback, &r2,
-                                            "SET foo 99");
+                                             "SET foo 99");
     ASSERT_MSG(status == VALKEY_OK, acc->errstr);
 
     ExpectedResult r3 = {.type = VALKEY_REPLY_STATUS, .str = "QUEUED"};
     status = valkeyClusterAsyncCommandToNode(acc, node, commandCallback, &r3,
-                                            "INCR foo");
+                                             "INCR foo");
     ASSERT_MSG(status == VALKEY_OK, acc->errstr);
 
     /* The EXEC command will return an array with result from 2 queued commands. */
     ExpectedResult r4 = {
         .type = VALKEY_REPLY_ARRAY, .elements = 2, .disconnect = true};
     status = valkeyClusterAsyncCommandToNode(acc, node, commandCallback, &r4,
-                                            "EXEC ");
+                                             "EXEC ");
     ASSERT_MSG(status == VALKEY_OK, acc->errstr);
 
     event_base_dispatch(base);

@@ -1,7 +1,7 @@
-#include <valkeycluster/adapters/libevent.h>
-#include <valkeycluster/valkeycluster.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <valkeycluster/adapters/libevent.h>
+#include <valkeycluster/valkeycluster.h>
 
 void getCallback(valkeyClusterAsyncContext *cc, void *r, void *privdata) {
     valkeyReply *reply = (valkeyReply *)r;
@@ -60,25 +60,25 @@ int main(int argc, char **argv) {
 
     int status;
     status = valkeyClusterAsyncCommand(cc, setCallback, (char *)"THE_ID",
-                                      "SET %s %s", "key", "value");
+                                       "SET %s %s", "key", "value");
     if (status != VALKEY_OK) {
         printf("error: err=%d errstr=%s\n", cc->err, cc->errstr);
     }
 
     status = valkeyClusterAsyncCommand(cc, getCallback, (char *)"THE_ID",
-                                      "GET %s", "key");
+                                       "GET %s", "key");
     if (status != VALKEY_OK) {
         printf("error: err=%d errstr=%s\n", cc->err, cc->errstr);
     }
 
     status = valkeyClusterAsyncCommand(cc, setCallback, (char *)"THE_ID",
-                                      "SET %s %s", "key2", "value2");
+                                       "SET %s %s", "key2", "value2");
     if (status != VALKEY_OK) {
         printf("error: err=%d errstr=%s\n", cc->err, cc->errstr);
     }
 
     status = valkeyClusterAsyncCommand(cc, getCallback, (char *)"THE_ID",
-                                      "GET %s", "key2");
+                                       "GET %s", "key2");
     if (status != VALKEY_OK) {
         printf("error: err=%d errstr=%s\n", cc->err, cc->errstr);
     }

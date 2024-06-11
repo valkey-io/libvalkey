@@ -18,7 +18,7 @@
 #define CHECK_REPLY_STATUS(_ctx, _reply, _str)                                 \
     {                                                                          \
         CHECK_REPLY(_ctx, _reply);                                             \
-        CHECK_REPLY_TYPE(_reply, VALKEY_REPLY_STATUS);                          \
+        CHECK_REPLY_TYPE(_reply, VALKEY_REPLY_STATUS);                         \
         ASSERT_MSG((strcmp(_reply->str, _str) == 0), _ctx->errstr);            \
     }
 
@@ -31,34 +31,34 @@
 #define CHECK_REPLY_INT(_ctx, _reply, _value)                                  \
     {                                                                          \
         CHECK_REPLY(_ctx, _reply);                                             \
-        CHECK_REPLY_TYPE(_reply, VALKEY_REPLY_INTEGER);                         \
+        CHECK_REPLY_TYPE(_reply, VALKEY_REPLY_INTEGER);                        \
         ASSERT_MSG((_reply->integer == _value), _ctx->errstr);                 \
     }
 
 #define CHECK_REPLY_STR(_ctx, _reply, _str)                                    \
     {                                                                          \
         CHECK_REPLY(_ctx, _reply);                                             \
-        CHECK_REPLY_TYPE(_reply, VALKEY_REPLY_STRING);                          \
+        CHECK_REPLY_TYPE(_reply, VALKEY_REPLY_STRING);                         \
         ASSERT_MSG((strcmp(_reply->str, _str) == 0), _ctx->errstr);            \
     }
 
 #define CHECK_REPLY_ARRAY(_ctx, _reply, _num_of_elements)                      \
     {                                                                          \
         CHECK_REPLY(_ctx, _reply);                                             \
-        CHECK_REPLY_TYPE(_reply, VALKEY_REPLY_ARRAY);                           \
+        CHECK_REPLY_TYPE(_reply, VALKEY_REPLY_ARRAY);                          \
         ASSERT_MSG(_reply->elements == _num_of_elements, _ctx->errstr);        \
     }
 
 #define CHECK_REPLY_NIL(_ctx, _reply)                                          \
     {                                                                          \
         CHECK_REPLY(_ctx, _reply);                                             \
-        CHECK_REPLY_TYPE(_reply, VALKEY_REPLY_NIL);                             \
+        CHECK_REPLY_TYPE(_reply, VALKEY_REPLY_NIL);                            \
     }
 
 #define CHECK_REPLY_ERROR(_ctx, _reply, _str)                                  \
     {                                                                          \
         CHECK_REPLY(_ctx, _reply);                                             \
-        CHECK_REPLY_TYPE(_reply, VALKEY_REPLY_ERROR);                           \
+        CHECK_REPLY_TYPE(_reply, VALKEY_REPLY_ERROR);                          \
         ASSERT_MSG((strncmp(_reply->str, _str, strlen(_str)) == 0),            \
                    _ctx->errstr);                                              \
     }
@@ -73,5 +73,5 @@
 
 struct valkeyClusterContext;
 
-void load_valkey_version(valkeyClusterContext *cc);
+void load_valkey_version(struct valkeyClusterContext *cc);
 int valkey_version_less_than(int major, int minor);

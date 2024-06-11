@@ -39,7 +39,7 @@ static int valkeyAeAttach_link(valkeyAsyncContext *ac, void *base) {
 }
 
 static int valkeyClusterAeAttach(aeEventLoop *loop,
-                                valkeyClusterAsyncContext *acc) {
+                                 valkeyClusterAsyncContext *acc) {
 
     if (acc == NULL || loop == NULL) {
         return VALKEY_ERR;
