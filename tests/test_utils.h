@@ -1,5 +1,5 @@
-#ifndef __TEST_UTILS_H__
-#define __TEST_UTILS_H__
+#ifndef VALKEY_TEST_UTILS_H
+#define VALKEY_TEST_UTILS_H
 
 #define ASSERT_MSG(_x, _msg)                                                   \
     if (!(_x)) {                                                               \
@@ -69,9 +69,9 @@
 #define ASSERT_STR_STARTS_WITH(_s1, _s2)                                       \
     { assert(strncmp(_s1, _s2, strlen(_s2)) == 0); }
 
-#endif
-
 struct valkeyClusterContext;
 
 void load_valkey_version(struct valkeyClusterContext *cc);
 int valkey_version_less_than(int major, int minor);
+
+#endif /* VALKEY_TEST_UTILS_H */

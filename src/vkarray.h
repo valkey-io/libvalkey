@@ -28,8 +28,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef __VKARRAY_H_
-#define __VKARRAY_H_
+#ifndef VALKEY_VKARRAY_H
+#define VALKEY_VKARRAY_H
 
 #include <stdint.h>
 
@@ -76,4 +76,4 @@ void vkarray_swap(struct vkarray *a, struct vkarray *b);
 void vkarray_sort(struct vkarray *a, vkarray_compare_t compare);
 int vkarray_each(struct vkarray *a, vkarray_each_t func, void *data);
 
-#endif
+#endif /* VALKEY_VKARRAY_H */
