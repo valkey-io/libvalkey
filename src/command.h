@@ -90,17 +90,13 @@ struct cmd {
     /* Command destination */
     int slot_num;    /* Command should be sent to slot.
                       * Set to -1 if command is sent to a given node,
-                      * or if a slot can not be found or calculated,
-                      * or if its a multi-key command cross different
-                      * nodes (cross slot) */
+                      * or if a slot can not be found or calculated. */
     char *node_addr; /* Command sent to this node address */
 
     struct cmd *
         *frag_seq; /* sequence of fragment command, map from keys to fragments*/
 
     valkeyReply *reply;
-
-    hilist *sub_commands; /* just for pipeline and multi-key commands */
 };
 
 void valkey_parse_cmd(struct cmd *r);
