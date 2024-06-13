@@ -259,9 +259,10 @@ void valkeyClusterReset(valkeyClusterContext *cc);
 /* Update the slotmap by querying any node. */
 int valkeyClusterUpdateSlotmap(valkeyClusterContext *cc);
 
-/* Internal functions */
-valkeyContext *ctx_get_by_node(valkeyClusterContext *cc,
-                               valkeyClusterNode *node);
+/* Get the valkeyContext used for communication with a given node.
+ * Connects or reconnects to the node if necessary. */
+valkeyContext *valkeyClusterGetValkeyContext(valkeyClusterContext *cc,
+                                             valkeyClusterNode *node);
 
 /*
  * Asynchronous API
@@ -316,9 +317,10 @@ int valkeyClusterAsyncFormattedCommandToNode(valkeyClusterAsyncContext *acc,
                                              void *privdata, char *cmd,
                                              int len);
 
-/* Internal functions */
-valkeyAsyncContext *actx_get_by_node(valkeyClusterAsyncContext *acc,
-                                     valkeyClusterNode *node);
+/* Get the valkeyAsyncContext used for communication with a given node.
+ * Connects or reconnects to the node if necessary. */
+valkeyAsyncContext *valkeyClusterGetValkeyAsyncContext(valkeyClusterAsyncContext *acc,
+                                                       valkeyClusterNode *node);
 
 /* Cluster node iterator functions */
 void valkeyClusterInitNodeIterator(valkeyClusterNodeIterator *iter,
