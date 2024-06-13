@@ -276,9 +276,6 @@ static void freeValkeyClusterNode(valkeyClusterNode *node) {
     if (node->slots != NULL) {
         listRelease(node->slots);
     }
-    if (node->slaves != NULL) {
-        listRelease(node->slaves);
-    }
     vk_free(node);
 }
 
@@ -391,8 +388,7 @@ error:
  */
 static valkeyClusterNode *node_get_with_slots(valkeyClusterContext *cc,
                                               valkeyReply *host_elem,
-                                              valkeyReply *port_elem,
-                                              uint8_t role) {
+                                              valkeyReply *port_elem) {
     valkeyClusterNode *node = NULL;
 
     if (host_elem == NULL || port_elem == NULL) {
@@ -425,14 +421,11 @@ static valkeyClusterNode *node_get_with_slots(valkeyClusterContext *cc,
         goto oom;
     }
 
-    if (role == VALKEY_ROLE_MASTER) {
-        node->slots = listCreate();
-        if (node->slots == NULL) {
-            goto oom;
-        }
-
-        node->slots->free = listClusterSlotDestructor;
+    node->slots = listCreate();
+    if (node->slots == NULL) {
+        goto oom;
     }
+    node->slots->free = listClusterSlotDestructor;
 
     node->addr = sdsnewlen(host_elem->str, host_elem->len);
     if (node->addr == NULL) {
@@ -448,7 +441,7 @@ static valkeyClusterNode *node_get_with_slots(valkeyClusterContext *cc,
     }
     node->name = NULL;
     node->port = (int)port_elem->integer;
-    node->role = role;
+    node->role = VALKEY_ROLE_MASTER;
 
     return node;
 
@@ -576,106 +569,10 @@ static void cluster_nodes_swap_ctx(dict *nodes_f, dict *nodes_t) {
     }
 }
 
-static int cluster_master_slave_mapping_with_name(valkeyClusterContext *cc,
-                                                  dict **nodes,
-                                                  valkeyClusterNode *node,
-                                                  sds master_name) {
-    int ret;
-    dictEntry *di;
-    valkeyClusterNode *node_old;
-    listNode *lnode;
-
-    if (node == NULL || master_name == NULL) {
-        return VALKEY_ERR;
-    }
-
-    if (*nodes == NULL) {
-        *nodes = dictCreate(&clusterNodesRefDictType, NULL);
-        if (*nodes == NULL) {
-            goto oom;
-        }
-    }
-
-    di = dictFind(*nodes, master_name);
-    if (di == NULL) {
-        sds key = sdsnewlen(master_name, sdslen(master_name));
-        if (key == NULL) {
-            goto oom;
-        }
-        ret = dictAdd(*nodes, key, node);
-        if (ret != DICT_OK) {
-            sdsfree(key);
-            goto oom;
-        }
-
-    } else {
-        node_old = dictGetEntryVal(di);
-        if (node_old == NULL) {
-            valkeyClusterSetError(cc, VALKEY_ERR_OTHER, "dict get value null");
-            return VALKEY_ERR;
-        }
-
-        if (node->role == VALKEY_ROLE_MASTER &&
-            node_old->role == VALKEY_ROLE_MASTER) {
-            valkeyClusterSetError(cc, VALKEY_ERR_OTHER,
-                                  "two masters have the same name");
-            return VALKEY_ERR;
-        } else if (node->role == VALKEY_ROLE_MASTER &&
-                   node_old->role == VALKEY_ROLE_SLAVE) {
-            if (node->slaves == NULL) {
-                node->slaves = listCreate();
-                if (node->slaves == NULL) {
-                    goto oom;
-                }
-
-                node->slaves->free = listClusterNodeDestructor;
-            }
-
-            if (node_old->slaves != NULL) {
-                node_old->slaves->free = NULL;
-                while (listLength(node_old->slaves) > 0) {
-                    lnode = listFirst(node_old->slaves);
-                    if (listAddNodeHead(node->slaves, lnode->value) == NULL) {
-                        goto oom;
-                    }
-                    listDelNode(node_old->slaves, lnode);
-                }
-                listRelease(node_old->slaves);
-                node_old->slaves = NULL;
-            }
-
-            if (listAddNodeHead(node->slaves, node_old) == NULL) {
-                goto oom;
-            }
-            dictSetHashVal(*nodes, di, node);
-
-        } else if (node->role == VALKEY_ROLE_SLAVE) {
-            if (node_old->slaves == NULL) {
-                node_old->slaves = listCreate();
-                if (node_old->slaves == NULL) {
-                    goto oom;
-                }
-
-                node_old->slaves->free = listClusterNodeDestructor;
-            }
-            if (listAddNodeTail(node_old->slaves, node) == NULL) {
-                goto oom;
-            }
-        }
-    }
-
-    return VALKEY_OK;
-
-oom:
-    valkeyClusterSetError(cc, VALKEY_ERR_OOM, "Out of memory");
-    return VALKEY_ERR;
-}
-
 /**
  * Parse the "cluster slots" command reply to nodes dict.
  */
-dict *parse_cluster_slots(valkeyClusterContext *cc, valkeyReply *reply,
-                          int flags) {
+dict *parse_cluster_slots(valkeyClusterContext *cc, valkeyReply *reply) {
     int ret;
     cluster_slot *slot = NULL;
     dict *nodes = NULL;
@@ -684,7 +581,7 @@ dict *parse_cluster_slots(valkeyClusterContext *cc, valkeyReply *reply,
     valkeyReply *elem_slots_begin, *elem_slots_end;
     valkeyReply *elem_nodes;
     valkeyReply *elem_ip, *elem_port;
-    valkeyClusterNode *master = NULL, *slave;
+    valkeyClusterNode *master = NULL;
     uint32_t i, idx;
 
     if (reply == NULL) {
@@ -796,8 +693,7 @@ dict *parse_cluster_slots(valkeyClusterContext *cc, valkeyReply *reply,
                         break;
                     }
 
-                    master = node_get_with_slots(cc, elem_ip, elem_port,
-                                                 VALKEY_ROLE_MASTER);
+                    master = node_get_with_slots(cc, elem_ip, elem_port);
                     if (master == NULL) {
                         goto error;
                     }
@@ -821,27 +717,6 @@ dict *parse_cluster_slots(valkeyClusterContext *cc, valkeyReply *reply,
                     }
 
                     slot = NULL;
-                } else if (flags & VALKEYCLUSTER_FLAG_ADD_SLAVE) {
-                    slave = node_get_with_slots(cc, elem_ip, elem_port,
-                                                VALKEY_ROLE_SLAVE);
-                    if (slave == NULL) {
-                        goto error;
-                    }
-
-                    if (master->slaves == NULL) {
-                        master->slaves = listCreate();
-                        if (master->slaves == NULL) {
-                            freeValkeyClusterNode(slave);
-                            goto oom;
-                        }
-
-                        master->slaves->free = listClusterNodeDestructor;
-                    }
-
-                    if (listAddNodeTail(master->slaves, slave) == NULL) {
-                        freeValkeyClusterNode(slave);
-                        goto oom;
-                    }
                 }
             }
         }
@@ -866,12 +741,11 @@ error:
 /**
  * Parse the "cluster nodes" command reply to nodes dict.
  */
-dict *parse_cluster_nodes(valkeyClusterContext *cc, char *str, int str_len,
-                          int flags) {
+dict *parse_cluster_nodes(valkeyClusterContext *cc, char *str, int str_len) {
     int ret;
     dict *nodes = NULL;
     dict *nodes_name = NULL;
-    valkeyClusterNode *master, *slave;
+    valkeyClusterNode *master;
     cluster_slot *slot;
     char *pos, *start, *end, *line_start, *line_end;
     char *role;
@@ -954,15 +828,6 @@ dict *parse_cluster_nodes(valkeyClusterContext *cc, char *str, int str_len,
                     goto error;
                 }
 
-                if (flags & VALKEYCLUSTER_FLAG_ADD_SLAVE) {
-                    ret = cluster_master_slave_mapping_with_name(
-                        cc, &nodes_name, master, master->name);
-                    if (ret != VALKEY_OK) {
-                        freeValkeyClusterNode(master);
-                        goto error;
-                    }
-                }
-
                 for (k = 8; k < count_part; k++) {
                     slot_start_end = sdssplitlen(part[k], sdslen(part[k]), "-",
                                                  1, &count_slot_start_end);
@@ -1002,23 +867,6 @@ dict *parse_cluster_nodes(valkeyClusterContext *cc, char *str, int str_len,
 
                     slot->start = (uint32_t)slot_start;
                     slot->end = (uint32_t)slot_end;
-                }
-
-            }
-            // add slave node
-            else if ((flags & VALKEYCLUSTER_FLAG_ADD_SLAVE) &&
-                     (role_len >= 5 && memcmp(role, "slave", 5) == 0)) {
-                slave = node_get_with_nodes(cc, part, count_part,
-                                            VALKEY_ROLE_SLAVE);
-                if (slave == NULL) {
-                    goto error;
-                }
-
-                ret = cluster_master_slave_mapping_with_name(cc, &nodes_name,
-                                                             slave, part[3]);
-                if (ret != VALKEY_OK) {
-                    freeValkeyClusterNode(slave);
-                    goto error;
                 }
             }
 
@@ -1106,7 +954,7 @@ static int handleClusterSlotsReply(valkeyClusterContext *cc, valkeyContext *c) {
         return VALKEY_ERR;
     }
 
-    dict *nodes = parse_cluster_slots(cc, reply, cc->flags);
+    dict *nodes = parse_cluster_slots(cc, reply);
     freeReplyObject(reply);
     return updateNodesAndSlotmap(cc, nodes);
 }
@@ -1138,7 +986,7 @@ static int handleClusterNodesReply(valkeyClusterContext *cc, valkeyContext *c) {
         return VALKEY_ERR;
     }
 
-    dict *nodes = parse_cluster_nodes(cc, reply->str, reply->len, cc->flags);
+    dict *nodes = parse_cluster_nodes(cc, reply->str, reply->len);
     freeReplyObject(reply);
     return updateNodesAndSlotmap(cc, nodes);
 }
@@ -1672,17 +1520,6 @@ int valkeyClusterSetOptionPassword(valkeyClusterContext *cc,
     return VALKEY_OK;
 }
 
-int valkeyClusterSetOptionParseSlaves(valkeyClusterContext *cc) {
-
-    if (cc == NULL) {
-        return VALKEY_ERR;
-    }
-
-    cc->flags |= VALKEYCLUSTER_FLAG_ADD_SLAVE;
-
-    return VALKEY_OK;
-}
-
 int valkeyClusterSetOptionRouteUseSlots(valkeyClusterContext *cc) {
 
     if (cc == NULL) {
@@ -1749,24 +1586,6 @@ int valkeyClusterSetOptionTimeout(valkeyClusterContext *cc,
                 }
                 if (node->con && node->con->err == 0) {
                     valkeySetTimeout(node->con, tv);
-                }
-
-                if (node->slaves && listLength(node->slaves) > 0) {
-                    valkeyClusterNode *slave;
-                    listNode *ln;
-
-                    listIter li;
-                    listRewind(node->slaves, &li);
-
-                    while ((ln = listNext(&li)) != NULL) {
-                        slave = listNodeValue(ln);
-                        if (slave->acon) {
-                            valkeyAsyncSetTimeout(slave->acon, tv);
-                        }
-                        if (slave->con && slave->con->err == 0) {
-                            valkeySetTimeout(slave->con, tv);
-                        }
-                    }
                 }
             }
         }
@@ -3097,7 +2916,7 @@ void clusterSlotsReplyCallback(valkeyAsyncContext *ac, void *r,
     }
 
     valkeyClusterContext *cc = acc->cc;
-    dict *nodes = parse_cluster_slots(cc, reply, cc->flags);
+    dict *nodes = parse_cluster_slots(cc, reply);
     if (updateNodesAndSlotmap(cc, nodes) != VALKEY_OK) {
         /* Ignore failures for now */
     }
@@ -3118,7 +2937,7 @@ void clusterNodesReplyCallback(valkeyAsyncContext *ac, void *r,
     }
 
     valkeyClusterContext *cc = acc->cc;
-    dict *nodes = parse_cluster_nodes(cc, reply->str, reply->len, cc->flags);
+    dict *nodes = parse_cluster_nodes(cc, reply->str, reply->len);
     if (updateNodesAndSlotmap(cc, nodes) != VALKEY_OK) {
         /* Ignore failures for now */
     }

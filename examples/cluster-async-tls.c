@@ -72,7 +72,6 @@ int main(int argc, char **argv) {
     valkeyClusterAsyncSetDisconnectCallback(acc, disconnectCallback);
     valkeyClusterSetOptionAddNodes(acc->cc, CLUSTER_NODE_TLS);
     valkeyClusterSetOptionRouteUseSlots(acc->cc);
-    valkeyClusterSetOptionParseSlaves(acc->cc);
     valkeyClusterSetOptionEnableSSL(acc->cc, ssl);
 
     if (valkeyClusterConnect2(acc->cc) != VALKEY_OK) {

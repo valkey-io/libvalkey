@@ -47,9 +47,6 @@
 
 /* Configuration flags */
 #define VALKEYCLUSTER_FLAG_NULL 0x0
-/* Flag to enable parsing of slave nodes. Currently not used, but the
-   information is added to its master node structure. */
-#define VALKEYCLUSTER_FLAG_ADD_SLAVE 0x1000
 /* Flag to enable routing table updates using the command 'cluster slots'.
  * Default is the 'cluster nodes' command. */
 #define VALKEYCLUSTER_FLAG_ROUTE_USE_SLOTS 0x4000
@@ -86,7 +83,6 @@ typedef struct valkeyClusterNode {
     valkeyAsyncContext *acon;
     int64_t lastConnectionAttempt; /* Timestamp */
     struct hilist *slots;
-    struct hilist *slaves;
 } valkeyClusterNode;
 
 typedef struct cluster_slot {
@@ -180,7 +176,6 @@ int valkeyClusterSetOptionUsername(valkeyClusterContext *cc,
                                    const char *username);
 int valkeyClusterSetOptionPassword(valkeyClusterContext *cc,
                                    const char *password);
-int valkeyClusterSetOptionParseSlaves(valkeyClusterContext *cc);
 int valkeyClusterSetOptionRouteUseSlots(valkeyClusterContext *cc);
 int valkeyClusterSetOptionConnectTimeout(valkeyClusterContext *cc,
                                          const struct timeval tv);
@@ -271,9 +266,8 @@ int valkeyClusterUpdateSlotmap(valkeyClusterContext *cc);
 valkeyContext *ctx_get_by_node(valkeyClusterContext *cc,
                                valkeyClusterNode *node);
 struct dict *parse_cluster_nodes(valkeyClusterContext *cc, char *str,
-                                 int str_len, int flags);
-struct dict *parse_cluster_slots(valkeyClusterContext *cc, valkeyReply *reply,
-                                 int flags);
+                                 int str_len);
+struct dict *parse_cluster_slots(valkeyClusterContext *cc, valkeyReply *reply);
 
 /*
  * Asynchronous API
