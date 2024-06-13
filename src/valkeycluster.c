@@ -674,8 +674,8 @@ oom:
 /**
  * Parse the "cluster slots" command reply to nodes dict.
  */
-dict *parse_cluster_slots(valkeyClusterContext *cc, valkeyReply *reply,
-                          int flags) {
+static dict *parse_cluster_slots(valkeyClusterContext *cc, valkeyReply *reply,
+                                 int flags) {
     int ret;
     cluster_slot *slot = NULL;
     dict *nodes = NULL;
@@ -866,8 +866,8 @@ error:
 /**
  * Parse the "cluster nodes" command reply to nodes dict.
  */
-dict *parse_cluster_nodes(valkeyClusterContext *cc, char *str, int str_len,
-                          int flags) {
+static dict *parse_cluster_nodes(valkeyClusterContext *cc, char *str, int str_len,
+                                 int flags) {
     int ret;
     dict *nodes = NULL;
     dict *nodes_name = NULL;
