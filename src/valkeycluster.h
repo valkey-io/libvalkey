@@ -55,9 +55,6 @@
 /* Flag to enable parsing of slave nodes. Currently not used, but the
    information is added to its master node structure. */
 #define VALKEYCLUSTER_FLAG_ADD_SLAVE 0x1000
-/* Flag to enable parsing of importing/migrating slots for master nodes.
- * Only applicable when 'cluster nodes' command is used for route updates. */
-#define VALKEYCLUSTER_FLAG_ADD_OPENSLOT 0x2000
 /* Flag to enable routing table updates using the command 'cluster slots'.
  * Default is the 'cluster nodes' command. */
 #define VALKEYCLUSTER_FLAG_ROUTE_USE_SLOTS 0x4000
@@ -92,8 +89,6 @@ typedef struct valkeyClusterNode {
     int64_t lastConnectionAttempt; /* Timestamp */
     struct hilist *slots;
     struct hilist *slaves;
-    struct vkarray *migrating; /* copen_slot[] */
-    struct vkarray *importing; /* copen_slot[] */
 } valkeyClusterNode;
 
 typedef struct cluster_slot {
@@ -101,13 +96,6 @@ typedef struct cluster_slot {
     uint32_t end;
     valkeyClusterNode *node; /* master that this slot region belong to */
 } cluster_slot;
-
-typedef struct copen_slot {
-    uint32_t slot_num; /* slot number */
-    int migrate;       /* migrating or importing? */
-    sds remote_name;   /* name of node this slot migrating to/importing from */
-    valkeyClusterNode *node; /* master that this slot belong to */
-} copen_slot;
 
 /* Context for accessing a Valkey Cluster */
 typedef struct valkeyClusterContext {
@@ -195,7 +183,6 @@ int valkeyClusterSetOptionUsername(valkeyClusterContext *cc,
 int valkeyClusterSetOptionPassword(valkeyClusterContext *cc,
                                    const char *password);
 int valkeyClusterSetOptionParseSlaves(valkeyClusterContext *cc);
-int valkeyClusterSetOptionParseOpenSlots(valkeyClusterContext *cc);
 int valkeyClusterSetOptionRouteUseSlots(valkeyClusterContext *cc);
 int valkeyClusterSetOptionConnectTimeout(valkeyClusterContext *cc,
                                          const struct timeval tv);
