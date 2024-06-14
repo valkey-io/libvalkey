@@ -48,8 +48,6 @@ typedef int rstatus_t; /* return type */
 
 int _vk_atoi(uint8_t *line, size_t n);
 
-int vk_valid_port(int n);
-
 /*
  * Wrappers for defining custom assert based on whether macro
  * VK_ASSERT_PANIC or VK_ASSERT_LOG was defined at the moment

@@ -64,14 +64,6 @@ int _vk_atoi(uint8_t *line, size_t n) {
     return value;
 }
 
-int vk_valid_port(int n) {
-    if (n < 1 || n > UINT16_MAX) {
-        return 0;
-    }
-
-    return 1;
-}
-
 void vk_stacktrace(int skip_count) {
 #ifdef VK_HAVE_BACKTRACE
     void *stack[64];

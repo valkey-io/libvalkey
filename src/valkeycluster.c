@@ -405,14 +405,14 @@ static valkeyClusterNode *node_get_with_slots(valkeyClusterContext *cc,
         goto error;
     }
 
-    if (port_elem->type != VALKEY_REPLY_INTEGER || port_elem->integer <= 0) {
+    if (port_elem->type != VALKEY_REPLY_INTEGER) {
         __valkeyClusterSetError(cc, VALKEY_ERR_OTHER,
                                 "Command(cluster slots) reply error: "
                                 "node port is not integer.");
         goto error;
     }
 
-    if (!vk_valid_port((int)port_elem->integer)) {
+    if (port_elem->integer < 1 || port_elem->integer > UINT16_MAX) {
         __valkeyClusterSetError(cc, VALKEY_ERR_OTHER,
                                 "Command(cluster slots) reply error: "
                                 "node port is not valid.");
