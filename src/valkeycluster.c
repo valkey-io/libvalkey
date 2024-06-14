@@ -291,7 +291,7 @@ static cluster_slot *cluster_slot_create(valkeyClusterNode *node) {
     slot->node = node;
 
     if (node != NULL) {
-        ASSERT(node->role == VALKEY_ROLE_MASTER);
+        assert(node->role == VALKEY_ROLE_MASTER);
         if (node->slots == NULL) {
             node->slots = listCreate();
             if (node->slots == NULL) {

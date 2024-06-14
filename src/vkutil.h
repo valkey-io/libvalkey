@@ -48,38 +48,6 @@ typedef int rstatus_t; /* return type */
 
 int _vk_atoi(uint8_t *line, size_t n);
 
-/*
- * Wrappers for defining custom assert based on whether macro
- * VK_ASSERT_PANIC or VK_ASSERT_LOG was defined at the moment
- * ASSERT was called.
- */
-#ifdef VK_ASSERT_PANIC
-
-#define ASSERT(_x)                                                             \
-    do {                                                                       \
-        if (!(_x)) {                                                           \
-            vk_assert(#_x, __FILE__, __LINE__, 1);                             \
-        }                                                                      \
-    } while (0)
-
-#elif VK_ASSERT_LOG
-
-#define ASSERT(_x)                                                             \
-    do {                                                                       \
-        if (!(_x)) {                                                           \
-            vk_assert(#_x, __FILE__, __LINE__, 0);                             \
-        }                                                                      \
-    } while (0)
-
-#else
-
-#define ASSERT(_x)
-
-#endif
-
-void vk_assert(const char *cond, const char *file, int line, int panic);
-void vk_stacktrace(int skip_count);
-
 int64_t vk_usec_now(void);
 
 uint16_t crc16(const char *buf, int len);

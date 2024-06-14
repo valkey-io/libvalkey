@@ -29,6 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+#include <assert.h>
 #include <stdlib.h>
 
 #include "alloc.h"
@@ -38,7 +39,7 @@
 struct vkarray *vkarray_create(uint32_t n, size_t size) {
     struct vkarray *a;
 
-    ASSERT(n != 0 && size != 0);
+    assert(n != 0 && size != 0);
 
     a = vk_malloc(sizeof(*a));
     if (a == NULL) {
@@ -64,7 +65,7 @@ void vkarray_destroy(struct vkarray *a) {
 }
 
 void vkarray_deinit(struct vkarray *a) {
-    ASSERT(a->nelem == 0);
+    assert(a->nelem == 0);
 
     vk_free(a->elem);
     a->elem = NULL;
@@ -74,13 +75,13 @@ uint32_t vkarray_idx(struct vkarray *a, void *elem) {
     uint8_t *p, *q;
     uint32_t off, idx;
 
-    ASSERT(elem >= a->elem);
+    assert(elem >= a->elem);
 
     p = a->elem;
     q = elem;
     off = (uint32_t)(q - p);
 
-    ASSERT(off % (uint32_t)a->size == 0);
+    assert(off % (uint32_t)a->size == 0);
 
     idx = off / (uint32_t)a->size;
 
@@ -113,7 +114,7 @@ void *vkarray_push(struct vkarray *a) {
 void *vkarray_pop(struct vkarray *a) {
     void *elem;
 
-    ASSERT(a->nelem != 0);
+    assert(a->nelem != 0);
 
     a->nelem--;
     elem = (uint8_t *)a->elem + a->size * a->nelem;
@@ -124,8 +125,8 @@ void *vkarray_pop(struct vkarray *a) {
 void *vkarray_get(struct vkarray *a, uint32_t idx) {
     void *elem;
 
-    ASSERT(a->nelem != 0);
-    ASSERT(idx < a->nelem);
+    assert(a->nelem != 0);
+    assert(idx < a->nelem);
 
     elem = (uint8_t *)a->elem + (a->size * idx);
 
@@ -133,7 +134,7 @@ void *vkarray_get(struct vkarray *a, uint32_t idx) {
 }
 
 void *vkarray_top(struct vkarray *a) {
-    ASSERT(a->nelem != 0);
+    assert(a->nelem != 0);
 
     return vkarray_get(a, a->nelem - 1);
 }
@@ -151,7 +152,7 @@ void vkarray_swap(struct vkarray *a, struct vkarray *b) {
  * compare comparator.
  */
 void vkarray_sort(struct vkarray *a, vkarray_compare_t compare) {
-    ASSERT(a->nelem != 0);
+    assert(a->nelem != 0);
 
     qsort(a->elem, a->nelem, a->size, compare);
 }
@@ -163,8 +164,8 @@ void vkarray_sort(struct vkarray *a, vkarray_compare_t compare) {
 int vkarray_each(struct vkarray *a, vkarray_each_t func, void *data) {
     uint32_t i, nelem;
 
-    ASSERT(vkarray_n(a) != 0);
-    ASSERT(func != NULL);
+    assert(vkarray_n(a) != 0);
+    assert(func != NULL);
 
     for (i = 0, nelem = vkarray_n(a); i < nelem; i++) {
         void *elem = vkarray_get(a, i);

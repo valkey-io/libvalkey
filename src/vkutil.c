@@ -35,10 +35,6 @@
 #include <sys/time.h>
 #endif
 
-#ifdef VK_HAVE_BACKTRACE
-#include <execinfo.h>
-#endif
-
 #include "alloc.h"
 #include "vkutil.h"
 
@@ -62,41 +58,6 @@ int _vk_atoi(uint8_t *line, size_t n) {
     }
 
     return value;
-}
-
-void vk_stacktrace(int skip_count) {
-#ifdef VK_HAVE_BACKTRACE
-    void *stack[64];
-    char **symbols;
-    int size, i, j;
-
-    size = backtrace(stack, 64);
-    symbols = backtrace_symbols(stack, size);
-    if (symbols == NULL) {
-        return;
-    }
-
-    skip_count++; /* skip the current frame also */
-
-    for (i = skip_count, j = 0; i < size; i++, j++) {
-        printf("[%d] %s\n", j, symbols[i]);
-    }
-
-    vk_free(symbols);
-#else
-    (void)skip_count;
-#endif
-}
-
-void vk_assert(const char *cond, const char *file, int line, int panic) {
-
-    printf("File: %s Line: %d: %s\n", file, line, cond);
-
-    if (panic) {
-        vk_stacktrace(1);
-        abort();
-    }
-    abort();
 }
 
 /*

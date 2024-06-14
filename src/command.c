@@ -28,6 +28,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+#include <assert.h>
 #include <ctype.h>
 #include <errno.h>
 #ifndef _WIN32
@@ -192,7 +193,7 @@ static inline int push_keypos(struct cmd *r, char *arg, uint32_t arglen) {
  *
  */
 void valkey_parse_cmd(struct cmd *r) {
-    ASSERT(r->cmd != NULL && r->clen > 0);
+    assert(r->cmd != NULL && r->clen > 0);
     char *p = r->cmd;
     char *end = r->cmd + r->clen;
     uint32_t rnarg = 0;                  /* Number of args including cmd name */
@@ -322,7 +323,7 @@ void valkey_parse_cmd(struct cmd *r) {
         goto oom;
 
 done:
-    ASSERT(r->type > CMD_UNKNOWN && r->type < CMD_SENTINEL);
+    assert(r->type > CMD_UNKNOWN && r->type < CMD_SENTINEL);
     r->result = CMD_PARSE_OK;
     return;
 
