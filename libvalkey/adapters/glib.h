@@ -1,5 +1,5 @@
 #ifndef VALKEY_GLIB_H
-#define VALKEY_GLIB_H__
+#define VALKEY_GLIB_H
 
 #include <glib.h>
 
