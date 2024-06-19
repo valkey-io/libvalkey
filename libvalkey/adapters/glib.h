@@ -1,4 +1,4 @@
-#ifndef VALKEY_GLIB_H__
+#ifndef VALKEY_GLIB_H
 #define VALKEY_GLIB_H__
 
 #include <glib.h>
