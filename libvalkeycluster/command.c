@@ -65,8 +65,8 @@ typedef struct {
     int8_t arity;              /* Arity, neg number means min num args */
 } cmddef;
 
-/* Populate the table with code in cmddef.h generated from Valkey JSON files. */
-static cmddef valkey_commands[] = {
+/* Populate the table with code in cmddef.h generated from JSON files. */
+static cmddef server_commands[] = {
 #define COMMAND(_type, _name, _subname, _arity, _keymethod, _keypos)           \
     {.type = CMD_REQ_VALKEY_##_type,                                           \
      .name = _name,                                                            \
@@ -94,7 +94,7 @@ static inline void to_upper(char *dst, const char *src, uint32_t len) {
  * populated. */
 cmddef *valkey_lookup_cmd(const char *arg0, uint32_t arg0_len, const char *arg1,
                           uint32_t arg1_len) {
-    int num_commands = sizeof(valkey_commands) / sizeof(cmddef);
+    int num_commands = sizeof(server_commands) / sizeof(cmddef);
     /* Compare command name in uppercase. */
     char *cmd = alloca(arg0_len);
     to_upper(cmd, arg0, arg0_len);
@@ -103,7 +103,7 @@ cmddef *valkey_lookup_cmd(const char *arg0, uint32_t arg0_len, const char *arg1,
     int left = 0, right = num_commands - 1;
     while (left <= right) {
         int i = (left + right) / 2;
-        cmddef *c = &valkey_commands[i];
+        cmddef *c = &server_commands[i];
 
         int cmp = strncmp(c->name, cmd, arg0_len);
         if (cmp == 0 && strlen(c->name) > arg0_len)
@@ -208,6 +208,21 @@ static inline int push_keypos(struct cmd *r, char *arg, uint32_t arglen) {
     return 1;
 }
 
+/*
+ * Reference: https://valkey.io/docs/topics/protocol/
+ *
+ * Libvalkey uses the unified protocol to send requests to the Valkey
+ * server. In the unified protocol all the arguments sent to the server
+ * are binary safe and every request has the following general form:
+ *
+ *   *<number of arguments> CR LF
+ *   $<number of bytes of argument 1> CR LF
+ *   <argument data> CR LF
+ *   ...
+ *   $<number of bytes of argument N> CR LF
+ *   <argument data> CR LF
+ *
+ */
 void valkey_parse_cmd(struct cmd *r) {
     ASSERT(r->cmd != NULL && r->clen > 0);
     char *p = r->cmd;

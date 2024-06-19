@@ -12,7 +12,7 @@
 # Alternatively, the output of the script utils/generate-commands-json.py (which
 # fetches the command metadata from a running Valkey node) or the file
 # commands.json from the valkey-doc repo can be used as input to this script:
-# https://github.com/valkey-io/valkey-doc/blob/master/commands.json
+# https://github.com/valkey-io/valkey-doc/blob/main/commands.json
 #
 # Additional JSON files can be added to extend support for custom commands. The
 # JSON file format is not fully documented but hopefully the format can be
@@ -20,7 +20,7 @@
 # the source code of this script to see what it does.
 #
 # The key specifications part is documented here:
-# https://valkey.io/docs/reference/key-specs/
+# https://valkey.io/docs/topics/key-specs/
 #
 # The discussion where this JSON format was added in Valkey is here:
 # https://github.com/redis/redis/issues/9359
