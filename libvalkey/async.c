@@ -478,7 +478,7 @@ static int valkeyGetSubscribeCallback(valkeyAsyncContext *ac, valkeyReply *reply
 
     /* Match reply with the expected format of a pushed message.
      * The type and number of elements (3 to 4) are specified at:
-     * https://valkey.io/topics/pubsub#format-of-pushed-messages */
+     * https://valkey.io/docs/topics/pubsub/#format-of-pushed-messages */
     if ((reply->type == VALKEY_REPLY_ARRAY && !(c->flags & VALKEY_SUPPORTS_PUSH) && reply->elements >= 3) ||
         reply->type == VALKEY_REPLY_PUSH) {
         assert(reply->element[0]->type == VALKEY_REPLY_STRING);
