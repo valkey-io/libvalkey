@@ -10,8 +10,8 @@ SSL_TEST_ARGS=
 SKIPS_ARG=${SKIPS_ARG:-}
 VALKEY_DOCKER=${VALKEY_DOCKER:-}
 
-# We need to enable the DEBUG command for valkey-server >= 7.0.0
-VALKEY_MAJOR_VERSION="$(valkey-server --version|awk -F'[^0-9]+' '{ print $2 }')"
+# Enable debug command for redis-server >= 7.0.0 or any version of valkey-server.
+VALKEY_MAJOR_VERSION="$("$VALKEY_SERVER" --version|awk -F'[^0-9]+' '{ print $2 }')"
 if [ "$VALKEY_MAJOR_VERSION" -gt "6" ]; then
     ENABLE_DEBUG_CMD="enable-debug-command local"
 fi
@@ -98,7 +98,7 @@ if [ -n "${VALKEY_DOCKER}" ] ; then
         -p ${VALKEY_SSL_PORT}:${VALKEY_SSL_PORT} \
         -v ${tmpdir}:${tmpdir} \
         ${VALKEY_DOCKER} \
-        valkey-server ${tmpdir}/valkey.comf
+        ${VALKEY_SERVER} ${tmpdir}/valkey.comf
 else
     ${VALKEY_SERVER} ${tmpdir}/valkey.comf
 fi
