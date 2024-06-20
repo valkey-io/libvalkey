@@ -1,7 +1,10 @@
-/*
- * Copyright (c) 2015, Ieshen Zheng <ieshen.zheng at 163 dot com>
- * Copyright (c) 2020, Nick <heronr1 at gmail dot com>
- * Copyright (c) 2020, Bjorn Svensson <bjorn.a.svensson at est dot tech>
+/* Extracted from anet.c to work properly with Hiredis error reporting.
+ *
+ * Copyright (c) 2009-2011, Salvatore Sanfilippo <antirez at gmail dot com>
+ * Copyright (c) 2010-2014, Pieter Noordhuis <pcnoordhuis at gmail dot com>
+ * Copyright (c) 2015, Matt Stancliff <matt at genges dot com>,
+ *                     Jan-Erik Rediger <janerik at fnordig dot com>
+ *
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -28,76 +31,27 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-#ifndef _WIN32_HELPER_INCLUDE
-#define _WIN32_HELPER_INCLUDE
-#ifdef _MSC_VER
 
-#include <winsock2.h> /* for struct timeval */
+#ifndef VALKEY_NET_H
+#define VALKEY_NET_H
 
-#ifndef inline
-#define inline __inline
+#include "valkey.h"
+
+void valkeyNetClose(valkeyContext *c);
+ssize_t valkeyNetRead(valkeyContext *c, char *buf, size_t bufcap);
+ssize_t valkeyNetWrite(valkeyContext *c);
+
+int valkeyCheckSocketError(valkeyContext *c);
+int valkeyContextSetTimeout(valkeyContext *c, const struct timeval tv);
+int valkeyContextConnectTcp(valkeyContext *c, const char *addr, int port, const struct timeval *timeout);
+int valkeyContextConnectBindTcp(valkeyContext *c, const char *addr, int port,
+                               const struct timeval *timeout,
+                               const char *source_addr);
+int valkeyContextConnectUnix(valkeyContext *c, const char *path, const struct timeval *timeout);
+int valkeyKeepAlive(valkeyContext *c, int interval);
+int valkeyCheckConnectDone(valkeyContext *c, int *completed);
+
+int valkeySetTcpNoDelay(valkeyContext *c);
+int valkeyContextSetTcpUserTimeout(valkeyContext *c, unsigned int timeout);
+
 #endif
-
-#ifndef strcasecmp
-#define strcasecmp stricmp
-#endif
-
-#ifndef strncasecmp
-#define strncasecmp _strnicmp
-#endif
-
-#ifndef alloca
-#define alloca _alloca
-#endif
-
-#ifndef va_copy
-#define va_copy(d,s) ((d) = (s))
-#endif
-
-#ifndef snprintf
-#define snprintf c99_snprintf
-
-__inline int c99_vsnprintf(char* str, size_t size, const char* format, va_list ap)
-{
-    int count = -1;
-
-    if (size != 0)
-        count = _vsnprintf_s(str, size, _TRUNCATE, format, ap);
-    if (count == -1)
-        count = _vscprintf(format, ap);
-
-    return count;
-}
-
-__inline int c99_snprintf(char* str, size_t size, const char* format, ...)
-{
-    int count;
-    va_list ap;
-
-    va_start(ap, format);
-    count = c99_vsnprintf(str, size, format, ap);
-    va_end(ap);
-
-    return count;
-}
-#endif
-
-#endif /* _MSC_VER */
-
-#ifdef _WIN32
-
-#include <profileapi.h> /* for QueryPerformance APIs */
-
-#define strerror_r(errno, buf, len) strerror_s(buf, len, errno)
-
-#ifndef srandom
-#define srandom srand
-#endif
-
-#ifndef random
-#define random rand
-#endif
-
-#endif /* _WIN32 */
-
-#endif /* _WIN32_HELPER_INCLUDE */

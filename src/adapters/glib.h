@@ -1,38 +1,158 @@
-/*
- * Copyright (c) 2021, Björn Svensson <bjorn.a.svensson@est.tech>
- *
- * All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are met:
- *
- *   * Redistributions of source code must retain the above copyright notice,
- *     this list of conditions and the following disclaimer.
- *   * Redistributions in binary form must reproduce the above copyright
- *     notice, this list of conditions and the following disclaimer in the
- *     documentation and/or other materials provided with the distribution.
- *   * Neither the name of Redis nor the names of its contributors may be used
- *     to endorse or promote products derived from this software without
- *     specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
- * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
- * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
- * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
- * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
- * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- * POSSIBILITY OF SUCH DAMAGE.
- */
+#ifndef VALKEY_GLIB_H
+#define VALKEY_GLIB_H
 
-#ifndef __VALKEYCLUSTER_GLIB_H__
-#define __VALKEYCLUSTER_GLIB_H__
+#include <glib.h>
 
+#include "../valkey.h"
+#include "../async.h"
 #include "../valkeycluster.h"
-#include <valkey/adapters/glib.h>
+
+typedef struct
+{
+    GSource source;
+    valkeyAsyncContext *ac;
+    GPollFD poll_fd;
+} ValkeySource;
+
+static void
+valkey_source_add_read (gpointer data)
+{
+    ValkeySource *source = (ValkeySource *)data;
+    g_return_if_fail(source);
+    source->poll_fd.events |= G_IO_IN;
+    g_main_context_wakeup(g_source_get_context((GSource *)data));
+}
+
+static void
+valkey_source_del_read (gpointer data)
+{
+    ValkeySource *source = (ValkeySource *)data;
+    g_return_if_fail(source);
+    source->poll_fd.events &= ~G_IO_IN;
+    g_main_context_wakeup(g_source_get_context((GSource *)data));
+}
+
+static void
+valkey_source_add_write (gpointer data)
+{
+    ValkeySource *source = (ValkeySource *)data;
+    g_return_if_fail(source);
+    source->poll_fd.events |= G_IO_OUT;
+    g_main_context_wakeup(g_source_get_context((GSource *)data));
+}
+
+static void
+valkey_source_del_write (gpointer data)
+{
+    ValkeySource *source = (ValkeySource *)data;
+    g_return_if_fail(source);
+    source->poll_fd.events &= ~G_IO_OUT;
+    g_main_context_wakeup(g_source_get_context((GSource *)data));
+}
+
+static void
+valkey_source_cleanup (gpointer data)
+{
+    ValkeySource *source = (ValkeySource *)data;
+
+    g_return_if_fail(source);
+
+    valkey_source_del_read(source);
+    valkey_source_del_write(source);
+    /*
+     * It is not our responsibility to remove ourself from the
+     * current main loop. However, we will remove the GPollFD.
+     */
+    if (source->poll_fd.fd >= 0) {
+        g_source_remove_poll((GSource *)data, &source->poll_fd);
+        source->poll_fd.fd = -1;
+    }
+}
+
+static gboolean
+valkey_source_prepare (GSource *source,
+                      gint    *timeout_)
+{
+    ValkeySource *valkey = (ValkeySource *)source;
+    *timeout_ = -1;
+    return !!(valkey->poll_fd.events & valkey->poll_fd.revents);
+}
+
+static gboolean
+valkey_source_check (GSource *source)
+{
+    ValkeySource *valkey = (ValkeySource *)source;
+    return !!(valkey->poll_fd.events & valkey->poll_fd.revents);
+}
+
+static gboolean
+valkey_source_dispatch (GSource      *source,
+                       GSourceFunc   callback,
+                       gpointer      user_data)
+{
+    ValkeySource *valkey = (ValkeySource *)source;
+
+    if ((valkey->poll_fd.revents & G_IO_OUT)) {
+        valkeyAsyncHandleWrite(valkey->ac);
+        valkey->poll_fd.revents &= ~G_IO_OUT;
+    }
+
+    if ((valkey->poll_fd.revents & G_IO_IN)) {
+        valkeyAsyncHandleRead(valkey->ac);
+        valkey->poll_fd.revents &= ~G_IO_IN;
+    }
+
+    if (callback) {
+        return callback(user_data);
+    }
+
+    return TRUE;
+}
+
+static void
+valkey_source_finalize (GSource *source)
+{
+    ValkeySource *valkey = (ValkeySource *)source;
+
+    if (valkey->poll_fd.fd >= 0) {
+        g_source_remove_poll(source, &valkey->poll_fd);
+        valkey->poll_fd.fd = -1;
+    }
+}
+
+static GSource *
+valkey_source_new (valkeyAsyncContext *ac)
+{
+    static GSourceFuncs source_funcs = {
+        .prepare  = valkey_source_prepare,
+        .check     = valkey_source_check,
+        .dispatch = valkey_source_dispatch,
+        .finalize = valkey_source_finalize,
+    };
+    valkeyContext *c = &ac->c;
+    ValkeySource *source;
+
+    g_return_val_if_fail(ac != NULL, NULL);
+
+    source = (ValkeySource *)g_source_new(&source_funcs, sizeof *source);
+    if (source == NULL)
+        return NULL;
+
+    source->ac = ac;
+    source->poll_fd.fd = c->fd;
+    source->poll_fd.events = 0;
+    source->poll_fd.revents = 0;
+    g_source_add_poll((GSource *)source, &source->poll_fd);
+
+    ac->ev.addRead = valkey_source_add_read;
+    ac->ev.delRead = valkey_source_del_read;
+    ac->ev.addWrite = valkey_source_add_write;
+    ac->ev.delWrite = valkey_source_del_write;
+    ac->ev.cleanup = valkey_source_cleanup;
+    ac->ev.data = source;
+
+    return (GSource *)source;
+}
 
 typedef struct valkeyClusterGlibAdapter {
     GMainContext *context;
@@ -54,8 +174,7 @@ static int valkeyClusterGlibAttach(valkeyClusterAsyncContext *acc,
 
     acc->adapter = adapter;
     acc->attach_fn = valkeyGlibAttach_link;
-
     return VALKEY_OK;
 }
 
-#endif
+#endif /* VALKEY_GLIB_H */

@@ -1,0 +1,16 @@
+@PACKAGE_INIT@
+
+set_and_check(valkey_ssl_INCLUDEDIR "@PACKAGE_INCLUDE_INSTALL_DIR@")
+
+include(CMakeFindDependencyMacro)
+find_dependency(OpenSSL)
+
+IF (NOT TARGET valkey::valkey_ssl)
+	INCLUDE(${CMAKE_CURRENT_LIST_DIR}/valkey_ssl-targets.cmake)
+ENDIF()
+
+SET(valkey_ssl_LIBRARIES valkey::valkey_ssl)
+SET(valkey_ssl_INCLUDE_DIRS ${valkey_ssl_INCLUDEDIR})
+
+check_required_components(valkey_ssl)
+

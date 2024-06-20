@@ -1,7 +1,6 @@
 /*
- * Copyright (c) 2015, Ieshen Zheng <ieshen.zheng at 163 dot com>
- * Copyright (c) 2020, Nick <heronr1 at gmail dot com>
- * Copyright (c) 2020, Bjorn Svensson <bjorn.a.svensson at est dot tech>
+ * Copyright (c) 2020, Michael Grunder <michael dot grunder at gmail dot com>
+ *
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -28,76 +27,64 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-#ifndef _WIN32_HELPER_INCLUDE
-#define _WIN32_HELPER_INCLUDE
-#ifdef _MSC_VER
 
-#include <winsock2.h> /* for struct timeval */
+#include "fmacros.h"
+#include "alloc.h"
+#include <string.h>
+#include <stdlib.h>
 
-#ifndef inline
-#define inline __inline
-#endif
+valkeyAllocFuncs valkeyAllocFns = {
+    .mallocFn = malloc,
+    .callocFn = calloc,
+    .reallocFn = realloc,
+    .strdupFn = strdup,
+    .freeFn = free,
+};
 
-#ifndef strcasecmp
-#define strcasecmp stricmp
-#endif
+/* Override valkey' allocators with ones supplied by the user */
+valkeyAllocFuncs valkeySetAllocators(valkeyAllocFuncs *override) {
+    valkeyAllocFuncs orig = valkeyAllocFns;
 
-#ifndef strncasecmp
-#define strncasecmp _strnicmp
-#endif
+    valkeyAllocFns = *override;
 
-#ifndef alloca
-#define alloca _alloca
-#endif
-
-#ifndef va_copy
-#define va_copy(d,s) ((d) = (s))
-#endif
-
-#ifndef snprintf
-#define snprintf c99_snprintf
-
-__inline int c99_vsnprintf(char* str, size_t size, const char* format, va_list ap)
-{
-    int count = -1;
-
-    if (size != 0)
-        count = _vsnprintf_s(str, size, _TRUNCATE, format, ap);
-    if (count == -1)
-        count = _vscprintf(format, ap);
-
-    return count;
+    return orig;
 }
 
-__inline int c99_snprintf(char* str, size_t size, const char* format, ...)
-{
-    int count;
-    va_list ap;
-
-    va_start(ap, format);
-    count = c99_vsnprintf(str, size, format, ap);
-    va_end(ap);
-
-    return count;
+/* Reset allocators to use libc defaults */
+void valkeyResetAllocators(void) {
+    valkeyAllocFns = (valkeyAllocFuncs) {
+        .mallocFn = malloc,
+        .callocFn = calloc,
+        .reallocFn = realloc,
+        .strdupFn = strdup,
+        .freeFn = free,
+    };
 }
-#endif
-
-#endif /* _MSC_VER */
 
 #ifdef _WIN32
 
-#include <profileapi.h> /* for QueryPerformance APIs */
+void *vk_malloc(size_t size) {
+    return valkeyAllocFns.mallocFn(size);
+}
 
-#define strerror_r(errno, buf, len) strerror_s(buf, len, errno)
+void *vk_calloc(size_t nmemb, size_t size) {
+    /* Overflow check as the user can specify any arbitrary allocator */
+    if (SIZE_MAX / size < nmemb)
+        return NULL;
 
-#ifndef srandom
-#define srandom srand
+    return valkeyAllocFns.callocFn(nmemb, size);
+}
+
+void *vk_realloc(void *ptr, size_t size) {
+    return valkeyAllocFns.reallocFn(ptr, size);
+}
+
+char *vk_strdup(const char *str) {
+    return valkeyAllocFns.strdupFn(str);
+}
+
+void vk_free(void *ptr) {
+    valkeyAllocFns.freeFn(ptr);
+}
+
 #endif
-
-#ifndef random
-#define random rand
-#endif
-
-#endif /* _WIN32 */
-
-#endif /* _WIN32_HELPER_INCLUDE */

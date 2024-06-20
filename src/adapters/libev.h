@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021, Björn Svensson <bjorn.a.svensson@est.tech>
+ * Copyright (c) 2010-2011, Pieter Noordhuis <pcnoordhuis at gmail dot com>
  *
  * All rights reserved.
  *
@@ -28,11 +28,163 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef __LIBVALKEYCLUSTER_LIBEV_H__
-#define __LIBVALKEYCLUSTER_LIBEV_H__
-
+#ifndef VALKEY_LIBEV_H
+#define VALKEY_LIBEV_H
+#include <stdlib.h>
+#include <sys/types.h>
+#include <ev.h>
+#include "../valkey.h"
+#include "../async.h"
 #include "../valkeycluster.h"
-#include <valkey/adapters/libev.h>
+
+typedef struct valkeyLibevEvents {
+    valkeyAsyncContext *context;
+    struct ev_loop *loop;
+    int reading, writing;
+    ev_io rev, wev;
+    ev_timer timer;
+} valkeyLibevEvents;
+
+static void valkeyLibevReadEvent(EV_P_ ev_io *watcher, int revents) {
+#if EV_MULTIPLICITY
+    ((void)EV_A);
+#endif
+    ((void)revents);
+
+    valkeyLibevEvents *e = (valkeyLibevEvents*)watcher->data;
+    valkeyAsyncHandleRead(e->context);
+}
+
+static void valkeyLibevWriteEvent(EV_P_ ev_io *watcher, int revents) {
+#if EV_MULTIPLICITY
+    ((void)EV_A);
+#endif
+    ((void)revents);
+
+    valkeyLibevEvents *e = (valkeyLibevEvents*)watcher->data;
+    valkeyAsyncHandleWrite(e->context);
+}
+
+static void valkeyLibevAddRead(void *privdata) {
+    valkeyLibevEvents *e = (valkeyLibevEvents*)privdata;
+#if EV_MULTIPLICITY
+    struct ev_loop *loop = e->loop;
+#endif
+    if (!e->reading) {
+        e->reading = 1;
+        ev_io_start(EV_A_ &e->rev);
+    }
+}
+
+static void valkeyLibevDelRead(void *privdata) {
+    valkeyLibevEvents *e = (valkeyLibevEvents*)privdata;
+#if EV_MULTIPLICITY
+    struct ev_loop *loop = e->loop;
+#endif
+    if (e->reading) {
+        e->reading = 0;
+        ev_io_stop(EV_A_ &e->rev);
+    }
+}
+
+static void valkeyLibevAddWrite(void *privdata) {
+    valkeyLibevEvents *e = (valkeyLibevEvents*)privdata;
+#if EV_MULTIPLICITY
+    struct ev_loop *loop = e->loop;
+#endif
+    if (!e->writing) {
+        e->writing = 1;
+        ev_io_start(EV_A_ &e->wev);
+    }
+}
+
+static void valkeyLibevDelWrite(void *privdata) {
+    valkeyLibevEvents *e = (valkeyLibevEvents*)privdata;
+#if EV_MULTIPLICITY
+    struct ev_loop *loop = e->loop;
+#endif
+    if (e->writing) {
+        e->writing = 0;
+        ev_io_stop(EV_A_ &e->wev);
+    }
+}
+
+static void valkeyLibevStopTimer(void *privdata) {
+    valkeyLibevEvents *e = (valkeyLibevEvents*)privdata;
+#if EV_MULTIPLICITY
+    struct ev_loop *loop = e->loop;
+#endif
+    ev_timer_stop(EV_A_ &e->timer);
+}
+
+static void valkeyLibevCleanup(void *privdata) {
+    valkeyLibevEvents *e = (valkeyLibevEvents*)privdata;
+    valkeyLibevDelRead(privdata);
+    valkeyLibevDelWrite(privdata);
+    valkeyLibevStopTimer(privdata);
+    vk_free(e);
+}
+
+static void valkeyLibevTimeout(EV_P_ ev_timer *timer, int revents) {
+#if EV_MULTIPLICITY
+    ((void)EV_A);
+#endif
+    ((void)revents);
+    valkeyLibevEvents *e = (valkeyLibevEvents*)timer->data;
+    valkeyAsyncHandleTimeout(e->context);
+}
+
+static void valkeyLibevSetTimeout(void *privdata, struct timeval tv) {
+    valkeyLibevEvents *e = (valkeyLibevEvents*)privdata;
+#if EV_MULTIPLICITY
+    struct ev_loop *loop = e->loop;
+#endif
+
+    if (!ev_is_active(&e->timer)) {
+        ev_init(&e->timer, valkeyLibevTimeout);
+        e->timer.data = e;
+    }
+
+    e->timer.repeat = tv.tv_sec + tv.tv_usec / 1000000.00;
+    ev_timer_again(EV_A_ &e->timer);
+}
+
+static int valkeyLibevAttach(EV_P_ valkeyAsyncContext *ac) {
+    valkeyContext *c = &(ac->c);
+    valkeyLibevEvents *e;
+
+    /* Nothing should be attached when something is already attached */
+    if (ac->ev.data != NULL)
+        return VALKEY_ERR;
+
+    /* Create container for context and r/w events */
+    e = (valkeyLibevEvents*)vk_calloc(1, sizeof(*e));
+    if (e == NULL)
+        return VALKEY_ERR;
+
+    e->context = ac;
+#if EV_MULTIPLICITY
+    e->loop = EV_A;
+#else
+    e->loop = NULL;
+#endif
+    e->rev.data = e;
+    e->wev.data = e;
+
+    /* Register functions to start/stop listening for events */
+    ac->ev.addRead = valkeyLibevAddRead;
+    ac->ev.delRead = valkeyLibevDelRead;
+    ac->ev.addWrite = valkeyLibevAddWrite;
+    ac->ev.delWrite = valkeyLibevDelWrite;
+    ac->ev.cleanup = valkeyLibevCleanup;
+    ac->ev.scheduleTimer = valkeyLibevSetTimeout;
+    ac->ev.data = e;
+
+    /* Initialize read/write events */
+    ev_io_init(&e->rev,valkeyLibevReadEvent,c->fd,EV_READ);
+    ev_io_init(&e->wev,valkeyLibevWriteEvent,c->fd,EV_WRITE);
+    return VALKEY_OK;
+}
 
 static int valkeyLibevAttach_link(valkeyAsyncContext *ac, void *loop) {
     return valkeyLibevAttach((struct ev_loop *)loop, ac);
@@ -46,7 +198,6 @@ static int valkeyClusterLibevAttach(valkeyClusterAsyncContext *acc,
 
     acc->adapter = loop;
     acc->attach_fn = valkeyLibevAttach_link;
-
     return VALKEY_OK;
 }
 

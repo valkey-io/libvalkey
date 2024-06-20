@@ -1,16 +1,16 @@
 #include <stdlib.h>
 
-#include <hiredis.h>
+#include <valkey.h>
 #include <async.h>
 #include <adapters/glib.h>
 
 static GMainLoop *mainloop;
 
 static void
-connect_cb (const redisAsyncContext *ac G_GNUC_UNUSED,
+connect_cb (const valkeyAsyncContext *ac G_GNUC_UNUSED,
             int status)
 {
-    if (status != REDIS_OK) {
+    if (status != VALKEY_OK) {
         g_printerr("Failed to connect: %s\n", ac->errstr);
         g_main_loop_quit(mainloop);
     } else {
@@ -19,10 +19,10 @@ connect_cb (const redisAsyncContext *ac G_GNUC_UNUSED,
 }
 
 static void
-disconnect_cb (const redisAsyncContext *ac G_GNUC_UNUSED,
+disconnect_cb (const valkeyAsyncContext *ac G_GNUC_UNUSED,
                int status)
 {
-    if (status != REDIS_OK) {
+    if (status != VALKEY_OK) {
         g_error("Failed to disconnect: %s", ac->errstr);
     } else {
         g_printerr("Disconnected...\n");
@@ -31,41 +31,41 @@ disconnect_cb (const redisAsyncContext *ac G_GNUC_UNUSED,
 }
 
 static void
-command_cb(redisAsyncContext *ac,
+command_cb(valkeyAsyncContext *ac,
            gpointer r,
            gpointer user_data G_GNUC_UNUSED)
 {
-    redisReply *reply = r;
+    valkeyReply *reply = r;
 
     if (reply) {
         g_print("REPLY: %s\n", reply->str);
     }
 
-    redisAsyncDisconnect(ac);
+    valkeyAsyncDisconnect(ac);
 }
 
 gint
 main (gint argc     G_GNUC_UNUSED,
       gchar *argv[] G_GNUC_UNUSED)
 {
-    redisAsyncContext *ac;
+    valkeyAsyncContext *ac;
     GMainContext *context = NULL;
     GSource *source;
 
-    ac = redisAsyncConnect("127.0.0.1", 6379);
+    ac = valkeyAsyncConnect("127.0.0.1", 6379);
     if (ac->err) {
         g_printerr("%s\n", ac->errstr);
         exit(EXIT_FAILURE);
     }
 
-    source = redis_source_new(ac);
+    source = valkey_source_new(ac);
     mainloop = g_main_loop_new(context, FALSE);
     g_source_attach(source, context);
 
-    redisAsyncSetConnectCallback(ac, connect_cb);
-    redisAsyncSetDisconnectCallback(ac, disconnect_cb);
-    redisAsyncCommand(ac, command_cb, NULL, "SET key 1234");
-    redisAsyncCommand(ac, command_cb, NULL, "GET key");
+    valkeyAsyncSetConnectCallback(ac, connect_cb);
+    valkeyAsyncSetDisconnectCallback(ac, disconnect_cb);
+    valkeyAsyncCommand(ac, command_cb, NULL, "SET key 1234");
+    valkeyAsyncCommand(ac, command_cb, NULL, "GET key");
 
     g_main_loop_run(mainloop);
 
