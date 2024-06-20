@@ -9,8 +9,8 @@ testname=slots-not-served-test
 perl -we 'use sigtrap "handler", sub{exit}, "CONT"; sleep 1; die "timeout"' &
 syncpid1=$!;
 
-# Start simulated redis node #1
-timeout 5s ./simulated-redis.pl -p 7401 -d --sigcont $syncpid1 <<'EOF' &
+# Start simulated valkey node #1
+timeout 5s ./simulated-valkey.pl -p 7401 -d --sigcont $syncpid1 <<'EOF' &
 # The initial slotmap is not covering all slots.
 EXPECT CONNECT
 EXPECT ["CLUSTER", "SLOTS"]

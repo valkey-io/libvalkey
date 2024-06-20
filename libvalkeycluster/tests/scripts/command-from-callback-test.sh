@@ -22,8 +22,8 @@ syncpid2=$!
 perl -we 'use sigtrap "handler", sub{exit}, "CONT"; sleep 1; die "timeout"' &
 syncpid3=$!
 
-# Start simulated redis node #1
-timeout 5s ./simulated-redis.pl -p 7401 -d --sigcont $syncpid1 <<'EOF' &
+# Start simulated valkey node #1
+timeout 5s ./simulated-valkey.pl -p 7401 -d --sigcont $syncpid1 <<'EOF' &
 # Inital topology
 EXPECT CONNECT
 EXPECT ["CLUSTER", "SLOTS"]
@@ -38,8 +38,8 @@ EXPECT CLOSE
 EOF
 server1=$!
 
-# Start simulated redis node #2
-timeout 5s ./simulated-redis.pl -p 7402 -d --sigcont $syncpid2 <<'EOF' &
+# Start simulated valkey node #2
+timeout 5s ./simulated-valkey.pl -p 7402 -d --sigcont $syncpid2 <<'EOF' &
 EXPECT CONNECT
 EXPECT ["GET", "fee"]
 SEND -MOVED 8471 127.0.0.1:7401
@@ -55,8 +55,8 @@ EXPECT CLOSE
 EOF
 server2=$!
 
-# Start simulated redis node #3
-timeout 5s ./simulated-redis.pl -p 7403 -d --sigcont $syncpid3 <<'EOF' &
+# Start simulated valkey node #3
+timeout 5s ./simulated-valkey.pl -p 7403 -d --sigcont $syncpid3 <<'EOF' &
 EXPECT CONNECT
 EXPECT ["GET", "foo"]
 # Sleep to make sure the command is aborted when node is removed from the slot map.

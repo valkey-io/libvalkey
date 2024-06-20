@@ -1,32 +1,33 @@
-#include <hiredis_cluster/hircluster.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <valkeycluster/valkeycluster.h>
 
 int main(int argc, char **argv) {
     UNUSED(argc);
     UNUSED(argv);
     struct timeval timeout = {1, 500000}; // 1.5s
 
-    redisClusterContext *cc = redisClusterContextInit();
-    redisClusterSetOptionAddNodes(cc, "127.0.0.1:7000");
-    redisClusterSetOptionConnectTimeout(cc, timeout);
-    redisClusterSetOptionRouteUseSlots(cc);
-    redisClusterConnect2(cc);
+    valkeyClusterContext *cc = valkeyClusterContextInit();
+    valkeyClusterSetOptionAddNodes(cc, "127.0.0.1:7000");
+    valkeyClusterSetOptionConnectTimeout(cc, timeout);
+    valkeyClusterSetOptionRouteUseSlots(cc);
+    valkeyClusterConnect2(cc);
     if (cc && cc->err) {
         printf("Error: %s\n", cc->errstr);
         // handle error
         exit(-1);
     }
 
-    redisReply *reply =
-        (redisReply *)redisClusterCommand(cc, "SET %s %s", "key", "value");
+    valkeyReply *reply =
+        (valkeyReply *)valkeyClusterCommand(cc, "SET %s %s", "key", "value");
     printf("SET: %s\n", reply->str);
     freeReplyObject(reply);
 
-    redisReply *reply2 = (redisReply *)redisClusterCommand(cc, "GET %s", "key");
+    valkeyReply *reply2 =
+        (valkeyReply *)valkeyClusterCommand(cc, "GET %s", "key");
     printf("GET: %s\n", reply2->str);
     freeReplyObject(reply2);
 
-    redisClusterFree(cc);
+    valkeyClusterFree(cc);
     return 0;
 }

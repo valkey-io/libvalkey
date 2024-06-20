@@ -35,6 +35,7 @@
 #include <ev.h>
 #include "../valkey.h"
 #include "../async.h"
+#include "../valkeycluster.h"
 
 typedef struct valkeyLibevEvents {
     valkeyAsyncContext *context;
@@ -182,6 +183,21 @@ static int valkeyLibevAttach(EV_P_ valkeyAsyncContext *ac) {
     /* Initialize read/write events */
     ev_io_init(&e->rev,valkeyLibevReadEvent,c->fd,EV_READ);
     ev_io_init(&e->wev,valkeyLibevWriteEvent,c->fd,EV_WRITE);
+    return VALKEY_OK;
+}
+
+static int valkeyLibevAttach_link(valkeyAsyncContext *ac, void *loop) {
+    return valkeyLibevAttach((struct ev_loop *)loop, ac);
+}
+
+static int valkeyClusterLibevAttach(valkeyClusterAsyncContext *acc,
+                                    struct ev_loop *loop) {
+    if (loop == NULL || acc == NULL) {
+        return VALKEY_ERR;
+    }
+
+    acc->adapter = loop;
+    acc->attach_fn = valkeyLibevAttach_link;
     return VALKEY_OK;
 }
 

@@ -18,8 +18,8 @@ syncpid1=$!
 perl -we 'use sigtrap "handler", sub{exit}, "CONT"; sleep 1; die "timeout"' &
 syncpid2=$!
 
-# Start simulated redis node #1
-timeout 5s ./simulated-redis.pl -p 7401 -d --sigcont $syncpid1 <<'EOF' &
+# Start simulated valkey node #1
+timeout 5s ./simulated-valkey.pl -p 7401 -d --sigcont $syncpid1 <<'EOF' &
 # Inital topology
 EXPECT CONNECT
 EXPECT ["CLUSTER", "SLOTS"]
@@ -38,8 +38,8 @@ EXPECT CLOSE
 EOF
 server1=$!
 
-# Start simulated redis node #2
-timeout 5s ./simulated-redis.pl -p 7402 -d --sigcont $syncpid2 <<'EOF' &
+# Start simulated valkey node #2
+timeout 5s ./simulated-valkey.pl -p 7402 -d --sigcont $syncpid2 <<'EOF' &
 EXPECT CONNECT
 EXPECT ["SET", "foo", "initial"]
 SEND +OK
@@ -91,24 +91,14 @@ if [ $clientexit -ne 0 ]; then
     exit $clientexit
 fi
 
-# Check the output from clusterclient, which depends on the hiredis version used.
-# hiredis v1.1.0
-expected1="OK
+expected="OK
 OK
 error: Timeout
 error: Timeout
 error: Timeout
 error: Timeout"
 
-# hiredis < v1.1.0
-expected2="OK
-OK
-unknown error
-unknown error
-unknown error
-unknown error"
-
-cmp "$testname.out" <(echo "$expected1") || cmp "$testname.out" <(echo "$expected2") || exit 99
+cmp "$testname.out" <(echo "$expected") || exit 99
 
 # Clean up
 rm "$testname.out"

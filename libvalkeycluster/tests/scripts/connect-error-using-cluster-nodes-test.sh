@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# Connect to a Redis node which have no knowledge of a cluster.
+# Connect to a Valkey node which have no knowledge of a cluster.
 #
 # The client is configured to use the CLUSTER NODES command,
 # which will receive a reply without slot information or other nodes.
@@ -19,7 +19,7 @@ perl -we 'use sigtrap "handler", sub{exit}, "CONT"; sleep 1; die "timeout"' &
 syncpid=$!
 
 # Start simulated server
-timeout 5s ./simulated-redis.pl -p 7400 -d --sigcont $syncpid <<'EOF' &
+timeout 5s ./simulated-valkey.pl -p 7400 -d --sigcont $syncpid <<'EOF' &
 EXPECT CONNECT
 EXPECT ["CLUSTER", "NODES"]
 SEND "653876bce37106406581ddc05d8629357a223a7e :30001@40001 myself,master - 0 0 0 connected\n"

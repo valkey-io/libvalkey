@@ -33,6 +33,7 @@
 #include <event2/event.h>
 #include "../valkey.h"
 #include "../async.h"
+#include "../valkeycluster.h"
 
 #define VALKEY_LIBEVENT_DELETED 0x01
 #define VALKEY_LIBEVENT_ENTERED 0x02
@@ -170,6 +171,21 @@ static int valkeyLibeventAttach(valkeyAsyncContext *ac, struct event_base *base)
     /* Initialize and install read/write events */
     e->ev = event_new(base, c->fd, EV_READ | EV_WRITE, valkeyLibeventHandler, e);
     e->base = base;
+    return VALKEY_OK;
+}
+
+static int valkeyLibeventAttach_link(valkeyAsyncContext *ac, void *base) {
+    return valkeyLibeventAttach(ac, (struct event_base *)base);
+}
+
+static int valkeyClusterLibeventAttach(valkeyClusterAsyncContext *acc,
+                                       struct event_base *base) {
+    if (acc == NULL || base == NULL) {
+        return VALKEY_ERR;
+    }
+
+    acc->adapter = base;
+    acc->attach_fn = valkeyLibeventAttach_link;
     return VALKEY_OK;
 }
 #endif

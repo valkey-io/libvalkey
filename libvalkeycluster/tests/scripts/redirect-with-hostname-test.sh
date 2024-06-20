@@ -2,12 +2,12 @@
 #
 # Verify that redirects with hostname are handled.
 #
-# Redis 7.0 introduced the config `cluster-preferred-endpoint-type` which
+# Valkey has the config `cluster-preferred-endpoint-type` which
 # controls how the endpoint is returned in ASK/MOVED redirects and in
-# CLUSTER SLOTS. This testcase verifies correct handling when Redis
+# CLUSTER SLOTS. This testcase verifies correct handling when Valkey
 # announce a hostname 'localhost' instead of an IP.
 #
-# Redis 7.0 also adds additional metadata in the CLUSTER SLOTS response
+# Valkey also provides additional metadata in the CLUSTER SLOTS response
 # and this testcase uses a black hole address to make sure this is accepted
 # but not used.
 #
@@ -22,8 +22,8 @@ syncpid1=$!;
 perl -we 'use sigtrap "handler", sub{exit}, "CONT"; sleep 1; die "timeout"' &
 syncpid2=$!;
 
-# Start simulated redis node #1
-timeout 5s ./simulated-redis.pl -p 7401 -d --sigcont $syncpid1 <<'EOF' &
+# Start simulated valkey node #1
+timeout 5s ./simulated-valkey.pl -p 7401 -d --sigcont $syncpid1 <<'EOF' &
 # Inital slotmap update
 EXPECT CONNECT
 EXPECT ["CLUSTER", "SLOTS"]
@@ -46,8 +46,8 @@ EXPECT CLOSE
 EOF
 server1=$!
 
-# Start simulated redis node #2
-timeout 5s ./simulated-redis.pl -p 7402 -d --sigcont $syncpid2 <<'EOF' &
+# Start simulated valkey node #2
+timeout 5s ./simulated-valkey.pl -p 7402 -d --sigcont $syncpid2 <<'EOF' &
 EXPECT CONNECT
 EXPECT ["ASKING"]
 SEND +OK

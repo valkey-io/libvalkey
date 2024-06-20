@@ -30,8 +30,8 @@ syncpid1=$!;
 perl -we 'use sigtrap "handler", sub{exit}, "CONT"; sleep 1; die "timeout"' &
 syncpid2=$!;
 
-# Start simulated redis node #1
-timeout 5s ./simulated-redis.pl -p 7401 -d --sigcont $syncpid1 <<'EOF' &
+# Start simulated valkey node #1
+timeout 5s ./simulated-valkey.pl -p 7401 -d --sigcont $syncpid1 <<'EOF' &
 # Initial slotmap.
 EXPECT CONNECT
 EXPECT ["CLUSTER", "SLOTS"]
@@ -58,8 +58,8 @@ EXPECT CLOSE
 EOF
 server1=$!
 
-# Start simulated redis node #2
-timeout 5s ./simulated-redis.pl -p 7402 -d --sigcont $syncpid2 <<'EOF' &
+# Start simulated valkey node #2
+timeout 5s ./simulated-valkey.pl -p 7402 -d --sigcont $syncpid2 <<'EOF' &
 EXPECT CONNECT
 EXPECT ["GET", "{foo}1"]
 SEND "bar1"

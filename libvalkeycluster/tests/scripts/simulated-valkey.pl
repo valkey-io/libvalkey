@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 
-# A tool for simulating the traffic of a Redis node.
+# A tool for simulating the traffic of a Valkey node.
 #
 # Copyright 2020 Ericsson Software Technology <viktor.soderqvist@est.tech>
 #
@@ -36,7 +36,7 @@ while ($_ = shift) {
         map { print "$_\n" }
             "Usage: $0 [ OPTIONS ]",
             "",
-            "Acts as a Redis node, communicating with clients according to",
+            "Acts as a Valkey node, communicating with clients according to",
             "expected traffic provided as events on stdin. Multiple connections",
             "are accepted, but data can only be sent to and received from the",
             "last accepted client, referred to as \"the client\" below.",
@@ -67,7 +67,7 @@ while ($_ = shift) {
             "  SEND \"bar\"",
             "",
             "The response (after SEND) can also be represented in raw backslash-",
-            "escaped Redis protocol data, optionally without the final '\\r\\n'.",
+            "escaped Valkey protocol data, optionally without the final '\\r\\n'.",
             "Examples:",
             "",
             "  SEND +OK",
@@ -121,13 +121,13 @@ while (<>) {
     if (/^SEND (.*)/) {
         my $data = $1;
         if ($data =~ /^[-+\$\*:]/) {
-            # Redis protocol with character escapes
+            # Valkey protocol with character escapes
             # e.g. '-ERR Unknown command: FOO\r\n'
             $data = unescape($data);
             $data .= "\r\n" unless $data =~ /\r\n$/;
         } else {
             # e.g. '["foo", "bar", 42]'
-            $data = redis_encode(JSON->new->allow_nonref->decode($1));
+            $data = valkey_encode(JSON->new->allow_nonref->decode($1));
         }
         print $connection $data;
         flush $connection;
@@ -176,9 +176,9 @@ sub unexpected {
     die "Unexpected communication\n";
 }
 
-sub redis_encode {
+sub valkey_encode {
     my $x = shift;
-    return ("*" . @$x . "\r\n" . join '', map { redis_encode($_) } @$x)
+    return ("*" . @$x . "\r\n" . join '', map { valkey_encode($_) } @$x)
         if ref $x eq "ARRAY";
     return ":$x\r\n"
         unless ($x ^ $x) ne "0"; # hack to check if int or string

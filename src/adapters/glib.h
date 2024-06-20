@@ -5,6 +5,7 @@
 
 #include "../valkey.h"
 #include "../async.h"
+#include "../valkeycluster.h"
 
 typedef struct
 {
@@ -151,6 +152,29 @@ valkey_source_new (valkeyAsyncContext *ac)
     ac->ev.data = source;
 
     return (GSource *)source;
+}
+
+typedef struct valkeyClusterGlibAdapter {
+    GMainContext *context;
+} valkeyClusterGlibAdapter;
+
+static int valkeyGlibAttach_link(valkeyAsyncContext *ac, void *adapter) {
+    GMainContext *context = ((valkeyClusterGlibAdapter *)adapter)->context;
+    if (g_source_attach(valkey_source_new(ac), context) > 0) {
+        return VALKEY_OK;
+    }
+    return VALKEY_ERR;
+}
+
+static int valkeyClusterGlibAttach(valkeyClusterAsyncContext *acc,
+                                   valkeyClusterGlibAdapter *adapter) {
+    if (acc == NULL || adapter == NULL) {
+        return VALKEY_ERR;
+    }
+
+    acc->adapter = adapter;
+    acc->attach_fn = valkeyGlibAttach_link;
+    return VALKEY_OK;
 }
 
 #endif /* VALKEY_GLIB_H */

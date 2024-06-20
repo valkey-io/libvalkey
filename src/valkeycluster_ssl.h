@@ -1,6 +1,5 @@
 /*
- * Copyright (c) 2021, Björn Svensson <bjorn.a.svensson@est.tech>
- *
+ * Copyright (c) 2022, Bjorn Svensson <bjorn.a.svensson at est dot tech>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -27,27 +26,24 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+#ifndef __HIRCLUSTER_SSL_H
+#define __HIRCLUSTER_SSL_H
 
-#ifndef __HIREDIS_CLUSTER_LIBEV_H__
-#define __HIREDIS_CLUSTER_LIBEV_H__
+#include "valkeycluster.h"
+#include "valkey_ssl.h"
 
-#include "../hircluster.h"
-#include <hiredis/adapters/libev.h>
-
-static int redisLibevAttach_link(redisAsyncContext *ac, void *loop) {
-    return redisLibevAttach((struct ev_loop *)loop, ac);
-}
-
-static int redisClusterLibevAttach(redisClusterAsyncContext *acc,
-                                   struct ev_loop *loop) {
-    if (loop == NULL || acc == NULL) {
-        return REDIS_ERR;
-    }
-
-    acc->adapter = loop;
-    acc->attach_fn = redisLibevAttach_link;
-
-    return REDIS_OK;
-}
-
+#ifdef __cplusplus
+extern "C" {
 #endif
+
+/**
+ * Configuration option to enable SSL/TLS negotiation on a context.
+ */
+int valkeyClusterSetOptionEnableSSL(valkeyClusterContext *cc,
+                                    valkeySSLContext *ssl);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif /* __HIRCLUSTER_SSL_H */

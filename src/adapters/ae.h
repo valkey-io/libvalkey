@@ -34,6 +34,7 @@
 #include <ae.h>
 #include "../valkey.h"
 #include "../async.h"
+#include "../valkeycluster.h"
 
 typedef struct valkeyAeEvents {
     valkeyAsyncContext *context;
@@ -125,6 +126,21 @@ static int valkeyAeAttach(aeEventLoop *loop, valkeyAsyncContext *ac) {
     ac->ev.cleanup = valkeyAeCleanup;
     ac->ev.data = e;
 
+    return VALKEY_OK;
+}
+
+static int valkeyAeAttach_link(valkeyAsyncContext *ac, void *base) {
+    return valkeyAeAttach((aeEventLoop *)base, ac);
+}
+
+static int valkeyClusterAeAttach(aeEventLoop *loop,
+                                 valkeyClusterAsyncContext *acc) {
+    if (acc == NULL || loop == NULL) {
+        return VALKEY_ERR;
+    }
+
+    acc->adapter = loop;
+    acc->attach_fn = valkeyAeAttach_link;
     return VALKEY_OK;
 }
 #endif
