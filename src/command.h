@@ -35,7 +35,7 @@
 #include <stdint.h>
 
 #include "adlist.h"
-#include <valkey/valkey.h>
+#include "valkey.h"
 
 typedef enum cmd_parse_result {
     CMD_PARSE_OK,     /* parsing ok */

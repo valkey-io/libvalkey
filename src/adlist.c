@@ -28,8 +28,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 #include <stdlib.h>
-#include <valkey/alloc.h>
 
+#include "alloc.h"
 #include "adlist.h"
 #include "vkutil.h"
 

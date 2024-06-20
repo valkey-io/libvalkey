@@ -30,7 +30,7 @@
 #define __HIRCLUSTER_SSL_H
 
 #include "valkeycluster.h"
-#include <valkey/valkey_ssl.h>
+#include "valkey_ssl.h"
 
 #ifdef __cplusplus
 extern "C" {

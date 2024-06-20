@@ -33,9 +33,9 @@
 #ifndef __HIRCLUSTER_H
 #define __HIRCLUSTER_H
 
+#include "async.h"
 #include "dict.h"
-#include <valkey/async.h>
-#include <valkey/valkey.h>
+#include "valkey.h"
 
 #define UNUSED(x) (void)(x)
 

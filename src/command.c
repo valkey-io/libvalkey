@@ -30,7 +30,6 @@
  */
 #include <ctype.h>
 #include <errno.h>
-#include <valkey/alloc.h>
 #ifndef _WIN32
 #include <alloca.h>
 #include <strings.h>
@@ -39,6 +38,7 @@
 #endif
 #include <string.h>
 
+#include "alloc.h"
 #include "command.h"
 #include "vkarray.h"
 #include "vkutil.h"
