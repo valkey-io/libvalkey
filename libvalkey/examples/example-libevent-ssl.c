@@ -3,30 +3,30 @@
 #include <string.h>
 #include <signal.h>
 
-#include <hiredis.h>
-#include <hiredis_ssl.h>
+#include <valkey.h>
+#include <valkey_ssl.h>
 #include <async.h>
 #include <adapters/libevent.h>
 
-void getCallback(redisAsyncContext *c, void *r, void *privdata) {
-    redisReply *reply = r;
+void getCallback(valkeyAsyncContext *c, void *r, void *privdata) {
+    valkeyReply *reply = r;
     if (reply == NULL) return;
     printf("argv[%s]: %s\n", (char*)privdata, reply->str);
 
     /* Disconnect after receiving the reply to GET */
-    redisAsyncDisconnect(c);
+    valkeyAsyncDisconnect(c);
 }
 
-void connectCallback(const redisAsyncContext *c, int status) {
-    if (status != REDIS_OK) {
+void connectCallback(const valkeyAsyncContext *c, int status) {
+    if (status != VALKEY_OK) {
         printf("Error: %s\n", c->errstr);
         return;
     }
     printf("Connected...\n");
 }
 
-void disconnectCallback(const redisAsyncContext *c, int status) {
-    if (status != REDIS_OK) {
+void disconnectCallback(const valkeyAsyncContext *c, int status) {
+    if (status != VALKEY_OK) {
         printf("Error: %s\n", c->errstr);
         return;
     }
@@ -55,36 +55,36 @@ int main (int argc, char **argv) {
     const char *certKey = argv[5];
     const char *caCert = argc > 5 ? argv[6] : NULL;
 
-    redisSSLContext *ssl;
-    redisSSLContextError ssl_error = REDIS_SSL_CTX_NONE;
+    valkeySSLContext *ssl;
+    valkeySSLContextError ssl_error = VALKEY_SSL_CTX_NONE;
 
-    redisInitOpenSSL();
+    valkeyInitOpenSSL();
 
-    ssl = redisCreateSSLContext(caCert, NULL,
+    ssl = valkeyCreateSSLContext(caCert, NULL,
             cert, certKey, NULL, &ssl_error);
     if (!ssl) {
-        printf("Error: %s\n", redisSSLContextGetError(ssl_error));
+        printf("Error: %s\n", valkeySSLContextGetError(ssl_error));
         return 1;
     }
 
-    redisAsyncContext *c = redisAsyncConnect(hostname, port);
+    valkeyAsyncContext *c = valkeyAsyncConnect(hostname, port);
     if (c->err) {
         /* Let *c leak for now... */
         printf("Error: %s\n", c->errstr);
         return 1;
     }
-    if (redisInitiateSSLWithContext(&c->c, ssl) != REDIS_OK) {
+    if (valkeyInitiateSSLWithContext(&c->c, ssl) != VALKEY_OK) {
         printf("SSL Error!\n");
         exit(1);
     }
 
-    redisLibeventAttach(c,base);
-    redisAsyncSetConnectCallback(c,connectCallback);
-    redisAsyncSetDisconnectCallback(c,disconnectCallback);
-    redisAsyncCommand(c, NULL, NULL, "SET key %b", value, nvalue);
-    redisAsyncCommand(c, getCallback, (char*)"end-1", "GET key");
+    valkeyLibeventAttach(c,base);
+    valkeyAsyncSetConnectCallback(c,connectCallback);
+    valkeyAsyncSetDisconnectCallback(c,disconnectCallback);
+    valkeyAsyncCommand(c, NULL, NULL, "SET key %b", value, nvalue);
+    valkeyAsyncCommand(c, getCallback, (char*)"end-1", "GET key");
     event_base_dispatch(base);
 
-    redisFreeSSLContext(ssl);
+    valkeyFreeSSLContext(ssl);
     return 0;
 }
