@@ -1977,21 +1977,6 @@ static int valkeyClusterGetReplyFromNode(valkeyClusterContext *cc,
     return VALKEY_OK;
 }
 
-static int __valkeyClusterGetReply(valkeyClusterContext *cc, int slot_num,
-                                   void **reply) {
-    valkeyClusterNode *node;
-
-    if (cc == NULL || slot_num < 0 || reply == NULL)
-        return VALKEY_ERR;
-
-    node = node_get_by_table(cc, (uint32_t)slot_num);
-    if (node == NULL) {
-        return VALKEY_ERR;
-    }
-
-    return valkeyClusterGetReplyFromNode(cc, node, reply);
-}
-
 /* Parses a MOVED or ASK error reply and returns the destination node. The slot
  * is returned by pointer, if provided. */
 static valkeyClusterNode *getNodeFromRedirectReply(valkeyClusterContext *cc,
@@ -2770,27 +2755,27 @@ int valkeyClusterGetReply(valkeyClusterContext *cc, void **reply) {
     /* Get reply when the command was sent via slot */
     slot_num = command->slot_num;
     if (slot_num >= 0) {
+        valkeyClusterNode *node;
+        if ((node = node_get_by_table(cc, (uint32_t)slot_num)) == NULL)
+            goto error;
+
         listDelNode(cc->requests, list_command);
-        return __valkeyClusterGetReply(cc, slot_num, reply);
+        return valkeyClusterGetReplyFromNode(cc, node, reply);
     }
     /* Get reply when the command was sent to a given node */
     if (command->node_addr != NULL) {
-        dictEntry *de;
-
-        de = dictFind(cc->nodes, command->node_addr);
-        if (de != NULL) {
-            listDelNode(cc->requests, list_command);
-            return valkeyClusterGetReplyFromNode(cc, dictGetEntryVal(de),
-                                                 reply);
-        } else {
+        dictEntry *de = dictFind(cc->nodes, command->node_addr);
+        if (de == NULL) {
             valkeyClusterSetError(cc, VALKEY_ERR_OTHER,
                                   "command was sent to a now unknown node");
             goto error;
         }
+
+        listDelNode(cc->requests, list_command);
+        return valkeyClusterGetReplyFromNode(cc, dictGetEntryVal(de), reply);
     }
 
 error:
-
     listDelNode(cc->requests, list_command);
     return VALKEY_ERR;
 }
