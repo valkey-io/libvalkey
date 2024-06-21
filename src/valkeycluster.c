@@ -1419,20 +1419,6 @@ void valkeyClusterFree(valkeyClusterContext *cc) {
 /* Connect to a Valkey cluster. On error the field error in the returned
  * context will be set to the return value of the error function.
  * When no set of reply functions is given, the default set will be used. */
-static int _valkeyClusterConnect2(valkeyClusterContext *cc) {
-
-    if (cc->nodes == NULL || dictSize(cc->nodes) == 0) {
-        valkeyClusterSetError(cc, VALKEY_ERR_OTHER,
-                              "servers address does not set up");
-        return VALKEY_ERR;
-    }
-
-    return valkeyClusterUpdateSlotmap(cc);
-}
-
-/* Connect to a Valkey cluster. On error the field error in the returned
- * context will be set to the return value of the error function.
- * When no set of reply functions is given, the default set will be used. */
 static valkeyClusterContext *_valkeyClusterConnect(valkeyClusterContext *cc,
                                                    const char *addrs) {
 
@@ -1817,7 +1803,12 @@ int valkeyClusterConnect2(valkeyClusterContext *cc) {
         return VALKEY_ERR;
     }
 
-    return _valkeyClusterConnect2(cc);
+    if (cc->nodes == NULL || dictSize(cc->nodes) == 0) {
+        valkeyClusterSetError(cc, VALKEY_ERR_OTHER,
+                              "server address not configured");
+        return VALKEY_ERR;
+    }
+    return valkeyClusterUpdateSlotmap(cc);
 }
 
 valkeyContext *ctx_get_by_node(valkeyClusterContext *cc,
