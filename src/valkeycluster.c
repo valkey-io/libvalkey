@@ -1918,8 +1918,8 @@ static valkeyClusterNode *node_get_by_table(valkeyClusterContext *cc,
  * is used, you need to call valkeyGetReply yourself to retrieve
  * the reply (or replies in pub/sub).
  */
-static int __valkeyClusterAppendCommand(valkeyClusterContext *cc,
-                                        struct cmd *command) {
+static int valkeyClusterAppendCommandInternal(valkeyClusterContext *cc,
+                                              struct cmd *command) {
 
     valkeyClusterNode *node;
     valkeyContext *c = NULL;
@@ -2521,7 +2521,7 @@ int valkeyClusterAppendFormattedCommand(valkeyClusterContext *cc, char *cmd,
         goto error;
     }
 
-    if (__valkeyClusterAppendCommand(cc, command) != VALKEY_OK) {
+    if (valkeyClusterAppendCommandInternal(cc, command) != VALKEY_OK) {
         goto error;
     }
 
