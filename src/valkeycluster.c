@@ -1952,9 +1952,9 @@ static int __valkeyClusterAppendCommand(valkeyClusterContext *cc,
 
 /* Helper functions for the valkeyClusterGetReply* family of functions.
  */
-static int __valkeyClusterGetReplyFromNode(valkeyClusterContext *cc,
-                                           valkeyClusterNode *node,
-                                           void **reply) {
+static int valkeyClusterGetReplyFromNode(valkeyClusterContext *cc,
+                                         valkeyClusterNode *node,
+                                         void **reply) {
     valkeyContext *c;
 
     if (cc == NULL || node == NULL || reply == NULL)
@@ -1998,7 +1998,7 @@ static int __valkeyClusterGetReply(valkeyClusterContext *cc, int slot_num,
         return VALKEY_ERR;
     }
 
-    return __valkeyClusterGetReplyFromNode(cc, node, reply);
+    return valkeyClusterGetReplyFromNode(cc, node, reply);
 }
 
 /* Parses a MOVED or ASK error reply and returns the destination node. The slot
@@ -2789,8 +2789,8 @@ int valkeyClusterGetReply(valkeyClusterContext *cc, void **reply) {
         de = dictFind(cc->nodes, command->node_addr);
         if (de != NULL) {
             listDelNode(cc->requests, list_command);
-            return __valkeyClusterGetReplyFromNode(cc, dictGetEntryVal(de),
-                                                   reply);
+            return valkeyClusterGetReplyFromNode(cc, dictGetEntryVal(de),
+                                                 reply);
         } else {
             valkeyClusterSetError(cc, VALKEY_ERR_OTHER,
                                   "command was sent to a now unknown node");
