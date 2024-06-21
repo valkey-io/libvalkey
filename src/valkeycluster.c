@@ -1416,21 +1416,12 @@ void valkeyClusterFree(valkeyClusterContext *cc) {
     vk_free(cc);
 }
 
-/* Connect to a Valkey cluster. On error the field error in the returned
- * context will be set to the return value of the error function.
- * When no set of reply functions is given, the default set will be used. */
-static valkeyClusterContext *_valkeyClusterConnect(valkeyClusterContext *cc,
-                                                   const char *addrs) {
-
-    int ret;
-
-    ret = valkeyClusterSetOptionAddNodes(cc, addrs);
-    if (ret != VALKEY_OK) {
+static valkeyClusterContext *
+valkeyClusterConnectInternal(valkeyClusterContext *cc, const char *addrs) {
+    if (valkeyClusterSetOptionAddNodes(cc, addrs) != VALKEY_OK) {
         return cc;
     }
-
     valkeyClusterUpdateSlotmap(cc);
-
     return cc;
 }
 
@@ -1445,7 +1436,7 @@ valkeyClusterContext *valkeyClusterConnect(const char *addrs, int flags) {
 
     cc->flags = flags;
 
-    return _valkeyClusterConnect(cc, addrs);
+    return valkeyClusterConnectInternal(cc, addrs);
 }
 
 valkeyClusterContext *valkeyClusterConnectWithTimeout(const char *addrs,
@@ -1470,7 +1461,7 @@ valkeyClusterContext *valkeyClusterConnectWithTimeout(const char *addrs,
 
     memcpy(cc->connect_timeout, &tv, sizeof(struct timeval));
 
-    return _valkeyClusterConnect(cc, addrs);
+    return valkeyClusterConnectInternal(cc, addrs);
 }
 
 int valkeyClusterSetOptionAddNode(valkeyClusterContext *cc, const char *addr) {
