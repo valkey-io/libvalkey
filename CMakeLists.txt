@@ -2,7 +2,7 @@ CMAKE_MINIMUM_REQUIRED(VERSION 3.0.0)
 
 MACRO(getVersionBit name)
   SET(VERSION_REGEX "^#define ${name} (.+)$")
-  FILE(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/valkey.h"
+  FILE(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/include/valkey/valkey.h"
     VERSION_BIT REGEX ${VERSION_REGEX})
   STRING(REGEX REPLACE ${VERSION_REGEX} "\\1" ${name} "${VERSION_BIT}")
 ENDMACRO(getVersionBit)
@@ -32,13 +32,20 @@ SET(CMAKE_C_STANDARD 99)
 SET(CMAKE_DEBUG_POSTFIX d)
 
 SET(valkey_sources
-    alloc.c
-    async.c
-    valkey.c
-    net.c
-    read.c
-    sds.c
-    sockcompat.c)
+    src/adlist.c
+    src/alloc.c
+    src/async.c
+    src/command.c
+    src/crc16.c
+    src/dict.c
+    src/net.c
+    src/read.c
+    src/sds.c
+    src/sockcompat.c
+    src/valkey.c
+    src/valkeycluster.c
+    src/vkarray.c
+    src/vkutil.c)
 
 SET(valkey_sources ${valkey_sources})
 
@@ -66,7 +73,11 @@ ELSEIF(CMAKE_SYSTEM_NAME MATCHES "SunOS")
     TARGET_LINK_LIBRARIES(valkey PUBLIC socket)
 ENDIF()
 
-TARGET_INCLUDE_DIRECTORIES(valkey PUBLIC $<INSTALL_INTERFACE:include> $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>)
+TARGET_INCLUDE_DIRECTORIES(valkey
+    PUBLIC
+        $<INSTALL_INTERFACE:include/valkey>
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/valkey>
+)
 
 CONFIGURE_FILE(valkey.pc.in valkey.pc @ONLY)
 
@@ -158,9 +169,15 @@ IF(ENABLE_SSL)
     ENDIF()
     FIND_PACKAGE(OpenSSL REQUIRED)
     SET(valkey_ssl_sources
-        ssl.c)
+        src/ssl.c)
     ADD_LIBRARY(valkey_ssl ${valkey_ssl_sources})
     ADD_LIBRARY(valkey::valkey_ssl ALIAS valkey_ssl)
+
+    TARGET_INCLUDE_DIRECTORIES(valkey_ssl
+        PRIVATE
+            $<INSTALL_INTERFACE:include/valkey>
+            $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/valkey>
+    )
 
     IF (APPLE AND BUILD_SHARED_LIBS)
         SET_PROPERTY(TARGET valkey_ssl PROPERTY LINK_FLAGS "-Wl,-undefined -Wl,dynamic_lookup")
@@ -192,7 +209,7 @@ IF(ENABLE_SSL)
             CONFIGURATIONS Debug RelWithDebInfo)
     endif()
 
-    INSTALL(FILES valkey_ssl.h
+    INSTALL(FILES valkey_ssl.h valkeycluster_ssl.h
         DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/valkey)
 
     INSTALL(FILES ${CMAKE_CURRENT_BINARY_DIR}/valkey_ssl.pc
@@ -220,21 +237,21 @@ IF(ENABLE_SSL)
         DESTINATION ${CMAKE_CONF_INSTALL_DIR})
 ENDIF()
 
-IF(NOT DISABLE_TESTS)
-    ENABLE_TESTING()
-    ADD_EXECUTABLE(libvalkey-test test.c)
-    TARGET_LINK_LIBRARIES(libvalkey-test valkey)
-    IF(ENABLE_SSL_TESTS)
-	ADD_DEFINITIONS(-DVALKEY_TEST_SSL=1)
-        TARGET_LINK_LIBRARIES(libvalkey-test valkey_ssl)
-    ENDIF()
-    IF(ENABLE_ASYNC_TESTS)
-	ADD_DEFINITIONS(-DVALKEY_TEST_ASYNC=1)
-        TARGET_LINK_LIBRARIES(libvalkey-test event)
-    ENDIF()
-    ADD_TEST(NAME libvalkey-test
-        COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/test.sh)
-ENDIF()
+#IF(NOT DISABLE_TESTS)
+#    ENABLE_TESTING()
+#    ADD_EXECUTABLE(libvalkey-test test.c)
+#    TARGET_LINK_LIBRARIES(libvalkey-test valkey)
+#    IF(ENABLE_SSL_TESTS)
+#	ADD_DEFINITIONS(-DVALKEY_TEST_SSL=1)
+#        TARGET_LINK_LIBRARIES(libvalkey-test valkey_ssl)
+#    ENDIF()
+#    IF(ENABLE_ASYNC_TESTS)
+#	ADD_DEFINITIONS(-DVALKEY_TEST_ASYNC=1)
+#        TARGET_LINK_LIBRARIES(libvalkey-test event)
+#    ENDIF()
+#    ADD_TEST(NAME libvalkey-test
+#        COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/test.sh)
+#ENDIF()
 
 # Add examples
 IF(ENABLE_EXAMPLES)

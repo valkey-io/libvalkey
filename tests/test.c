@@ -1,10 +1,11 @@
-#include "fmacros.h"
+#define _POSIX_C_SOURCE 200112L
 #include "sockcompat.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #ifndef _WIN32
 #include <strings.h>
+#include <time.h>
 #include <sys/time.h>
 #endif
 #include <assert.h>
@@ -12,6 +13,7 @@
 #include <errno.h>
 #include <limits.h>
 #include <math.h>
+#include <unistd.h>
 
 #include "valkey.h"
 #include "async.h"
@@ -23,8 +25,6 @@
 #include "adapters/libevent.h"
 #include <event2/event.h>
 #endif
-#include "net.h"
-#include "win32.h"
 
 enum connection_type {
     CONN_TCP,
@@ -76,12 +76,12 @@ static int tests = 0, fails = 0, skips = 0;
 #define test_cond(_c) if(_c) printf("\033[0;32mPASSED\033[0;0m\n"); else {printf("\033[0;31mFAILED\033[0;0m\n"); fails++;}
 #define test_skipped() { printf("\033[01;33mSKIPPED\033[0;0m\n"); skips++; }
 
-static void millisleep(int ms)
-{
+static void millisleep(int ms) {
 #ifdef _MSC_VER
     Sleep(ms);
 #else
-    usleep(ms*1000);
+    struct timespec ts = { ms / 1000, (ms % 1000) * 1000000 };
+    clock_nanosleep(CLOCK_REALTIME, 0, &ts, NULL);
 #endif
 }
 
@@ -876,6 +876,18 @@ static void test_free_null(void) {
     test_cond(reply == NULL);
 }
 
+/* Wrap malloc to abort on failure so OOM checks don't make the test logic
+ * harder to follow. */
+static void *vk_malloc_safe(size_t size) {
+    void *ptr = vk_malloc(size);
+    if (ptr == NULL) {
+        fprintf(stderr, "Error:  Out of memory\n");
+        exit(-1);
+    }
+
+    return ptr;
+}
+
 static void *vk_malloc_fail(size_t size) {
     (void)size;
     return NULL;
@@ -900,6 +912,18 @@ static void *vk_realloc_fail(void *ptr, size_t size) {
     return NULL;
 }
 
+static char *vk_test_strdup(const char *s) {
+    size_t len;
+    char *dup;
+
+    len = strlen(s);
+    dup = vk_malloc_safe(len + 1);
+
+    memcpy(dup,s,len + 1);
+
+    return dup;
+}
+
 static void test_allocator_injection(void) {
     void *ptr;
 
@@ -907,7 +931,7 @@ static void test_allocator_injection(void) {
         .mallocFn = vk_malloc_fail,
         .callocFn = vk_calloc_fail,
         .reallocFn = vk_realloc_fail,
-        .strdupFn = strdup,
+        .strdupFn = vk_test_strdup,
         .freeFn = free,
     };
 
@@ -1420,18 +1444,6 @@ static void test_invalid_timeout_errors(struct config config) {
     valkeyFree(c);
 }
 
-/* Wrap malloc to abort on failure so OOM checks don't make the test logic
- * harder to follow. */
-void *vk_malloc_safe(size_t size) {
-    void *ptr = vk_malloc(size);
-    if (ptr == NULL) {
-        fprintf(stderr, "Error:  Out of memory\n");
-        exit(-1);
-    }
-
-    return ptr;
-}
-
 static void test_throughput(struct config config) {
     valkeyContext *c = do_connect(config);
     valkeyReply **replies;
@@ -1520,105 +1532,6 @@ static void test_throughput(struct config config) {
 
     disconnect(c, 0);
 }
-
-// static long __test_callback_flags = 0;
-// static void __test_callback(valkeyContext *c, void *privdata) {
-//     ((void)c);
-//     /* Shift to detect execution order */
-//     __test_callback_flags <<= 8;
-//     __test_callback_flags |= (long)privdata;
-// }
-//
-// static void __test_reply_callback(valkeyContext *c, valkeyReply *reply, void *privdata) {
-//     ((void)c);
-//     /* Shift to detect execution order */
-//     __test_callback_flags <<= 8;
-//     __test_callback_flags |= (long)privdata;
-//     if (reply) freeReplyObject(reply);
-// }
-//
-// static valkeyContext *__connect_nonblock() {
-//     /* Reset callback flags */
-//     __test_callback_flags = 0;
-//     return valkeyConnectNonBlock("127.0.0.1", port, NULL);
-// }
-//
-// static void test_nonblocking_connection() {
-//     valkeyContext *c;
-//     int wdone = 0;
-//
-//     test("Calls command callback when command is issued: ");
-//     c = __connect_nonblock();
-//     valkeySetCommandCallback(c,__test_callback,(void*)1);
-//     valkeyCommand(c,"PING");
-//     test_cond(__test_callback_flags == 1);
-//     valkeyFree(c);
-//
-//     test("Calls disconnect callback on valkeyDisconnect: ");
-//     c = __connect_nonblock();
-//     valkeySetDisconnectCallback(c,__test_callback,(void*)2);
-//     valkeyDisconnect(c);
-//     test_cond(__test_callback_flags == 2);
-//     valkeyFree(c);
-//
-//     test("Calls disconnect callback and free callback on valkeyFree: ");
-//     c = __connect_nonblock();
-//     valkeySetDisconnectCallback(c,__test_callback,(void*)2);
-//     valkeySetFreeCallback(c,__test_callback,(void*)4);
-//     valkeyFree(c);
-//     test_cond(__test_callback_flags == ((2 << 8) | 4));
-//
-//     test("valkeyBufferWrite against empty write buffer: ");
-//     c = __connect_nonblock();
-//     test_cond(valkeyBufferWrite(c,&wdone) == VALKEY_OK && wdone == 1);
-//     valkeyFree(c);
-//
-//     test("valkeyBufferWrite against not yet connected fd: ");
-//     c = __connect_nonblock();
-//     valkeyCommand(c,"PING");
-//     test_cond(valkeyBufferWrite(c,NULL) == VALKEY_ERR &&
-//               strncmp(c->error,"write:",6) == 0);
-//     valkeyFree(c);
-//
-//     test("valkeyBufferWrite against closed fd: ");
-//     c = __connect_nonblock();
-//     valkeyCommand(c,"PING");
-//     valkeyDisconnect(c);
-//     test_cond(valkeyBufferWrite(c,NULL) == VALKEY_ERR &&
-//               strncmp(c->error,"write:",6) == 0);
-//     valkeyFree(c);
-//
-//     test("Process callbacks in the right sequence: ");
-//     c = __connect_nonblock();
-//     valkeyCommandWithCallback(c,__test_reply_callback,(void*)1,"PING");
-//     valkeyCommandWithCallback(c,__test_reply_callback,(void*)2,"PING");
-//     valkeyCommandWithCallback(c,__test_reply_callback,(void*)3,"PING");
-//
-//     /* Write output buffer */
-//     wdone = 0;
-//     while(!wdone) {
-//         usleep(500);
-//         valkeyBufferWrite(c,&wdone);
-//     }
-//
-//     /* Read until at least one callback is executed (the 3 replies will
-//      * arrive in a single packet, causing all callbacks to be executed in
-//      * a single pass). */
-//     while(__test_callback_flags == 0) {
-//         assert(valkeyBufferRead(c) == VALKEY_OK);
-//         valkeyProcessCallbacks(c);
-//     }
-//     test_cond(__test_callback_flags == 0x010203);
-//     valkeyFree(c);
-//
-//     test("valkeyDisconnect executes pending callbacks with NULL reply: ");
-//     c = __connect_nonblock();
-//     valkeySetDisconnectCallback(c,__test_callback,(void*)1);
-//     valkeyCommandWithCallback(c,__test_reply_callback,(void*)2,"PING");
-//     valkeyDisconnect(c);
-//     test_cond(__test_callback_flags == 0x0201);
-//     valkeyFree(c);
-// }
 
 #ifdef VALKEY_TEST_ASYNC
 

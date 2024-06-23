@@ -3,16 +3,32 @@
 # Copyright (C) 2010-2011 Pieter Noordhuis <pcnoordhuis at gmail dot com>
 # This file is released under the BSD license, see the COPYING file
 
-OBJ=alloc.o net.o valkey.o sds.o async.o read.o sockcompat.o
-EXAMPLES=valkey-example valkey-example-libevent valkey-example-libev valkey-example-glib valkey-example-push valkey-example-poll
-TESTS=libvalkey-test
-LIBNAME=libvalkey
-PKGCONFNAME=valkey.pc
+SRC_DIR = src
+OBJ_DIR = obj
+LIB_DIR = lib
+TEST_DIR = tests
 
-LIBVALKEY_MAJOR=$(shell grep LIBVALKEY_MAJOR valkey.h | awk '{print $$3}')
-LIBVALKEY_MINOR=$(shell grep LIBVALKEY_MINOR valkey.h | awk '{print $$3}')
-LIBVALKEY_PATCH=$(shell grep LIBVALKEY_PATCH valkey.h | awk '{print $$3}')
-LIBVALKEY_SONAME=$(shell grep LIBVALKEY_SONAME valkey.h | awk '{print $$3}')
+INCLUDE_DIR = include/valkey
+
+TEST_SRCS = $(wildcard $(TEST_DIR)/*.c)
+TEST_OBJS = $(patsubst $(TEST_DIR)/%.c,$(OBJ_DIR)/%.o,$(TEST_SRCS))
+TEST_BINS = $(patsubst $(TEST_DIR)/%.c,$(TEST_DIR)/%,$(TEST_SRCS))
+
+SOURCES = $(filter-out $(wildcard $(SRC_DIR)/*ssl*.c), $(wildcard $(SRC_DIR)/*.c))
+HEADERS = $(filter-out $(INCLUDE_DIR)/valkey_ssl.h, $(wildcard $(INCLUDE_DIR)/*.h))
+
+OBJS = $(patsubst $(SRC_DIR)/%.c,$(OBJ_DIR)/%.o,$(SOURCES))
+
+LIBNAME=libvalkey
+PKGCONFNAME=$(LIB_DIR)/valkey.pc
+
+PKGCONF_TEMPLATE = valkey.pc.in
+SSL_PKGCONF_TEMPLATE = valkey_ssl.pc.in
+
+LIBVALKEY_MAJOR=$(shell grep LIBVALKEY_MAJOR $(INCLUDE_DIR)/valkey.h | awk '{print $$3}')
+LIBVALKEY_MINOR=$(shell grep LIBVALKEY_MINOR $(INCLUDE_DIR)/valkey.h | awk '{print $$3}')
+LIBVALKEY_PATCH=$(shell grep LIBVALKEY_PATCH $(INCLUDE_DIR)/valkey.h | awk '{print $$3}')
+LIBVALKEY_SONAME=$(shell grep LIBVALKEY_SONAME include/valkey/valkey.h | awk '{print $$3}')
 
 # Installation related variables and target
 PREFIX?=/usr/local
@@ -52,28 +68,33 @@ DYLIBSUFFIX=so
 STLIBSUFFIX=a
 DYLIB_MINOR_NAME=$(LIBNAME).$(DYLIBSUFFIX).$(LIBVALKEY_SONAME)
 DYLIB_MAJOR_NAME=$(LIBNAME).$(DYLIBSUFFIX).$(LIBVALKEY_MAJOR)
-DYLIBNAME=$(LIBNAME).$(DYLIBSUFFIX)
+DYLIB_ROOT_NAME=$(LIBNAME).$(DYLIBSUFFIX)
+DYLIBNAME=$(LIB_DIR)/$(DYLIB_ROOT_NAME)
 
 DYLIB_MAKE_CMD=$(CC) $(PLATFORM_FLAGS) -shared -Wl,-soname,$(DYLIB_MINOR_NAME)
-STLIBNAME=$(LIBNAME).$(STLIBSUFFIX)
+STLIB_ROOT_NAME=$(LIBNAME).$(STLIBSUFFIX)
+STLIBNAME=$(LIB_DIR)/$(STLIB_ROOT_NAME)
 STLIB_MAKE_CMD=$(AR) rcs
 
 #################### SSL variables start ####################
-SSL_OBJ=ssl.o
 SSL_LIBNAME=libvalkey_ssl
-SSL_PKGCONFNAME=valkey_ssl.pc
+SSL_PKGCONFNAME=$(LIB_DIR)/valkey_ssl.pc
 SSL_INSTALLNAME=install-ssl
 SSL_DYLIB_MINOR_NAME=$(SSL_LIBNAME).$(DYLIBSUFFIX).$(LIBVALKEY_SONAME)
 SSL_DYLIB_MAJOR_NAME=$(SSL_LIBNAME).$(DYLIBSUFFIX).$(LIBVALKEY_MAJOR)
-SSL_DYLIBNAME=$(SSL_LIBNAME).$(DYLIBSUFFIX)
-SSL_STLIBNAME=$(SSL_LIBNAME).$(STLIBSUFFIX)
+SSL_ROOT_DYLIB_NAME=$(SSL_LIBNAME).$(DYLIBSUFFIX)
+SSL_DYLIBNAME=$(LIB_DIR)/$(SSL_LIBNAME).$(DYLIBSUFFIX)
+SSL_STLIBNAME=$(LIB_DIR)/$(SSL_LIBNAME).$(STLIBSUFFIX)
 SSL_DYLIB_MAKE_CMD=$(CC) $(PLATFORM_FLAGS) -shared -Wl,-soname,$(SSL_DYLIB_MINOR_NAME)
 
 USE_SSL?=0
+
 ifeq ($(USE_SSL),1)
+  SSL_SOURCES = $(wildcard $(SRC_DIR)/*ssl*.c)
+  SSL_OBJS = $(patsubst $(SRC_DIR)/%.c,$(OBJ_DIR)/%.o,$(SSL_SOURCES))
+
   # This is required for test.c only
   CFLAGS+=-DVALKEY_TEST_SSL
-  EXAMPLES+=valkey-example-ssl valkey-example-libevent-ssl
   SSL_STLIB=$(SSL_STLIBNAME)
   SSL_DYLIB=$(SSL_DYLIBNAME)
   SSL_PKGCONF=$(SSL_PKGCONFNAME)
@@ -85,7 +106,6 @@ else
   SSL_INSTALL=
 endif
 ##################### SSL variables end #####################
-
 
 # Platform-specific overrides
 uname_S := $(shell sh -c 'uname -s 2>/dev/null || echo not')
@@ -146,7 +166,34 @@ ifeq ($(uname_S),Darwin)
   DYLIB_PLUGIN=-Wl,-undefined -Wl,dynamic_lookup
 endif
 
-all: dynamic static libvalkey-test pkgconfig
+all: dynamic static pkgconfig
+
+$(DYLIBNAME): $(OBJS) | $(LIB_DIR)
+	$(DYLIB_MAKE_CMD) -o $(DYLIBNAME) $(OBJS) $(REAL_LDFLAGS)
+
+$(STLIBNAME): $(OBJS) | $(LIB_DIR)
+	$(STLIB_MAKE_CMD) $(STLIBNAME) $(OBJS)
+
+$(SSL_DYLIBNAME): $(SSL_OBJS)
+	$(SSL_DYLIB_MAKE_CMD) $(DYLIB_PLUGIN) -o $(SSL_DYLIBNAME) $(SSL_OBJS) $(REAL_LDFLAGS) $(LDFLAGS) $(SSL_LDFLAGS)
+
+$(SSL_STLIBNAME): $(SSL_OBJS)
+	$(STLIB_MAKE_CMD) $(SSL_STLIBNAME) $(SSL_OBJS)
+
+$(OBJ_DIR)/%.o: $(SRC_DIR)/%.c | $(OBJ_DIR)
+	$(CC) -std=c99 $(REAL_CFLAGS) -I$(INCLUDE_DIR) -MMD -MP -c $< -o $@
+
+$(OBJ_DIR)/%.o: $(TEST_DIR)/%.c | $(OBJ_DIR)
+	$(CC) -std=c99 $(REAL_CFLAGS) -I$(INCLUDE_DIR) -MMD -MP -c $< -o $@
+
+$(TEST_DIR)/%: $(OBJ_DIR)/%.o $(STLIBNAME)
+	$(CC) -o $@ $< $(STLIBNAME) $(LDFLAGS) $(SSL_LDLAGS) $(TEST_LDFLAGS)
+
+$(OBJ_DIR):
+	mkdir -p $(OBJ_DIR)
+
+$(LIB_DIR):
+	mkdir -p $(LIB_DIR)
 
 dynamic: $(DYLIBNAME) $(SSL_DYLIB)
 
@@ -154,100 +201,7 @@ static: $(STLIBNAME) $(SSL_STLIB)
 
 pkgconfig: $(PKGCONFNAME) $(SSL_PKGCONF)
 
-# Deps (use make dep to generate this)
-alloc.o: alloc.c fmacros.h alloc.h
-async.o: async.c fmacros.h alloc.h async.h valkey.h read.h sds.h net.h dict.c dict.h win32.h async_private.h
-dict.o: dict.c fmacros.h alloc.h dict.h
-valkey.o: valkey.c fmacros.h valkey.h read.h sds.h alloc.h net.h async.h win32.h
-net.o: net.c fmacros.h net.h valkey.h read.h sds.h alloc.h sockcompat.h win32.h
-read.o: read.c fmacros.h alloc.h read.h sds.h win32.h
-sds.o: sds.c sds.h sdsalloc.h alloc.h
-sockcompat.o: sockcompat.c sockcompat.h
-test.o: test.c fmacros.h valkey.h read.h sds.h alloc.h net.h sockcompat.h win32.h
-
-$(DYLIBNAME): $(OBJ)
-	$(DYLIB_MAKE_CMD) -o $(DYLIBNAME) $(OBJ) $(REAL_LDFLAGS)
-
-$(STLIBNAME): $(OBJ)
-	$(STLIB_MAKE_CMD) $(STLIBNAME) $(OBJ)
-
-#################### SSL building rules start ####################
-$(SSL_DYLIBNAME): $(SSL_OBJ)
-	$(SSL_DYLIB_MAKE_CMD) $(DYLIB_PLUGIN) -o $(SSL_DYLIBNAME) $(SSL_OBJ) $(REAL_LDFLAGS) $(LDFLAGS) $(SSL_LDFLAGS)
-
-$(SSL_STLIBNAME): $(SSL_OBJ)
-	$(STLIB_MAKE_CMD) $(SSL_STLIBNAME) $(SSL_OBJ)
-
-$(SSL_OBJ): ssl.c valkey.h read.h sds.h alloc.h async.h win32.h async_private.h
-#################### SSL building rules end ####################
-
-# Binaries:
-valkey-example-libevent: examples/example-libevent.c adapters/libevent.h $(STLIBNAME)
-	$(CC) -o examples/$@ $(REAL_CFLAGS) -I. $< -levent $(STLIBNAME) $(REAL_LDFLAGS)
-
-valkey-example-libevent-ssl: examples/example-libevent-ssl.c adapters/libevent.h $(STLIBNAME) $(SSL_STLIBNAME)
-	$(CC) -o examples/$@ $(REAL_CFLAGS) -I. $< -levent $(STLIBNAME) $(SSL_STLIBNAME) $(REAL_LDFLAGS) $(SSL_LDFLAGS)
-
-valkey-example-libev: examples/example-libev.c adapters/libev.h $(STLIBNAME)
-	$(CC) -o examples/$@ $(REAL_CFLAGS) -I. $< -lev $(STLIBNAME) $(REAL_LDFLAGS)
-
-valkey-example-libhv: examples/example-libhv.c adapters/libhv.h $(STLIBNAME)
-	$(CC) -o examples/$@ $(REAL_CFLAGS) -I. $< -lhv $(STLIBNAME) $(REAL_LDFLAGS)
-
-valkey-example-glib: examples/example-glib.c adapters/glib.h $(STLIBNAME)
-	$(CC) -o examples/$@ $(REAL_CFLAGS) -I. $< $(shell pkg-config --cflags --libs glib-2.0) $(STLIBNAME) $(REAL_LDFLAGS)
-
-valkey-example-ivykis: examples/example-ivykis.c adapters/ivykis.h $(STLIBNAME)
-	$(CC) -o examples/$@ $(REAL_CFLAGS) -I. $< -livykis $(STLIBNAME) $(REAL_LDFLAGS)
-
-valkey-example-macosx: examples/example-macosx.c adapters/macosx.h $(STLIBNAME)
-	$(CC) -o examples/$@ $(REAL_CFLAGS) -I. $< -framework CoreFoundation $(STLIBNAME) $(REAL_LDFLAGS)
-
-valkey-example-ssl: examples/example-ssl.c $(STLIBNAME) $(SSL_STLIBNAME)
-	$(CC) -o examples/$@ $(REAL_CFLAGS) -I. $< $(STLIBNAME) $(SSL_STLIBNAME) $(REAL_LDFLAGS) $(SSL_LDFLAGS)
-
-valkey-example-poll: examples/example-poll.c adapters/poll.h $(STLIBNAME)
-	$(CC) -o examples/$@ $(REAL_CFLAGS) -I. $< $(STLIBNAME) $(REAL_LDFLAGS)
-
-ifndef AE_DIR
-valkey-example-ae:
-	@echo "Please specify AE_DIR (e.g. <valkey repository>/src)"
-	@false
-else
-valkey-example-ae: examples/example-ae.c adapters/ae.h $(STLIBNAME)
-	$(CC) -o examples/$@ $(REAL_CFLAGS) $(REAL_LDFLAGS) -I. -I$(AE_DIR) $< $(AE_DIR)/ae.o $(AE_DIR)/zmalloc.o $(AE_DIR)/../deps/jemalloc/lib/libjemalloc.a -pthread $(STLIBNAME)
-endif
-
-ifndef LIBUV_DIR
-# dynamic link libuv.so
-valkey-example-libuv: examples/example-libuv.c adapters/libuv.h $(STLIBNAME)
-	$(CC) -o examples/$@ $(REAL_CFLAGS) -I. -I$(LIBUV_DIR)/include $< -luv -lpthread -lrt $(STLIBNAME) $(REAL_LDFLAGS)
-else
-# use user provided static lib
-valkey-example-libuv: examples/example-libuv.c adapters/libuv.h $(STLIBNAME)
-	$(CC) -o examples/$@ $(REAL_CFLAGS) -I. -I$(LIBUV_DIR)/include $< $(LIBUV_DIR)/.libs/libuv.a -lpthread -lrt $(STLIBNAME) $(REAL_LDFLAGS)
-endif
-
-ifeq ($(and $(QT_MOC),$(QT_INCLUDE_DIR),$(QT_LIBRARY_DIR)),)
-valkey-example-qt:
-	@echo "Please specify QT_MOC, QT_INCLUDE_DIR AND QT_LIBRARY_DIR"
-	@false
-else
-valkey-example-qt: examples/example-qt.cpp adapters/qt.h $(STLIBNAME)
-	$(QT_MOC) adapters/qt.h -I. -I$(QT_INCLUDE_DIR) -I$(QT_INCLUDE_DIR)/QtCore | \
-	    $(CXX) -x c++ -o qt-adapter-moc.o -c - $(REAL_CFLAGS) -I. -I$(QT_INCLUDE_DIR) -I$(QT_INCLUDE_DIR)/QtCore
-	$(QT_MOC) examples/example-qt.h -I. -I$(QT_INCLUDE_DIR) -I$(QT_INCLUDE_DIR)/QtCore | \
-	    $(CXX) -x c++ -o qt-example-moc.o -c - $(REAL_CFLAGS) -I. -I$(QT_INCLUDE_DIR) -I$(QT_INCLUDE_DIR)/QtCore
-	$(CXX) -o examples/$@ $(REAL_CFLAGS) $(REAL_LDFLAGS) -I. -I$(QT_INCLUDE_DIR) -I$(QT_INCLUDE_DIR)/QtCore -L$(QT_LIBRARY_DIR) qt-adapter-moc.o qt-example-moc.o $< -pthread $(STLIBNAME) -lQtCore
-endif
-
-valkey-example: examples/example.c $(STLIBNAME)
-	$(CC) -o examples/$@ $(REAL_CFLAGS) -I. $< $(STLIBNAME) $(REAL_LDFLAGS)
-
-valkey-example-push: examples/example-push.c $(STLIBNAME)
-	$(CC) -o examples/$@ $(REAL_CFLAGS) -I. $< $(STLIBNAME) $(REAL_LDFLAGS)
-
-examples: $(EXAMPLES)
+-include $(OBJS:.o=.d)
 
 TEST_LIBS = $(STLIBNAME) $(SSL_STLIB)
 TEST_LDFLAGS = $(SSL_LDFLAGS)
@@ -258,73 +212,50 @@ ifeq ($(TEST_ASYNC),1)
     TEST_LDFLAGS += -levent
 endif
 
-libvalkey-test: test.o $(TEST_LIBS)
-	$(CC) -o $@ $(REAL_CFLAGS) -I. $^ $(REAL_LDFLAGS) $(TEST_LDFLAGS)
+tests: $(TEST_BINS)
 
-valkey-%: %.o $(STLIBNAME)
-	$(CC) $(REAL_CFLAGS) -o $@ $< $(TEST_LIBS) $(REAL_LDFLAGS)
-
-test: libvalkey-test
-	./libvalkey-test
-
-check: libvalkey-test
-	TEST_SSL=$(USE_SSL) ./test.sh
-
-.c.o:
-	$(CC) -std=c99 -c $(REAL_CFLAGS) $<
+examples: $(STLIBNAME)
+	$(MAKE) -C examples
 
 clean:
-	rm -rf $(DYLIBNAME) $(STLIBNAME) $(SSL_DYLIBNAME) $(SSL_STLIBNAME) $(TESTS) $(PKGCONFNAME) examples/valkey-example* *.o *.gcda *.gcno *.gcov
-
-dep:
-	$(CC) $(CPPFLAGS) $(CFLAGS) -MM *.c
+	rm -rf $(OBJ_DIR) $(LIB_DIR) $(TEST_BINS) *.gcda *.gcno *.gcov
+	rm -rf examples/example-*
 
 INSTALL?= cp -pPR
 
-$(PKGCONFNAME): valkey.h
+$(PKGCONFNAME): $(PKGCONF_TEMPLATE)
 	@echo "Generating $@ for pkgconfig..."
-	@echo prefix=$(PREFIX) > $@
-	@echo exec_prefix=\$${prefix} >> $@
-	@echo libdir=$(PREFIX)/$(LIBRARY_PATH) >> $@
-	@echo includedir=$(PREFIX)/include >> $@
-	@echo pkgincludedir=$(PREFIX)/$(INCLUDE_PATH) >> $@
-	@echo >> $@
-	@echo Name: valkey >> $@
-	@echo Description: C client library for Valkey. >> $@
-	@echo Version: $(LIBVALKEY_MAJOR).$(LIBVALKEY_MINOR).$(LIBVALKEY_PATCH) >> $@
-	@echo Libs: -L\$${libdir} -lvalkey >> $@
-	@echo Cflags: -I\$${pkgincludedir} -I\$${includedir} -D_FILE_OFFSET_BITS=64 >> $@
+	sed \
+		-e 's|@CMAKE_INSTALL_PREFIX@|$(PREFIX)|g' \
+		-e 's|@CMAKE_INSTALL_LIBDIR@|$(INSTALL_LIBRARY_PATH)|g' \
+		-e 's|@PROJECT_VERSION@|$(LIBVALKEY_SONAME)|g' \
+		$< > $@
 
-$(SSL_PKGCONFNAME): valkey_ssl.h
+$(SSL_PKGCONFNAME): $(SSL_PKGCONF_TEMPLATE)
 	@echo "Generating $@ for pkgconfig..."
-	@echo prefix=$(PREFIX) > $@
-	@echo exec_prefix=\$${prefix} >> $@
-	@echo libdir=$(PREFIX)/$(LIBRARY_PATH) >> $@
-	@echo includedir=$(PREFIX)/include >> $@
-	@echo pkgincludedir=$(PREFIX)/$(INCLUDE_PATH) >> $@
-	@echo >> $@
-	@echo Name: valkey_ssl >> $@
-	@echo Description: SSL Support for valkey. >> $@
-	@echo Version: $(LIBVALKEY_MAJOR).$(LIBVALKEY_MINOR).$(LIBVALKEY_PATCH) >> $@
-	@echo Requires: valkey >> $@
-	@echo Libs: -L\$${libdir} -lvalkey_ssl >> $@
-	@echo Libs.private: -lssl -lcrypto >> $@
+	sed \
+		-e 's|@CMAKE_INSTALL_PREFIX@|$(PREFIX)|g' \
+		-e 's|@CMAKE_INSTALL_LIBDIR@|$(INSTALL_LIBRARY_PATH)|g' \
+		-e 's|@PROJECT_VERSION@|$(LIBVALKEY_SONAME)|g' \
+		$< > $@
 
 install: $(DYLIBNAME) $(STLIBNAME) $(PKGCONFNAME) $(SSL_INSTALL)
-	mkdir -p $(INSTALL_INCLUDE_PATH) $(INSTALL_INCLUDE_PATH)/adapters $(INSTALL_LIBRARY_PATH)
-	$(INSTALL) valkey.h async.h read.h sds.h alloc.h sockcompat.h $(INSTALL_INCLUDE_PATH)
-	$(INSTALL) adapters/*.h $(INSTALL_INCLUDE_PATH)/adapters
+	mkdir -p $(INSTALL_INCLUDE_PATH)/adapters $(INSTALL_LIBRARY_PATH)
+	$(INSTALL) $(HEADERS) $(INSTALL_INCLUDE_PATH)
+	$(INSTALL) $(INCLUDE_DIR)/adapters/*.h $(INSTALL_INCLUDE_PATH)/adapters
 	$(INSTALL) $(DYLIBNAME) $(INSTALL_LIBRARY_PATH)/$(DYLIB_MINOR_NAME)
-	cd $(INSTALL_LIBRARY_PATH) && ln -sf $(DYLIB_MINOR_NAME) $(DYLIBNAME) && ln -sf $(DYLIB_MINOR_NAME) $(DYLIB_MAJOR_NAME)
+	ln -sf $(DYLIB_MINOR_NAME) $(INSTALL_LIBRARY_PATH)/$(DYLIB_ROOT_NAME)
+	ln -sf $(DYLIB_MINOR_NAME) $(INSTALL_LIBRARY_PATH)/$(DYLIB_MAJOR_NAME)
 	$(INSTALL) $(STLIBNAME) $(INSTALL_LIBRARY_PATH)
 	mkdir -p $(INSTALL_PKGCONF_PATH)
 	$(INSTALL) $(PKGCONFNAME) $(INSTALL_PKGCONF_PATH)
 
 install-ssl: $(SSL_DYLIBNAME) $(SSL_STLIBNAME) $(SSL_PKGCONFNAME)
 	mkdir -p $(INSTALL_INCLUDE_PATH) $(INSTALL_LIBRARY_PATH)
-	$(INSTALL) valkey_ssl.h $(INSTALL_INCLUDE_PATH)
+	$(INSTALL) $(INCLUDE_DIR)/valkey_ssl.h $(INSTALL_INCLUDE_PATH)
 	$(INSTALL) $(SSL_DYLIBNAME) $(INSTALL_LIBRARY_PATH)/$(SSL_DYLIB_MINOR_NAME)
-	cd $(INSTALL_LIBRARY_PATH) && ln -sf $(SSL_DYLIB_MINOR_NAME) $(SSL_DYLIBNAME) && ln -sf $(SSL_DYLIB_MINOR_NAME) $(SSL_DYLIB_MAJOR_NAME)
+	ln -sf $(SSL_DYLIB_MINOR_NAME) $(INSTALL_LIBRARY_PATH)/$(SSL_ROOT_DYLIB_NAME)
+	ln -sf $(SSL_DYLIB_MINOR_NAME) $(INSTALL_LIBRARY_PATH)/$(SSL_DYLIB_MAJOR_NAME)
 	$(INSTALL) $(SSL_STLIBNAME) $(INSTALL_LIBRARY_PATH)
 	mkdir -p $(INSTALL_PKGCONF_PATH)
 	$(INSTALL) $(SSL_PKGCONFNAME) $(INSTALL_PKGCONF_PATH)
@@ -352,7 +283,7 @@ coverage: gcov
 	lcov -q -l tmp/lcov/valkey.info
 	genhtml --legend -q -o tmp/lcov/report tmp/lcov/valkey.info
 
-noopt:
-	$(MAKE) OPTIMIZATION=""
+debug:
+	$(MAKE) OPTIMIZATION="-O0"
 
-.PHONY: all test check clean dep install 32bit 32bit-vars gprof gcov noopt
+.PHONY: all test check clean install 32bit 32bit-vars gprof gcov noopt
