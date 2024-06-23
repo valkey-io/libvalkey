@@ -63,7 +63,7 @@ static void enableClientTracking(valkeyContext *c) {
 
     if (reply->type != VALKEY_REPLY_MAP) {
         fprintf(stderr, "Error: Can't send HELLO 3 command.  Are you sure you're ");
-        fprintf(stderr, "connected to valkey-server >= 6.0.0?\Server error: %s\n",
+        fprintf(stderr, "connected to valkey-server >= 6.0.0?\nServer error: %s\n",
                         reply->type == VALKEY_REPLY_ERROR ? reply->str : "(unknown)");
         exit(-1);
     }
