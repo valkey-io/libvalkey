@@ -166,7 +166,7 @@ ifeq ($(uname_S),Darwin)
   DYLIB_PLUGIN=-Wl,-undefined -Wl,dynamic_lookup
 endif
 
-all: dynamic static pkgconfig
+all: dynamic static pkgconfig tests
 
 $(DYLIBNAME): $(OBJS) | $(LIB_DIR)
 	$(DYLIB_MAKE_CMD) -o $(DYLIBNAME) $(OBJS) $(REAL_LDFLAGS)
@@ -187,7 +187,7 @@ $(OBJ_DIR)/%.o: $(TEST_DIR)/%.c | $(OBJ_DIR)
 	$(CC) -std=c99 $(REAL_CFLAGS) -I$(INCLUDE_DIR) -MMD -MP -c $< -o $@
 
 $(TEST_DIR)/%: $(OBJ_DIR)/%.o $(STLIBNAME)
-	$(CC) -o $@ $< $(STLIBNAME) $(LDFLAGS) $(SSL_LDLAGS) $(TEST_LDFLAGS)
+	$(CC) -o $@ $< $(STLIBNAME) $(SSL_STLIB) $(LDFLAGS) $(SSL_LDLAGS) $(TEST_LDFLAGS)
 
 $(OBJ_DIR):
 	mkdir -p $(OBJ_DIR)
@@ -219,7 +219,7 @@ examples: $(STLIBNAME)
 
 clean:
 	rm -rf $(OBJ_DIR) $(LIB_DIR) $(TEST_BINS) *.gcda *.gcno *.gcov
-	rm -rf examples/example-*
+	make -C examples clean
 
 INSTALL?= cp -pPR
 

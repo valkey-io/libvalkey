@@ -10,10 +10,14 @@ jobs:
 
       - name: Install dependencies
         run: |
-          curl -fsSL https://packages.redis.io/gpg | sudo gpg --dearmor -o /usr/share/keyrings/redis-archive-keyring.gpg
-          echo "deb [signed-by=/usr/share/keyrings/redis-archive-keyring.gpg] https://packages.redis.io/deb $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/redis.list
           sudo apt-get update
-          sudo apt-get install -y redis-server valgrind libevent-dev
+          sudo apt-get install -y valgrind libevent-dev cmake libssl-dev
+
+      # TODO:  Test against Redis and KeyDB in addition to Valkey
+      - name: Install Valkey
+        run: |
+          git clone --depth 1 --branch 7.2.5 https://github.com/valkey-io/valkey.git
+          cd valkey && sudo BUILD_TLS=yes make install
 
       - name: Build using cmake
         env:
@@ -26,10 +30,11 @@ jobs:
         run: USE_SSL=1 TEST_ASYNC=1 make
 
       - name: Run tests
+        working-directory: tests
         env:
           SKIPS_AS_FAILS: 1
           TEST_SSL: 1
-        run: $GITHUB_WORKSPACE/test.sh
+        run: ./test.sh
 
       #      - name: Run tests under valgrind
       #        env:
@@ -48,7 +53,12 @@ jobs:
         run: |
           yum -y install http://rpms.remirepo.net/enterprise/remi-release-7.rpm
           yum -y --enablerepo=remi install redis
-          yum -y install gcc gcc-c++ make openssl openssl-devel cmake3 valgrind libevent-devel
+          yum -y install git gcc gcc-c++ make openssl openssl-devel cmake3 valgrind libevent-devel
+
+      - name: Install Valkey
+        run: |
+          git clone --depth 1 --branch 7.2.5 https://github.com/valkey-io/valkey.git
+          cd valkey && BUILD_TLS=yes make install
 
       - name: Build using cmake
         env:
@@ -61,17 +71,19 @@ jobs:
         run: USE_SSL=1 TEST_ASYNC=1 make
 
       - name: Run tests
+        working-directory: tests
         env:
           SKIPS_AS_FAILS: 1
           TEST_SSL: 1
-        run: $GITHUB_WORKSPACE/test.sh
+        run: ./test.sh
 
       - name: Run tests under valgrind
+        working-directory: tests
         env:
           SKIPS_AS_FAILS: 1
           TEST_SSL: 1
           TEST_PREFIX: valgrind --error-exitcode=99 --track-origins=yes --leak-check=full
-        run: $GITHUB_WORKSPACE/test.sh
+        run: ./test.sh
 
   centos8:
     name: RockyLinux 8
@@ -88,6 +100,11 @@ jobs:
           dnf -y group install "Development Tools"
           dnf -y install openssl-devel cmake valgrind libevent-devel
 
+      - name: Install Valkey
+        run: |
+          git clone --depth 1 --branch 7.2.5 https://github.com/valkey-io/valkey.git
+          cd valkey && BUILD_TLS=yes make install
+
       - name: Build using cmake
         env:
           EXTRA_CMAKE_OPTS: -DENABLE_EXAMPLES:BOOL=ON -DENABLE_SSL:BOOL=ON -DENABLE_SSL_TESTS:BOOL=ON -DENABLE_ASYNC_TESTS:BOOL=ON
@@ -99,17 +116,19 @@ jobs:
         run: USE_SSL=1 TEST_ASYNC=1 make
 
       - name: Run tests
+        working-directory: tests
         env:
           SKIPS_AS_FAILS: 1
           TEST_SSL: 1
-        run: $GITHUB_WORKSPACE/test.sh
+        run: ./test.sh
 
       - name: Run tests under valgrind
+        working-directory: tests
         env:
           SKIPS_AS_FAILS: 1
           TEST_SSL: 1
           TEST_PREFIX: valgrind --error-exitcode=99 --track-origins=yes --leak-check=full
-        run: $GITHUB_WORKSPACE/test.sh
+        run: ./test.sh
 
   freebsd:
     runs-on: ubuntu-latest
@@ -133,16 +152,16 @@ jobs:
 
       - name: Install dependencies
         run: |
-          brew install openssl redis@7.2
-          brew link redis@7.2 --force
+          brew install openssl valkey
 
       - name: Build hiredis
         run: USE_SSL=1 make
 
       - name: Run tests
+        working-directory: tests
         env:
           TEST_SSL: 1
-        run: $GITHUB_WORKSPACE/test.sh
+        run: ./test.sh
 
   windows:
     name: Windows
@@ -163,7 +182,7 @@ jobs:
 
       - name: Run tests
         run: |
-          ./build/hiredis-test.exe
+          ./build/test.exe
 
       - name: Install Cygwin Action
         uses: cygwin/cygwin-install-action@v2

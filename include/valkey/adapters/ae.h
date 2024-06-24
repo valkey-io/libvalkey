@@ -133,6 +133,7 @@ static int valkeyAeAttach_link(valkeyAsyncContext *ac, void *base) {
     return valkeyAeAttach((aeEventLoop *)base, ac);
 }
 
+VALKEY_UNUSED
 static int valkeyClusterAeAttach(aeEventLoop *loop,
                                  valkeyClusterAsyncContext *acc) {
     if (acc == NULL || loop == NULL) {

@@ -37,6 +37,13 @@
 extern "C" {
 #endif
 
+/* For the async cluster attach functions. */
+#if defined(__GNUC__) || defined(__clang__)
+#define VALKEY_UNUSED __attribute__((unused))
+#else
+#define VALKEY_UNUSED
+#endif
+
 struct valkeyAsyncContext; /* need forward declaration of valkeyAsyncContext */
 struct dict; /* dictionary header is included in async.c */
 

@@ -81,7 +81,7 @@ static void millisleep(int ms) {
     Sleep(ms);
 #else
     struct timespec ts = { ms / 1000, (ms % 1000) * 1000000 };
-    clock_nanosleep(CLOCK_REALTIME, 0, &ts, NULL);
+    nanosleep(&ts, NULL);
 #endif
 }
 

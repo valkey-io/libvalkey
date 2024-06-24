@@ -174,10 +174,12 @@ static int valkeyLibeventAttach(valkeyAsyncContext *ac, struct event_base *base)
     return VALKEY_OK;
 }
 
+VALKEY_UNUSED
 static int valkeyLibeventAttach_link(valkeyAsyncContext *ac, void *base) {
     return valkeyLibeventAttach(ac, (struct event_base *)base);
 }
 
+VALKEY_UNUSED
 static int valkeyClusterLibeventAttach(valkeyClusterAsyncContext *acc,
                                        struct event_base *base) {
     if (acc == NULL || base == NULL) {

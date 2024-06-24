@@ -166,6 +166,7 @@ static int valkeyGlibAttach_link(valkeyAsyncContext *ac, void *adapter) {
     return VALKEY_ERR;
 }
 
+VALKEY_UNUSED
 static int valkeyClusterGlibAttach(valkeyClusterAsyncContext *acc,
                                    valkeyClusterGlibAdapter *adapter) {
     if (acc == NULL || adapter == NULL) {
