@@ -37,8 +37,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <valkey/alloc.h>
 
+#include "alloc.h"
 #include "adlist.h"
 #include "command.h"
 #include "dict.h"
@@ -3353,6 +3353,7 @@ int valkeyClusterAppendCommandArgv(valkeyClusterContext *cc, int argc,
     return ret;
 }
 
+VALKEY_UNUSED
 static int valkeyClusterSendAll(valkeyClusterContext *cc) {
     dictEntry *de;
     valkeyClusterNode *node;
@@ -3388,6 +3389,7 @@ static int valkeyClusterSendAll(valkeyClusterContext *cc) {
     return VALKEY_OK;
 }
 
+VALKEY_UNUSED
 static int valkeyClusterClearAll(valkeyClusterContext *cc) {
     dictEntry *de;
     valkeyClusterNode *node;
@@ -3532,7 +3534,7 @@ error:
 }
 
 /**
- * Resets cluster state after pipeline. 
+ * Resets cluster state after pipeline.
  * Resets Valkey node connections if pipeline commands were not called beforehand.
  */
 void valkeyClusterReset(valkeyClusterContext *cc) {

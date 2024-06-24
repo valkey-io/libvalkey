@@ -1,4 +1,11 @@
 #!/bin/sh -ue
+#
+check_executable() {
+    if ! command -v "$1" >/dev/null 2>&1; then
+        echo "Error: $1 is not found or not executable."
+        exit 1
+    fi
+}
 
 VALKEY_SERVER=${VALKEY_SERVER:-valkey-server}
 VALKEY_PORT=${VALKEY_PORT:-56379}
@@ -9,6 +16,8 @@ ENABLE_DEBUG_CMD=
 SSL_TEST_ARGS=
 SKIPS_ARG=${SKIPS_ARG:-}
 VALKEY_DOCKER=${VALKEY_DOCKER:-}
+
+check_executable "$VALKEY_SERVER"
 
 # Enable debug command for redis-server >= 7.0.0 or any version of valkey-server.
 VALKEY_MAJOR_VERSION="$("$VALKEY_SERVER" --version|awk -F'[^0-9]+' '{ print $2 }')"
@@ -104,9 +113,13 @@ else
 fi
 # Wait until we detect the unix socket
 echo waiting for server
-while [ ! -S "${SOCK_FILE}" ]; do sleep 1; done
+while [ ! -S "${SOCK_FILE}" ]; do
+    2>&1 echo "Waiting for server..."
+    ps aux|grep valkey-server
+    sleep 1;
+done
 
 # Treat skips as failures if directed
 [ "$SKIPS_AS_FAILS" = 1 ] && SKIPS_ARG="${SKIPS_ARG} --skips-as-fails"
 
-${TEST_PREFIX:-} ./libvalkey-test -h 127.0.0.1 -p ${VALKEY_PORT} -s ${SOCK_FILE} ${SSL_TEST_ARGS} ${SKIPS_ARG}
+${TEST_PREFIX:-} ./test -h 127.0.0.1 -p ${VALKEY_PORT} -s ${SOCK_FILE} ${SSL_TEST_ARGS} ${SKIPS_ARG}

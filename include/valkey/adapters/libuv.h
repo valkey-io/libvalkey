@@ -206,6 +206,7 @@ static int valkeyLibuvAttach_link(valkeyAsyncContext *ac, void *loop) {
     return valkeyLibuvAttach(ac, (uv_loop_t *)loop);
 }
 
+VALKEY_UNUSED
 static int valkeyClusterLibuvAttach(valkeyClusterAsyncContext *acc,
                                     uv_loop_t *loop) {
     if (acc == NULL || loop == NULL) {
