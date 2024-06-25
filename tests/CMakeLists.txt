@@ -69,6 +69,12 @@ if(LIBEVENT_LIBRARY)
 endif()
 target_link_libraries(client_test valkey ${SSL_LIBRARY} ${LIBEVENT_LIBRARY})
 add_test(NAME client_test COMMAND "${CMAKE_CURRENT_SOURCE_DIR}/test.sh")
+if(TEST_WITH_REDIS_VERSION)
+  set_property(TEST client_test PROPERTY ENVIRONMENT "VALKEY_SERVER=redis-server")
+endif()
+if(SSL_LIBRARY)
+  set_property(TEST client_test PROPERTY ENVIRONMENT "TEST_SSL=1")
+endif()
 
 # Add cluster tests
 
