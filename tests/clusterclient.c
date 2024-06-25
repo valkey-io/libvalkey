@@ -15,7 +15,6 @@
  */
 
 #include "valkeycluster.h"
-#include "win32.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

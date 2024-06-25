@@ -181,7 +181,7 @@ void sendNextCommand(int fd, short kind, void *arg) {
 void eventCallback(const valkeyClusterContext *cc, int event, void *privdata) {
     (void)cc;
     (void)privdata;
-    char *e = NULL;
+    const char *e = NULL;
     switch (event) {
     case VALKEYCLUSTER_EVENT_SLOTMAP_UPDATED:
         e = "slotmap-updated";

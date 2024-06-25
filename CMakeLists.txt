@@ -20,9 +20,8 @@ INCLUDE(GNUInstallDirs)
 OPTION(BUILD_SHARED_LIBS "Build shared libraries" ON)
 OPTION(ENABLE_SSL "Build valkey_ssl for SSL support" OFF)
 OPTION(DISABLE_TESTS "If tests should be compiled or not" OFF)
-OPTION(ENABLE_SSL_TESTS "Should we test SSL connections" OFF)
 OPTION(ENABLE_EXAMPLES "Enable building valkey examples" OFF)
-OPTION(ENABLE_ASYNC_TESTS "Should we run all asynchronous API tests" OFF)
+option(ENABLE_IPV6_TESTS "Enable IPv6 tests requiring special prerequisites" OFF)
 # Historically, the NuGet file was always install; default
 # to ON for those who rely on that historical behaviour.
 OPTION(ENABLE_NUGET "Install NuGET packaging details" ON)
@@ -237,21 +236,14 @@ IF(ENABLE_SSL)
         DESTINATION ${CMAKE_CONF_INSTALL_DIR})
 ENDIF()
 
-#IF(NOT DISABLE_TESTS)
-#    ENABLE_TESTING()
-#    ADD_EXECUTABLE(libvalkey-test test.c)
-#    TARGET_LINK_LIBRARIES(libvalkey-test valkey)
-#    IF(ENABLE_SSL_TESTS)
-#	ADD_DEFINITIONS(-DVALKEY_TEST_SSL=1)
-#        TARGET_LINK_LIBRARIES(libvalkey-test valkey_ssl)
-#    ENDIF()
-#    IF(ENABLE_ASYNC_TESTS)
-#	ADD_DEFINITIONS(-DVALKEY_TEST_ASYNC=1)
-#        TARGET_LINK_LIBRARIES(libvalkey-test event)
-#    ENDIF()
-#    ADD_TEST(NAME libvalkey-test
-#        COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/test.sh)
-#ENDIF()
+# Add tests
+if(NOT DISABLE_TESTS)
+  # Make sure ctest prints the output when a test fails.
+  # Must be set before including CTest.
+  set(CMAKE_CTEST_ARGUMENTS "--output-on-failure")
+  include(CTest)
+  add_subdirectory(tests)
+endif()
 
 # Add examples
 IF(ENABLE_EXAMPLES)
