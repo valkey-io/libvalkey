@@ -60,16 +60,15 @@ endif()
 
 # Add non-cluster tests
 
-add_executable(libvalkey-test test.c)
-set_target_properties(libvalkey-test PROPERTIES OUTPUT_NAME "test")
+add_executable(client_test client_test.c)
 if(SSL_LIBRARY)
-  target_compile_definitions(libvalkey-test PUBLIC VALKEY_TEST_SSL=1)
+  target_compile_definitions(client_test PUBLIC VALKEY_TEST_SSL=1)
 endif()
 if(LIBEVENT_LIBRARY)
-  target_compile_definitions(libvalkey-test PUBLIC VALKEY_TEST_ASYNC=1)
+  target_compile_definitions(client_test PUBLIC VALKEY_TEST_ASYNC=1)
 endif()
-target_link_libraries(libvalkey-test valkey ${SSL_LIBRARY} ${LIBEVENT_LIBRARY})
-add_test(NAME libvalkey-test COMMAND "${CMAKE_CURRENT_SOURCE_DIR}/test.sh")
+target_link_libraries(client_test valkey ${SSL_LIBRARY} ${LIBEVENT_LIBRARY})
+add_test(NAME client_test COMMAND "${CMAKE_CURRENT_SOURCE_DIR}/test.sh")
 
 # Add cluster tests
 

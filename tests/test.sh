@@ -122,4 +122,4 @@ done
 # Treat skips as failures if directed
 [ "$SKIPS_AS_FAILS" = 1 ] && SKIPS_ARG="${SKIPS_ARG} --skips-as-fails"
 
-${TEST_PREFIX:-} ./test -h 127.0.0.1 -p ${VALKEY_PORT} -s ${SOCK_FILE} ${SSL_TEST_ARGS} ${SKIPS_ARG}
+${TEST_PREFIX:-} ./client_test -h 127.0.0.1 -p ${VALKEY_PORT} -s ${SOCK_FILE} ${SSL_TEST_ARGS} ${SKIPS_ARG}
