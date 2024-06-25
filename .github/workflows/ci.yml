@@ -48,13 +48,10 @@ jobs:
       with:
         packages: libevent-dev libuv1-dev libev-dev libglib2.0-dev ${{ matrix.compiler }}
         version: 1.0
-    - name: Install hiredis
-      env:
-        VERSION: 1.2.0
+    - name: Install Valkey for non-cluster tests
       run: |
-        curl -L https://github.com/redis/hiredis/archive/v${VERSION}.tar.gz | tar -xz
-        cmake -S hiredis-${VERSION} -B hiredis-build -DENABLE_SSL=ON
-        sudo make -C hiredis-build install
+        git clone --depth 1 --branch 7.2.5 https://github.com/valkey-io/valkey.git
+        cd valkey && BUILD_TLS=yes make install
     - name: Setup cmake
       uses: jwlawson/actions-setup-cmake@802fa1a2c4e212495c05bf94dba2704a92a472be # v2.0.2
       with:

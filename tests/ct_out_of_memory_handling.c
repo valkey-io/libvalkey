@@ -27,7 +27,6 @@
 #include "adapters/libevent.h"
 #include "test_utils.h"
 #include "valkeycluster.h"
-#include "win32.h"
 #include <assert.h>
 #include <stdbool.h>
 #include <stdio.h>
