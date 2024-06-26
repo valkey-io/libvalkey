@@ -154,7 +154,7 @@ jobs:
         run: |
           brew install openssl valkey
 
-      - name: Build hiredis
+      - name: Build library
         run: USE_SSL=1 make
 
       - name: Run tests
@@ -174,15 +174,15 @@ jobs:
           choco install -y ninja memurai-developer
 
       - uses: ilammy/msvc-dev-cmd@v1
-      - name: Build hiredis
+      - name: Build library
         run: |
           mkdir build && cd build
-          cmake .. -G Ninja -DCMAKE_BUILD_TYPE=Release -DENABLE_EXAMPLES=ON
+          cmake .. -G Ninja -DCMAKE_BUILD_TYPE=Release
           ninja -v
 
       - name: Run tests
-        run: |
-          ./build/test.exe
+        working-directory: ${{ github.workspace }}/build
+        run: .\tests\client_test.exe
 
       - name: Install Cygwin Action
         uses: cygwin/cygwin-install-action@v2

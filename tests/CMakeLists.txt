@@ -63,7 +63,6 @@ else()
 endif()
 
 # Add non-cluster tests
-
 add_executable(client_test client_test.c)
 target_link_libraries(client_test valkey)
 if(SSL_LIBRARY)
@@ -82,183 +81,184 @@ if(SSL_LIBRARY)
   set_property(TEST client_test PROPERTY ENVIRONMENT "TEST_SSL=1")
 endif()
 
-# Add cluster tests
-
-add_executable(ct_async ct_async.c)
-target_link_libraries(ct_async valkey ${SSL_LIBRARY} ${LIBEVENT_LIBRARY})
-add_test(NAME ct_async COMMAND "$<TARGET_FILE:ct_async>")
-
-add_executable(ct_commands ct_commands.c test_utils.c)
-target_link_libraries(ct_commands valkey ${SSL_LIBRARY})
-add_test(NAME ct_commands COMMAND "$<TARGET_FILE:ct_commands>")
-
-add_executable(ct_connection ct_connection.c test_utils.c)
-target_link_libraries(ct_connection valkey ${SSL_LIBRARY} ${LIBEVENT_LIBRARY})
-add_test(NAME ct_connection COMMAND "$<TARGET_FILE:ct_connection>")
-
-add_executable(ct_pipeline ct_pipeline.c)
-target_link_libraries(ct_pipeline valkey ${SSL_LIBRARY} ${LIBEVENT_LIBRARY})
-add_test(NAME ct_pipeline COMMAND "$<TARGET_FILE:ct_pipeline>")
-
-add_executable(ct_connection_ipv6 ct_connection_ipv6.c)
-target_link_libraries(ct_connection_ipv6 valkey ${SSL_LIBRARY} ${LIBEVENT_LIBRARY})
-add_test(NAME ct_connection_ipv6 COMMAND "$<TARGET_FILE:ct_connection_ipv6>")
-if(NOT ENABLE_IPV6_TESTS)
-  set_tests_properties(ct_connection_ipv6 PROPERTIES DISABLED True)
-endif()
-
-add_executable(ct_out_of_memory_handling ct_out_of_memory_handling.c)
-target_link_libraries(ct_out_of_memory_handling valkey ${SSL_LIBRARY} ${LIBEVENT_LIBRARY})
-add_test(NAME ct_out_of_memory_handling COMMAND "$<TARGET_FILE:ct_out_of_memory_handling>")
-
-add_executable(ct_specific_nodes ct_specific_nodes.c test_utils.c)
-target_link_libraries(ct_specific_nodes valkey ${SSL_LIBRARY} ${LIBEVENT_LIBRARY})
-add_test(NAME ct_specific_nodes COMMAND "$<TARGET_FILE:ct_specific_nodes>")
-
-add_executable(ut_parse_cmd ut_parse_cmd.c test_utils.c)
-target_include_directories(ut_parse_cmd PRIVATE "${PROJECT_SOURCE_DIR}/src")
-target_link_libraries(ut_parse_cmd valkey ${SSL_LIBRARY})
-add_test(NAME ut_parse_cmd COMMAND "$<TARGET_FILE:ut_parse_cmd>")
-
-if(LIBUV_LIBRARY)
-  add_executable(ct_async_libuv ct_async_libuv.c)
-  target_link_libraries(ct_async_libuv valkey ${SSL_LIBRARY} ${LIBUV_LIBRARY})
-  add_test(NAME ct_async_libuv COMMAND "$<TARGET_FILE:ct_async_libuv>")
-else()
-  add_test(NAME ct_async_libuv COMMAND "")
-  set_tests_properties(ct_async_libuv PROPERTIES DISABLED True)
-endif()
-
-if(LIBEV_LIBRARY)
-  add_executable(ct_async_libev ct_async_libev.c)
-  target_link_libraries(ct_async_libev valkey ${SSL_LIBRARY} ${LIBEV_LIBRARY})
-  add_test(NAME ct_async_libev COMMAND "$<TARGET_FILE:ct_async_libev>")
-else()
-  add_test(NAME ct_async_libev COMMAND "")
-  set_tests_properties(ct_async_libev PROPERTIES DISABLED True)
-endif()
-
-if(GLIB_LIBRARY_FOUND)
-  add_executable(ct_async_glib ct_async_glib.c)
-  target_link_libraries(ct_async_glib valkey ${SSL_LIBRARY} PkgConfig::GLIB_LIBRARY)
-  add_test(NAME ct_async_glib COMMAND "$<TARGET_FILE:ct_async_glib>")
-else()
-  add_test(NAME ct_async_glib COMMAND "")
-  set_tests_properties(ct_async_glib PROPERTIES DISABLED True)
-endif()
-
-# Tests using simulated Valkey node
-add_executable(clusterclient clusterclient.c)
-target_link_libraries(clusterclient valkey ${SSL_LIBRARY})
-add_executable(clusterclient_async clusterclient_async.c)
-target_link_libraries(clusterclient_async valkey ${SSL_LIBRARY} ${LIBEVENT_LIBRARY})
-add_executable(clusterclient_reconnect_async clusterclient_reconnect_async.c)
-target_link_libraries(clusterclient_reconnect_async valkey ${SSL_LIBRARY} ${LIBEVENT_LIBRARY})
-add_test(NAME set-get-test
-         COMMAND "${CMAKE_SOURCE_DIR}/tests/scripts/set-get-test.sh"
-                 "$<TARGET_FILE:clusterclient>"
-         WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/tests/scripts/")
-add_test(NAME set-get-test-async
-         COMMAND "${CMAKE_SOURCE_DIR}/tests/scripts/set-get-test.sh"
-                 "$<TARGET_FILE:clusterclient_async>"
-         WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/tests/scripts/")
-add_test(NAME ask-redirect-test
-         COMMAND "${CMAKE_SOURCE_DIR}/tests/scripts/ask-redirect-test.sh"
+# Add cluster tests if we have libevent
+if (LIBEVENT_LIBRARY)
+  add_executable(ct_async ct_async.c)
+  target_link_libraries(ct_async valkey ${SSL_LIBRARY} ${LIBEVENT_LIBRARY})
+  add_test(NAME ct_async COMMAND "$<TARGET_FILE:ct_async>")
+  
+  add_executable(ct_commands ct_commands.c test_utils.c)
+  target_link_libraries(ct_commands valkey ${SSL_LIBRARY})
+  add_test(NAME ct_commands COMMAND "$<TARGET_FILE:ct_commands>")
+  
+  add_executable(ct_connection ct_connection.c test_utils.c)
+  target_link_libraries(ct_connection valkey ${SSL_LIBRARY} ${LIBEVENT_LIBRARY})
+  add_test(NAME ct_connection COMMAND "$<TARGET_FILE:ct_connection>")
+  
+  add_executable(ct_pipeline ct_pipeline.c)
+  target_link_libraries(ct_pipeline valkey ${SSL_LIBRARY} ${LIBEVENT_LIBRARY})
+  add_test(NAME ct_pipeline COMMAND "$<TARGET_FILE:ct_pipeline>")
+  
+  add_executable(ct_connection_ipv6 ct_connection_ipv6.c)
+  target_link_libraries(ct_connection_ipv6 valkey ${SSL_LIBRARY} ${LIBEVENT_LIBRARY})
+  add_test(NAME ct_connection_ipv6 COMMAND "$<TARGET_FILE:ct_connection_ipv6>")
+  if(NOT ENABLE_IPV6_TESTS)
+    set_tests_properties(ct_connection_ipv6 PROPERTIES DISABLED True)
+  endif()
+  
+  add_executable(ct_out_of_memory_handling ct_out_of_memory_handling.c)
+  target_link_libraries(ct_out_of_memory_handling valkey ${SSL_LIBRARY} ${LIBEVENT_LIBRARY})
+  add_test(NAME ct_out_of_memory_handling COMMAND "$<TARGET_FILE:ct_out_of_memory_handling>")
+  
+  add_executable(ct_specific_nodes ct_specific_nodes.c test_utils.c)
+  target_link_libraries(ct_specific_nodes valkey ${SSL_LIBRARY} ${LIBEVENT_LIBRARY})
+  add_test(NAME ct_specific_nodes COMMAND "$<TARGET_FILE:ct_specific_nodes>")
+  
+  add_executable(ut_parse_cmd ut_parse_cmd.c test_utils.c)
+  target_include_directories(ut_parse_cmd PRIVATE "${PROJECT_SOURCE_DIR}/src")
+  target_link_libraries(ut_parse_cmd valkey ${SSL_LIBRARY})
+  add_test(NAME ut_parse_cmd COMMAND "$<TARGET_FILE:ut_parse_cmd>")
+  
+  if(LIBUV_LIBRARY)
+    add_executable(ct_async_libuv ct_async_libuv.c)
+    target_link_libraries(ct_async_libuv valkey ${SSL_LIBRARY} ${LIBUV_LIBRARY})
+    add_test(NAME ct_async_libuv COMMAND "$<TARGET_FILE:ct_async_libuv>")
+  else()
+    add_test(NAME ct_async_libuv COMMAND "")
+    set_tests_properties(ct_async_libuv PROPERTIES DISABLED True)
+  endif()
+  
+  if(LIBEV_LIBRARY)
+    add_executable(ct_async_libev ct_async_libev.c)
+    target_link_libraries(ct_async_libev valkey ${SSL_LIBRARY} ${LIBEV_LIBRARY})
+    add_test(NAME ct_async_libev COMMAND "$<TARGET_FILE:ct_async_libev>")
+  else()
+    add_test(NAME ct_async_libev COMMAND "")
+    set_tests_properties(ct_async_libev PROPERTIES DISABLED True)
+  endif()
+  
+  if(GLIB_LIBRARY_FOUND)
+    add_executable(ct_async_glib ct_async_glib.c)
+    target_link_libraries(ct_async_glib valkey ${SSL_LIBRARY} PkgConfig::GLIB_LIBRARY)
+    add_test(NAME ct_async_glib COMMAND "$<TARGET_FILE:ct_async_glib>")
+  else()
+    add_test(NAME ct_async_glib COMMAND "")
+    set_tests_properties(ct_async_glib PROPERTIES DISABLED True)
+  endif()
+  
+  # Tests using simulated Valkey node
+  add_executable(clusterclient clusterclient.c)
+  target_link_libraries(clusterclient valkey ${SSL_LIBRARY})
+  add_executable(clusterclient_async clusterclient_async.c)
+  target_link_libraries(clusterclient_async valkey ${SSL_LIBRARY} ${LIBEVENT_LIBRARY})
+  add_executable(clusterclient_reconnect_async clusterclient_reconnect_async.c)
+  target_link_libraries(clusterclient_reconnect_async valkey ${SSL_LIBRARY} ${LIBEVENT_LIBRARY})
+  add_test(NAME set-get-test
+           COMMAND "${CMAKE_SOURCE_DIR}/tests/scripts/set-get-test.sh"
+                   "$<TARGET_FILE:clusterclient>"
+           WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/tests/scripts/")
+  add_test(NAME set-get-test-async
+           COMMAND "${CMAKE_SOURCE_DIR}/tests/scripts/set-get-test.sh"
+                   "$<TARGET_FILE:clusterclient_async>"
+           WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/tests/scripts/")
+  add_test(NAME ask-redirect-test
+           COMMAND "${CMAKE_SOURCE_DIR}/tests/scripts/ask-redirect-test.sh"
+                    "$<TARGET_FILE:clusterclient>"
+           WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/tests/scripts/")
+  add_test(NAME ask-redirect-test-async
+           COMMAND "${CMAKE_SOURCE_DIR}/tests/scripts/ask-redirect-test.sh"
+                   "$<TARGET_FILE:clusterclient_async>"
+           WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/tests/scripts/")
+  add_test(NAME ask-redirect-using-cluster-nodes-test-async
+           COMMAND "${CMAKE_SOURCE_DIR}/tests/scripts/ask-redirect-using-cluster-nodes-test.sh"
+                   "$<TARGET_FILE:clusterclient_async>"
+           WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/tests/scripts/")
+  add_test(NAME moved-redirect-test
+           COMMAND "${CMAKE_SOURCE_DIR}/tests/scripts/moved-redirect-test.sh"
+                   "$<TARGET_FILE:clusterclient>"
+           WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/tests/scripts/")
+  add_test(NAME moved-redirect-test-async
+           COMMAND "${CMAKE_SOURCE_DIR}/tests/scripts/moved-redirect-test.sh"
+                   "$<TARGET_FILE:clusterclient_async>"
+           WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/tests/scripts/")
+  add_test(NAME moved-redirect-using-cluster-nodes-test-async
+           COMMAND "${CMAKE_SOURCE_DIR}/tests/scripts/moved-redirect-using-cluster-nodes-test.sh"
+                   "$<TARGET_FILE:clusterclient_async>"
+           WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/tests/scripts/")
+  add_test(NAME dbsize-to-all-nodes-test
+           COMMAND "${CMAKE_SOURCE_DIR}/tests/scripts/dbsize-to-all-nodes-test.sh"
+                   "$<TARGET_FILE:clusterclient>"
+           WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/tests/scripts/")
+  add_test(NAME dbsize-to-all-nodes-test-async
+           COMMAND "${CMAKE_SOURCE_DIR}/tests/scripts/dbsize-to-all-nodes-test.sh"
+                   "$<TARGET_FILE:clusterclient_async>"
+           WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/tests/scripts/")
+  add_test(NAME dbsize-to-all-nodes-during-scaledown-test
+           COMMAND "${CMAKE_SOURCE_DIR}/tests/scripts/dbsize-to-all-nodes-during-scaledown-test.sh"
+                   "$<TARGET_FILE:clusterclient>"
+           WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/tests/scripts/")
+  add_test(NAME dbsize-to-all-nodes-during-scaledown-test-async
+           COMMAND "${CMAKE_SOURCE_DIR}/tests/scripts/dbsize-to-all-nodes-during-scaledown-test-async.sh"
+                   "$<TARGET_FILE:clusterclient_async>"
+           WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/tests/scripts/")
+  add_test(NAME reconnect-test
+           COMMAND "${CMAKE_SOURCE_DIR}/tests/scripts/reconnect-test.sh"
+                   "$<TARGET_FILE:clusterclient_reconnect_async>"
+           WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/tests/scripts/")
+  add_test(NAME timeout-handling-test
+           COMMAND "${CMAKE_SOURCE_DIR}/tests/scripts/timeout-handling-test.sh"
+                   "$<TARGET_FILE:clusterclient_async>"
+           WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/tests/scripts/")
+  add_test(NAME connect-error-using-cluster-nodes-test
+           COMMAND "${CMAKE_SOURCE_DIR}/tests/scripts/connect-error-using-cluster-nodes-test.sh"
+                   "$<TARGET_FILE:clusterclient>"
+           WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/tests/scripts/")
+  add_test(NAME command-from-callback-test
+           COMMAND "${CMAKE_SOURCE_DIR}/tests/scripts/command-from-callback-test.sh"
+                   "$<TARGET_FILE:clusterclient_async>"
+           WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/tests/scripts/")
+  add_test(NAME ask-redirect-connection-error-test
+           COMMAND "${CMAKE_SOURCE_DIR}/tests/scripts/ask-redirect-connection-error-test.sh"
+                   "$<TARGET_FILE:clusterclient_async>"
+           WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/tests/scripts/")
+  add_test(NAME cluster-down-test
+           COMMAND "${CMAKE_SOURCE_DIR}/tests/scripts/cluster-down-test.sh"
+                   "$<TARGET_FILE:clusterclient_async>"
+           WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/tests/scripts/")
+  add_test(NAME connection-error-test
+           COMMAND "${CMAKE_SOURCE_DIR}/tests/scripts/connection-error-test.sh"
+                   "$<TARGET_FILE:clusterclient_async>"
+           WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/tests/scripts/")
+  add_test(NAME redirect-with-hostname-test
+           COMMAND "${CMAKE_SOURCE_DIR}/tests/scripts/redirect-with-hostname-test.sh"
+                   "$<TARGET_FILE:clusterclient>"
+           WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/tests/scripts/")
+  add_test(NAME redirect-with-ipv6-test
+           COMMAND "${CMAKE_SOURCE_DIR}/tests/scripts/redirect-with-ipv6-test.sh"
+                   "$<TARGET_FILE:clusterclient>"
+           WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/tests/scripts/")
+  add_test(NAME redirect-with-ipv6-async-test
+           COMMAND "${CMAKE_SOURCE_DIR}/tests/scripts/redirect-with-ipv6-test.sh"
+                   "$<TARGET_FILE:clusterclient_async>"
+           WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/tests/scripts/")
+  if(NOT ENABLE_IPV6_TESTS)
+    set_tests_properties(redirect-with-ipv6-test PROPERTIES DISABLED True)
+    set_tests_properties(redirect-with-ipv6-async-test PROPERTIES DISABLED True)
+  endif()
+  add_test(NAME redirect-with-hostname-test-async
+           COMMAND "${CMAKE_SOURCE_DIR}/tests/scripts/redirect-with-hostname-test.sh"
+                   "$<TARGET_FILE:clusterclient_async>"
+           WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/tests/scripts/")
+  add_test(NAME cluster-scale-down-test
+           COMMAND "${CMAKE_SOURCE_DIR}/tests/scripts/cluster-scale-down-test.sh"
                   "$<TARGET_FILE:clusterclient>"
-         WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/tests/scripts/")
-add_test(NAME ask-redirect-test-async
-         COMMAND "${CMAKE_SOURCE_DIR}/tests/scripts/ask-redirect-test.sh"
-                 "$<TARGET_FILE:clusterclient_async>"
-         WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/tests/scripts/")
-add_test(NAME ask-redirect-using-cluster-nodes-test-async
-         COMMAND "${CMAKE_SOURCE_DIR}/tests/scripts/ask-redirect-using-cluster-nodes-test.sh"
-                 "$<TARGET_FILE:clusterclient_async>"
-         WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/tests/scripts/")
-add_test(NAME moved-redirect-test
-         COMMAND "${CMAKE_SOURCE_DIR}/tests/scripts/moved-redirect-test.sh"
-                 "$<TARGET_FILE:clusterclient>"
-         WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/tests/scripts/")
-add_test(NAME moved-redirect-test-async
-         COMMAND "${CMAKE_SOURCE_DIR}/tests/scripts/moved-redirect-test.sh"
-                 "$<TARGET_FILE:clusterclient_async>"
-         WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/tests/scripts/")
-add_test(NAME moved-redirect-using-cluster-nodes-test-async
-         COMMAND "${CMAKE_SOURCE_DIR}/tests/scripts/moved-redirect-using-cluster-nodes-test.sh"
-                 "$<TARGET_FILE:clusterclient_async>"
-         WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/tests/scripts/")
-add_test(NAME dbsize-to-all-nodes-test
-         COMMAND "${CMAKE_SOURCE_DIR}/tests/scripts/dbsize-to-all-nodes-test.sh"
-                 "$<TARGET_FILE:clusterclient>"
-         WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/tests/scripts/")
-add_test(NAME dbsize-to-all-nodes-test-async
-         COMMAND "${CMAKE_SOURCE_DIR}/tests/scripts/dbsize-to-all-nodes-test.sh"
-                 "$<TARGET_FILE:clusterclient_async>"
-         WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/tests/scripts/")
-add_test(NAME dbsize-to-all-nodes-during-scaledown-test
-         COMMAND "${CMAKE_SOURCE_DIR}/tests/scripts/dbsize-to-all-nodes-during-scaledown-test.sh"
-                 "$<TARGET_FILE:clusterclient>"
-         WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/tests/scripts/")
-add_test(NAME dbsize-to-all-nodes-during-scaledown-test-async
-         COMMAND "${CMAKE_SOURCE_DIR}/tests/scripts/dbsize-to-all-nodes-during-scaledown-test-async.sh"
-                 "$<TARGET_FILE:clusterclient_async>"
-         WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/tests/scripts/")
-add_test(NAME reconnect-test
-         COMMAND "${CMAKE_SOURCE_DIR}/tests/scripts/reconnect-test.sh"
-                 "$<TARGET_FILE:clusterclient_reconnect_async>"
-         WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/tests/scripts/")
-add_test(NAME timeout-handling-test
-         COMMAND "${CMAKE_SOURCE_DIR}/tests/scripts/timeout-handling-test.sh"
-                 "$<TARGET_FILE:clusterclient_async>"
-         WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/tests/scripts/")
-add_test(NAME connect-error-using-cluster-nodes-test
-         COMMAND "${CMAKE_SOURCE_DIR}/tests/scripts/connect-error-using-cluster-nodes-test.sh"
-                 "$<TARGET_FILE:clusterclient>"
-         WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/tests/scripts/")
-add_test(NAME command-from-callback-test
-         COMMAND "${CMAKE_SOURCE_DIR}/tests/scripts/command-from-callback-test.sh"
-                 "$<TARGET_FILE:clusterclient_async>"
-         WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/tests/scripts/")
-add_test(NAME ask-redirect-connection-error-test
-         COMMAND "${CMAKE_SOURCE_DIR}/tests/scripts/ask-redirect-connection-error-test.sh"
-                 "$<TARGET_FILE:clusterclient_async>"
-         WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/tests/scripts/")
-add_test(NAME cluster-down-test
-         COMMAND "${CMAKE_SOURCE_DIR}/tests/scripts/cluster-down-test.sh"
-                 "$<TARGET_FILE:clusterclient_async>"
-         WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/tests/scripts/")
-add_test(NAME connection-error-test
-         COMMAND "${CMAKE_SOURCE_DIR}/tests/scripts/connection-error-test.sh"
-                 "$<TARGET_FILE:clusterclient_async>"
-         WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/tests/scripts/")
-add_test(NAME redirect-with-hostname-test
-         COMMAND "${CMAKE_SOURCE_DIR}/tests/scripts/redirect-with-hostname-test.sh"
-                 "$<TARGET_FILE:clusterclient>"
-         WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/tests/scripts/")
-add_test(NAME redirect-with-ipv6-test
-         COMMAND "${CMAKE_SOURCE_DIR}/tests/scripts/redirect-with-ipv6-test.sh"
-                 "$<TARGET_FILE:clusterclient>"
-         WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/tests/scripts/")
-add_test(NAME redirect-with-ipv6-async-test
-         COMMAND "${CMAKE_SOURCE_DIR}/tests/scripts/redirect-with-ipv6-test.sh"
-                 "$<TARGET_FILE:clusterclient_async>"
-         WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/tests/scripts/")
-if(NOT ENABLE_IPV6_TESTS)
-  set_tests_properties(redirect-with-ipv6-test PROPERTIES DISABLED True)
-  set_tests_properties(redirect-with-ipv6-async-test PROPERTIES DISABLED True)
+           WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/tests/scripts/")
+  add_test(NAME slots-not-served-test
+           COMMAND "${CMAKE_SOURCE_DIR}/tests/scripts/slots-not-served-test.sh"
+                   "$<TARGET_FILE:clusterclient>"
+           WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/tests/scripts/")
+  add_test(NAME slots-not-served-test-async
+           COMMAND "${CMAKE_SOURCE_DIR}/tests/scripts/slots-not-served-test-async.sh"
+                   "$<TARGET_FILE:clusterclient_async>"
+           WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/tests/scripts/")
 endif()
-add_test(NAME redirect-with-hostname-test-async
-         COMMAND "${CMAKE_SOURCE_DIR}/tests/scripts/redirect-with-hostname-test.sh"
-                 "$<TARGET_FILE:clusterclient_async>"
-         WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/tests/scripts/")
-add_test(NAME cluster-scale-down-test
-         COMMAND "${CMAKE_SOURCE_DIR}/tests/scripts/cluster-scale-down-test.sh"
-                "$<TARGET_FILE:clusterclient>"
-         WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/tests/scripts/")
-add_test(NAME slots-not-served-test
-         COMMAND "${CMAKE_SOURCE_DIR}/tests/scripts/slots-not-served-test.sh"
-                 "$<TARGET_FILE:clusterclient>"
-         WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/tests/scripts/")
-add_test(NAME slots-not-served-test-async
-         COMMAND "${CMAKE_SOURCE_DIR}/tests/scripts/slots-not-served-test-async.sh"
-                 "$<TARGET_FILE:clusterclient_async>"
-         WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/tests/scripts/")
