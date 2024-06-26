@@ -1,13 +1,13 @@
-INCLUDE(FindPkgConfig)
-# Check for GLib
-
-PKG_CHECK_MODULES(GLIB2 glib-2.0)
-if (GLIB2_FOUND)
+find_package(PkgConfig QUIET)
+if(PkgConfig_FOUND)
+  pkg_check_modules(GLIB2 glib-2.0)
+  if(GLIB2_FOUND)
     INCLUDE_DIRECTORIES(${GLIB2_INCLUDE_DIRS})
     LINK_DIRECTORIES(${GLIB2_LIBRARY_DIRS})
     ADD_EXECUTABLE(async-glib async-glib.c)
     TARGET_LINK_LIBRARIES(async-glib valkey ${GLIB2_LIBRARIES})
-ENDIF(GLIB2_FOUND)
+  endif()
+endif()
 
 FIND_PATH(LIBEV ev.h
     HINTS /usr/local /usr/opt/local
