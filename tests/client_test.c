@@ -9,13 +9,15 @@
 #include <strings.h>
 #include <time.h>
 #include <sys/time.h>
+#include <unistd.h>
+#else
+#define strcasecmp _stricmp
 #endif
 #include <assert.h>
 #include <signal.h>
 #include <errno.h>
 #include <limits.h>
 #include <math.h>
-#include <unistd.h>
 
 #include "valkey.h"
 #include "async.h"

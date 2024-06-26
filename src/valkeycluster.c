@@ -2494,15 +2494,15 @@ static int command_pre_fragment(valkeyClusterContext *cc, struct cmd *command,
             uint32_t len = 0;
             char *p;
 
-            for (p = sub_kp->end + 1; !isdigit(*p); p++) {
+            for (p = sub_kp->end + 1; !isdigit((unsigned char)*p); p++) {
             }
 
             p = sub_kp->end + 1;
-            while (!isdigit(*p)) {
+            while (!isdigit((unsigned char)*p)) {
                 p++;
             }
 
-            for (; isdigit(*p); p++) {
+            for (; isdigit((unsigned char)*p); p++) {
                 len = len * 10 + (uint32_t)(*p - '0');
             }
 
