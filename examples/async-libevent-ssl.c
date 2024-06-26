@@ -3,10 +3,10 @@
 #include <string.h>
 #include <signal.h>
 
-#include <valkey.h>
-#include <valkey_ssl.h>
-#include <async.h>
-#include <adapters/libevent.h>
+#include <valkey/valkey.h>
+#include <valkey/valkey_ssl.h>
+#include <valkey/async.h>
+#include <valkey/adapters/libevent.h>
 
 void getCallback(valkeyAsyncContext *c, void *r, void *privdata) {
     valkeyReply *reply = r;

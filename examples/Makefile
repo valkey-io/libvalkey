@@ -1,15 +1,18 @@
 CC?=gcc
 CXX?=g++
 
-CFLAGS=-Wall -Wextra -g -O2 -I../include/valkey
+CFLAGS=-Wall -Wextra -g -O2 -I../include
 STLIBNAME=../lib/libvalkey.a
 
 # Define examples
 EXAMPLES=example-blocking example-blocking-push example-async-libevent \
-	 example-async-libev example-async-glib example-async-poll
+	 example-async-libev example-async-glib example-async-poll \
+	 example-cluster-async example-cluster-clientside-caching-async \
+	 example-cluster-simple
 
 ifeq ($(USE_SSL),1)
-  EXAMPLES+=blocking-ssl async-libevent-ssl
+  EXAMPLES+=example-blocking-ssl example-async-libevent-ssl \
+	    example-cluster-async-tls example-cluster-tls
   SSL_STLIBNAME=../lib/libvalkey_ssl.a
   SSL_LDFLAGS=-lssl -lcrypto
 endif
@@ -91,6 +94,21 @@ example-async-qt: async-qt.cpp $(STLIBNAME)
 	    $(CXX) -x c++ -o qt-example-moc.o -c - $(CFLAGS) -I$(QT_INCLUDE_DIR) -I$(QT_INCLUDE_DIR)/QtCore
 	$(CXX) -o $@ $(CFLAGS) $(LDFLAGS) -I$(QT_INCLUDE_DIR) -I$(QT_INCLUDE_DIR)/QtCore -L$(QT_LIBRARY_DIR) qt-adapter-moc.o qt-example-moc.o $< -pthread $(STLIBNAME) -lQtCore
 endif
+
+example-cluster-async: cluster-async.c $(STLIBNAME)
+	$(CC) -o $@ $(CFLAGS) $< -levent $(STLIBNAME)
+
+example-cluster-async-tls: cluster-async-tls.c $(STLIBNAME) $(SSL_STLIBNAME)
+	$(CC) -o $@ $(CFLAGS) $< -levent $(STLIBNAME) $(SSL_STLIBNAME) $(SSL_LDFLAGS)
+
+example-cluster-clientside-caching-async: cluster-clientside-caching-async.c $(STLIBNAME)
+	$(CC) -o $@ $(CFLAGS) $< -levent $(STLIBNAME)
+
+example-cluster-simple: cluster-simple.c $(STLIBNAME)
+	$(CC) -o $@ $(CFLAGS) $< $(STLIBNAME)
+
+example-cluster-tls: cluster-tls.c $(STLIBNAME) $(SSL_STLIBNAME)
+	$(CC) -o $@ $(CFLAGS) $< $(STLIBNAME) $(SSL_STLIBNAME) $(SSL_LDFLAGS)
 
 clean:
 	rm -f example-* *.o

@@ -1,6 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <valkeycluster/valkeycluster.h>
+#include <valkey/valkeycluster.h>
 
 int main(int argc, char **argv) {
     UNUSED(argc);
@@ -12,19 +12,20 @@ int main(int argc, char **argv) {
     valkeyClusterSetOptionConnectTimeout(cc, timeout);
     valkeyClusterSetOptionRouteUseSlots(cc);
     valkeyClusterConnect2(cc);
-    if (cc && cc->err) {
+    if (!cc) {
+        printf("Error: Allocation failure\n");
+        exit(-1);
+    } else if (cc->err) {
         printf("Error: %s\n", cc->errstr);
         // handle error
         exit(-1);
     }
 
-    valkeyReply *reply =
-        (valkeyReply *)valkeyClusterCommand(cc, "SET %s %s", "key", "value");
+    valkeyReply *reply = valkeyClusterCommand(cc, "SET %s %s", "key", "value");
     printf("SET: %s\n", reply->str);
     freeReplyObject(reply);
 
-    valkeyReply *reply2 =
-        (valkeyReply *)valkeyClusterCommand(cc, "GET %s", "key");
+    valkeyReply *reply2 = valkeyClusterCommand(cc, "GET %s", "key");
     printf("GET: %s\n", reply2->str);
     freeReplyObject(reply2);
 

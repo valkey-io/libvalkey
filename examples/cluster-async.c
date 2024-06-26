@@ -1,12 +1,12 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <valkeycluster/adapters/libevent.h>
-#include <valkeycluster/valkeycluster.h>
+#include <valkey/adapters/libevent.h>
+#include <valkey/valkeycluster.h>
 
 void getCallback(valkeyClusterAsyncContext *cc, void *r, void *privdata) {
     valkeyReply *reply = (valkeyReply *)r;
     if (reply == NULL) {
-        if (cc->errstr) {
+        if (cc->err) {
             printf("errstr: %s\n", cc->errstr);
         }
         return;
@@ -20,7 +20,7 @@ void getCallback(valkeyClusterAsyncContext *cc, void *r, void *privdata) {
 void setCallback(valkeyClusterAsyncContext *cc, void *r, void *privdata) {
     valkeyReply *reply = (valkeyReply *)r;
     if (reply == NULL) {
-        if (cc->errstr) {
+        if (cc->err) {
             printf("errstr: %s\n", cc->errstr);
         }
         return;
@@ -45,12 +45,18 @@ void disconnectCallback(const valkeyAsyncContext *ac, int status) {
 }
 
 int main(int argc, char **argv) {
+    (void) argc;
+    (void) argv;
     printf("Connecting...\n");
     valkeyClusterAsyncContext *cc =
         valkeyClusterAsyncConnect("127.0.0.1:7000", VALKEYCLUSTER_FLAG_NULL);
-    if (cc && cc->err) {
+    if (!cc) {
+        printf("Error: Allocation failure\n");
+        exit(-1);
+    } else if (cc->err) {
         printf("Error: %s\n", cc->errstr);
-        return 1;
+        // handle error
+        exit(-1);
     }
 
     struct event_base *base = event_base_new();

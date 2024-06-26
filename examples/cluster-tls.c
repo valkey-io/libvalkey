@@ -2,8 +2,8 @@
 #include <stdlib.h>
 #include <valkey/valkey.h>
 #include <valkey/valkey_ssl.h>
-#include <valkeycluster/valkeycluster.h>
-#include <valkeycluster/valkeycluster_ssl.h>
+#include <valkey/valkeycluster.h>
+#include <valkey/valkeycluster_ssl.h>
 
 #define CLUSTER_NODE_TLS "127.0.0.1:7301"
 
@@ -31,14 +31,16 @@ int main(int argc, char **argv) {
     valkeyClusterSetOptionParseSlaves(cc);
     valkeyClusterSetOptionEnableSSL(cc, ssl);
     valkeyClusterConnect2(cc);
-    if (cc && cc->err) {
+    if (!cc) {
+        printf("Error: Allocation failure\n");
+        exit(-1);
+    } else if (cc->err) {
         printf("Error: %s\n", cc->errstr);
         // handle error
         exit(-1);
     }
 
-    valkeyReply *reply =
-        (valkeyReply *)valkeyClusterCommand(cc, "SET %s %s", "key", "value");
+    valkeyReply *reply = valkeyClusterCommand(cc, "SET %s %s", "key", "value");
     if (!reply) {
         printf("Reply missing: %s\n", cc->errstr);
         exit(-1);
@@ -46,8 +48,7 @@ int main(int argc, char **argv) {
     printf("SET: %s\n", reply->str);
     freeReplyObject(reply);
 
-    valkeyReply *reply2 =
-        (valkeyReply *)valkeyClusterCommand(cc, "GET %s", "key");
+    valkeyReply *reply2 = valkeyClusterCommand(cc, "GET %s", "key");
     if (!reply2) {
         printf("Reply missing: %s\n", cc->errstr);
         exit(-1);
