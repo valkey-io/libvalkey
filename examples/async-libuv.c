@@ -3,9 +3,9 @@
 #include <string.h>
 #include <signal.h>
 
-#include <valkey.h>
-#include <async.h>
-#include <adapters/libuv.h>
+#include <valkey/valkey.h>
+#include <valkey/async.h>
+#include <valkey/adapters/libuv.h>
 
 void debugCallback(valkeyAsyncContext *c, void *r, void *privdata) {
     (void)privdata; //unused

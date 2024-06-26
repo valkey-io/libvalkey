@@ -1,12 +1,7 @@
-#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
-
-#include "adapters/libevent.h"
-#include "valkeycluster.h"
-#include "valkeycluster_ssl.h"
-
-#define CLUSTER_NODE_TLS "127.0.0.1:7300"
+#include <valkey/adapters/libevent.h>
+#include <valkey/valkeycluster.h>
 
 void getCallback(valkeyClusterAsyncContext *cc, void *r, void *privdata) {
     valkeyReply *reply = (valkeyReply *)r;
@@ -38,7 +33,6 @@ void connectCallback(const valkeyAsyncContext *ac, int status) {
         printf("Error: %s\n", ac->errstr);
         return;
     }
-
     printf("Connected to %s:%d\n", ac->c.tcp.host, ac->c.tcp.port);
 }
 
@@ -51,56 +45,55 @@ void disconnectCallback(const valkeyAsyncContext *ac, int status) {
 }
 
 int main(int argc, char **argv) {
-    UNUSED(argc);
-    UNUSED(argv);
-
-    valkeySSLContext *ssl;
-    valkeySSLContextError ssl_error;
-
-    valkeyInitOpenSSL();
-    ssl = valkeyCreateSSLContext("ca.crt", NULL, "client.crt", "client.key",
-                                 NULL, &ssl_error);
-    if (!ssl) {
-        printf("SSL Context error: %s\n", valkeySSLContextGetError(ssl_error));
-        exit(1);
-    }
-
-    valkeyClusterAsyncContext *acc = valkeyClusterAsyncContextInit();
-    assert(acc);
-    valkeyClusterAsyncSetConnectCallback(acc, connectCallback);
-    valkeyClusterAsyncSetDisconnectCallback(acc, disconnectCallback);
-    valkeyClusterSetOptionAddNodes(acc->cc, CLUSTER_NODE_TLS);
-    valkeyClusterSetOptionRouteUseSlots(acc->cc);
-    valkeyClusterSetOptionParseSlaves(acc->cc);
-    valkeyClusterSetOptionEnableSSL(acc->cc, ssl);
-
-    if (valkeyClusterConnect2(acc->cc) != VALKEY_OK) {
-        printf("Error: %s\n", acc->cc->errstr);
+    (void) argc;
+    (void) argv;
+    printf("Connecting...\n");
+    valkeyClusterAsyncContext *cc =
+        valkeyClusterAsyncConnect("127.0.0.1:7000", VALKEYCLUSTER_FLAG_NULL);
+    if (!cc) {
+        printf("Error: Allocation failure\n");
+        exit(-1);
+    } else if (cc->err) {
+        printf("Error: %s\n", cc->errstr);
+        // handle error
         exit(-1);
     }
 
     struct event_base *base = event_base_new();
-    valkeyClusterLibeventAttach(acc, base);
+    valkeyClusterLibeventAttach(cc, base);
+    valkeyClusterAsyncSetConnectCallback(cc, connectCallback);
+    valkeyClusterAsyncSetDisconnectCallback(cc, disconnectCallback);
 
     int status;
-    status = valkeyClusterAsyncCommand(acc, setCallback, (char *)"THE_ID",
+    status = valkeyClusterAsyncCommand(cc, setCallback, (char *)"THE_ID",
                                        "SET %s %s", "key", "value");
     if (status != VALKEY_OK) {
-        printf("error: err=%d errstr=%s\n", acc->err, acc->errstr);
+        printf("error: err=%d errstr=%s\n", cc->err, cc->errstr);
     }
 
-    status = valkeyClusterAsyncCommand(acc, getCallback, (char *)"THE_ID",
+    status = valkeyClusterAsyncCommand(cc, getCallback, (char *)"THE_ID",
                                        "GET %s", "key");
     if (status != VALKEY_OK) {
-        printf("error: err=%d errstr=%s\n", acc->err, acc->errstr);
+        printf("error: err=%d errstr=%s\n", cc->err, cc->errstr);
+    }
+
+    status = valkeyClusterAsyncCommand(cc, setCallback, (char *)"THE_ID",
+                                       "SET %s %s", "key2", "value2");
+    if (status != VALKEY_OK) {
+        printf("error: err=%d errstr=%s\n", cc->err, cc->errstr);
+    }
+
+    status = valkeyClusterAsyncCommand(cc, getCallback, (char *)"THE_ID",
+                                       "GET %s", "key2");
+    if (status != VALKEY_OK) {
+        printf("error: err=%d errstr=%s\n", cc->err, cc->errstr);
     }
 
     printf("Dispatch..\n");
     event_base_dispatch(base);
 
     printf("Done..\n");
-    valkeyClusterAsyncFree(acc);
-    valkeyFreeSSLContext(ssl);
+    valkeyClusterAsyncFree(cc);
     event_base_free(base);
     return 0;
 }

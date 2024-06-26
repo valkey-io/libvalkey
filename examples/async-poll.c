@@ -4,8 +4,8 @@
 #include <signal.h>
 #include <unistd.h>
 
-#include <async.h>
-#include <adapters/poll.h>
+#include <valkey/async.h>
+#include <valkey/adapters/poll.h>
 
 /* Put in the global scope, so that loop can be explicitly stopped */
 static int exit_loop = 0;

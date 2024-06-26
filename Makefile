@@ -217,7 +217,7 @@ examples: $(STLIBNAME)
 
 clean:
 	rm -rf $(OBJ_DIR) $(LIB_DIR) $(TEST_BINS) *.gcda *.gcno *.gcov
-	make -C examples clean
+	$(MAKE) -C examples clean
 
 INSTALL?= cp -pPR
 

@@ -4,8 +4,8 @@
  * messages are received via the registered push callback.
  * The disconnect callback should also be used as an indication of invalidation.
  */
-#include <valkeycluster/adapters/libevent.h>
-#include <valkeycluster/valkeycluster.h>
+#include <valkey/adapters/libevent.h>
+#include <valkey/valkeycluster.h>
 
 #include <assert.h>
 #include <stdio.h>
@@ -83,6 +83,7 @@ void getCallback1(valkeyClusterAsyncContext *acc, void *r, void *privdata) {
 
 /* Push message callback handling invalidation messages. */
 void pushCallback(valkeyAsyncContext *ac, void *r) {
+    (void) ac;
     valkeyReply *reply = r;
     if (!(reply->type == VALKEY_REPLY_PUSH && reply->elements == 2 &&
           reply->element[0]->type == VALKEY_REPLY_STRING &&
@@ -139,6 +140,8 @@ void modifyKey(const char *key, const char *value) {
 }
 
 int main(int argc, char **argv) {
+    (void) argc;
+    (void) argv;
     valkeyClusterAsyncContext *acc = valkeyClusterAsyncContextInit();
     assert(acc);
 

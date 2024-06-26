@@ -1,8 +1,8 @@
 #include <stdlib.h>
 
-#include <valkey.h>
-#include <async.h>
-#include <adapters/glib.h>
+#include <valkey/valkey.h>
+#include <valkey/async.h>
+#include <valkey/adapters/glib.h>
 
 static GMainLoop *mainloop;
 

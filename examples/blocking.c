@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <valkey.h>
+#include <valkey/valkey.h>
 
 #ifdef _MSC_VER
 #include <winsock2.h> /* For struct timeval */
