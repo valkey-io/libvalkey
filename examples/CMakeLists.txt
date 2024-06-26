@@ -1,10 +1,14 @@
 cmake_minimum_required(VERSION 3.0.0)
 project(examples LANGUAGES C)
 
-find_package(valkey QUIET)
-find_package(valkey_ssl QUIET)
-if(NOT valkey_FOUND)
-  # Add path to enable <valkey/x.h> includes
+if(CMAKE_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR)
+  # This CMakeLists.txt is used standalone to build the examples.
+  # Find required valkey package to get include paths.
+  find_package(valkey REQUIRED)
+  find_package(valkey_ssl QUIET)
+else()
+  # This CMakeLists.txt is included, most likely from libvalkey's project
+  # CMakeLists.txt. Add path to enable <valkey/x.h> includes.
   include_directories(${CMAKE_SOURCE_DIR}/include)
 endif()
 
