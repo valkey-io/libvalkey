@@ -1,8 +1,8 @@
 CC?=gcc
 CXX?=g++
 
-CFLAGS=-Wall -Wextra -g -O2 -I../include
-STLIBNAME=../lib/libvalkey.a
+CFLAGS?=-Wall -Wextra -g -O2 -I../include
+STLIBNAME?=../lib/libvalkey.a
 
 # Define examples
 EXAMPLES=example-blocking example-blocking-push example-async-libevent \
