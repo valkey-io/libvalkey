@@ -1,7 +1,7 @@
 #ifndef VALKEY_EXAMPLE_QT_H
 #define VALKEY_EXAMPLE_QT_H
 
-#include <adapters/qt.h>
+#include <valkey/adapters/qt.h>
 
 class ExampleQt : public QObject {
 

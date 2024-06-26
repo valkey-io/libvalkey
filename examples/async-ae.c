@@ -3,9 +3,9 @@
 #include <string.h>
 #include <signal.h>
 
-#include <valkey.h>
-#include <async.h>
-#include <adapters/ae.h>
+#include <valkey/valkey.h>
+#include <valkey/async.h>
+#include <valkey/adapters/ae.h>
 
 /* Put event loop in the global scope, so it can be explicitly stopped */
 static aeEventLoop *loop;
