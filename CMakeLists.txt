@@ -46,8 +46,6 @@ SET(valkey_sources
     src/vkarray.c
     src/vkutil.c)
 
-SET(valkey_sources ${valkey_sources})
-
 IF(WIN32)
     ADD_DEFINITIONS(-D_CRT_SECURE_NO_WARNINGS -DWIN32_LEAN_AND_MEAN)
 ENDIF()
@@ -168,7 +166,8 @@ IF(ENABLE_SSL)
     ENDIF()
     FIND_PACKAGE(OpenSSL REQUIRED)
     SET(valkey_ssl_sources
-        src/ssl.c)
+        src/ssl.c
+        src/valkeycluster_ssl.c)
     ADD_LIBRARY(valkey_ssl ${valkey_ssl_sources})
     ADD_LIBRARY(valkey::valkey_ssl ALIAS valkey_ssl)
 
