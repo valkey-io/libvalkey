@@ -5,12 +5,14 @@ project(examples LANGUAGES C)
 include_directories(${CMAKE_SOURCE_DIR}/include)
 
 # Check for GLib
-include(FindPkgConfig)
-pkg_check_modules(GLIB2 glib-2.0)
-if(GLIB2_FOUND)
-  add_executable(example-async-glib async-glib.c)
-  target_include_directories(example-async-glib PUBLIC ${GLIB2_INCLUDE_DIRS})
-  target_link_libraries(example-async-glib valkey ${GLIB2_LIBRARIES})
+find_package(PkgConfig QUIET)
+if(PkgConfig_FOUND)
+  pkg_check_modules(GLIB2 glib-2.0)
+  if(GLIB2_FOUND)
+    add_executable(example-async-glib async-glib.c)
+    target_include_directories(example-async-glib PUBLIC ${GLIB2_INCLUDE_DIRS})
+    target_link_libraries(example-async-glib valkey ${GLIB2_LIBRARIES})
+  endif()
 endif()
 
 find_path(LIBEV ev.h
