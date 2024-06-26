@@ -22,9 +22,7 @@ OPTION(ENABLE_SSL "Build valkey_ssl for SSL support" OFF)
 OPTION(DISABLE_TESTS "If tests should be compiled or not" OFF)
 OPTION(ENABLE_EXAMPLES "Enable building valkey examples" OFF)
 option(ENABLE_IPV6_TESTS "Enable IPv6 tests requiring special prerequisites" OFF)
-# Historically, the NuGet file was always install; default
-# to ON for those who rely on that historical behaviour.
-OPTION(ENABLE_NUGET "Install NuGET packaging details" ON)
+OPTION(ENABLE_NUGET "Install NuGET packaging details" OFF)
 
 # valkey requires C99
 SET(CMAKE_C_STANDARD 99)
@@ -72,7 +70,7 @@ ENDIF()
 
 TARGET_INCLUDE_DIRECTORIES(valkey
     PUBLIC
-        $<INSTALL_INTERFACE:include/valkey>
+        $<INSTALL_INTERFACE:include>
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/valkey>
 )
 
@@ -122,11 +120,8 @@ if (ENABLE_NUGET)
         DESTINATION build/native)
 endif()
 
-INSTALL(FILES valkey.h read.h sds.h async.h alloc.h sockcompat.h
-    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/valkey)
-
-INSTALL(DIRECTORY adapters
-    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/valkey)
+install(DIRECTORY include/valkey
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 
 INSTALL(FILES ${CMAKE_CURRENT_BINARY_DIR}/valkey.pc
     DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig)
@@ -173,7 +168,7 @@ IF(ENABLE_SSL)
 
     TARGET_INCLUDE_DIRECTORIES(valkey_ssl
         PRIVATE
-            $<INSTALL_INTERFACE:include/valkey>
+            $<INSTALL_INTERFACE:include>
             $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/valkey>
     )
 
@@ -206,9 +201,6 @@ IF(ENABLE_SSL)
             DESTINATION ${CMAKE_INSTALL_BINDIR}
             CONFIGURATIONS Debug RelWithDebInfo)
     endif()
-
-    INSTALL(FILES valkey_ssl.h valkeycluster_ssl.h
-        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/valkey)
 
     INSTALL(FILES ${CMAKE_CURRENT_BINARY_DIR}/valkey_ssl.pc
         DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig)

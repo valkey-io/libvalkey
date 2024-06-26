@@ -85,15 +85,40 @@ jobs:
       working-directory: build
       shell: bash
       run: make stop
-    - name: Build examples
-      shell: bash
-      env:
-        CC: ${{ matrix.compiler }}
+
+  install:
+    name: Installation tests
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@44c2b7a8a4ea60a981eaca3cf939b5f4305c123b # v4.1.5
+    - name: Prepare
+      uses: awalsh128/cache-apt-pkgs-action@a6c3917cc929dd0345bfb2d3feaf9101823370ad # v1.4.2
+      with:
+        packages: libevent-dev libuv1-dev libev-dev libglib2.0-dev
+        version: 1.0
+    - name: Install libvalkey using Makefile
       run: |
-        examples/using_cmake_externalproject/build.sh
-        examples/using_cmake_separate/build.sh
-        examples/using_cmake_and_make_mixed/build.sh
-        examples/using_make/build.sh
+        make USE_SSL=1 DESTDIR=${{ github.workspace }}/make-install install
+    - name: Install libvalkey using CMake
+      run: |
+        mkdir build && cd build
+        cmake -DDISABLE_TESTS=ON -DENABLE_SSL=ON ..
+        make DESTDIR=${{ github.workspace }}/cmake-install install
+    - name: Build examples with Makefile using a Makefile-installed libvalkey
+      run: |
+        make CFLAGS="-I${{ github.workspace }}/make-install/usr/local/include" \
+             STLIBNAME="${{ github.workspace }}/make-install/usr/local/lib/libvalkey.a" \
+             -C examples
+    - name: Build examples with Makefile using a CMake-installed libvalkey
+      run: |
+        make CFLAGS="-I${{ github.workspace }}/cmake-install/usr/local/include" \
+             STLIBNAME="${{ github.workspace }}/cmake-install/usr/local/lib/libvalkey.a" \
+             -C examples
+    - name: Build examples with CMake using a CMake-installed libvalkey
+      run: |
+        cd examples && mkdir build && cd build
+        cmake -DCMAKE_PREFIX_PATH=${{ github.workspace }}/cmake-install/usr/local -DENABLE_SSL=ON ..
+        make
 
   macos:
     name: macOS
