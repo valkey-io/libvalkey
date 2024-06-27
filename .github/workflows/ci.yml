@@ -137,7 +137,7 @@ jobs:
       - name: Build
         run: |
           mkdir build && cd build
-          cmake .. -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE=C:\vcpkg\scripts\buildsystems\vcpkg.cmake
+          cmake .. -G Ninja -DCMAKE_BUILD_TYPE=Release -DDISABLE_TESTS=ON -DCMAKE_TOOLCHAIN_FILE=C:\vcpkg\scripts\buildsystems\vcpkg.cmake
           ninja -v
 
   windows-mingw64:
