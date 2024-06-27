@@ -185,7 +185,7 @@ jobs:
         run: .\tests\client_test.exe
 
       - name: Install Cygwin Action
-        uses: cygwin/cygwin-install-action@v2
+        uses: cygwin/cygwin-install-action@v4
         with:
           packages: make git gcc-core
 
