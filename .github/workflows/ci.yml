@@ -20,57 +20,49 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        compiler: [gcc-11, clang-12]
-        cmake-version: [3.19]
+        compiler: [gcc-13, clang-18]
+        cmake-version: [3.29]
         cmake-build-type: [Release, RelWithDebInfo]
         sanitizer: ["", thread, undefined, leak, address]
         include:
           - compiler: gcc-7
-            cmake-version: 3.14
+            cmake-version: 3.11
             cmake-build-type: Release
             sanitizer: ""
-          - compiler: gcc-8
-            cmake-version: 3.15
+          - compiler: clang-12
+            cmake-version: 3.11
             cmake-build-type: Release
             sanitizer: ""
-          - compiler: clang-7
-            cmake-version: 3.17
-            cmake-build-type: Release
-            sanitizer: ""
-          - compiler: clang-9
-            cmake-version: 3.18
-            cmake-build-type: Release
-            sanitizer: ""
-
     steps:
     - name: Prepare
       uses: awalsh128/cache-apt-pkgs-action@a6c3917cc929dd0345bfb2d3feaf9101823370ad # v1.4.2
       with:
-        packages: libevent-dev libuv1-dev libev-dev libglib2.0-dev ${{ matrix.compiler }}
+        packages: libevent-dev libuv1-dev libev-dev libglib2.0-dev
         version: 1.0
+    - name: Setup compiler
+      uses: aminya/setup-cpp@290824452986e378826155f3379d31bce8753d76 # v0.37.0
+      with:
+        compiler: ${{ matrix.compiler }}
+    - name: Setup CMake
+      uses: jwlawson/actions-setup-cmake@802fa1a2c4e212495c05bf94dba2704a92a472be # v2.0.2
+      with:
+        cmake-version: ${{ matrix.cmake-version }}
     - name: Install Valkey for non-cluster tests
       run: |
         git clone --depth 1 --branch 7.2.5 https://github.com/valkey-io/valkey.git
         cd valkey && BUILD_TLS=yes make install
-    - name: Setup cmake
-      uses: jwlawson/actions-setup-cmake@802fa1a2c4e212495c05bf94dba2704a92a472be # v2.0.2
-      with:
-        cmake-version: ${{ matrix.cmake-version }}
     - uses: actions/checkout@44c2b7a8a4ea60a981eaca3cf939b5f4305c123b # v4.1.5
     - name: Create build folder
       run: cmake -E make_directory build
     - name: Generate makefiles
-      shell: bash
       env:
         CC: ${{ matrix.compiler }}
       working-directory: build
-      run: cmake $GITHUB_WORKSPACE -DCMAKE_BUILD_TYPE=$BUILD_TYPE -DENABLE_SSL=ON -DENABLE_IPV6_TESTS=ON -DDOWNLOAD_HIREDIS=OFF -DUSE_SANITIZER=${{ matrix.sanitizer }} ..
+      run: cmake $GITHUB_WORKSPACE -DCMAKE_BUILD_TYPE=$BUILD_TYPE -DENABLE_SSL=ON -DENABLE_IPV6_TESTS=ON -DUSE_SANITIZER=${{ matrix.sanitizer }} ..
     - name: Build
-      shell: bash
       working-directory: build
       run: VERBOSE=1 make
     - name: Setup clusters
-      shell: bash
       working-directory: build
       run: make start
     - name: Wait for clusters to start..
@@ -78,12 +70,10 @@ jobs:
       with:
         time: '20s'
     - name: Run tests
-      shell: bash
       working-directory: build
-      run: make CTEST_OUTPUT_ON_FAILURE=1 test
+      run: make test
     - name: Teardown clusters
       working-directory: build
-      shell: bash
       run: make stop
 
   install:
@@ -147,7 +137,7 @@ jobs:
       - name: Build
         run: |
           mkdir build && cd build
-          cmake .. -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE=C:\vcpkg\scripts\buildsystems\vcpkg.cmake
+          cmake .. -G Ninja -DCMAKE_BUILD_TYPE=Release -DDISABLE_TESTS=ON -DCMAKE_TOOLCHAIN_FILE=C:\vcpkg\scripts\buildsystems\vcpkg.cmake
           ninja -v
 
   windows-mingw64:

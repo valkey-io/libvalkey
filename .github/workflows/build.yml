@@ -142,7 +142,7 @@ jobs:
           prepare: pkg install -y gmake cmake
           run: |
             gmake
-            mkdir build && cd build && cmake -DDISABLE_TESTS=ON .. && gmake
+            mkdir build && cd build && cmake .. && gmake
 
   macos:
     name: macOS

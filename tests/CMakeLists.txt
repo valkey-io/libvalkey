@@ -50,7 +50,7 @@ find_library(LIBUV_LIBRARY uv HINTS /usr/lib/x86_64-linux-gnu)
 find_library(LIBEV_LIBRARY ev HINTS /usr/lib/x86_64-linux-gnu)
 find_library(LIBEVENT_LIBRARY event HINTS /usr/lib/x86_64-linux-gnu)
 find_path(LIBEVENT_INCLUDES event2/event.h)
-if(LIBEVENT_INCLUDES_FOUND)
+if(LIBEVENT_INCLUDES)
   include_directories(${LIBEVENT_INCLUDES})
 endif()
 

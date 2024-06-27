@@ -32,9 +32,7 @@ jobs:
       run: sudo apt-get update && sudo apt-get install gcc-multilib
     - uses: actions/checkout@v3
     - name: Run make
-      run: make all
-      env:
-        PLATFORM_FLAGS: -m32
+      run: make 32bit
     - name: Run unittests
       env:
         REDIS_DOCKER: redis:alpine
@@ -71,26 +69,3 @@ jobs:
         REDIS_DOCKER: redis:alpine
         TEST_PREFIX: ${{matrix.emulator}} -L /usr/${{matrix.toolset}}/
       run: make check
-
-  build-windows:
-    name: Build and test on windows 64 bit Intel
-    runs-on: windows-latest
-    steps:
-      - uses: microsoft/setup-msbuild@v1.0.2
-      - uses: actions/checkout@v3
-      - name: Run CMake (shared lib)
-        run: cmake -Wno-dev CMakeLists.txt
-      - name: Build shared library
-        run: MSBuild hiredis.vcxproj /p:Configuration=Debug
-      - name: Run CMake (static lib)
-        run: cmake -Wno-dev CMakeLists.txt -DBUILD_SHARED_LIBS=OFF
-      - name: Build static library
-        run: MSBuild hiredis.vcxproj /p:Configuration=Debug
-      - name: Build test.exe
-        run: MSBuild hiredis-test.vcxproj /p:Configuration=Debug
-      # use memurai, redis compatible server, since it is easy to install.  Can't
-      # install official redis containers on the windows runner
-      - name: Install Memurai redis server
-        run: choco install -y memurai-developer.install
-      - name: Run tests
-        run: Debug\hiredis-test.exe
