@@ -96,7 +96,6 @@ typedef enum CLUSTER_ERR_TYPE {
 
 static void freeValkeyClusterNode(valkeyClusterNode *node);
 static void cluster_slot_destroy(cluster_slot *slot);
-static void cluster_open_slot_destroy(copen_slot *oslot);
 static int updateNodesAndSlotmap(valkeyClusterContext *cc, dict *nodes);
 static int updateSlotMapAsync(valkeyClusterAsyncContext *acc,
                               valkeyAsyncContext *ac);
@@ -279,22 +278,6 @@ static void freeValkeyClusterNode(valkeyClusterNode *node) {
     if (node->slaves != NULL) {
         listRelease(node->slaves);
     }
-
-    copen_slot **oslot;
-    if (node->migrating) {
-        while (vkarray_n(node->migrating)) {
-            oslot = vkarray_pop(node->migrating);
-            cluster_open_slot_destroy(*oslot);
-        }
-        vkarray_destroy(node->migrating);
-    }
-    if (node->importing) {
-        while (vkarray_n(node->importing)) {
-            oslot = vkarray_pop(node->importing);
-            cluster_open_slot_destroy(*oslot);
-        }
-        vkarray_destroy(node->importing);
-    }
     vk_free(node);
 }
 
@@ -360,37 +343,6 @@ static void cluster_slot_destroy(cluster_slot *slot) {
     slot->node = NULL;
 
     vk_free(slot);
-}
-
-static copen_slot *cluster_open_slot_create(uint32_t slot_num, int migrate,
-                                            sds remote_name,
-                                            valkeyClusterNode *node) {
-    copen_slot *oslot;
-
-    oslot = vk_calloc(1, sizeof(*oslot));
-    if (oslot == NULL) {
-        return NULL;
-    }
-
-    oslot->slot_num = slot_num;
-    oslot->migrate = migrate;
-    oslot->node = node;
-    oslot->remote_name = sdsdup(remote_name);
-    if (oslot->remote_name == NULL) {
-        vk_free(oslot);
-        return NULL;
-    }
-
-    return oslot;
-}
-
-static void cluster_open_slot_destroy(copen_slot *oslot) {
-    oslot->slot_num = 0;
-    oslot->migrate = 0;
-    oslot->node = NULL;
-    sdsfree(oslot->remote_name);
-    oslot->remote_name = NULL;
-    vk_free(oslot);
 }
 
 /**
@@ -1031,85 +983,9 @@ dict *parse_cluster_nodes(valkeyClusterContext *cc, char *str, int str_len,
                     } else if (count_slot_start_end == 2) {
                         slot_start = vk_atoi(slot_start_end[0],
                                              sdslen(slot_start_end[0]));
-                        ;
                         slot_end = vk_atoi(slot_start_end[1],
                                            sdslen(slot_start_end[1]));
-                        ;
                     } else {
-                        // add open slot for master
-                        if (flags & VALKEYCLUSTER_FLAG_ADD_OPENSLOT &&
-                            count_slot_start_end == 3 &&
-                            sdslen(slot_start_end[0]) > 1 &&
-                            sdslen(slot_start_end[1]) == 1 &&
-                            sdslen(slot_start_end[2]) > 1 &&
-                            slot_start_end[0][0] == '[' &&
-                            slot_start_end[2][sdslen(slot_start_end[2]) - 1] ==
-                                ']') {
-
-                            copen_slot *oslot, **oslot_elem;
-
-                            sdsrange(slot_start_end[0], 1, -1);
-                            sdsrange(slot_start_end[2], 0, -2);
-
-                            if (slot_start_end[1][0] == '>') {
-                                oslot = cluster_open_slot_create(
-                                    vk_atoi(slot_start_end[0],
-                                            sdslen(slot_start_end[0])),
-                                    1, slot_start_end[2], master);
-                                if (oslot == NULL) {
-                                    __valkeyClusterSetError(
-                                        cc, VALKEY_ERR_OTHER,
-                                        "create open slot error");
-                                    goto error;
-                                }
-
-                                if (master->migrating == NULL) {
-                                    master->migrating =
-                                        vkarray_create(1, sizeof(oslot));
-                                    if (master->migrating == NULL) {
-                                        cluster_open_slot_destroy(oslot);
-                                        goto oom;
-                                    }
-                                }
-
-                                oslot_elem = vkarray_push(master->migrating);
-                                if (oslot_elem == NULL) {
-                                    cluster_open_slot_destroy(oslot);
-                                    goto oom;
-                                }
-
-                                *oslot_elem = oslot;
-                            } else if (slot_start_end[1][0] == '<') {
-                                oslot = cluster_open_slot_create(
-                                    vk_atoi(slot_start_end[0],
-                                            sdslen(slot_start_end[0])),
-                                    0, slot_start_end[2], master);
-                                if (oslot == NULL) {
-                                    __valkeyClusterSetError(
-                                        cc, VALKEY_ERR_OTHER,
-                                        "create open slot error");
-                                    goto error;
-                                }
-
-                                if (master->importing == NULL) {
-                                    master->importing =
-                                        vkarray_create(1, sizeof(oslot));
-                                    if (master->importing == NULL) {
-                                        cluster_open_slot_destroy(oslot);
-                                        goto oom;
-                                    }
-                                }
-
-                                oslot_elem = vkarray_push(master->importing);
-                                if (oslot_elem == NULL) {
-                                    cluster_open_slot_destroy(oslot);
-                                    goto oom;
-                                }
-
-                                *oslot_elem = oslot;
-                            }
-                        }
-
                         slot_start = -1;
                         slot_end = -1;
                     }
@@ -1833,17 +1709,6 @@ int valkeyClusterSetOptionParseSlaves(valkeyClusterContext *cc) {
     }
 
     cc->flags |= VALKEYCLUSTER_FLAG_ADD_SLAVE;
-
-    return VALKEY_OK;
-}
-
-int valkeyClusterSetOptionParseOpenSlots(valkeyClusterContext *cc) {
-
-    if (cc == NULL) {
-        return VALKEY_ERR;
-    }
-
-    cc->flags |= VALKEYCLUSTER_FLAG_ADD_OPENSLOT;
 
     return VALKEY_OK;
 }
