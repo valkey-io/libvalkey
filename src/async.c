@@ -41,7 +41,7 @@
 #include <errno.h>
 #include "async.h"
 #include "net.h"
-#include "dict.c"
+#include "dict.h"
 #include "sds.h"
 #include "win32.h"
 

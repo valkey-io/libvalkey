@@ -31,7 +31,11 @@
 #include <ctype.h>
 #include <errno.h>
 #ifndef _WIN32
+#if !defined(__FreeBSD__)
 #include <alloca.h>
+#else
+#include <stdlib.h>
+#endif
 #include <strings.h>
 #else
 #include <malloc.h>
