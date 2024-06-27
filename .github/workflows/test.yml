@@ -32,9 +32,7 @@ jobs:
       run: sudo apt-get update && sudo apt-get install gcc-multilib
     - uses: actions/checkout@v3
     - name: Run make
-      run: make all
-      env:
-        PLATFORM_FLAGS: -m32
+      run: make 32bit
     - name: Run unittests
       env:
         REDIS_DOCKER: redis:alpine
