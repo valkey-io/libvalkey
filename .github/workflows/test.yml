@@ -13,7 +13,7 @@ jobs:
     steps:
     - name: Install prerequisites
       run: sudo apt-get update && sudo apt-get install -y libev-dev libevent-dev libglib2.0-dev libssl-dev valgrind
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
     - name: Run make
       run: make all examples
     - name: Run unittests
@@ -30,7 +30,7 @@ jobs:
     steps:
     - name: Install prerequisites
       run: sudo apt-get update && sudo apt-get install gcc-multilib
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
     - name: Run make
       run: make 32bit
     - name: Run unittests
@@ -58,7 +58,7 @@ jobs:
     - name: Install platform toolset
       if: matrix.toolset
       run: sudo apt-get install -y gcc-${{matrix.toolset}}
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
     - name: Run make
       run: make all
       env:
