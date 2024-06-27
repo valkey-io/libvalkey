@@ -37,8 +37,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <valkey/alloc.h>
 
+#include "alloc.h"
 #include "adlist.h"
 #include "command.h"
 #include "dict.h"
@@ -2359,15 +2359,15 @@ static int command_pre_fragment(valkeyClusterContext *cc, struct cmd *command,
             uint32_t len = 0;
             char *p;
 
-            for (p = sub_kp->end + 1; !isdigit(*p); p++) {
+            for (p = sub_kp->end + 1; !isdigit((unsigned char)*p); p++) {
             }
 
             p = sub_kp->end + 1;
-            while (!isdigit(*p)) {
+            while (!isdigit((unsigned char)*p)) {
                 p++;
             }
 
-            for (; isdigit(*p); p++) {
+            for (; isdigit((unsigned char)*p); p++) {
                 len = len * 10 + (uint32_t)(*p - '0');
             }
 
@@ -3218,6 +3218,7 @@ int valkeyClusterAppendCommandArgv(valkeyClusterContext *cc, int argc,
     return ret;
 }
 
+VALKEY_UNUSED
 static int valkeyClusterSendAll(valkeyClusterContext *cc) {
     dictEntry *de;
     valkeyClusterNode *node;
@@ -3253,6 +3254,7 @@ static int valkeyClusterSendAll(valkeyClusterContext *cc) {
     return VALKEY_OK;
 }
 
+VALKEY_UNUSED
 static int valkeyClusterClearAll(valkeyClusterContext *cc) {
     dictEntry *de;
     valkeyClusterNode *node;
@@ -3397,7 +3399,7 @@ error:
 }
 
 /**
- * Resets cluster state after pipeline. 
+ * Resets cluster state after pipeline.
  * Resets Valkey node connections if pipeline commands were not called beforehand.
  */
 void valkeyClusterReset(valkeyClusterContext *cc) {
