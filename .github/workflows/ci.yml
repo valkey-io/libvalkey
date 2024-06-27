@@ -80,7 +80,7 @@ jobs:
     - name: Run tests
       shell: bash
       working-directory: build
-      run: make CTEST_OUTPUT_ON_FAILURE=1 test
+      run: make test
     - name: Teardown clusters
       working-directory: build
       shell: bash
