@@ -34,8 +34,6 @@
 
 #include <stdint.h>
 
-#include "adlist.h"
-
 typedef enum cmd_parse_result {
     CMD_PARSE_OK,     /* parsing ok */
     CMD_PARSE_ENOMEM, /* out of memory */
@@ -61,8 +59,8 @@ typedef enum cmd_type {
 } cmd_type_t;
 
 struct keypos {
-    char *start;         /* key start pos */
-    char *end;           /* key end pos */
+    char *start;  /* key start pos */
+    uint32_t len; /* Length of key */
 };
 
 struct cmd {
@@ -72,7 +70,7 @@ struct cmd {
     char *cmd;
     uint32_t clen; /* command length */
 
-    struct vkarray *keys; /* array of keypos, for req */
+    struct keypos key; /* First found key in command. */
 
     /* Command destination */
     int slot_num;    /* Command should be sent to slot.

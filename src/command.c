@@ -46,7 +46,6 @@
 #include "alloc.h"
 #include "command.h"
 #include "sds.h"
-#include "vkarray.h"
 #include "vkutil.h"
 #include "win32.h"
 
@@ -166,15 +165,6 @@ char *valkey_parse_bulk(char *p, char *end, char **str, uint32_t *len) {
     return p;
 }
 
-static inline int push_keypos(struct cmd *r, char *arg, uint32_t arglen) {
-    struct keypos *kpos = vkarray_push(r->keys);
-    if (kpos == NULL)
-        return 0;
-    kpos->start = arg;
-    kpos->end = arg + arglen;
-    return 1;
-}
-
 /*
  * Reference: https://valkey.io/docs/topics/protocol/
  *
@@ -271,8 +261,9 @@ void valkey_parse_cmd(struct cmd *r) {
                 /* Keyword found. Now the first key is the next arg. */
                 if ((p = valkey_parse_bulk(p, end, &arg, &arglen)) == NULL)
                     goto error;
-                if (!push_keypos(r, arg, arglen))
-                    goto oom;
+                /* Keep found key. */
+                r->key.start = arg;
+                r->key.len = arglen;
                 goto done;
             }
         }
@@ -314,9 +305,9 @@ void valkey_parse_cmd(struct cmd *r) {
          * from the end of the command line. This is not implemented. */
         goto error;
     }
-
-    if (!push_keypos(r, arg, arglen))
-        goto oom;
+    /* Keep found key. */
+    r->key.start = arg;
+    r->key.len = arglen;
 
 done:
     ASSERT(r->type > CMD_UNKNOWN && r->type < CMD_SENTINEL);
@@ -330,7 +321,8 @@ error:
     if (r->errstr == NULL) {
         r->errstr = vk_malloc(errmaxlen);
         if (r->errstr == NULL) {
-            goto oom;
+            r->result = CMD_PARSE_ENOMEM;
+            return;
         }
     }
 
@@ -348,9 +340,6 @@ error:
     else
         snprintf(r->errstr, errmaxlen, "Command parse error");
     return;
-
-oom:
-    r->result = CMD_PARSE_ENOMEM;
 }
 
 struct cmd *command_get(void) {
@@ -364,15 +353,10 @@ struct cmd *command_get(void) {
     command->errstr = NULL;
     command->cmd = NULL;
     command->clen = 0;
-    command->keys = NULL;
+    command->key.start = NULL;
+    command->key.len = 0;
     command->slot_num = -1;
     command->node_addr = NULL;
-
-    command->keys = vkarray_create(1, sizeof(struct keypos));
-    if (command->keys == NULL) {
-        vk_free(command);
-        return NULL;
-    }
 
     return command;
 }
@@ -390,12 +374,6 @@ void command_destroy(struct cmd *command) {
     if (command->errstr != NULL) {
         vk_free(command->errstr);
         command->errstr = NULL;
-    }
-
-    if (command->keys != NULL) {
-        command->keys->nelem = 0;
-        vkarray_destroy(command->keys);
-        command->keys = NULL;
     }
 
     if (command->node_addr != NULL) {
