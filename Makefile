@@ -3,6 +3,8 @@
 # Copyright (C) 2010-2011 Pieter Noordhuis <pcnoordhuis at gmail dot com>
 # This file is released under the BSD license, see the COPYING file
 
+SHELL := /bin/sh
+
 SRC_DIR = src
 OBJ_DIR = obj
 LIB_DIR = lib
@@ -24,10 +26,13 @@ PKGCONFNAME=$(LIB_DIR)/valkey.pc
 PKGCONF_TEMPLATE = valkey.pc.in
 SSL_PKGCONF_TEMPLATE = valkey_ssl.pc.in
 
-LIBVALKEY_MAJOR=$(shell grep LIBVALKEY_MAJOR $(INCLUDE_DIR)/valkey.h | awk '{print $$3}')
-LIBVALKEY_MINOR=$(shell grep LIBVALKEY_MINOR $(INCLUDE_DIR)/valkey.h | awk '{print $$3}')
-LIBVALKEY_PATCH=$(shell grep LIBVALKEY_PATCH $(INCLUDE_DIR)/valkey.h | awk '{print $$3}')
-LIBVALKEY_SONAME=$(shell grep LIBVALKEY_SONAME include/valkey/valkey.h | awk '{print $$3}')
+LIBVALKEY_HEADER=$(INCLUDE_DIR)/valkey.h
+LIBVALKEY_VERSION=$(shell awk '/LIBVALKEY_(MAJOR|MINOR|PATCH|SONAME)/{print $$3}' $(LIBVALKEY_HEADER))
+
+LIBVALKEY_MAJOR=$(word 1,$(LIBVALKEY_VERSION))
+LIBVALKEY_MINOR=$(word 2,$(LIBVALKEY_VERSION))
+LIBVALKEY_PATCH=$(word 3,$(LIBVALKEY_VERSION))
+LIBVALKEY_SONAME=$(word 4,$(LIBVALKEY_VERSION))
 
 # Installation related variables and target
 PREFIX?=/usr/local
@@ -51,8 +56,8 @@ endef
 export VALKEY_TEST_CONFIG
 
 # Fallback to gcc when $CC is not in $PATH.
-CC:=$(shell sh -c 'type $${CC%% *} >/dev/null 2>/dev/null && echo $(CC) || echo gcc')
-CXX:=$(shell sh -c 'type $${CXX%% *} >/dev/null 2>/dev/null && echo $(CXX) || echo g++')
+CC := $(if $(shell command -v $(firstword $(CC)) >/dev/null 2>&1 && echo OK),$(CC),gcc)
+
 OPTIMIZATION?=-O3
 WARNINGS=-Wall -Wextra -Wstrict-prototypes -Wwrite-strings -Wno-missing-field-initializers
 USE_WERROR?=1
@@ -107,7 +112,7 @@ endif
 ##################### SSL variables end #####################
 
 # Platform-specific overrides
-uname_S := $(shell sh -c 'uname -s 2>/dev/null || echo not')
+uname_S := $(shell uname -s 2>/dev/null || echo not)
 
 # This is required for test.c only
 ifeq ($(TEST_ASYNC),1)
@@ -137,27 +142,17 @@ ifeq ($(USE_SSL),1)
 endif
 
 ifeq ($(uname_S),FreeBSD)
-  LDFLAGS+=-lm
-  IS_GCC=$(shell sh -c '$(CC) --version 2>/dev/null |egrep -i -c "gcc"')
-  ifeq ($(IS_GCC),1)
-    REAL_CFLAGS+=-pedantic
-  endif
-else
-  REAL_CFLAGS+=-pedantic
-endif
-
-ifeq ($(uname_S),SunOS)
-  IS_SUN_CC=$(shell sh -c '$(CC) -V 2>&1 |egrep -i -c "sun|studio"')
-  ifeq ($(IS_SUN_CC),1)
-    SUN_SHARED_FLAG=-G
+  LDFLAGS += -lm
+else ifeq ($(UNAME_S),SunOS)
+  ifeq ($(shell $(CC) -V 2>&1 | grep -iq 'sun\|studio' && echo true),true)
+    SUN_SHARED_FLAG = -G
   else
-    SUN_SHARED_FLAG=-shared
+    SUN_SHARED_FLAG = -shared
   endif
-  REAL_LDFLAGS+= -ldl -lnsl -lsocket
-  DYLIB_MAKE_CMD=$(CC) $(OPTIMIZATION) $(SUN_SHARED_FLAG) -o $(DYLIBNAME) -h $(DYLIB_MINOR_NAME) $(LDFLAGS)
-  SSL_DYLIB_MAKE_CMD=$(CC) $(SUN_SHARED_FLAG) -o $(SSL_DYLIBNAME) -h $(SSL_DYLIB_MINOR_NAME) $(LDFLAGS) $(SSL_LDFLAGS)
-endif
-ifeq ($(uname_S),Darwin)
+  REAL_LDFLAGS += -ldl -lnsl -lsocket
+  DYLIB_MAKE_CMD = $(CC) $(OPTIMIZATION) $(SUN_SHARED_FLAG) -o $(DYLIBNAME) -h $(DYLIB_MINOR_NAME) $(LDFLAGS)
+  SSL_DYLIB_MAKE_CMD = $(CC) $(SUN_SHARED_FLAG) -o $(SSL_DYLIBNAME) -h $(SSL_DYLIB_MINOR_NAME) $(LDFLAGS) $(SSL_LDFLAGS)
+else ifeq ($(uname_S),Darwin)
   DYLIBSUFFIX=dylib
   DYLIB_MINOR_NAME=$(LIBNAME).$(LIBVALKEY_SONAME).$(DYLIBSUFFIX)
   DYLIB_MAKE_CMD=$(CC) -dynamiclib -Wl,-install_name,$(PREFIX)/$(LIBRARY_PATH)/$(DYLIB_MINOR_NAME) -o $(DYLIBNAME) $(LDFLAGS)
@@ -180,10 +175,10 @@ $(SSL_STLIBNAME): $(SSL_OBJS)
 	$(STLIB_MAKE_CMD) $(SSL_STLIBNAME) $(SSL_OBJS)
 
 $(OBJ_DIR)/%.o: $(SRC_DIR)/%.c | $(OBJ_DIR)
-	$(CC) -std=c99 $(REAL_CFLAGS) -I$(INCLUDE_DIR) -MMD -MP -c $< -o $@
+	$(CC) -std=c99 -pedantic $(REAL_CFLAGS) -I$(INCLUDE_DIR) -MMD -MP -c $< -o $@
 
 $(OBJ_DIR)/%.o: $(TEST_DIR)/%.c | $(OBJ_DIR)
-	$(CC) -std=c99 $(REAL_CFLAGS) -I$(INCLUDE_DIR) -MMD -MP -c $< -o $@
+	$(CC) -std=c99 -pedantic $(REAL_CFLAGS) -I$(INCLUDE_DIR) -MMD -MP -c $< -o $@
 
 $(TEST_DIR)/%: $(OBJ_DIR)/%.o $(STLIBNAME)
 	$(CC) -o $@ $< $(STLIBNAME) $(SSL_STLIB) $(LDFLAGS) $(TEST_LDFLAGS)
