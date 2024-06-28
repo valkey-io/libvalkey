@@ -77,9 +77,6 @@ struct cmd {
 
     struct vkarray *keys; /* array of keypos, for req */
 
-    unsigned quit : 1;      /* quit request? */
-    unsigned noforward : 1; /* not need forward (example: ping) */
-
     /* Command destination */
     int slot_num;    /* Command should be sent to slot.
                       * Set to -1 if command is sent to a given node,

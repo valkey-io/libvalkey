@@ -363,8 +363,6 @@ struct cmd *command_get(void) {
     command->cmd = NULL;
     command->clen = 0;
     command->keys = NULL;
-    command->quit = 0;
-    command->noforward = 0;
     command->slot_num = -1;
     command->reply = NULL;
     command->node_addr = NULL;
