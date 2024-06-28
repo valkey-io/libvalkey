@@ -93,9 +93,6 @@ struct cmd {
                       * or if a slot can not be found or calculated. */
     char *node_addr; /* Command sent to this node address */
 
-    struct cmd *
-        *frag_seq; /* sequence of fragment command, map from keys to fragments*/
-
     valkeyReply *reply;
 };
 

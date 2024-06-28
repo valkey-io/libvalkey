@@ -374,7 +374,6 @@ struct cmd *command_get(void) {
     command->quit = 0;
     command->noforward = 0;
     command->slot_num = -1;
-    command->frag_seq = NULL;
     command->reply = NULL;
     command->node_addr = NULL;
 
@@ -406,11 +405,6 @@ void command_destroy(struct cmd *command) {
         command->keys->nelem = 0;
         vkarray_destroy(command->keys);
         command->keys = NULL;
-    }
-
-    if (command->frag_seq != NULL) {
-        vk_free(command->frag_seq);
-        command->frag_seq = NULL;
     }
 
     freeReplyObject(command->reply);
