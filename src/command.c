@@ -40,10 +40,12 @@
 #else
 #include <malloc.h>
 #endif
+#include <stdio.h>
 #include <string.h>
 
 #include "alloc.h"
 #include "command.h"
+#include "sds.h"
 #include "vkarray.h"
 #include "vkutil.h"
 #include "win32.h"
@@ -364,7 +366,6 @@ struct cmd *command_get(void) {
     command->clen = 0;
     command->keys = NULL;
     command->slot_num = -1;
-    command->reply = NULL;
     command->node_addr = NULL;
 
     command->keys = vkarray_create(1, sizeof(struct keypos));
@@ -396,8 +397,6 @@ void command_destroy(struct cmd *command) {
         vkarray_destroy(command->keys);
         command->keys = NULL;
     }
-
-    freeReplyObject(command->reply);
 
     if (command->node_addr != NULL) {
         sdsfree(command->node_addr);

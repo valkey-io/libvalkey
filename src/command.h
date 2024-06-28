@@ -35,7 +35,6 @@
 #include <stdint.h>
 
 #include "adlist.h"
-#include "valkey.h"
 
 typedef enum cmd_parse_result {
     CMD_PARSE_OK,     /* parsing ok */
@@ -82,8 +81,6 @@ struct cmd {
                       * Set to -1 if command is sent to a given node,
                       * or if a slot can not be found or calculated. */
     char *node_addr; /* Command sent to this node address */
-
-    valkeyReply *reply;
 };
 
 void valkey_parse_cmd(struct cmd *r);
