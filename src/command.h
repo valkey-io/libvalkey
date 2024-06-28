@@ -63,8 +63,6 @@ typedef enum cmd_type {
 struct keypos {
     char *start;         /* key start pos */
     char *end;           /* key end pos */
-    uint32_t remain_len; /* remain length after keypos->end for more key-value
-                            pairs in command, like mset */
 };
 
 struct cmd {
