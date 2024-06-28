@@ -91,9 +91,8 @@ static inline void to_upper(char *dst, const char *src, uint32_t len) {
 }
 
 /* Looks up a command or subcommand in the command table. Arg0 and arg1 are used
- * to lookup the command. The function returns CMD_UNKNOWN on failure. On
- * success, the command type is returned and *firstkey and *arity are
- * populated. */
+ * to lookup the command. The function returns the cmddef for a found command,
+ * or NULL on failure. */
 cmddef *valkey_lookup_cmd(const char *arg0, uint32_t arg0_len, const char *arg1,
                           uint32_t arg1_len) {
     int num_commands = sizeof(server_commands) / sizeof(cmddef);
@@ -229,7 +228,6 @@ void valkey_parse_cmd(struct cmd *r) {
     /* Lookup command. */
     if ((info = valkey_lookup_cmd(arg0, arg0_len, arg1, arg1_len)) == NULL)
         goto error; /* Command not found. */
-    r->type = info->type;
 
     /* Arity check (negative arity means minimum num args) */
     if ((info->arity >= 0 && (int)rnarg != info->arity) ||
@@ -248,10 +246,10 @@ void valkey_parse_cmd(struct cmd *r) {
         /* Keyword-based first key position */
         const char *keyword;
         int startfrom;
-        if (r->type == CMD_REQ_VALKEY_XREAD) {
+        if (info->type == CMD_REQ_VALKEY_XREAD) {
             keyword = "STREAMS";
             startfrom = 1;
-        } else if (r->type == CMD_REQ_VALKEY_XREADGROUP) {
+        } else if (info->type == CMD_REQ_VALKEY_XREADGROUP) {
             keyword = "STREAMS";
             startfrom = 4;
         } else {
@@ -340,10 +338,10 @@ error:
     else if (info != NULL)
         snprintf(r->errstr, errmaxlen, "Failed to find keys of command %s",
                  info->name);
-    else if (r->type == CMD_UNKNOWN && arg0 != NULL && arg1 != NULL)
+    else if (info == NULL && arg0 != NULL && arg1 != NULL)
         snprintf(r->errstr, errmaxlen, "Unknown command %.*s %.*s", arg0_len,
                  arg0, arg1_len, arg1);
-    else if (r->type == CMD_UNKNOWN && arg0 != NULL)
+    else if (info == NULL && arg0 != NULL)
         snprintf(r->errstr, errmaxlen, "Unknown command %.*s", arg0_len, arg0);
     else
         snprintf(r->errstr, errmaxlen, "Command parse error");
@@ -362,7 +360,6 @@ struct cmd *command_get(void) {
 
     command->result = CMD_PARSE_OK;
     command->errstr = NULL;
-    command->type = CMD_UNKNOWN;
     command->cmd = NULL;
     command->clen = 0;
     command->keys = NULL;

@@ -72,8 +72,6 @@ struct cmd {
     cmd_parse_result_t result; /* command parsing result */
     char *errstr;              /* error info when the command parse failed */
 
-    cmd_type_t type; /* command type */
-
     char *cmd;
     uint32_t clen; /* command length */
 
