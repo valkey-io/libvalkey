@@ -69,9 +69,6 @@ struct keypos {
 };
 
 struct cmd {
-
-    uint64_t id; /* command id */
-
     cmd_parse_result_t result; /* command parsing result */
     char *errstr;              /* error info when the command parse failed */
 

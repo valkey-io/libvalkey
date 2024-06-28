@@ -51,8 +51,6 @@
 #define LF (uint8_t)10
 #define CR (uint8_t)13
 
-static uint64_t cmd_id = 0; /* command id counter */
-
 typedef enum {
     KEYPOS_NONE,
     KEYPOS_UNKNOWN,
@@ -362,7 +360,6 @@ struct cmd *command_get(void) {
         return NULL;
     }
 
-    command->id = ++cmd_id;
     command->result = CMD_PARSE_OK;
     command->errstr = NULL;
     command->type = CMD_UNKNOWN;
