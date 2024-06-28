@@ -48,7 +48,7 @@ jobs:
     container: centos:7
     steps:
       # CentOS 7 uses an older glibc, only v3 of actions/checkout can be used.
-      - uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # v3.6.0
+      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
 
       - name: Install dependencies
         run: |
