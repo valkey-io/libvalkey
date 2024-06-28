@@ -217,7 +217,6 @@ void valkey_parse_cmd(struct cmd *r) {
         goto error;
     if (rnarg == 0)
         goto error;
-    r->narg = rnarg;
 
     /* Parse the first two args. */
     if ((p = valkey_parse_bulk(p, end, &arg0, &arg0_len)) == NULL)
@@ -370,7 +369,6 @@ struct cmd *command_get(void) {
     command->cmd = NULL;
     command->clen = 0;
     command->keys = NULL;
-    command->narg = 0;
     command->quit = 0;
     command->noforward = 0;
     command->slot_num = -1;

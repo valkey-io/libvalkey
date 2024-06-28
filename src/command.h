@@ -82,8 +82,6 @@ struct cmd {
 
     struct vkarray *keys; /* array of keypos, for req */
 
-    uint32_t narg; /* # arguments (valkey) */
-
     unsigned quit : 1;      /* quit request? */
     unsigned noforward : 1; /* not need forward (example: ping) */
 
