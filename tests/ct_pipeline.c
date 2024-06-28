@@ -57,40 +57,6 @@ void test_pipeline(void) {
     valkeyClusterFree(cc);
 }
 
-// Test of pipelines containing multi-node commands
-void test_pipeline_with_multinode_commands(void) {
-    valkeyClusterContext *cc = valkeyClusterContextInit();
-    assert(cc);
-
-    int status;
-    status = valkeyClusterSetOptionAddNodes(cc, CLUSTER_NODE);
-    ASSERT_MSG(status == VALKEY_OK, cc->errstr);
-
-    status = valkeyClusterConnect2(cc);
-    ASSERT_MSG(status == VALKEY_OK, cc->errstr);
-
-    status =
-        valkeyClusterAppendCommand(cc, "MSET key1 Hello key2 World key3 !");
-    ASSERT_MSG(status == VALKEY_OK, cc->errstr);
-
-    status = valkeyClusterAppendCommand(cc, "MGET key1 key2 key3");
-    ASSERT_MSG(status == VALKEY_OK, cc->errstr);
-
-    valkeyReply *reply;
-    valkeyClusterGetReply(cc, (void *)&reply);
-    CHECK_REPLY_OK(cc, reply);
-    freeReplyObject(reply);
-
-    valkeyClusterGetReply(cc, (void *)&reply);
-    CHECK_REPLY_ARRAY(cc, reply, 3);
-    CHECK_REPLY_STR(cc, reply->element[0], "Hello");
-    CHECK_REPLY_STR(cc, reply->element[1], "World");
-    CHECK_REPLY_STR(cc, reply->element[2], "!");
-    freeReplyObject(reply);
-
-    valkeyClusterFree(cc);
-}
-
 //------------------------------------------------------------------------------
 // Async API
 //------------------------------------------------------------------------------
@@ -173,10 +139,8 @@ void test_async_pipeline(void) {
 int main(void) {
 
     test_pipeline();
-    test_pipeline_with_multinode_commands();
 
     test_async_pipeline();
-    // Asynchronous API does not support multi-key commands
 
     return 0;
 }

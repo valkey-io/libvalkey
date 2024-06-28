@@ -2287,474 +2287,31 @@ done:
     return reply;
 }
 
-static int command_pre_fragment(valkeyClusterContext *cc, struct cmd *command,
-                                hilist *commands) {
-
-    struct keypos *kp, *sub_kp;
-    uint32_t key_count;
-    uint32_t i, j;
-    uint32_t idx;
-    uint32_t key_len;
-    int slot_num = -1;
-    struct cmd *sub_command;
-    struct cmd **sub_commands = NULL;
-    char num_str[12];
-    uint8_t num_str_len;
-
-    if (command == NULL || commands == NULL) {
-        goto done;
-    }
-
-    key_count = vkarray_n(command->keys);
-
-    sub_commands = vk_calloc(VALKEYCLUSTER_SLOTS, sizeof(*sub_commands));
-    if (sub_commands == NULL) {
-        goto oom;
-    }
-
-    command->frag_seq = vk_calloc(key_count, sizeof(*command->frag_seq));
-    if (command->frag_seq == NULL) {
-        goto oom;
-    }
-
-    // Fill sub_command with key, slot and command length (clen, only keylength)
-    for (i = 0; i < key_count; i++) {
-        kp = vkarray_get(command->keys, i);
-
-        slot_num = keyHashSlot(kp->start, kp->end - kp->start);
-
-        if (slot_num < 0 || slot_num >= VALKEYCLUSTER_SLOTS) {
-            __valkeyClusterSetError(cc, VALKEY_ERR_OTHER,
-                                    "keyHashSlot return error");
-            goto done;
-        }
-
-        if (sub_commands[slot_num] == NULL) {
-            sub_commands[slot_num] = command_get();
-            if (sub_commands[slot_num] == NULL) {
-                goto oom;
-            }
-        }
-
-        command->frag_seq[i] = sub_command = sub_commands[slot_num];
-
-        sub_command->narg++;
-
-        sub_kp = vkarray_push(sub_command->keys);
-        if (sub_kp == NULL) {
-            goto oom;
-        }
-
-        sub_kp->start = kp->start;
-        sub_kp->end = kp->end;
-
-        // Number of characters in key
-        key_len = (uint32_t)(kp->end - kp->start);
-
-        sub_command->clen += key_len + uint_len(key_len);
-
-        sub_command->slot_num = slot_num;
-
-        if (command->type == CMD_REQ_VALKEY_MSET) {
-            uint32_t len = 0;
-            char *p;
-
-            for (p = sub_kp->end + 1; !isdigit((unsigned char)*p); p++) {
-            }
-
-            p = sub_kp->end + 1;
-            while (!isdigit((unsigned char)*p)) {
-                p++;
-            }
-
-            for (; isdigit((unsigned char)*p); p++) {
-                len = len * 10 + (uint32_t)(*p - '0');
-            }
-
-            len += CRLF_LEN * 2;
-            len += (p - sub_kp->end);
-            sub_kp->remain_len = len;
-            sub_command->clen += len;
-        }
-    }
-
-    /* prepend command header */
-    for (i = 0; i < VALKEYCLUSTER_SLOTS; i++) {
-        sub_command = sub_commands[i];
-        if (sub_command == NULL) {
-            continue;
-        }
-
-        idx = 0;
-        if (command->type == CMD_REQ_VALKEY_MGET) {
-            //"*%d\r\n$4\r\nmget\r\n"
-
-            sub_command->clen += 5 * sub_command->narg;
-
-            sub_command->narg++;
-
-            vk_itoa(num_str, sub_command->narg);
-            num_str_len = (uint8_t)(strlen(num_str));
-
-            sub_command->clen += 13 + num_str_len;
-
-            sub_command->cmd =
-                vk_calloc(sub_command->clen, sizeof(*sub_command->cmd));
-            if (sub_command->cmd == NULL) {
-                goto oom;
-            }
-
-            sub_command->cmd[idx++] = '*';
-            memcpy(sub_command->cmd + idx, num_str, num_str_len);
-            idx += num_str_len;
-            memcpy(sub_command->cmd + idx, "\r\n$4\r\nmget\r\n", 12);
-            idx += 12;
-
-            for (j = 0; j < vkarray_n(sub_command->keys); j++) {
-                kp = vkarray_get(sub_command->keys, j);
-                key_len = (uint32_t)(kp->end - kp->start);
-                vk_itoa(num_str, key_len);
-                num_str_len = strlen(num_str);
-
-                sub_command->cmd[idx++] = '$';
-                memcpy(sub_command->cmd + idx, num_str, num_str_len);
-                idx += num_str_len;
-                memcpy(sub_command->cmd + idx, CRLF, CRLF_LEN);
-                idx += CRLF_LEN;
-                memcpy(sub_command->cmd + idx, kp->start, key_len);
-                idx += key_len;
-                memcpy(sub_command->cmd + idx, CRLF, CRLF_LEN);
-                idx += CRLF_LEN;
-            }
-        } else if (command->type == CMD_REQ_VALKEY_DEL) {
-            //"*%d\r\n$3\r\ndel\r\n"
-
-            sub_command->clen += 5 * sub_command->narg;
-
-            sub_command->narg++;
-
-            vk_itoa(num_str, sub_command->narg);
-            num_str_len = (uint8_t)strlen(num_str);
-
-            sub_command->clen += 12 + num_str_len;
-
-            sub_command->cmd =
-                vk_calloc(sub_command->clen, sizeof(*sub_command->cmd));
-            if (sub_command->cmd == NULL) {
-                goto oom;
-            }
-
-            sub_command->cmd[idx++] = '*';
-            memcpy(sub_command->cmd + idx, num_str, num_str_len);
-            idx += num_str_len;
-            memcpy(sub_command->cmd + idx, "\r\n$3\r\ndel\r\n", 11);
-            idx += 11;
-
-            for (j = 0; j < vkarray_n(sub_command->keys); j++) {
-                kp = vkarray_get(sub_command->keys, j);
-                key_len = (uint32_t)(kp->end - kp->start);
-                vk_itoa(num_str, key_len);
-                num_str_len = strlen(num_str);
-
-                sub_command->cmd[idx++] = '$';
-                memcpy(sub_command->cmd + idx, num_str, num_str_len);
-                idx += num_str_len;
-                memcpy(sub_command->cmd + idx, CRLF, CRLF_LEN);
-                idx += CRLF_LEN;
-                memcpy(sub_command->cmd + idx, kp->start, key_len);
-                idx += key_len;
-                memcpy(sub_command->cmd + idx, CRLF, CRLF_LEN);
-                idx += CRLF_LEN;
-            }
-        } else if (command->type == CMD_REQ_VALKEY_EXISTS) {
-            //"*%d\r\n$6\r\nexists\r\n"
-
-            sub_command->clen += 5 * sub_command->narg;
-
-            sub_command->narg++;
-
-            vk_itoa(num_str, sub_command->narg);
-            num_str_len = (uint8_t)strlen(num_str);
-
-            sub_command->clen += 15 + num_str_len;
-
-            sub_command->cmd =
-                vk_calloc(sub_command->clen, sizeof(*sub_command->cmd));
-            if (sub_command->cmd == NULL) {
-                goto oom;
-            }
-
-            sub_command->cmd[idx++] = '*';
-            memcpy(sub_command->cmd + idx, num_str, num_str_len);
-            idx += num_str_len;
-            memcpy(sub_command->cmd + idx, "\r\n$6\r\nexists\r\n", 14);
-            idx += 14;
-
-            for (j = 0; j < vkarray_n(sub_command->keys); j++) {
-                kp = vkarray_get(sub_command->keys, j);
-                key_len = (uint32_t)(kp->end - kp->start);
-                vk_itoa(num_str, key_len);
-                num_str_len = strlen(num_str);
-
-                sub_command->cmd[idx++] = '$';
-                memcpy(sub_command->cmd + idx, num_str, num_str_len);
-                idx += num_str_len;
-                memcpy(sub_command->cmd + idx, CRLF, CRLF_LEN);
-                idx += CRLF_LEN;
-                memcpy(sub_command->cmd + idx, kp->start, key_len);
-                idx += key_len;
-                memcpy(sub_command->cmd + idx, CRLF, CRLF_LEN);
-                idx += CRLF_LEN;
-            }
-        } else if (command->type == CMD_REQ_VALKEY_MSET) {
-            //"*%d\r\n$4\r\nmset\r\n"
-
-            sub_command->clen += 3 * sub_command->narg;
-
-            sub_command->narg *= 2;
-
-            sub_command->narg++;
-
-            vk_itoa(num_str, sub_command->narg);
-            num_str_len = (uint8_t)strlen(num_str);
-
-            sub_command->clen += 13 + num_str_len;
-
-            sub_command->cmd =
-                vk_calloc(sub_command->clen, sizeof(*sub_command->cmd));
-            if (sub_command->cmd == NULL) {
-                goto oom;
-            }
-
-            sub_command->cmd[idx++] = '*';
-            memcpy(sub_command->cmd + idx, num_str, num_str_len);
-            idx += num_str_len;
-            memcpy(sub_command->cmd + idx, "\r\n$4\r\nmset\r\n", 12);
-            idx += 12;
-
-            for (j = 0; j < vkarray_n(sub_command->keys); j++) {
-                kp = vkarray_get(sub_command->keys, j);
-                key_len = (uint32_t)(kp->end - kp->start);
-                vk_itoa(num_str, key_len);
-                num_str_len = strlen(num_str);
-
-                sub_command->cmd[idx++] = '$';
-                memcpy(sub_command->cmd + idx, num_str, num_str_len);
-                idx += num_str_len;
-                memcpy(sub_command->cmd + idx, CRLF, CRLF_LEN);
-                idx += CRLF_LEN;
-                memcpy(sub_command->cmd + idx, kp->start,
-                       key_len + kp->remain_len);
-                idx += key_len + kp->remain_len;
-            }
-        } else {
-            NOT_REACHED();
-        }
-
-        sub_command->type = command->type;
-
-        if (listAddNodeTail(commands, sub_command) == NULL) {
-            goto oom;
-        }
-        sub_commands[i] = NULL;
-    }
-
-done:
-    vk_free(sub_commands);
-
-    if (slot_num >= 0 && commands != NULL && listLength(commands) == 1) {
-        listNode *list_node = listFirst(commands);
-        listDelNode(commands, list_node);
-        if (command->frag_seq) {
-            vk_free(command->frag_seq);
-            command->frag_seq = NULL;
-        }
-
-        command->slot_num = slot_num;
-    }
-    return slot_num;
-
-oom:
-    __valkeyClusterSetError(cc, VALKEY_ERR_OOM, "Out of memory");
-    if (sub_commands != NULL) {
-        for (i = 0; i < VALKEYCLUSTER_SLOTS; i++) {
-            command_destroy(sub_commands[i]);
-        }
-    }
-    vk_free(sub_commands);
-    return -1; // failing slot_num
-}
-
-static void *command_post_fragment(valkeyClusterContext *cc,
-                                   struct cmd *command, hilist *commands) {
-    struct cmd *sub_command;
-    listNode *list_node;
-    valkeyReply *reply = NULL, *sub_reply;
-    long long count = 0;
-
-    listIter li;
-    listRewind(commands, &li);
-
-    while ((list_node = listNext(&li)) != NULL) {
-        sub_command = list_node->value;
-        reply = sub_command->reply;
-        if (reply == NULL) {
-            return NULL;
-        } else if (reply->type == VALKEY_REPLY_ERROR) {
-            return reply;
-        }
-
-        if (command->type == CMD_REQ_VALKEY_MGET) {
-            if (reply->type != VALKEY_REPLY_ARRAY) {
-                __valkeyClusterSetError(cc, VALKEY_ERR_OTHER,
-                                        "reply type error");
-                return NULL;
-            }
-        } else if (command->type == CMD_REQ_VALKEY_DEL) {
-            if (reply->type != VALKEY_REPLY_INTEGER) {
-                __valkeyClusterSetError(cc, VALKEY_ERR_OTHER,
-                                        "reply type error");
-                return NULL;
-            }
-            count += reply->integer;
-        } else if (command->type == CMD_REQ_VALKEY_EXISTS) {
-            if (reply->type != VALKEY_REPLY_INTEGER) {
-                __valkeyClusterSetError(cc, VALKEY_ERR_OTHER,
-                                        "reply type error");
-                return NULL;
-            }
-            count += reply->integer;
-        } else if (command->type == CMD_REQ_VALKEY_MSET) {
-            if (reply->type != VALKEY_REPLY_STATUS || reply->len != 2 ||
-                strcmp(reply->str, VALKEY_STATUS_OK) != 0) {
-                __valkeyClusterSetError(cc, VALKEY_ERR_OTHER,
-                                        "reply type error");
-                return NULL;
-            }
-        } else {
-            NOT_REACHED();
-        }
-    }
-
-    reply = vk_calloc(1, sizeof(*reply));
-    if (reply == NULL) {
-        goto oom;
-    }
-
-    if (command->type == CMD_REQ_VALKEY_MGET) {
-        int i;
-        uint32_t key_count;
-
-        reply->type = VALKEY_REPLY_ARRAY;
-
-        key_count = vkarray_n(command->keys);
-
-        reply->elements = key_count;
-        reply->element = vk_calloc(key_count, sizeof(*reply->element));
-        if (reply->element == NULL) {
-            goto oom;
-        }
-
-        for (i = key_count - 1; i >= 0; i--) {       /* for each key */
-            sub_reply = command->frag_seq[i]->reply; /* get it's reply */
-            if (sub_reply == NULL) {
-                freeReplyObject(reply);
-                __valkeyClusterSetError(cc, VALKEY_ERR_OTHER,
-                                        "sub reply is null");
-                return NULL;
-            }
-
-            if (sub_reply->type == VALKEY_REPLY_STRING) {
-                reply->element[i] = sub_reply;
-            } else if (sub_reply->type == VALKEY_REPLY_ARRAY) {
-                if (sub_reply->elements == 0) {
-                    freeReplyObject(reply);
-                    __valkeyClusterSetError(cc, VALKEY_ERR_OTHER,
-                                            "sub reply elements error");
-                    return NULL;
-                }
-
-                reply->element[i] = sub_reply->element[sub_reply->elements - 1];
-                sub_reply->elements--;
-            }
-        }
-    } else if (command->type == CMD_REQ_VALKEY_DEL) {
-        reply->type = VALKEY_REPLY_INTEGER;
-        reply->integer = count;
-    } else if (command->type == CMD_REQ_VALKEY_EXISTS) {
-        reply->type = VALKEY_REPLY_INTEGER;
-        reply->integer = count;
-    } else if (command->type == CMD_REQ_VALKEY_MSET) {
-        reply->type = VALKEY_REPLY_STATUS;
-        uint32_t str_len = strlen(VALKEY_STATUS_OK);
-        reply->str = vk_malloc((str_len + 1) * sizeof(char));
-        if (reply->str == NULL) {
-            goto oom;
-        }
-
-        reply->len = str_len;
-        memcpy(reply->str, VALKEY_STATUS_OK, str_len);
-        reply->str[str_len] = '\0';
-    } else {
-        NOT_REACHED();
-    }
-
-    return reply;
-
-oom:
-    freeReplyObject(reply);
-    __valkeyClusterSetError(cc, VALKEY_ERR_OOM, "Out of memory");
-    return NULL;
-}
-
-/*
- * Split the command into subcommands by slot
- *
- * Returns slot_num
- * If slot_num < 0 or slot_num >=  VALKEYCLUSTER_SLOTS means this function runs
- * error; Otherwise if  the commands > 1 , slot_num is the last subcommand slot
- * number.
- */
-static int command_format_by_slot(valkeyClusterContext *cc, struct cmd *command,
-                                  hilist *commands) {
-    struct keypos *kp;
-    int key_count;
-    int slot_num = -1;
-
-    if (cc == NULL || commands == NULL || command == NULL ||
-        command->cmd == NULL || command->clen <= 0) {
-        goto done;
+/* Prepare command by parsing the string to find the key and to get the slot. */
+static int prepareCommand(valkeyClusterContext *cc, struct cmd *command) {
+    if (command->cmd == NULL || command->clen <= 0) {
+        return VALKEY_ERR;
     }
 
     valkey_parse_cmd(command);
     if (command->result == CMD_PARSE_ENOMEM) {
         __valkeyClusterSetError(cc, VALKEY_ERR_OOM, "Out of memory");
-        goto done;
-    } else if (command->result != CMD_PARSE_OK) {
-        __valkeyClusterSetError(cc, VALKEY_ERR_PROTOCOL, command->errstr);
-        goto done;
+        return VALKEY_ERR;
     }
-
-    key_count = vkarray_n(command->keys);
-
-    if (key_count <= 0) {
+    if (command->result != CMD_PARSE_OK) {
+        __valkeyClusterSetError(cc, VALKEY_ERR_PROTOCOL, command->errstr);
+        return VALKEY_ERR;
+    }
+    if (vkarray_n(command->keys) <= 0) {
         __valkeyClusterSetError(
             cc, VALKEY_ERR_OTHER,
             "No keys in command(must have keys for valkey cluster mode)");
-        goto done;
-    } else if (key_count == 1) {
-        kp = vkarray_get(command->keys, 0);
-        slot_num = keyHashSlot(kp->start, kp->end - kp->start);
-        command->slot_num = slot_num;
-
-        goto done;
+        return VALKEY_ERR;
     }
 
-    slot_num = command_pre_fragment(cc, command, commands);
-
-done:
-
-    return slot_num;
+    struct keypos *kp = vkarray_get(command->keys, 0);
+    command->slot_num = keyHashSlot(kp->start, kp->end - kp->start);
+    return VALKEY_OK;
 }
 
 /* Deprecated function, replaced with valkeyClusterSetOptionMaxRetry() */
@@ -2792,10 +2349,7 @@ int valkeyClusterSetEventCallback(valkeyClusterContext *cc,
 void *valkeyClusterFormattedCommand(valkeyClusterContext *cc, char *cmd,
                                     int len) {
     valkeyReply *reply = NULL;
-    int slot_num;
-    struct cmd *command = NULL, *sub_command;
-    hilist *commands = NULL;
-    listNode *list_node;
+    struct cmd *command = NULL;
 
     if (cc == NULL) {
         return NULL;
@@ -2810,62 +2364,16 @@ void *valkeyClusterFormattedCommand(valkeyClusterContext *cc, char *cmd,
     if (command == NULL) {
         goto oom;
     }
-
     command->cmd = cmd;
     command->clen = len;
 
-    commands = listCreate();
-    if (commands == NULL) {
-        goto oom;
-    }
-
-    commands->free = listCommandFree;
-
-    slot_num = command_format_by_slot(cc, command, commands);
-
-    if (slot_num < 0) {
-        goto error;
-    } else if (slot_num >= VALKEYCLUSTER_SLOTS) {
-        __valkeyClusterSetError(cc, VALKEY_ERR_OTHER,
-                                "slot_num is out of range");
+    if (prepareCommand(cc, command) != VALKEY_OK) {
         goto error;
     }
 
-    // all keys belong to one slot
-    if (listLength(commands) == 0) {
-        reply = valkey_cluster_command_execute(cc, command);
-        goto done;
-    }
-
-    ASSERT(listLength(commands) != 1);
-
-    listIter li;
-    listRewind(commands, &li);
-
-    while ((list_node = listNext(&li)) != NULL) {
-        sub_command = list_node->value;
-
-        reply = valkey_cluster_command_execute(cc, sub_command);
-        if (reply == NULL) {
-            goto error;
-        } else if (reply->type == VALKEY_REPLY_ERROR) {
-            goto done;
-        }
-
-        sub_command->reply = reply;
-    }
-
-    reply = command_post_fragment(cc, command, commands);
-
-done:
-
+    reply = valkey_cluster_command_execute(cc, command);
     command->cmd = NULL;
     command_destroy(command);
-
-    if (commands != NULL) {
-        listRelease(commands);
-    }
-
     cc->retry_count = 0;
     return reply;
 
@@ -2877,9 +2385,6 @@ error:
     if (command != NULL) {
         command->cmd = NULL;
         command_destroy(command);
-    }
-    if (commands != NULL) {
-        listRelease(commands);
     }
     cc->retry_count = 0;
     return NULL;
@@ -3001,10 +2506,7 @@ void *valkeyClusterCommandArgv(valkeyClusterContext *cc, int argc,
 
 int valkeyClusterAppendFormattedCommand(valkeyClusterContext *cc, char *cmd,
                                         int len) {
-    int slot_num;
-    struct cmd *command = NULL, *sub_command;
-    hilist *commands = NULL;
-    listNode *list_node;
+    struct cmd *command = NULL;
 
     if (cc->requests == NULL) {
         cc->requests = listCreate();
@@ -3018,55 +2520,17 @@ int valkeyClusterAppendFormattedCommand(valkeyClusterContext *cc, char *cmd,
     if (command == NULL) {
         goto oom;
     }
-
     command->cmd = cmd;
     command->clen = len;
 
-    commands = listCreate();
-    if (commands == NULL) {
-        goto oom;
-    }
-
-    commands->free = listCommandFree;
-
-    slot_num = command_format_by_slot(cc, command, commands);
-
-    if (slot_num < 0) {
-        goto error;
-    } else if (slot_num >= VALKEYCLUSTER_SLOTS) {
-        __valkeyClusterSetError(cc, VALKEY_ERR_OTHER,
-                                "slot_num is out of range");
+    if (prepareCommand(cc, command) != VALKEY_OK) {
         goto error;
     }
 
-    // Append command(s)
-    if (listLength(commands) == 0) {
-        // All keys belong to one slot
-        if (__valkeyClusterAppendCommand(cc, command) != VALKEY_OK) {
-            goto error;
-        }
-    } else {
-        // Keys belongs to different slots
-        ASSERT(listLength(commands) != 1);
-
-        listIter li;
-        listRewind(commands, &li);
-
-        while ((list_node = listNext(&li)) != NULL) {
-            sub_command = list_node->value;
-
-            if (__valkeyClusterAppendCommand(cc, sub_command) != VALKEY_OK) {
-                goto error;
-            }
-        }
+    if (__valkeyClusterAppendCommand(cc, command) != VALKEY_OK) {
+        goto error;
     }
 
-    if (listLength(commands) > 0) {
-        command->sub_commands = commands;
-    } else {
-        listRelease(commands);
-    }
-    commands = NULL;
     command->cmd = NULL;
 
     if (listAddNodeTail(cc->requests, command) == NULL) {
@@ -3083,13 +2547,6 @@ error:
         command->cmd = NULL;
         command_destroy(command);
     }
-    if (commands != NULL) {
-        listRelease(commands);
-    }
-
-    /* Attention: mybe here we must pop the
-      sub_commands that had append to the nodes.
-      But now we do not handle it. */
     return VALKEY_ERR;
 }
 
@@ -3295,12 +2752,9 @@ static int valkeyClusterClearAll(valkeyClusterContext *cc) {
 }
 
 int valkeyClusterGetReply(valkeyClusterContext *cc, void **reply) {
-
-    struct cmd *command, *sub_command;
-    hilist *commands = NULL;
-    listNode *list_command, *list_sub_command;
+    struct cmd *command;
+    listNode *list_command;
     int slot_num;
-    void *sub_reply;
 
     if (cc == NULL || reply == NULL)
         return VALKEY_ERR;
@@ -3328,14 +2782,14 @@ int valkeyClusterGetReply(valkeyClusterContext *cc, void **reply) {
         goto error;
     }
 
+    /* Get reply when the command was sent via slot */
     slot_num = command->slot_num;
     if (slot_num >= 0) {
-        /* Command was sent via single slot */
         listDelNode(cc->requests, list_command);
         return __valkeyClusterGetReply(cc, slot_num, reply);
-
-    } else if (command->node_addr) {
-        /* Command was sent to a single node */
+    }
+    /* Get reply when the command was sent to a given node */
+    if (command->node_addr != NULL) {
         dictEntry *de;
 
         de = dictFind(cc->nodes, command->node_addr);
@@ -3349,48 +2803,6 @@ int valkeyClusterGetReply(valkeyClusterContext *cc, void **reply) {
             goto error;
         }
     }
-
-    commands = command->sub_commands;
-    if (commands == NULL) {
-        __valkeyClusterSetError(cc, VALKEY_ERR_OTHER,
-                                "sub_commands in command is null");
-        goto error;
-    }
-
-    ASSERT(listLength(commands) != 1);
-
-    listIter li;
-    listRewind(commands, &li);
-
-    while ((list_sub_command = listNext(&li)) != NULL) {
-        sub_command = list_sub_command->value;
-        if (sub_command == NULL) {
-            __valkeyClusterSetError(cc, VALKEY_ERR_OTHER,
-                                    "sub_command is null");
-            goto error;
-        }
-
-        slot_num = sub_command->slot_num;
-        if (slot_num < 0) {
-            __valkeyClusterSetError(cc, VALKEY_ERR_OTHER,
-                                    "sub_command slot_num is less then zero");
-            goto error;
-        }
-
-        if (__valkeyClusterGetReply(cc, slot_num, &sub_reply) != VALKEY_OK) {
-            goto error;
-        }
-
-        sub_command->reply = sub_reply;
-    }
-
-    *reply = command_post_fragment(cc, command, commands);
-    if (*reply == NULL) {
-        goto error;
-    }
-
-    listDelNode(cc->requests, list_command);
-    return VALKEY_OK;
 
 error:
 
@@ -3984,11 +3396,9 @@ int valkeyClusterAsyncFormattedCommand(valkeyClusterAsyncContext *acc,
 
     valkeyClusterContext *cc;
     int status = VALKEY_OK;
-    int slot_num;
     valkeyClusterNode *node;
     valkeyAsyncContext *ac;
     struct cmd *command = NULL;
-    hilist *commands = NULL;
     cluster_async_data *cad;
 
     if (acc == NULL) {
@@ -4019,35 +3429,12 @@ int valkeyClusterAsyncFormattedCommand(valkeyClusterAsyncContext *acc,
     memcpy(command->cmd, cmd, len);
     command->clen = len;
 
-    commands = listCreate();
-    if (commands == NULL) {
-        goto oom;
-    }
-
-    commands->free = listCommandFree;
-
-    slot_num = command_format_by_slot(cc, command, commands);
-
-    if (slot_num < 0) {
+    if (prepareCommand(cc, command) != VALKEY_OK) {
         __valkeyClusterAsyncSetError(acc, cc->err, cc->errstr);
         goto error;
-    } else if (slot_num >= VALKEYCLUSTER_SLOTS) {
-        __valkeyClusterAsyncSetError(acc, VALKEY_ERR_OTHER,
-                                     "slot_num is out of range");
-        goto error;
     }
 
-    // all keys not belong to one slot
-    if (listLength(commands) > 0) {
-        ASSERT(listLength(commands) != 1);
-
-        __valkeyClusterAsyncSetError(
-            acc, VALKEY_ERR_OTHER,
-            "Asynchronous API now not support multi-key command");
-        goto error;
-    }
-
-    node = node_get_by_table(cc, (uint32_t)slot_num);
+    node = node_get_by_table(cc, (uint32_t)command->slot_num);
     if (node == NULL) {
         /* Initiate a slotmap update since the slot is not served. */
         throttledUpdateSlotMapAsync(acc, NULL);
@@ -4078,11 +3465,6 @@ int valkeyClusterAsyncFormattedCommand(valkeyClusterAsyncContext *acc,
     if (status != VALKEY_OK) {
         goto error;
     }
-
-    if (commands != NULL) {
-        listRelease(commands);
-    }
-
     return VALKEY_OK;
 
 oom:
@@ -4091,9 +3473,6 @@ oom:
 
 error:
     command_destroy(command);
-    if (commands != NULL) {
-        listRelease(commands);
-    }
     return VALKEY_ERR;
 }
 

@@ -140,42 +140,6 @@ cmddef *valkey_lookup_cmd(const char *arg0, uint32_t arg0_len, const char *arg1,
     return NULL;
 }
 
-/*
- * Return true, if the valkey command is a vector command accepting one or
- * more keys, otherwise return false
- * Format: command key [ key ... ]
- */
-static int valkey_argx(struct cmd *r) {
-    switch (r->type) {
-    case CMD_REQ_VALKEY_EXISTS:
-    case CMD_REQ_VALKEY_MGET:
-    case CMD_REQ_VALKEY_DEL:
-        return 1;
-
-    default:
-        break;
-    }
-
-    return 0;
-}
-
-/*
- * Return true, if the valkey command is a vector command accepting one or
- * more key-value pairs, otherwise return false
- * Format: command key value [ key value ... ]
- */
-static int valkey_argkvx(struct cmd *r) {
-    switch (r->type) {
-    case CMD_REQ_VALKEY_MSET:
-        return 1;
-
-    default:
-        break;
-    }
-
-    return 0;
-}
-
 /* Parses a bulk string starting at 'p' and ending somewhere before 'end'.
  * Returns the remaining of the input after consuming the bulk string. The
  * pointers *str and *len are pointed to the parsed string and its length. On
@@ -357,22 +321,6 @@ void valkey_parse_cmd(struct cmd *r) {
     if (!push_keypos(r, arg, arglen))
         goto oom;
 
-    /* Special commands where we want all keys (not only the first key). */
-    if (valkey_argx(r) || valkey_argkvx(r)) {
-        /* argx:   MGET key [ key ... ] */
-        /* argkvx: MSET key value [ key value ... ] */
-        if (valkey_argkvx(r) && rnarg % 2 == 0)
-            goto error;
-        for (uint32_t i = 2; i < rnarg; i++) {
-            if ((p = valkey_parse_bulk(p, end, &arg, &arglen)) == NULL)
-                goto error;
-            if (valkey_argkvx(r) && i % 2 == 0)
-                continue; /* not a key */
-            if (!push_keypos(r, arg, arglen))
-                goto oom;
-        }
-    }
-
 done:
     ASSERT(r->type > CMD_UNKNOWN && r->type < CMD_SENTINEL);
     r->result = CMD_PARSE_OK;
@@ -428,7 +376,6 @@ struct cmd *command_get(void) {
     command->slot_num = -1;
     command->frag_seq = NULL;
     command->reply = NULL;
-    command->sub_commands = NULL;
     command->node_addr = NULL;
 
     command->keys = vkarray_create(1, sizeof(struct keypos));
@@ -467,10 +414,6 @@ void command_destroy(struct cmd *command) {
     }
 
     freeReplyObject(command->reply);
-
-    if (command->sub_commands != NULL) {
-        listRelease(command->sub_commands);
-    }
 
     if (command->node_addr != NULL) {
         sdsfree(command->node_addr);

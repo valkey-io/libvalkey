@@ -75,7 +75,7 @@ void test_valkey_parse_cmd_mset(void) {
     c->clen = len;
     valkey_parse_cmd(c);
     ASSERT_MSG(c->result == CMD_PARSE_OK, "Parse not OK");
-    ASSERT_KEYS(c, "foo", "bar");
+    ASSERT_KEYS(c, "foo");
     command_destroy(c);
 }
 

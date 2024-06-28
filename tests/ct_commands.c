@@ -9,24 +9,23 @@
 
 void test_exists(valkeyClusterContext *cc) {
     valkeyReply *reply;
-    reply = (valkeyReply *)valkeyClusterCommand(cc, "SET key1 Hello");
+    reply = valkeyClusterCommand(cc, "SET {key}1 Hello");
     CHECK_REPLY_OK(cc, reply);
     freeReplyObject(reply);
 
-    reply = (valkeyReply *)valkeyClusterCommand(cc, "EXISTS key1");
+    reply = valkeyClusterCommand(cc, "EXISTS {key}1");
     CHECK_REPLY_INT(cc, reply, 1);
     freeReplyObject(reply);
 
-    reply = (valkeyReply *)valkeyClusterCommand(cc, "EXISTS nosuchkey");
+    reply = valkeyClusterCommand(cc, "EXISTS nosuch{key}");
     CHECK_REPLY_INT(cc, reply, 0);
     freeReplyObject(reply);
 
-    reply = (valkeyReply *)valkeyClusterCommand(cc, "SET key2 World");
+    reply = valkeyClusterCommand(cc, "SET {key}2 World");
     CHECK_REPLY_OK(cc, reply);
     freeReplyObject(reply);
 
-    reply =
-        (valkeyReply *)valkeyClusterCommand(cc, "EXISTS key1 key2 nosuchkey");
+    reply = valkeyClusterCommand(cc, "EXISTS {key}1 {key}2 nosuch{key}");
     CHECK_REPLY_INT(cc, reply, 2);
     freeReplyObject(reply);
 }
@@ -60,39 +59,39 @@ void test_bitfield_ro(valkeyClusterContext *cc) {
 
 void test_mset(valkeyClusterContext *cc) {
     valkeyReply *reply;
-    reply = (valkeyReply *)valkeyClusterCommand(
-        cc, "MSET key1 mset1 key2 mset2 key3 mset3");
+    reply =
+        valkeyClusterCommand(cc, "MSET {key}1 mset1 {key}2 mset2 {key}3 mset3");
     CHECK_REPLY_OK(cc, reply);
     freeReplyObject(reply);
 
-    reply = (valkeyReply *)valkeyClusterCommand(cc, "GET key1");
+    reply = valkeyClusterCommand(cc, "GET {key}1");
     CHECK_REPLY_STR(cc, reply, "mset1");
     freeReplyObject(reply);
 
-    reply = (valkeyReply *)valkeyClusterCommand(cc, "GET key2");
+    reply = valkeyClusterCommand(cc, "GET {key}2");
     CHECK_REPLY_STR(cc, reply, "mset2");
     freeReplyObject(reply);
 
-    reply = (valkeyReply *)valkeyClusterCommand(cc, "GET key3");
+    reply = valkeyClusterCommand(cc, "GET {key}3");
     CHECK_REPLY_STR(cc, reply, "mset3");
     freeReplyObject(reply);
 }
 
 void test_mget(valkeyClusterContext *cc) {
     valkeyReply *reply;
-    reply = (valkeyReply *)valkeyClusterCommand(cc, "SET key1 mget1");
+    reply = valkeyClusterCommand(cc, "SET {key}1 mget1");
     CHECK_REPLY_OK(cc, reply);
     freeReplyObject(reply);
 
-    reply = (valkeyReply *)valkeyClusterCommand(cc, "SET key2 mget2");
+    reply = valkeyClusterCommand(cc, "SET {key}2 mget2");
     CHECK_REPLY_OK(cc, reply);
     freeReplyObject(reply);
 
-    reply = (valkeyReply *)valkeyClusterCommand(cc, "SET key3 mget3");
+    reply = valkeyClusterCommand(cc, "SET {key}3 mget3");
     CHECK_REPLY_OK(cc, reply);
     freeReplyObject(reply);
 
-    reply = (valkeyReply *)valkeyClusterCommand(cc, "MGET key1 key2 key3");
+    reply = valkeyClusterCommand(cc, "MGET {key}1 {key}2 {key}3");
     CHECK_REPLY_ARRAY(cc, reply, 3);
     CHECK_REPLY_STR(cc, reply->element[0], "mget1");
     CHECK_REPLY_STR(cc, reply->element[1], "mget2");
