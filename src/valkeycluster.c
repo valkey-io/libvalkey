@@ -661,9 +661,6 @@ static int cluster_master_slave_mapping_with_name(valkeyClusterContext *cc,
             if (listAddNodeTail(node_old->slaves, node) == NULL) {
                 goto oom;
             }
-
-        } else {
-            NOT_REACHED();
         }
     }
 

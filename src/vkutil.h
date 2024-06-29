@@ -64,8 +64,6 @@ int vk_valid_port(int n);
         }                                                                      \
     } while (0)
 
-#define NOT_REACHED() ASSERT(0)
-
 #elif VK_ASSERT_LOG
 
 #define ASSERT(_x)                                                             \
@@ -75,13 +73,9 @@ int vk_valid_port(int n);
         }                                                                      \
     } while (0)
 
-#define NOT_REACHED() ASSERT(0)
-
 #else
 
 #define ASSERT(_x)
-
-#define NOT_REACHED()
 
 #endif
 
