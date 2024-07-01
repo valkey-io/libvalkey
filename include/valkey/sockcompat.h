@@ -28,8 +28,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef __SOCKCOMPAT_H
-#define __SOCKCOMPAT_H
+#ifndef VALKEY_SOCKCOMPAT_H
+#define VALKEY_SOCKCOMPAT_H
 
 #ifndef _WIN32
 /* For POSIX systems we use the standard BSD socket API. */
@@ -92,4 +92,4 @@ int win32_valkeyKeepAlive(SOCKET sockfd, int interval_ms);
 #endif /* VALKEY_SOCKCOMPAT_IMPLEMENTATION */
 #endif /* _WIN32 */
 
-#endif /* __SOCKCOMPAT_H */
+#endif /* VALKEY_SOCKCOMPAT_H */
