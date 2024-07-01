@@ -43,7 +43,6 @@
 #include "command.h"
 #include "dict.h"
 #include "valkeycluster.h"
-#include "vkarray.h"
 #include "vkutil.h"
 #include "win32.h"
 
@@ -2302,15 +2301,13 @@ static int prepareCommand(valkeyClusterContext *cc, struct cmd *command) {
         __valkeyClusterSetError(cc, VALKEY_ERR_PROTOCOL, command->errstr);
         return VALKEY_ERR;
     }
-    if (vkarray_n(command->keys) <= 0) {
+    if (command->key.len == 0) {
         __valkeyClusterSetError(
             cc, VALKEY_ERR_OTHER,
             "No keys in command(must have keys for valkey cluster mode)");
         return VALKEY_ERR;
     }
-
-    struct keypos *kp = vkarray_get(command->keys, 0);
-    command->slot_num = keyHashSlot(kp->start, kp->end - kp->start);
+    command->slot_num = keyHashSlot(command->key.start, command->key.len);
     return VALKEY_OK;
 }
 
