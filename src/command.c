@@ -311,7 +311,6 @@ void valkey_parse_cmd(struct cmd *r) {
     r->key.len = arglen;
 
 done:
-    assert(r->type > CMD_UNKNOWN && r->type < CMD_SENTINEL);
     r->result = CMD_PARSE_OK;
     return;
 
