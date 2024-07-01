@@ -36,10 +36,6 @@
 #include <stdint.h>
 #include <sys/types.h>
 
-#define VK_OK 0
-
-typedef int rstatus_t; /* return type */
-
 /*
  * Wrapper to workaround well known, safe, implicit type conversion when
  * invoking system calls.

@@ -3,47 +3,34 @@
 #include "command.h"
 #include "test_utils.h"
 #include "valkeycluster.h"
-#include "vkarray.h"
 #include "win32.h"
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-/* Helper for the macro ASSERT_KEYS below. */
-void check_keys(char **keys, int numkeys, struct cmd *command, char *file,
-                int line) {
+/* Helper for the macro ASSERT_KEY below. */
+void check_key(char *key, struct cmd *command, char *file, int line) {
     if (command->result != CMD_PARSE_OK) {
         fprintf(stderr, "%s:%d: Command parsing failed: %s\n", file, line,
                 command->errstr);
         assert(0);
     }
-    int actual_numkeys = (int)vkarray_n(command->keys);
-    if (actual_numkeys != numkeys) {
-        fprintf(stderr, "%s:%d: Expected %d keys but got %d\n", file, line,
-                numkeys, actual_numkeys);
-        assert(actual_numkeys == numkeys);
-    }
-    for (int i = 0; i < numkeys; i++) {
-        struct keypos *kpos = vkarray_get(command->keys, i);
-        char *actual_key = kpos->start;
-        int actual_keylen = (int)(kpos->end - kpos->start);
-        if ((int)strlen(keys[i]) != actual_keylen ||
-            strncmp(keys[i], actual_key, actual_keylen)) {
-            fprintf(stderr,
-                    "%s:%d: Expected key %d to be \"%s\" but got \"%.*s\"\n",
-                    file, line, i, keys[i], actual_keylen, actual_key);
-            assert(0);
-        }
+    char *actual_key = command->key.start;
+    int actual_keylen = command->key.len;
+    if ((int)strlen(key) != actual_keylen ||
+        strncmp(key, actual_key, actual_keylen)) {
+        fprintf(stderr,
+                "%s:%d: Expected key to be \"%s\" but got \"%.*s\"\n",
+                file, line, key, actual_keylen, actual_key);
+        assert(0);
     }
 }
 
-/* Checks that a command (struct cmd *) has the given keys (strings). */
-#define ASSERT_KEYS(command, ...)                                              \
-    do {                                                                       \
-        char *expected_keys[] = {__VA_ARGS__};                                 \
-        size_t n = sizeof(expected_keys) / sizeof(char *);                     \
-        check_keys(expected_keys, n, command, __FILE__, __LINE__);             \
+/* Checks that a command (struct cmd *) has the given key (string). */
+#define ASSERT_KEY(command, key)                                        \
+    do {                                                                \
+        check_key(key, command, __FILE__, __LINE__);                    \
     } while (0)
 
 void test_valkey_parse_error_nonresp(void) {
@@ -64,7 +51,7 @@ void test_valkey_parse_cmd_get(void) {
     c->clen = len;
     valkey_parse_cmd(c);
     ASSERT_MSG(c->result == CMD_PARSE_OK, "Parse not OK");
-    ASSERT_KEYS(c, "foo");
+    ASSERT_KEY(c, "foo");
     command_destroy(c);
 }
 
@@ -75,7 +62,7 @@ void test_valkey_parse_cmd_mset(void) {
     c->clen = len;
     valkey_parse_cmd(c);
     ASSERT_MSG(c->result == CMD_PARSE_OK, "Parse not OK");
-    ASSERT_KEYS(c, "foo");
+    ASSERT_KEY(c, "foo");
     command_destroy(c);
 }
 
@@ -86,7 +73,7 @@ void test_valkey_parse_cmd_eval_1(void) {
     c->clen = len;
     valkey_parse_cmd(c);
     ASSERT_MSG(c->result == CMD_PARSE_OK, "Parse not OK");
-    ASSERT_KEYS(c, "foo");
+    ASSERT_KEY(c, "foo");
     command_destroy(c);
 }
 
@@ -97,7 +84,7 @@ void test_valkey_parse_cmd_eval_0(void) {
     c->clen = len;
     valkey_parse_cmd(c);
     ASSERT_MSG(c->result == CMD_PARSE_OK, "Parse not OK");
-    ASSERT_MSG(vkarray_n(c->keys) == 0, "Nonzero number of keys");
+    ASSERT_MSG(c->key.len == 0, "Unexpected key found");
     command_destroy(c);
 }
 
@@ -132,7 +119,7 @@ void test_valkey_parse_cmd_xgroup_destroy_ok(void) {
     ASSERT_MSG(len >= 0, "Format command error");
     c->clen = len;
     valkey_parse_cmd(c);
-    ASSERT_KEYS(c, "mystream");
+    ASSERT_KEY(c, "mystream");
     command_destroy(c);
 }
 
@@ -145,7 +132,7 @@ void test_valkey_parse_cmd_xreadgroup_ok(void) {
     ASSERT_MSG(len >= 0, "Format command error");
     c->clen = len;
     valkey_parse_cmd(c);
-    ASSERT_KEYS(c, "mystream");
+    ASSERT_KEY(c, "mystream");
     command_destroy(c);
 }
 
@@ -156,7 +143,7 @@ void test_valkey_parse_cmd_xread_ok(void) {
     ASSERT_MSG(len >= 0, "Format command error");
     c->clen = len;
     valkey_parse_cmd(c);
-    ASSERT_KEYS(c, "mystream");
+    ASSERT_KEY(c, "mystream");
     command_destroy(c);
 }
 
@@ -168,7 +155,7 @@ void test_valkey_parse_cmd_restore_ok(void) {
     ASSERT_MSG(len >= 0, "Format command error");
     c->clen = len;
     valkey_parse_cmd(c);
-    ASSERT_KEYS(c, "k");
+    ASSERT_KEY(c, "k");
     command_destroy(c);
 }
 
@@ -180,7 +167,7 @@ void test_valkey_parse_cmd_restore_asking_ok(void) {
     ASSERT_MSG(len >= 0, "Format command error");
     c->clen = len;
     valkey_parse_cmd(c);
-    ASSERT_KEYS(c, "k");
+    ASSERT_KEY(c, "k");
     command_destroy(c);
 }
 
@@ -192,7 +179,7 @@ void test_valkey_parse_cmd_georadius_ro_ok(void) {
     ASSERT_MSG(len >= 0, "Format command error");
     c->clen = len;
     valkey_parse_cmd(c);
-    ASSERT_KEYS(c, "k");
+    ASSERT_KEY(c, "k");
     command_destroy(c);
 }
 

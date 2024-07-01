@@ -41,7 +41,6 @@ SET(valkey_sources
     src/sockcompat.c
     src/valkey.c
     src/valkeycluster.c
-    src/vkarray.c
     src/vkutil.c)
 
 IF(WIN32)
