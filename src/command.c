@@ -28,6 +28,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+#include <assert.h>
 #include <ctype.h>
 #include <errno.h>
 #ifndef _WIN32
@@ -181,7 +182,7 @@ char *valkey_parse_bulk(char *p, char *end, char **str, uint32_t *len) {
  *
  */
 void valkey_parse_cmd(struct cmd *r) {
-    ASSERT(r->cmd != NULL && r->clen > 0);
+    assert(r->cmd != NULL && r->clen > 0);
     char *p = r->cmd;
     char *end = r->cmd + r->clen;
     uint32_t rnarg = 0;                  /* Number of args including cmd name */
@@ -310,7 +311,6 @@ void valkey_parse_cmd(struct cmd *r) {
     r->key.len = arglen;
 
 done:
-    ASSERT(r->type > CMD_UNKNOWN && r->type < CMD_SENTINEL);
     r->result = CMD_PARSE_OK;
     return;
 

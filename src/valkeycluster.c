@@ -290,7 +290,7 @@ static cluster_slot *cluster_slot_create(valkeyClusterNode *node) {
     slot->node = node;
 
     if (node != NULL) {
-        ASSERT(node->role == VALKEY_ROLE_MASTER);
+        assert(node->role == VALKEY_ROLE_MASTER);
         if (node->slots == NULL) {
             node->slots = listCreate();
             if (node->slots == NULL) {
@@ -404,14 +404,14 @@ static valkeyClusterNode *node_get_with_slots(valkeyClusterContext *cc,
         goto error;
     }
 
-    if (port_elem->type != VALKEY_REPLY_INTEGER || port_elem->integer <= 0) {
+    if (port_elem->type != VALKEY_REPLY_INTEGER) {
         valkeyClusterSetError(cc, VALKEY_ERR_OTHER,
                               "Command(cluster slots) reply error: "
                               "node port is not integer.");
         goto error;
     }
 
-    if (!vk_valid_port((int)port_elem->integer)) {
+    if (port_elem->integer < 1 || port_elem->integer > UINT16_MAX) {
         valkeyClusterSetError(cc, VALKEY_ERR_OTHER,
                               "Command(cluster slots) reply error: "
                               "node port is not valid.");
@@ -659,9 +659,6 @@ static int cluster_master_slave_mapping_with_name(valkeyClusterContext *cc,
             if (listAddNodeTail(node_old->slaves, node) == NULL) {
                 goto oom;
             }
-
-        } else {
-            NOT_REACHED();
         }
     }
 
