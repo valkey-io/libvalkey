@@ -36,11 +36,8 @@
 #include <stdint.h>
 #include <sys/types.h>
 
-#define VK_OK 0
 #define VK_ERROR -1
 #define VK_EAGAIN -2
-
-typedef int rstatus_t; /* return type */
 
 #define VK_INET4_ADDRSTRLEN (sizeof("255.255.255.255") - 1)
 #define VK_INET6_ADDRSTRLEN                                                    \

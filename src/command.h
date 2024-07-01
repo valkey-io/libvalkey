@@ -34,9 +34,6 @@
 
 #include <stdint.h>
 
-#include "adlist.h"
-#include "valkey.h"
-
 typedef enum cmd_parse_result {
     CMD_PARSE_OK,     /* parsing ok */
     CMD_PARSE_ENOMEM, /* out of memory */
@@ -62,41 +59,24 @@ typedef enum cmd_type {
 } cmd_type_t;
 
 struct keypos {
-    char *start;         /* key start pos */
-    char *end;           /* key end pos */
-    uint32_t remain_len; /* remain length after keypos->end for more key-value
-                            pairs in command, like mset */
+    char *start;  /* key start pos */
+    uint32_t len; /* Length of key */
 };
 
 struct cmd {
-
-    uint64_t id; /* command id */
-
     cmd_parse_result_t result; /* command parsing result */
     char *errstr;              /* error info when the command parse failed */
-
-    cmd_type_t type; /* command type */
 
     char *cmd;
     uint32_t clen; /* command length */
 
-    struct vkarray *keys; /* array of keypos, for req */
-
-    uint32_t narg; /* # arguments (valkey) */
-
-    unsigned quit : 1;      /* quit request? */
-    unsigned noforward : 1; /* not need forward (example: ping) */
+    struct keypos key; /* First found key in command. */
 
     /* Command destination */
     int slot_num;    /* Command should be sent to slot.
                       * Set to -1 if command is sent to a given node,
                       * or if a slot can not be found or calculated. */
     char *node_addr; /* Command sent to this node address */
-
-    struct cmd *
-        *frag_seq; /* sequence of fragment command, map from keys to fragments*/
-
-    valkeyReply *reply;
 };
 
 void valkey_parse_cmd(struct cmd *r);

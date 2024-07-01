@@ -40,18 +40,17 @@
 #else
 #include <malloc.h>
 #endif
+#include <stdio.h>
 #include <string.h>
 
 #include "alloc.h"
 #include "command.h"
-#include "vkarray.h"
+#include "sds.h"
 #include "vkutil.h"
 #include "win32.h"
 
 #define LF (uint8_t)10
 #define CR (uint8_t)13
-
-static uint64_t cmd_id = 0; /* command id counter */
 
 typedef enum {
     KEYPOS_NONE,
@@ -93,9 +92,8 @@ static inline void to_upper(char *dst, const char *src, uint32_t len) {
 }
 
 /* Looks up a command or subcommand in the command table. Arg0 and arg1 are used
- * to lookup the command. The function returns CMD_UNKNOWN on failure. On
- * success, the command type is returned and *firstkey and *arity are
- * populated. */
+ * to lookup the command. The function returns the cmddef for a found command,
+ * or NULL on failure. */
 cmddef *valkey_lookup_cmd(const char *arg0, uint32_t arg0_len, const char *arg1,
                           uint32_t arg1_len) {
     int num_commands = sizeof(server_commands) / sizeof(cmddef);
@@ -167,15 +165,6 @@ char *valkey_parse_bulk(char *p, char *end, char **str, uint32_t *len) {
     return p;
 }
 
-static inline int push_keypos(struct cmd *r, char *arg, uint32_t arglen) {
-    struct keypos *kpos = vkarray_push(r->keys);
-    if (kpos == NULL)
-        return 0;
-    kpos->start = arg;
-    kpos->end = arg + arglen;
-    return 1;
-}
-
 /*
  * Reference: https://valkey.io/docs/topics/protocol/
  *
@@ -217,7 +206,6 @@ void valkey_parse_cmd(struct cmd *r) {
         goto error;
     if (rnarg == 0)
         goto error;
-    r->narg = rnarg;
 
     /* Parse the first two args. */
     if ((p = valkey_parse_bulk(p, end, &arg0, &arg0_len)) == NULL)
@@ -232,7 +220,6 @@ void valkey_parse_cmd(struct cmd *r) {
     /* Lookup command. */
     if ((info = valkey_lookup_cmd(arg0, arg0_len, arg1, arg1_len)) == NULL)
         goto error; /* Command not found. */
-    r->type = info->type;
 
     /* Arity check (negative arity means minimum num args) */
     if ((info->arity >= 0 && (int)rnarg != info->arity) ||
@@ -251,10 +238,10 @@ void valkey_parse_cmd(struct cmd *r) {
         /* Keyword-based first key position */
         const char *keyword;
         int startfrom;
-        if (r->type == CMD_REQ_VALKEY_XREAD) {
+        if (info->type == CMD_REQ_VALKEY_XREAD) {
             keyword = "STREAMS";
             startfrom = 1;
-        } else if (r->type == CMD_REQ_VALKEY_XREADGROUP) {
+        } else if (info->type == CMD_REQ_VALKEY_XREADGROUP) {
             keyword = "STREAMS";
             startfrom = 4;
         } else {
@@ -274,8 +261,9 @@ void valkey_parse_cmd(struct cmd *r) {
                 /* Keyword found. Now the first key is the next arg. */
                 if ((p = valkey_parse_bulk(p, end, &arg, &arglen)) == NULL)
                     goto error;
-                if (!push_keypos(r, arg, arglen))
-                    goto oom;
+                /* Keep found key. */
+                r->key.start = arg;
+                r->key.len = arglen;
                 goto done;
             }
         }
@@ -317,9 +305,9 @@ void valkey_parse_cmd(struct cmd *r) {
          * from the end of the command line. This is not implemented. */
         goto error;
     }
-
-    if (!push_keypos(r, arg, arglen))
-        goto oom;
+    /* Keep found key. */
+    r->key.start = arg;
+    r->key.len = arglen;
 
 done:
     ASSERT(r->type > CMD_UNKNOWN && r->type < CMD_SENTINEL);
@@ -333,7 +321,8 @@ error:
     if (r->errstr == NULL) {
         r->errstr = vk_malloc(errmaxlen);
         if (r->errstr == NULL) {
-            goto oom;
+            r->result = CMD_PARSE_ENOMEM;
+            return;
         }
     }
 
@@ -343,17 +332,14 @@ error:
     else if (info != NULL)
         snprintf(r->errstr, errmaxlen, "Failed to find keys of command %s",
                  info->name);
-    else if (r->type == CMD_UNKNOWN && arg0 != NULL && arg1 != NULL)
+    else if (info == NULL && arg0 != NULL && arg1 != NULL)
         snprintf(r->errstr, errmaxlen, "Unknown command %.*s %.*s", arg0_len,
                  arg0, arg1_len, arg1);
-    else if (r->type == CMD_UNKNOWN && arg0 != NULL)
+    else if (info == NULL && arg0 != NULL)
         snprintf(r->errstr, errmaxlen, "Unknown command %.*s", arg0_len, arg0);
     else
         snprintf(r->errstr, errmaxlen, "Command parse error");
     return;
-
-oom:
-    r->result = CMD_PARSE_ENOMEM;
 }
 
 struct cmd *command_get(void) {
@@ -363,26 +349,14 @@ struct cmd *command_get(void) {
         return NULL;
     }
 
-    command->id = ++cmd_id;
     command->result = CMD_PARSE_OK;
     command->errstr = NULL;
-    command->type = CMD_UNKNOWN;
     command->cmd = NULL;
     command->clen = 0;
-    command->keys = NULL;
-    command->narg = 0;
-    command->quit = 0;
-    command->noforward = 0;
+    command->key.start = NULL;
+    command->key.len = 0;
     command->slot_num = -1;
-    command->frag_seq = NULL;
-    command->reply = NULL;
     command->node_addr = NULL;
-
-    command->keys = vkarray_create(1, sizeof(struct keypos));
-    if (command->keys == NULL) {
-        vk_free(command);
-        return NULL;
-    }
 
     return command;
 }
@@ -401,19 +375,6 @@ void command_destroy(struct cmd *command) {
         vk_free(command->errstr);
         command->errstr = NULL;
     }
-
-    if (command->keys != NULL) {
-        command->keys->nelem = 0;
-        vkarray_destroy(command->keys);
-        command->keys = NULL;
-    }
-
-    if (command->frag_seq != NULL) {
-        vk_free(command->frag_seq);
-        command->frag_seq = NULL;
-    }
-
-    freeReplyObject(command->reply);
 
     if (command->node_addr != NULL) {
         sdsfree(command->node_addr);
