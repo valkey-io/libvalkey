@@ -28,8 +28,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef __ADLIST_H__
-#define __ADLIST_H__
+#ifndef VALKEY_ADLIST_H
+#define VALKEY_ADLIST_H
 
 /* Node, List, and Iterator are the only data structures used currently. */
 
@@ -91,4 +91,4 @@ void listRotate(hilist *list);
 #define AL_START_HEAD 0
 #define AL_START_TAIL 1
 
-#endif /* __ADLIST_H__ */
+#endif /* VALKEY_ADLIST_H */
