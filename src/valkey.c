@@ -39,6 +39,7 @@
 #include <ctype.h>
 
 #include "valkey.h"
+#include "valkey_private.h"
 #include "net.h"
 #include "sds.h"
 #include "async.h"

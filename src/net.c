@@ -47,9 +47,7 @@
 #include "sds.h"
 #include "sockcompat.h"
 #include "win32.h"
-
-/* Defined in valkey.c */
-void valkeySetError(valkeyContext *c, int type, const char *str);
+#include "valkey_private.h"
 
 int valkeyContextUpdateCommandTimeout(valkeyContext *c, const struct timeval *timeout);
 

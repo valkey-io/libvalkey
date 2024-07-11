@@ -46,6 +46,7 @@
 #include "win32.h"
 
 #include "async_private.h"
+#include "valkey_private.h"
 
 #ifdef NDEBUG
 #undef assert
@@ -54,7 +55,6 @@
 
 /* Forward declarations of valkey.c functions */
 int valkeyAppendCmdLen(valkeyContext *c, const char *cmd, size_t len);
-void valkeySetError(valkeyContext *c, int type, const char *str);
 
 /* Functions managing dictionary of callbacks for pub/sub. */
 static unsigned int callbackHash(const void *key) {

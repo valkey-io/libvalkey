@@ -58,10 +58,9 @@
 #include "win32.h"
 #include "async_private.h"
 #include "valkey_ssl.h"
+#include "valkey_private.h"
 
 #define OPENSSL_1_1_0 0x10100000L
-
-void valkeySetError(valkeyContext *c, int type, const char *str);
 
 struct valkeySSLContext {
     /* Associated OpenSSL SSL_CTX as created by valkeyCreateSSLContext() */
