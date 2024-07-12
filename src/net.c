@@ -49,8 +49,6 @@
 #include "win32.h"
 #include "valkey_private.h"
 
-int valkeyContextUpdateCommandTimeout(valkeyContext *c, const struct timeval *timeout);
-
 void valkeyNetClose(valkeyContext *c) {
     if (c && c->fd != VALKEY_INVALID_FD) {
         close(c->fd);
@@ -372,38 +370,6 @@ int valkeyContextSetTimeout(valkeyContext *c, const struct timeval tv) {
         valkeySetErrorFromErrno(c,VALKEY_ERR_IO,"setsockopt(SO_SNDTIMEO)");
         return VALKEY_ERR;
     }
-    return VALKEY_OK;
-}
-
-int valkeyContextUpdateConnectTimeout(valkeyContext *c, const struct timeval *timeout) {
-    /* Same timeval struct, short circuit */
-    if (c->connect_timeout == timeout)
-        return VALKEY_OK;
-
-    /* Allocate context timeval if we need to */
-    if (c->connect_timeout == NULL) {
-        c->connect_timeout = vk_malloc(sizeof(*c->connect_timeout));
-        if (c->connect_timeout == NULL)
-            return VALKEY_ERR;
-    }
-
-    memcpy(c->connect_timeout, timeout, sizeof(*c->connect_timeout));
-    return VALKEY_OK;
-}
-
-int valkeyContextUpdateCommandTimeout(valkeyContext *c, const struct timeval *timeout) {
-    /* Same timeval struct, short circuit */
-    if (c->command_timeout == timeout)
-        return VALKEY_OK;
-
-    /* Allocate context timeval if we need to */
-    if (c->command_timeout == NULL) {
-        c->command_timeout = vk_malloc(sizeof(*c->command_timeout));
-        if (c->command_timeout == NULL)
-            return VALKEY_ERR;
-    }
-
-    memcpy(c->command_timeout, timeout, sizeof(*c->command_timeout));
     return VALKEY_OK;
 }
 

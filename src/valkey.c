@@ -45,9 +45,6 @@
 #include "async.h"
 #include "win32.h"
 
-extern int valkeyContextUpdateConnectTimeout(valkeyContext *c, const struct timeval *timeout);
-extern int valkeyContextUpdateCommandTimeout(valkeyContext *c, const struct timeval *timeout);
-
 static valkeyContextFuncs valkeyContextDefaultFuncs = {
     .close = valkeyNetClose,
     .free_privctx = NULL,
