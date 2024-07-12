@@ -94,7 +94,7 @@ typedef struct valkeySSL {
 } valkeySSL;
 
 /* Forward declaration */
-valkeyContextFuncs valkeyContextSSLFuncs;
+static valkeyContextFuncs valkeyContextSSLFuncs;
 
 /**
  * OpenSSL global initialization and locking handling callbacks.
@@ -608,7 +608,7 @@ static void valkeySSLAsyncWrite(valkeyAsyncContext *ac) {
     _EL_ADD_READ(ac);
 }
 
-valkeyContextFuncs valkeyContextSSLFuncs = {
+static valkeyContextFuncs valkeyContextSSLFuncs = {
     .close = valkeyNetClose,
     .free_privctx = valkeySSLFree,
     .async_read = valkeySSLAsyncRead,
