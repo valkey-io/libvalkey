@@ -248,32 +248,6 @@ int valkeyContextSetTcpUserTimeout(valkeyContext *c, unsigned int timeout) {
     return VALKEY_OK;
 }
 
-#define __MAX_MSEC (((LONG_MAX) - 999) / 1000)
-
-static int valkeyContextTimeoutMsec(valkeyContext *c, long *result)
-{
-    const struct timeval *timeout = c->connect_timeout;
-    long msec = -1;
-
-    /* Only use timeout when not NULL. */
-    if (timeout != NULL) {
-        if (timeout->tv_usec > 1000000 || timeout->tv_sec > __MAX_MSEC) {
-            valkeySetError(c, VALKEY_ERR_IO, "Invalid timeout specified");
-            *result = msec;
-            return VALKEY_ERR;
-        }
-
-        msec = (timeout->tv_sec * 1000) + ((timeout->tv_usec + 999) / 1000);
-
-        if (msec < 0 || msec > INT_MAX) {
-            msec = INT_MAX;
-        }
-    }
-
-    *result = msec;
-    return VALKEY_OK;
-}
-
 static long valkeyPollMillis(void) {
 #ifndef _MSC_VER
     struct timespec now;
@@ -472,7 +446,7 @@ static int _valkeyContextConnectTcp(valkeyContext *c, const char *addr, int port
         c->connect_timeout = NULL;
     }
 
-    if (valkeyContextTimeoutMsec(c, &timeout_msec) != VALKEY_OK) {
+    if (valkeyConnectTimeoutMsec(c, &timeout_msec) != VALKEY_OK) {
         goto error;
     }
 
@@ -652,7 +626,7 @@ int valkeyContextConnectUnix(valkeyContext *c, const char *path, const struct ti
         c->connect_timeout = NULL;
     }
 
-    if (valkeyContextTimeoutMsec(c,&timeout_msec) != VALKEY_OK)
+    if (valkeyConnectTimeoutMsec(c,&timeout_msec) != VALKEY_OK)
         return VALKEY_ERR;
 
     /* Don't leak sockaddr if we're reconnecting */

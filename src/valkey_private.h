@@ -32,7 +32,94 @@
 #define VALKEY_VK_PRIVATE_H
 
 #include "valkey.h"
+#include "win32.h"
+
+#include <limits.h>
+#include <string.h>
+
 
 void valkeySetError(valkeyContext *c, int type, const char *str);
+
+
+/* Helper function. Convert struct timeval to millisecond. */
+static inline int valkeyContextTimeoutMsec(const struct timeval *timeout, long *result) {
+    long max_msec = ((LONG_MAX) - 999) / 1000;
+    long msec = INT_MAX;
+
+    /* Only use timeout when not NULL. */
+    if (timeout != NULL) {
+        if (timeout->tv_usec > 1000000 || timeout->tv_sec > max_msec) {
+            *result = msec;
+            return VALKEY_ERR;
+        }
+
+        msec = (timeout->tv_sec * 1000) + ((timeout->tv_usec + 999) / 1000);
+
+        if (msec < 0 || msec > INT_MAX) {
+            msec = INT_MAX;
+        }
+    }
+
+    *result = msec;
+    return VALKEY_OK;
+}
+
+/* Get connect timeout of valkeyContext */
+static inline int valkeyConnectTimeoutMsec(valkeyContext *c, long *result) {
+    const struct timeval *timeout = c->connect_timeout;
+    int ret = valkeyContextTimeoutMsec(timeout, result);
+
+    if (ret != VALKEY_OK) {
+        valkeySetError(c, VALKEY_ERR_IO, "Invalid timeout specified");
+    }
+
+    return ret;
+}
+
+/* Get command timeout of valkeyContext */
+static inline int valkeyCommandTimeoutMsec(valkeyContext *c, long *result) {
+    const struct timeval *timeout = c->command_timeout;
+    int ret = valkeyContextTimeoutMsec(timeout, result);
+
+    if (ret != VALKEY_OK) {
+        valkeySetError(c, VALKEY_ERR_IO, "Invalid timeout specified");
+    }
+
+    return ret;
+}
+
+static inline int valkeyContextUpdateConnectTimeout(valkeyContext *c,
+                                                    const struct timeval *timeout) {
+    /* Same timeval struct, short circuit */
+    if (c->connect_timeout == timeout)
+        return VALKEY_OK;
+
+    /* Allocate context timeval if we need to */
+    if (c->connect_timeout == NULL) {
+        c->connect_timeout = vk_malloc(sizeof(*c->connect_timeout));
+        if (c->connect_timeout == NULL)
+            return VALKEY_ERR;
+    }
+
+    memcpy(c->connect_timeout, timeout, sizeof(*c->connect_timeout));
+    return VALKEY_OK;
+}
+
+static inline int valkeyContextUpdateCommandTimeout(valkeyContext *c,
+                                                    const struct timeval *timeout) {
+    /* Same timeval struct, short circuit */
+    if (c->command_timeout == timeout)
+        return VALKEY_OK;
+
+    /* Allocate context timeval if we need to */
+    if (c->command_timeout == NULL) {
+        c->command_timeout = vk_malloc(sizeof(*c->command_timeout));
+        if (c->command_timeout == NULL)
+            return VALKEY_ERR;
+    }
+
+    memcpy(c->command_timeout, timeout, sizeof(*c->command_timeout));
+    return VALKEY_OK;
+}
 
 #endif  /* VALKEY_VK_PRIVATE_H */
