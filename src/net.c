@@ -47,11 +47,7 @@
 #include "sds.h"
 #include "sockcompat.h"
 #include "win32.h"
-
-/* Defined in valkey.c */
-void valkeySetError(valkeyContext *c, int type, const char *str);
-
-int valkeyContextUpdateCommandTimeout(valkeyContext *c, const struct timeval *timeout);
+#include "valkey_private.h"
 
 void valkeyNetClose(valkeyContext *c) {
     if (c && c->fd != VALKEY_INVALID_FD) {
@@ -250,32 +246,6 @@ int valkeyContextSetTcpUserTimeout(valkeyContext *c, unsigned int timeout) {
     return VALKEY_OK;
 }
 
-#define __MAX_MSEC (((LONG_MAX) - 999) / 1000)
-
-static int valkeyContextTimeoutMsec(valkeyContext *c, long *result)
-{
-    const struct timeval *timeout = c->connect_timeout;
-    long msec = -1;
-
-    /* Only use timeout when not NULL. */
-    if (timeout != NULL) {
-        if (timeout->tv_usec > 1000000 || timeout->tv_sec > __MAX_MSEC) {
-            valkeySetError(c, VALKEY_ERR_IO, "Invalid timeout specified");
-            *result = msec;
-            return VALKEY_ERR;
-        }
-
-        msec = (timeout->tv_sec * 1000) + ((timeout->tv_usec + 999) / 1000);
-
-        if (msec < 0 || msec > INT_MAX) {
-            msec = INT_MAX;
-        }
-    }
-
-    *result = msec;
-    return VALKEY_OK;
-}
-
 static long valkeyPollMillis(void) {
 #ifndef _MSC_VER
     struct timespec now;
@@ -403,38 +373,6 @@ int valkeyContextSetTimeout(valkeyContext *c, const struct timeval tv) {
     return VALKEY_OK;
 }
 
-int valkeyContextUpdateConnectTimeout(valkeyContext *c, const struct timeval *timeout) {
-    /* Same timeval struct, short circuit */
-    if (c->connect_timeout == timeout)
-        return VALKEY_OK;
-
-    /* Allocate context timeval if we need to */
-    if (c->connect_timeout == NULL) {
-        c->connect_timeout = vk_malloc(sizeof(*c->connect_timeout));
-        if (c->connect_timeout == NULL)
-            return VALKEY_ERR;
-    }
-
-    memcpy(c->connect_timeout, timeout, sizeof(*c->connect_timeout));
-    return VALKEY_OK;
-}
-
-int valkeyContextUpdateCommandTimeout(valkeyContext *c, const struct timeval *timeout) {
-    /* Same timeval struct, short circuit */
-    if (c->command_timeout == timeout)
-        return VALKEY_OK;
-
-    /* Allocate context timeval if we need to */
-    if (c->command_timeout == NULL) {
-        c->command_timeout = vk_malloc(sizeof(*c->command_timeout));
-        if (c->command_timeout == NULL)
-            return VALKEY_ERR;
-    }
-
-    memcpy(c->command_timeout, timeout, sizeof(*c->command_timeout));
-    return VALKEY_OK;
-}
-
 static int _valkeyContextConnectTcp(valkeyContext *c, const char *addr, int port,
                                    const struct timeval *timeout,
                                    const char *source_addr) {
@@ -474,7 +412,7 @@ static int _valkeyContextConnectTcp(valkeyContext *c, const char *addr, int port
         c->connect_timeout = NULL;
     }
 
-    if (valkeyContextTimeoutMsec(c, &timeout_msec) != VALKEY_OK) {
+    if (valkeyConnectTimeoutMsec(c, &timeout_msec) != VALKEY_OK) {
         goto error;
     }
 
@@ -654,7 +592,7 @@ int valkeyContextConnectUnix(valkeyContext *c, const char *path, const struct ti
         c->connect_timeout = NULL;
     }
 
-    if (valkeyContextTimeoutMsec(c,&timeout_msec) != VALKEY_OK)
+    if (valkeyConnectTimeoutMsec(c,&timeout_msec) != VALKEY_OK)
         return VALKEY_ERR;
 
     /* Don't leak sockaddr if we're reconnecting */

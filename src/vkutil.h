@@ -46,6 +46,10 @@ int _vk_atoi(uint8_t *line, size_t n);
 
 int64_t vk_usec_now(void);
 
+static inline int64_t vk_msec_now(void) {
+    return vk_usec_now() / 1000;
+}
+
 uint16_t crc16(const char *buf, int len);
 
 #endif /* VALKEY_VKUTIL_H */

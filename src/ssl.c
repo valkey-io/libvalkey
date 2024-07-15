@@ -58,10 +58,9 @@
 #include "win32.h"
 #include "async_private.h"
 #include "valkey_ssl.h"
+#include "valkey_private.h"
 
 #define OPENSSL_1_1_0 0x10100000L
-
-void valkeySetError(valkeyContext *c, int type, const char *str);
 
 struct valkeySSLContext {
     /* Associated OpenSSL SSL_CTX as created by valkeyCreateSSLContext() */
@@ -95,7 +94,7 @@ typedef struct valkeySSL {
 } valkeySSL;
 
 /* Forward declaration */
-valkeyContextFuncs valkeyContextSSLFuncs;
+static valkeyContextFuncs valkeyContextSSLFuncs;
 
 /**
  * OpenSSL global initialization and locking handling callbacks.
@@ -609,7 +608,7 @@ static void valkeySSLAsyncWrite(valkeyAsyncContext *ac) {
     _EL_ADD_READ(ac);
 }
 
-valkeyContextFuncs valkeyContextSSLFuncs = {
+static valkeyContextFuncs valkeyContextSSLFuncs = {
     .close = valkeyNetClose,
     .free_privctx = valkeySSLFree,
     .async_read = valkeySSLAsyncRead,
