@@ -147,7 +147,9 @@ void valkeyFreeSdsCommand(sds cmd);
 enum valkeyConnectionType {
     VALKEY_CONN_TCP,
     VALKEY_CONN_UNIX,
-    VALKEY_CONN_USERFD
+    VALKEY_CONN_USERFD,
+
+    VALKEY_CONN_MAX
 };
 
 struct valkeySsl;
@@ -239,6 +241,7 @@ typedef struct {
     } while(0)
 
 typedef struct valkeyContextFuncs {
+    int (*connect)(struct valkeyContext *, const valkeyOptions *);
     void (*close)(struct valkeyContext *);
     void (*free_privctx)(void *);
     void (*async_read)(struct valkeyAsyncContext *);
@@ -250,6 +253,7 @@ typedef struct valkeyContextFuncs {
      * recoverable error, they should return 0. */
     ssize_t (*read)(struct valkeyContext *, char *, size_t);
     ssize_t (*write)(struct valkeyContext *);
+    int (*set_timeout)(struct valkeyContext *, const struct timeval);
 } valkeyContextFuncs;
 
 
