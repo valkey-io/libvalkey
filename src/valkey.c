@@ -42,17 +42,7 @@
 #include "valkey_private.h"
 #include "net.h"
 #include "sds.h"
-#include "async.h"
 #include "win32.h"
-
-static valkeyContextFuncs valkeyContextDefaultFuncs = {
-    .close = valkeyNetClose,
-    .free_privctx = NULL,
-    .async_read = valkeyAsyncRead,
-    .async_write = valkeyAsyncWrite,
-    .read = valkeyNetRead,
-    .write = valkeyNetWrite
-};
 
 static valkeyReply *createReplyObject(int type);
 static void *createStringObject(const valkeyReadTask *task, char *str, size_t len);
@@ -718,8 +708,6 @@ static valkeyContext *valkeyContextInit(void) {
     if (c == NULL)
         return NULL;
 
-    c->funcs = &valkeyContextDefaultFuncs;
-
     c->obuf = sdsempty();
     c->reader = valkeyReaderCreate();
     c->fd = VALKEY_INVALID_FD;
@@ -767,6 +755,8 @@ valkeyFD valkeyFreeKeepFd(valkeyContext *c) {
 }
 
 int valkeyReconnect(valkeyContext *c) {
+    valkeyOptions options = { .connect_timeout = c->connect_timeout };
+
     c->err = 0;
     memset(c->errstr, '\0', strlen(c->errstr));
 
@@ -790,28 +780,41 @@ int valkeyReconnect(valkeyContext *c) {
         return VALKEY_ERR;
     }
 
-    int ret = VALKEY_ERR;
-    if (c->connection_type == VALKEY_CONN_TCP) {
-        ret = valkeyContextConnectBindTcp(c, c->tcp.host, c->tcp.port,
-               c->connect_timeout, c->tcp.source_addr);
-    } else if (c->connection_type == VALKEY_CONN_UNIX) {
-        ret = valkeyContextConnectUnix(c, c->unix_sock.path, c->connect_timeout);
-    } else {
+    switch (c->connection_type) {
+    case VALKEY_CONN_TCP:
+        options.endpoint.tcp.ip = c->tcp.host;
+        options.endpoint.tcp.source_addr = c->tcp.source_addr;
+        options.endpoint.tcp.port = c->tcp.port;
+        break;
+    case VALKEY_CONN_UNIX:
+        options.endpoint.unix_socket = c->unix_sock.path;
+        break;
+    default:
         /* Something bad happened here and shouldn't have. There isn't
            enough information in the context to reconnect. */
         valkeySetError(c,VALKEY_ERR_OTHER,"Not enough information to reconnect");
-        ret = VALKEY_ERR;
+        return VALKEY_ERR;
+    }
+
+    if (c->funcs->connect(c, &options) != VALKEY_OK) {
+        return VALKEY_ERR;
     }
 
     if (c->command_timeout != NULL && (c->flags & VALKEY_BLOCK) && c->fd != VALKEY_INVALID_FD) {
-        valkeyContextSetTimeout(c, *c->command_timeout);
+        c->funcs->set_timeout(c, *c->command_timeout);
     }
 
-    return ret;
+    return VALKEY_OK;
 }
 
 valkeyContext *valkeyConnectWithOptions(const valkeyOptions *options) {
-    valkeyContext *c = valkeyContextInit();
+    valkeyContext *c;
+
+    if (options->type >= VALKEY_CONN_MAX) {
+        return NULL;
+    }
+
+    c = valkeyContextInit();
     if (c == NULL) {
         return NULL;
     }
@@ -850,25 +853,13 @@ valkeyContext *valkeyConnectWithOptions(const valkeyOptions *options) {
         return c;
     }
 
-    if (options->type == VALKEY_CONN_TCP) {
-        valkeyContextConnectBindTcp(c, options->endpoint.tcp.ip,
-                                   options->endpoint.tcp.port, options->connect_timeout,
-                                   options->endpoint.tcp.source_addr);
-    } else if (options->type == VALKEY_CONN_UNIX) {
-        valkeyContextConnectUnix(c, options->endpoint.unix_socket,
-                                options->connect_timeout);
-    } else if (options->type == VALKEY_CONN_USERFD) {
-        c->fd = options->endpoint.fd;
-        c->flags |= VALKEY_CONNECTED;
-    } else {
-        valkeyFree(c);
-        return NULL;
-    }
-
+    c->connection_type = options->type;
+    valkeyContextSetFuncs(c);
+    c->funcs->connect(c, options);
     if (c->err == 0 && c->fd != VALKEY_INVALID_FD &&
         options->command_timeout != NULL && (c->flags & VALKEY_BLOCK))
     {
-        valkeyContextSetTimeout(c, *options->command_timeout);
+        c->funcs->set_timeout(c, *options->command_timeout);
     }
 
     return c;
@@ -944,9 +935,15 @@ valkeyContext *valkeyConnectFd(valkeyFD fd) {
 
 /* Set read/write timeout on a blocking socket. */
 int valkeySetTimeout(valkeyContext *c, const struct timeval tv) {
-    if (c->flags & VALKEY_BLOCK)
-        return valkeyContextSetTimeout(c,tv);
-    return VALKEY_ERR;
+    if (!(c->flags & VALKEY_BLOCK))
+        return VALKEY_ERR;
+
+    if (valkeyContextUpdateCommandTimeout(c, &tv) != VALKEY_OK) {
+        valkeySetError(c, VALKEY_ERR_OOM, "Out of memory");
+        return VALKEY_ERR;
+    }
+
+    return c->funcs->set_timeout(c,tv);
 }
 
 int valkeyEnableKeepAliveWithInterval(valkeyContext *c, int interval) {

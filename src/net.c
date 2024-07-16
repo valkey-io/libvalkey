@@ -43,6 +43,7 @@
 #include <stdlib.h>
 #include <time.h>
 
+#include "async.h"
 #include "net.h"
 #include "sds.h"
 #include "sockcompat.h"
@@ -56,7 +57,7 @@ void valkeyNetClose(valkeyContext *c) {
     }
 }
 
-ssize_t valkeyNetRead(valkeyContext *c, char *buf, size_t bufcap) {
+static ssize_t valkeyNetRead(valkeyContext *c, char *buf, size_t bufcap) {
     ssize_t nread = recv(c->fd, buf, bufcap, 0);
     if (nread == -1) {
         if ((errno == EWOULDBLOCK && !(c->flags & VALKEY_BLOCK)) || (errno == EINTR)) {
@@ -78,7 +79,7 @@ ssize_t valkeyNetRead(valkeyContext *c, char *buf, size_t bufcap) {
     }
 }
 
-ssize_t valkeyNetWrite(valkeyContext *c) {
+static ssize_t valkeyNetWrite(valkeyContext *c) {
     ssize_t nwritten;
 
     nwritten = send(c->fd, c->obuf, sdslen(c->obuf), 0);
@@ -354,14 +355,10 @@ int valkeyCheckSocketError(valkeyContext *c) {
     return VALKEY_OK;
 }
 
-int valkeyContextSetTimeout(valkeyContext *c, const struct timeval tv) {
+int valkeyTcpSetTimeout(valkeyContext *c, const struct timeval tv) {
     const void *to_ptr = &tv;
     size_t to_sz = sizeof(tv);
 
-    if (valkeyContextUpdateCommandTimeout(c, &tv) != VALKEY_OK) {
-        valkeySetError(c, VALKEY_ERR_OOM, "Out of memory");
-        return VALKEY_ERR;
-    }
     if (setsockopt(c->fd,SOL_SOCKET,SO_RCVTIMEO,to_ptr,to_sz) == -1) {
         valkeySetErrorFromErrno(c,VALKEY_ERR_IO,"setsockopt(SO_RCVTIMEO)");
         return VALKEY_ERR;
@@ -373,9 +370,11 @@ int valkeyContextSetTimeout(valkeyContext *c, const struct timeval tv) {
     return VALKEY_OK;
 }
 
-static int _valkeyContextConnectTcp(valkeyContext *c, const char *addr, int port,
-                                   const struct timeval *timeout,
-                                   const char *source_addr) {
+int valkeyContextConnectTcp(valkeyContext *c, const valkeyOptions *options) {
+    const struct timeval *timeout = options->connect_timeout;
+    const char *addr = options->endpoint.tcp.ip;
+    const char *source_addr = options->endpoint.tcp.source_addr;
+    int port = options->endpoint.tcp.port;
     valkeyFD s;
     int rv, n;
     char _port[6];  /* strlen("65535"); */
@@ -553,19 +552,10 @@ end:
     return rv;  // Need to return VALKEY_OK if alright
 }
 
-int valkeyContextConnectTcp(valkeyContext *c, const char *addr, int port,
-                           const struct timeval *timeout) {
-    return _valkeyContextConnectTcp(c, addr, port, timeout, NULL);
-}
-
-int valkeyContextConnectBindTcp(valkeyContext *c, const char *addr, int port,
-                               const struct timeval *timeout,
-                               const char *source_addr) {
-    return _valkeyContextConnectTcp(c, addr, port, timeout, source_addr);
-}
-
-int valkeyContextConnectUnix(valkeyContext *c, const char *path, const struct timeval *timeout) {
+static int valkeyContextConnectUnix(valkeyContext *c, const valkeyOptions *options) {
 #ifndef _WIN32
+    const struct timeval *timeout = options->connect_timeout;
+    const char *path = options->endpoint.unix_socket;
     int blocking = (c->flags & VALKEY_BLOCK);
     struct sockaddr_un *sa;
     long timeout_msec = -1;
@@ -629,4 +619,56 @@ int valkeyContextConnectUnix(valkeyContext *c, const char *path, const struct ti
 oom:
     valkeySetError(c, VALKEY_ERR_OOM, "Out of memory");
     return VALKEY_ERR;
+}
+
+static valkeyContextFuncs valkeyContextTcpFuncs = {
+    .connect = valkeyContextConnectTcp,
+    .close = valkeyNetClose,
+    .free_privctx = NULL,
+    .async_read = valkeyAsyncRead,
+    .async_write = valkeyAsyncWrite,
+    .read = valkeyNetRead,
+    .write = valkeyNetWrite,
+    .set_timeout = valkeyTcpSetTimeout
+};
+
+void valkeyContextRegisterTcpFuncs(void) {
+    valkeyContextRegisterFuncs(&valkeyContextTcpFuncs, VALKEY_CONN_TCP);
+}
+
+static valkeyContextFuncs valkeyContextUnixFuncs = {
+    .connect = valkeyContextConnectUnix,
+    .close = valkeyNetClose,
+    .free_privctx = NULL,
+    .async_read = valkeyAsyncRead,
+    .async_write = valkeyAsyncWrite,
+    .read = valkeyNetRead,
+    .write = valkeyNetWrite,
+    .set_timeout = valkeyTcpSetTimeout
+};
+
+void valkeyContextRegisterUnixFuncs(void) {
+    valkeyContextRegisterFuncs(&valkeyContextUnixFuncs, VALKEY_CONN_UNIX);
+}
+
+static int valkeyContextConnectUserfd(valkeyContext *c, const valkeyOptions *options) {
+    c->fd = options->endpoint.fd;
+    c->flags |= VALKEY_CONNECTED;
+
+    return VALKEY_OK;
+}
+
+static valkeyContextFuncs valkeyContextUserfdFuncs = {
+    .connect = valkeyContextConnectUserfd,
+    .close = valkeyNetClose,
+    .free_privctx = NULL,
+    .async_read = valkeyAsyncRead,
+    .async_write = valkeyAsyncWrite,
+    .read = valkeyNetRead,
+    .write = valkeyNetWrite,
+    .set_timeout = valkeyTcpSetTimeout
+};
+
+void valkeyContextRegisterUserfdFuncs(void) {
+    valkeyContextRegisterFuncs(&valkeyContextUserfdFuncs, VALKEY_CONN_USERFD);
 }

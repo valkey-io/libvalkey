@@ -609,11 +609,13 @@ static void valkeySSLAsyncWrite(valkeyAsyncContext *ac) {
 }
 
 static valkeyContextFuncs valkeyContextSSLFuncs = {
+    .connect = valkeyContextConnectTcp,
     .close = valkeyNetClose,
     .free_privctx = valkeySSLFree,
     .async_read = valkeySSLAsyncRead,
     .async_write = valkeySSLAsyncWrite,
     .read = valkeySSLRead,
-    .write = valkeySSLWrite
+    .write = valkeySSLWrite,
+    .set_timeout = valkeyTcpSetTimeout
 };
 
