@@ -28,6 +28,7 @@ fi
 tmpdir=$(mktemp -d)
 PID_FILE=${tmpdir}/libvalkey-test-valkey.pid
 SOCK_FILE=${tmpdir}/libvalkey-test-valkey.sock
+CONF_FILE=${tmpdir}/valkey.conf
 
 if [ "$TEST_SSL" = "1" ]; then
     SSL_CA_CERT=${tmpdir}/ca.crt
@@ -71,7 +72,7 @@ cleanup() {
 trap cleanup INT TERM EXIT
 
 # base config
-cat > ${tmpdir}/valkey.comf <<EOF
+cat > ${CONF_FILE} <<EOF
 pidfile ${PID_FILE}
 port ${VALKEY_PORT}
 unixsocket ${SOCK_FILE}
@@ -80,7 +81,7 @@ EOF
 
 # if not running in docker add these:
 if [ ! -n "${VALKEY_DOCKER}" ]; then
-cat >> ${tmpdir}/valkey.comf <<EOF
+cat >> ${CONF_FILE} <<EOF
 daemonize yes
 ${ENABLE_DEBUG_CMD}
 bind 127.0.0.1
@@ -89,7 +90,7 @@ fi
 
 # if doing ssl, add these
 if [ "$TEST_SSL" = "1" ]; then
-    cat >> ${tmpdir}/valkey.comf <<EOF
+    cat >> ${CONF_FILE} <<EOF
 tls-port ${VALKEY_SSL_PORT}
 tls-ca-cert-file ${SSL_CA_CERT}
 tls-cert-file ${SSL_CERT}
@@ -98,7 +99,7 @@ EOF
 fi
 
 echo ${tmpdir}
-cat ${tmpdir}/valkey.comf
+cat ${CONF_FILE}
 if [ -n "${VALKEY_DOCKER}" ] ; then
     chmod a+wx ${tmpdir}
     chmod a+r ${tmpdir}/*
@@ -107,9 +108,9 @@ if [ -n "${VALKEY_DOCKER}" ] ; then
         -p ${VALKEY_SSL_PORT}:${VALKEY_SSL_PORT} \
         -v ${tmpdir}:${tmpdir} \
         ${VALKEY_DOCKER} \
-        ${VALKEY_SERVER} ${tmpdir}/valkey.comf
+        ${VALKEY_SERVER} ${CONF_FILE}
 else
-    ${VALKEY_SERVER} ${tmpdir}/valkey.comf
+    ${VALKEY_SERVER} ${CONF_FILE}
 fi
 # Wait until we detect the unix socket
 echo waiting for server
