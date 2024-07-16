@@ -33,6 +33,7 @@ SET(valkey_sources
     src/alloc.c
     src/async.c
     src/command.c
+    src/conn.c
     src/crc16.c
     src/dict.c
     src/net.c

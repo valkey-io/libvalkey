@@ -1,9 +1,5 @@
-/* Extracted from anet.c to work properly with Hiredis error reporting.
- *
- * Copyright (c) 2009-2011, Salvatore Sanfilippo <antirez at gmail dot com>
- * Copyright (c) 2010-2014, Pieter Noordhuis <pcnoordhuis at gmail dot com>
- * Copyright (c) 2015, Matt Stancliff <matt at genges dot com>,
- *                     Jan-Erik Rediger <janerik at fnordig dot com>
+/*
+ * Copyright (c) 2024, zhenwei pi <pizhenwei@bytedance.com>
  *
  * All rights reserved.
  *
@@ -15,9 +11,9 @@
  *   * Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution.
- *   * Neither the name of Redis nor the names of its contributors may be used
- *     to endorse or promote products derived from this software without
- *     specific prior written permission.
+ *   * Neither the name of the copyright holder nor the names of its
+ *     contributors may be used to endorse or promote products derived
+ *     from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
  * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
@@ -32,20 +28,32 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef VALKEY_NET_H
-#define VALKEY_NET_H
+#include "valkey_private.h"
 
-#include "valkey.h"
+#include <assert.h>
 
-void valkeyNetClose(valkeyContext *c);
+static valkeyContextFuncs *valkeyContextFuncsArray[VALKEY_CONN_MAX];
 
-int valkeyCheckSocketError(valkeyContext *c);
-int valkeyTcpSetTimeout(valkeyContext *c, const struct timeval tv);
-int valkeyContextConnectTcp(valkeyContext *c, const valkeyOptions *options);
-int valkeyKeepAlive(valkeyContext *c, int interval);
-int valkeyCheckConnectDone(valkeyContext *c, int *completed);
+int valkeyContextRegisterFuncs(valkeyContextFuncs *funcs, enum valkeyConnectionType type) {
+    assert(type < VALKEY_CONN_MAX);
+    assert(!valkeyContextFuncsArray[type]);
 
-int valkeySetTcpNoDelay(valkeyContext *c);
-int valkeyContextSetTcpUserTimeout(valkeyContext *c, unsigned int timeout);
+    valkeyContextFuncsArray[type] = funcs;
+    return VALKEY_OK;
+}
 
-#endif
+void valkeyContextSetFuncs(valkeyContext *c) {
+    static int initialized;
+
+    if (!initialized) {
+        initialized = 1;
+        valkeyContextRegisterTcpFuncs();
+        valkeyContextRegisterUnixFuncs();
+        valkeyContextRegisterUserfdFuncs();
+    }
+
+    assert(c->connection_type < VALKEY_CONN_MAX);
+    assert(!c->funcs);
+    c->funcs = valkeyContextFuncsArray[c->connection_type];
+    assert(c->funcs != NULL);
+}
