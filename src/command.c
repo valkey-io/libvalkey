@@ -41,14 +41,14 @@
 #else
 #include <malloc.h>
 #endif
-#include <stdio.h>
-#include <string.h>
-
 #include "alloc.h"
 #include "command.h"
 #include "sds.h"
 #include "vkutil.h"
 #include "win32.h"
+
+#include <stdio.h>
+#include <string.h>
 
 #define LF (uint8_t)10
 #define CR (uint8_t)13

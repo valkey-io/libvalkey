@@ -1,6 +1,7 @@
+#include "test_utils.h"
+
 #include "valkeycluster.h"
 
-#include "test_utils.h"
 #include <stdlib.h>
 #include <string.h>
 
@@ -9,7 +10,7 @@ static int server_version_minor;
 
 /* Helper to extract version information. */
 #define VALKEY_VERSION_FIELD "valkey_version:"
-#define REDIS_VERSION_FIELD "redis_version:"
+#define REDIS_VERSION_FIELD  "redis_version:"
 void load_valkey_version(valkeyClusterContext *cc) {
     valkeyClusterNodeIterator ni;
     valkeyClusterNode *node;

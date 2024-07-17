@@ -30,23 +30,25 @@
  */
 
 #include "fmacros.h"
+
 #include "alloc.h"
+
 #include <stdlib.h>
 #include <string.h>
 #ifndef _MSC_VER
 #include <strings.h>
 #endif
+#include "async.h"
+#include "async_private.h"
+#include "dict.h"
+#include "net.h"
+#include "sds.h"
+#include "valkey_private.h"
+#include "win32.h"
+
 #include <assert.h>
 #include <ctype.h>
 #include <errno.h>
-#include "async.h"
-#include "net.h"
-#include "dict.h"
-#include "sds.h"
-#include "win32.h"
-
-#include "async_private.h"
-#include "valkey_private.h"
 
 #ifdef NDEBUG
 #undef assert
@@ -63,59 +65,56 @@ static unsigned int callbackHash(const void *key) {
 }
 
 static void *callbackValDup(void *privdata, const void *src) {
-    ((void) privdata);
+    ((void)privdata);
     valkeyCallback *dup;
 
     dup = vk_malloc(sizeof(*dup));
     if (dup == NULL)
         return NULL;
 
-    memcpy(dup,src,sizeof(*dup));
+    memcpy(dup, src, sizeof(*dup));
     return dup;
 }
 
-static int callbackKeyCompare(void *privdata, const void *key1, const void *key2) {
+static int callbackKeyCompare(void *privdata, const void *key1,
+                              const void *key2) {
     int l1, l2;
-    ((void) privdata);
+    ((void)privdata);
 
     l1 = sdslen((const sds)key1);
     l2 = sdslen((const sds)key2);
-    if (l1 != l2) return 0;
-    return memcmp(key1,key2,l1) == 0;
+    if (l1 != l2)
+        return 0;
+    return memcmp(key1, key2, l1) == 0;
 }
 
 static void callbackKeyDestructor(void *privdata, void *key) {
-    ((void) privdata);
+    ((void)privdata);
     sdsfree((sds)key);
 }
 
 static void callbackValDestructor(void *privdata, void *val) {
-    ((void) privdata);
+    ((void)privdata);
     vk_free(val);
 }
 
-static dictType callbackDict = {
-    callbackHash,
-    NULL,
-    callbackValDup,
-    callbackKeyCompare,
-    callbackKeyDestructor,
-    callbackValDestructor
-};
+static dictType callbackDict = {callbackHash,          NULL,
+                                callbackValDup,        callbackKeyCompare,
+                                callbackKeyDestructor, callbackValDestructor};
 
 static valkeyAsyncContext *valkeyAsyncInitialize(valkeyContext *c) {
     valkeyAsyncContext *ac;
     dict *channels = NULL, *patterns = NULL;
 
-    channels = dictCreate(&callbackDict,NULL);
+    channels = dictCreate(&callbackDict, NULL);
     if (channels == NULL)
         goto oom;
 
-    patterns = dictCreate(&callbackDict,NULL);
+    patterns = dictCreate(&callbackDict, NULL);
     if (patterns == NULL)
         goto oom;
 
-    ac = vk_realloc(c,sizeof(valkeyAsyncContext));
+    ac = vk_realloc(c, sizeof(valkeyAsyncContext));
     if (ac == NULL)
         goto oom;
 
@@ -153,8 +152,10 @@ static valkeyAsyncContext *valkeyAsyncInitialize(valkeyContext *c) {
 
     return ac;
 oom:
-    if (channels) dictRelease(channels);
-    if (patterns) dictRelease(patterns);
+    if (channels)
+        dictRelease(channels);
+    if (patterns)
+        dictRelease(patterns);
     return NULL;
 }
 
@@ -169,7 +170,8 @@ static void valkeyAsyncCopyError(valkeyAsyncContext *ac) {
     ac->errstr = c->errstr;
 }
 
-valkeyAsyncContext *valkeyAsyncConnectWithOptions(const valkeyOptions *options) {
+valkeyAsyncContext *
+valkeyAsyncConnectWithOptions(const valkeyOptions *options) {
     valkeyOptions myOptions = *options;
     valkeyContext *c;
     valkeyAsyncContext *ac;
@@ -227,10 +229,9 @@ valkeyAsyncContext *valkeyAsyncConnectUnix(const char *path) {
     return valkeyAsyncConnectWithOptions(&options);
 }
 
-static int
-valkeyAsyncSetConnectCallbackImpl(valkeyAsyncContext *ac, valkeyConnectCallback *fn,
-                                  valkeyConnectCallbackNC *fn_nc)
-{
+static int valkeyAsyncSetConnectCallbackImpl(valkeyAsyncContext *ac,
+                                             valkeyConnectCallback *fn,
+                                             valkeyConnectCallbackNC *fn_nc) {
     /* If either are already set, this is an error */
     if (ac->onConnect || ac->onConnectNC)
         return VALKEY_ERR;
@@ -249,15 +250,18 @@ valkeyAsyncSetConnectCallbackImpl(valkeyAsyncContext *ac, valkeyConnectCallback 
     return VALKEY_OK;
 }
 
-int valkeyAsyncSetConnectCallback(valkeyAsyncContext *ac, valkeyConnectCallback *fn) {
+int valkeyAsyncSetConnectCallback(valkeyAsyncContext *ac,
+                                  valkeyConnectCallback *fn) {
     return valkeyAsyncSetConnectCallbackImpl(ac, fn, NULL);
 }
 
-int valkeyAsyncSetConnectCallbackNC(valkeyAsyncContext *ac, valkeyConnectCallbackNC *fn) {
+int valkeyAsyncSetConnectCallbackNC(valkeyAsyncContext *ac,
+                                    valkeyConnectCallbackNC *fn) {
     return valkeyAsyncSetConnectCallbackImpl(ac, NULL, fn);
 }
 
-int valkeyAsyncSetDisconnectCallback(valkeyAsyncContext *ac, valkeyDisconnectCallback *fn) {
+int valkeyAsyncSetDisconnectCallback(valkeyAsyncContext *ac,
+                                     valkeyDisconnectCallback *fn) {
     if (ac->onDisconnect == NULL) {
         ac->onDisconnect = fn;
         return VALKEY_OK;
@@ -266,7 +270,8 @@ int valkeyAsyncSetDisconnectCallback(valkeyAsyncContext *ac, valkeyDisconnectCal
 }
 
 /* Helper functions to push/shift callbacks */
-static int valkeyPushCallback(valkeyCallbackList *list, valkeyCallback *source) {
+static int valkeyPushCallback(valkeyCallbackList *list,
+                              valkeyCallback *source) {
     valkeyCallback *cb;
 
     /* Copy callback from stack to heap */
@@ -275,7 +280,7 @@ static int valkeyPushCallback(valkeyCallbackList *list, valkeyCallback *source) 
         return VALKEY_ERR_OOM;
 
     if (source != NULL) {
-        memcpy(cb,source,sizeof(*cb));
+        memcpy(cb, source, sizeof(*cb));
         cb->next = NULL;
     }
 
@@ -288,7 +293,8 @@ static int valkeyPushCallback(valkeyCallbackList *list, valkeyCallback *source) 
     return VALKEY_OK;
 }
 
-static int valkeyShiftCallback(valkeyCallbackList *list, valkeyCallback *target) {
+static int valkeyShiftCallback(valkeyCallbackList *list,
+                               valkeyCallback *target) {
     valkeyCallback *cb = list->head;
     if (cb != NULL) {
         list->head = cb->next;
@@ -297,18 +303,19 @@ static int valkeyShiftCallback(valkeyCallbackList *list, valkeyCallback *target)
 
         /* Copy callback from heap to stack */
         if (target != NULL)
-            memcpy(target,cb,sizeof(*cb));
+            memcpy(target, cb, sizeof(*cb));
         vk_free(cb);
         return VALKEY_OK;
     }
     return VALKEY_ERR;
 }
 
-static void valkeyRunCallback(valkeyAsyncContext *ac, valkeyCallback *cb, valkeyReply *reply) {
+static void valkeyRunCallback(valkeyAsyncContext *ac, valkeyCallback *cb,
+                              valkeyReply *reply) {
     valkeyContext *c = &(ac->c);
     if (cb->fn != NULL) {
         c->flags |= VALKEY_IN_CALLBACK;
-        cb->fn(ac,reply,cb->privdata);
+        cb->fn(ac, reply, cb->privdata);
         c->flags &= ~VALKEY_IN_CALLBACK;
     }
 }
@@ -321,8 +328,7 @@ static void valkeyRunPushCallback(valkeyAsyncContext *ac, valkeyReply *reply) {
     }
 }
 
-static void valkeyRunConnectCallback(valkeyAsyncContext *ac, int status)
-{
+static void valkeyRunConnectCallback(valkeyAsyncContext *ac, int status) {
     if (ac->onConnect == NULL && ac->onConnectNC == NULL)
         return;
 
@@ -344,8 +350,7 @@ static void valkeyRunConnectCallback(valkeyAsyncContext *ac, int status)
     }
 }
 
-static void valkeyRunDisconnectCallback(valkeyAsyncContext *ac, int status)
-{
+static void valkeyRunDisconnectCallback(valkeyAsyncContext *ac, int status) {
     if (ac->onDisconnect) {
         if (!(ac->c.flags & VALKEY_IN_CALLBACK)) {
             ac->c.flags |= VALKEY_IN_CALLBACK;
@@ -366,24 +371,24 @@ static void valkeyAsyncFreeInternal(valkeyAsyncContext *ac) {
     dictEntry *de;
 
     /* Execute pending callbacks with NULL reply. */
-    while (valkeyShiftCallback(&ac->replies,&cb) == VALKEY_OK)
-        valkeyRunCallback(ac,&cb,NULL);
-    while (valkeyShiftCallback(&ac->sub.replies,&cb) == VALKEY_OK)
-        valkeyRunCallback(ac,&cb,NULL);
+    while (valkeyShiftCallback(&ac->replies, &cb) == VALKEY_OK)
+        valkeyRunCallback(ac, &cb, NULL);
+    while (valkeyShiftCallback(&ac->sub.replies, &cb) == VALKEY_OK)
+        valkeyRunCallback(ac, &cb, NULL);
 
     /* Run subscription callbacks with NULL reply */
     if (ac->sub.channels) {
-        dictInitIterator(&it,ac->sub.channels);
+        dictInitIterator(&it, ac->sub.channels);
         while ((de = dictNext(&it)) != NULL)
-            valkeyRunCallback(ac,dictGetEntryVal(de),NULL);
+            valkeyRunCallback(ac, dictGetEntryVal(de), NULL);
 
         dictRelease(ac->sub.channels);
     }
 
     if (ac->sub.patterns) {
-        dictInitIterator(&it,ac->sub.patterns);
+        dictInitIterator(&it, ac->sub.patterns);
         while ((de = dictNext(&it)) != NULL)
-            valkeyRunCallback(ac,dictGetEntryVal(de),NULL);
+            valkeyRunCallback(ac, dictGetEntryVal(de), NULL);
 
         dictRelease(ac->sub.patterns);
     }
@@ -432,7 +437,7 @@ void valkeyAsyncDisconnectInternal(valkeyAsyncContext *ac) {
 
     if (ac->err == 0) {
         /* For clean disconnects, there should be no pending callbacks. */
-        int ret = valkeyShiftCallback(&ac->replies,NULL);
+        int ret = valkeyShiftCallback(&ac->replies, NULL);
         assert(ret == VALKEY_ERR);
     } else {
         /* Disconnection is caused by an error, make sure that pending
@@ -447,7 +452,7 @@ void valkeyAsyncDisconnectInternal(valkeyAsyncContext *ac) {
     /* For non-clean disconnects, valkeyAsyncFreeInternal() will execute pending
      * callbacks with a NULL-reply. */
     if (!(c->flags & VALKEY_NO_AUTO_FREE)) {
-      valkeyAsyncFreeInternal(ac);
+        valkeyAsyncFreeInternal(ac);
     }
 }
 
@@ -467,7 +472,9 @@ void valkeyAsyncDisconnect(valkeyAsyncContext *ac) {
         valkeyAsyncDisconnectInternal(ac);
 }
 
-static int valkeyGetSubscribeCallback(valkeyAsyncContext *ac, valkeyReply *reply, valkeyCallback *dstcb) {
+static int valkeyGetSubscribeCallback(valkeyAsyncContext *ac,
+                                      valkeyReply *reply,
+                                      valkeyCallback *dstcb) {
     valkeyContext *c = &(ac->c);
     dict *callbacks;
     valkeyCallback *cb = NULL;
@@ -479,7 +486,8 @@ static int valkeyGetSubscribeCallback(valkeyAsyncContext *ac, valkeyReply *reply
     /* Match reply with the expected format of a pushed message.
      * The type and number of elements (3 to 4) are specified at:
      * https://valkey.io/docs/topics/pubsub/#format-of-pushed-messages */
-    if ((reply->type == VALKEY_REPLY_ARRAY && !(c->flags & VALKEY_SUPPORTS_PUSH) && reply->elements >= 3) ||
+    if ((reply->type == VALKEY_REPLY_ARRAY &&
+         !(c->flags & VALKEY_SUPPORTS_PUSH) && reply->elements >= 3) ||
         reply->type == VALKEY_REPLY_PUSH) {
         assert(reply->element[0]->type == VALKEY_REPLY_STRING);
         stype = reply->element[0]->str;
@@ -492,25 +500,26 @@ static int valkeyGetSubscribeCallback(valkeyAsyncContext *ac, valkeyReply *reply
 
         /* Locate the right callback */
         if (reply->element[1]->type == VALKEY_REPLY_STRING) {
-            sname = sdsnewlen(reply->element[1]->str,reply->element[1]->len);
-            if (sname == NULL) goto oom;
+            sname = sdsnewlen(reply->element[1]->str, reply->element[1]->len);
+            if (sname == NULL)
+                goto oom;
 
-            if ((de = dictFind(callbacks,sname)) != NULL) {
+            if ((de = dictFind(callbacks, sname)) != NULL) {
                 cb = dictGetEntryVal(de);
-                memcpy(dstcb,cb,sizeof(*dstcb));
+                memcpy(dstcb, cb, sizeof(*dstcb));
             }
         }
 
         /* If this is an subscribe reply decrease pending counter. */
-        if (strcasecmp(stype+pvariant,"subscribe") == 0) {
+        if (strcasecmp(stype + pvariant, "subscribe") == 0) {
             assert(cb != NULL);
             cb->pending_subs -= 1;
 
-        } else if (strcasecmp(stype+pvariant,"unsubscribe") == 0) {
+        } else if (strcasecmp(stype + pvariant, "unsubscribe") == 0) {
             if (cb == NULL)
                 ac->sub.pending_unsubs -= 1;
             else if (cb->pending_subs == 0)
-                dictDelete(callbacks,sname);
+                dictDelete(callbacks, sname);
 
             /* If this was the last unsubscribe message, revert to
              * non-subscribe mode. */
@@ -518,23 +527,24 @@ static int valkeyGetSubscribeCallback(valkeyAsyncContext *ac, valkeyReply *reply
 
             /* Unset subscribed flag only when no pipelined pending subscribe
              * or pending unsubscribe replies. */
-            if (reply->element[2]->integer == 0
-                && dictSize(ac->sub.channels) == 0
-                && dictSize(ac->sub.patterns) == 0
-                && ac->sub.pending_unsubs == 0) {
+            if (reply->element[2]->integer == 0 &&
+                dictSize(ac->sub.channels) == 0 &&
+                dictSize(ac->sub.patterns) == 0 &&
+                ac->sub.pending_unsubs == 0) {
                 c->flags &= ~VALKEY_SUBSCRIBED;
 
                 /* Move ongoing regular command callbacks. */
                 valkeyCallback cb;
-                while (valkeyShiftCallback(&ac->sub.replies,&cb) == VALKEY_OK) {
-                    valkeyPushCallback(&ac->replies,&cb);
+                while (valkeyShiftCallback(&ac->sub.replies, &cb) ==
+                       VALKEY_OK) {
+                    valkeyPushCallback(&ac->replies, &cb);
                 }
             }
         }
         sdsfree(sname);
     } else {
         /* Shift callback for pending command in subscribed context. */
-        valkeyShiftCallback(&ac->sub.replies,dstcb);
+        valkeyShiftCallback(&ac->sub.replies, dstcb);
     }
     return VALKEY_OK;
 oom:
@@ -543,7 +553,7 @@ oom:
     return VALKEY_ERR;
 }
 
-#define valkeyIsSpontaneousPushReply(r) \
+#define valkeyIsSpontaneousPushReply(r)                                        \
     (valkeyIsPushReply(r) && !valkeyIsSubscribeReply(r))
 
 static int valkeyIsSubscribeReply(valkeyReply *reply) {
@@ -552,8 +562,7 @@ static int valkeyIsSubscribeReply(valkeyReply *reply) {
 
     /* We will always have at least one string with the subscribe/message type */
     if (reply->elements < 1 || reply->element[0]->type != VALKEY_REPLY_STRING ||
-        reply->element[0]->len < sizeof("message") - 1)
-    {
+        reply->element[0]->len < sizeof("message") - 1) {
         return 0;
     }
 
@@ -572,12 +581,12 @@ void valkeyProcessCallbacks(valkeyAsyncContext *ac) {
     void *reply = NULL;
     int status;
 
-    while((status = valkeyGetReply(c,&reply)) == VALKEY_OK) {
+    while ((status = valkeyGetReply(c, &reply)) == VALKEY_OK) {
         if (reply == NULL) {
             /* When the connection is being disconnected and there are
              * no more replies, this is the cue to really disconnect. */
-            if (c->flags & VALKEY_DISCONNECTING && sdslen(c->obuf) == 0
-                && ac->replies.head == NULL) {
+            if (c->flags & VALKEY_DISCONNECTING && sdslen(c->obuf) == 0 &&
+                ac->replies.head == NULL) {
                 valkeyAsyncDisconnectInternal(ac);
                 return;
             }
@@ -587,7 +596,8 @@ void valkeyProcessCallbacks(valkeyAsyncContext *ac) {
         }
 
         /* Keep track of push message support for subscribe handling */
-        if (valkeyIsPushReply(reply)) c->flags |= VALKEY_SUPPORTS_PUSH;
+        if (valkeyIsPushReply(reply))
+            c->flags |= VALKEY_SUPPORTS_PUSH;
 
         /* Send any non-subscribe related PUSH messages to our PUSH handler
          * while allowing subscribe related PUSH messages to pass through.
@@ -602,7 +612,7 @@ void valkeyProcessCallbacks(valkeyAsyncContext *ac) {
         /* Even if the context is subscribed, pending regular
          * callbacks will get a reply before pub/sub messages arrive. */
         valkeyCallback cb = {NULL, NULL, 0, 0, NULL};
-        if (valkeyShiftCallback(&ac->replies,&cb) != VALKEY_OK) {
+        if (valkeyShiftCallback(&ac->replies, &cb) != VALKEY_OK) {
             /*
              * A spontaneous reply in a not-subscribed context can be the error
              * reply that is sent when a new connection exceeds the maximum
@@ -618,9 +628,10 @@ void valkeyProcessCallbacks(valkeyAsyncContext *ac) {
              * In this case we also want to close the connection, and have the
              * user wait until the server is ready to take our request.
              */
-            if (((valkeyReply*)reply)->type == VALKEY_REPLY_ERROR) {
+            if (((valkeyReply *)reply)->type == VALKEY_REPLY_ERROR) {
                 c->err = VALKEY_ERR_OTHER;
-                snprintf(c->errstr,sizeof(c->errstr),"%s",((valkeyReply*)reply)->str);
+                snprintf(c->errstr, sizeof(c->errstr), "%s",
+                         ((valkeyReply *)reply)->str);
                 c->reader->fn->freeObject(reply);
                 valkeyAsyncDisconnectInternal(ac);
                 return;
@@ -628,12 +639,12 @@ void valkeyProcessCallbacks(valkeyAsyncContext *ac) {
             /* No more regular callbacks and no errors, the context *must* be subscribed. */
             assert(c->flags & VALKEY_SUBSCRIBED);
             if (c->flags & VALKEY_SUBSCRIBED)
-                valkeyGetSubscribeCallback(ac,reply,&cb);
+                valkeyGetSubscribeCallback(ac, reply, &cb);
         }
 
         if (cb.fn != NULL) {
-            valkeyRunCallback(ac,&cb,reply);
-            if (!(c->flags & VALKEY_NO_AUTO_FREE_REPLIES)){
+            valkeyRunCallback(ac, &cb, reply);
+            if (!(c->flags & VALKEY_NO_AUTO_FREE_REPLIES)) {
                 c->reader->fn->freeObject(reply);
             }
 
@@ -652,7 +663,7 @@ void valkeyProcessCallbacks(valkeyAsyncContext *ac) {
 
         /* If in monitor mode, repush the callback */
         if (c->flags & VALKEY_MONITORING) {
-            valkeyPushCallback(&ac->replies,&cb);
+            valkeyPushCallback(&ac->replies, &cb);
         }
     }
 
@@ -742,7 +753,7 @@ void valkeyAsyncWrite(valkeyAsyncContext *ac) {
     valkeyContext *c = &(ac->c);
     int done = 0;
 
-    if (valkeyBufferWrite(c,&done) == VALKEY_ERR) {
+    if (valkeyBufferWrite(c, &done) == VALKEY_ERR) {
         valkeyAsyncDisconnectInternal(ac);
     } else {
         /* Continue writing when not done, stop writing otherwise */
@@ -785,8 +796,8 @@ void valkeyAsyncHandleTimeout(valkeyAsyncContext *ac) {
             return;
         }
 
-        if (!ac->c.command_timeout ||
-            (!ac->c.command_timeout->tv_sec && !ac->c.command_timeout->tv_usec)) {
+        if (!ac->c.command_timeout || (!ac->c.command_timeout->tv_sec &&
+                                       !ac->c.command_timeout->tv_usec)) {
             /* A belated connect timeout arriving, ignore */
             return;
         }
@@ -814,24 +825,28 @@ void valkeyAsyncHandleTimeout(valkeyAsyncContext *ac) {
 
 /* Sets a pointer to the first argument and its length starting at p. Returns
  * the number of bytes to skip to get to the following argument. */
-static const char *nextArgument(const char *start, const char **str, size_t *len) {
+static const char *nextArgument(const char *start, const char **str,
+                                size_t *len) {
     const char *p = start;
     if (p[0] != '$') {
-        p = strchr(p,'$');
-        if (p == NULL) return NULL;
+        p = strchr(p, '$');
+        if (p == NULL)
+            return NULL;
     }
 
-    *len = (int)strtol(p+1,NULL,10);
-    p = strchr(p,'\r');
+    *len = (int)strtol(p + 1, NULL, 10);
+    p = strchr(p, '\r');
     assert(p);
-    *str = p+2;
-    return p+2+(*len)+2;
+    *str = p + 2;
+    return p + 2 + (*len) + 2;
 }
 
 /* Helper function for the valkeyAsyncCommand* family of functions. Writes a
  * formatted command to the output buffer and registers the provided callback
  * function with the context. */
-static int valkeyAsyncAppendCmdLen(valkeyAsyncContext *ac, valkeyCallbackFn *fn, void *privdata, const char *cmd, size_t len) {
+static int valkeyAsyncAppendCmdLen(valkeyAsyncContext *ac, valkeyCallbackFn *fn,
+                                   void *privdata, const char *cmd,
+                                   size_t len) {
     valkeyContext *c = &(ac->c);
     valkeyCallback cb;
     struct dict *cbdict;
@@ -846,7 +861,8 @@ static int valkeyAsyncAppendCmdLen(valkeyAsyncContext *ac, valkeyCallbackFn *fn,
     int ret;
 
     /* Don't accept new commands when the connection is about to be closed. */
-    if (c->flags & (VALKEY_DISCONNECTING | VALKEY_FREEING)) return VALKEY_ERR;
+    if (c->flags & (VALKEY_DISCONNECTING | VALKEY_FREEING))
+        return VALKEY_ERR;
 
     /* Setup callback */
     cb.fn = fn;
@@ -855,19 +871,19 @@ static int valkeyAsyncAppendCmdLen(valkeyAsyncContext *ac, valkeyCallbackFn *fn,
     cb.unsubscribe_sent = 0;
 
     /* Find out which command will be appended. */
-    p = nextArgument(cmd,&cstr,&clen);
+    p = nextArgument(cmd, &cstr, &clen);
     assert(p != NULL);
     hasnext = (p[0] == '$');
     pvariant = (tolower(cstr[0]) == 'p') ? 1 : 0;
     cstr += pvariant;
     clen -= pvariant;
 
-    if (hasnext && strncasecmp(cstr,"subscribe\r\n",11) == 0) {
+    if (hasnext && strncasecmp(cstr, "subscribe\r\n", 11) == 0) {
         c->flags |= VALKEY_SUBSCRIBED;
 
         /* Add every channel/pattern to the list of subscription callbacks. */
-        while ((p = nextArgument(p,&astr,&alen)) != NULL) {
-            sname = sdsnewlen(astr,alen);
+        while ((p = nextArgument(p, &astr, &alen)) != NULL) {
+            sname = sdsnewlen(astr, alen);
             if (sname == NULL)
                 goto oom;
 
@@ -876,21 +892,23 @@ static int valkeyAsyncAppendCmdLen(valkeyAsyncContext *ac, valkeyCallbackFn *fn,
             else
                 cbdict = ac->sub.channels;
 
-            de = dictFind(cbdict,sname);
+            de = dictFind(cbdict, sname);
 
             if (de != NULL) {
                 existcb = dictGetEntryVal(de);
                 cb.pending_subs = existcb->pending_subs + 1;
             }
 
-            ret = dictReplace(cbdict,sname,&cb);
+            ret = dictReplace(cbdict, sname, &cb);
 
-            if (ret == 0) sdsfree(sname);
+            if (ret == 0)
+                sdsfree(sname);
         }
-    } else if (strncasecmp(cstr,"unsubscribe\r\n",13) == 0) {
+    } else if (strncasecmp(cstr, "unsubscribe\r\n", 13) == 0) {
         /* It is only useful to call (P)UNSUBSCRIBE when the context is
          * subscribed to one or more channels or patterns. */
-        if (!(c->flags & VALKEY_SUBSCRIBED)) return VALKEY_ERR;
+        if (!(c->flags & VALKEY_SUBSCRIBED))
+            return VALKEY_ERR;
 
         if (pvariant)
             cbdict = ac->sub.patterns;
@@ -900,12 +918,12 @@ static int valkeyAsyncAppendCmdLen(valkeyAsyncContext *ac, valkeyCallbackFn *fn,
         if (hasnext) {
             /* Send an unsubscribe with specific channels/patterns.
              * Bookkeeping the number of expected replies */
-            while ((p = nextArgument(p,&astr,&alen)) != NULL) {
-                sname = sdsnewlen(astr,alen);
+            while ((p = nextArgument(p, &astr, &alen)) != NULL) {
+                sname = sdsnewlen(astr, alen);
                 if (sname == NULL)
                     goto oom;
 
-                de = dictFind(cbdict,sname);
+                de = dictFind(cbdict, sname);
                 if (de != NULL) {
                     existcb = dictGetEntryVal(de);
                     if (existcb->unsubscribe_sent == 0)
@@ -923,7 +941,7 @@ static int valkeyAsyncAppendCmdLen(valkeyAsyncContext *ac, valkeyCallbackFn *fn,
             /* Send an unsubscribe without specific channels/patterns.
              * Bookkeeping the number of expected replies */
             int no_subs = 1;
-            dictInitIterator(&it,cbdict);
+            dictInitIterator(&it, cbdict);
             while ((de = dictNext(&it)) != NULL) {
                 existcb = dictGetEntryVal(de);
                 if (existcb->unsubscribe_sent == 0) {
@@ -940,22 +958,22 @@ static int valkeyAsyncAppendCmdLen(valkeyAsyncContext *ac, valkeyCallbackFn *fn,
         /* (P)UNSUBSCRIBE does not have its own response: every channel or
          * pattern that is unsubscribed will receive a message. This means we
          * should not append a callback function for this command. */
-    } else if (strncasecmp(cstr,"monitor\r\n",9) == 0) {
+    } else if (strncasecmp(cstr, "monitor\r\n", 9) == 0) {
         /* Set monitor flag and push callback */
         c->flags |= VALKEY_MONITORING;
-        if (valkeyPushCallback(&ac->replies,&cb) != VALKEY_OK)
+        if (valkeyPushCallback(&ac->replies, &cb) != VALKEY_OK)
             goto oom;
     } else {
         if (c->flags & VALKEY_SUBSCRIBED) {
-            if (valkeyPushCallback(&ac->sub.replies,&cb) != VALKEY_OK)
+            if (valkeyPushCallback(&ac->sub.replies, &cb) != VALKEY_OK)
                 goto oom;
         } else {
-            if (valkeyPushCallback(&ac->replies,&cb) != VALKEY_OK)
+            if (valkeyPushCallback(&ac->replies, &cb) != VALKEY_OK)
                 goto oom;
         }
     }
 
-    valkeyAppendCmdLen(c,cmd,len);
+    valkeyAppendCmdLen(c, cmd, len);
 
     /* Always schedule a write when the write buffer is non-empty */
     _EL_ADD_WRITE(ac);
@@ -967,48 +985,54 @@ oom:
     return VALKEY_ERR;
 }
 
-int valkeyvAsyncCommand(valkeyAsyncContext *ac, valkeyCallbackFn *fn, void *privdata, const char *format, va_list ap) {
+int valkeyvAsyncCommand(valkeyAsyncContext *ac, valkeyCallbackFn *fn,
+                        void *privdata, const char *format, va_list ap) {
     char *cmd;
     int len;
     int status;
-    len = valkeyvFormatCommand(&cmd,format,ap);
+    len = valkeyvFormatCommand(&cmd, format, ap);
 
     /* We don't want to pass -1 or -2 to future functions as a length. */
     if (len < 0)
         return VALKEY_ERR;
 
-    status = valkeyAsyncAppendCmdLen(ac,fn,privdata,cmd,len);
+    status = valkeyAsyncAppendCmdLen(ac, fn, privdata, cmd, len);
     vk_free(cmd);
     return status;
 }
 
-int valkeyAsyncCommand(valkeyAsyncContext *ac, valkeyCallbackFn *fn, void *privdata, const char *format, ...) {
+int valkeyAsyncCommand(valkeyAsyncContext *ac, valkeyCallbackFn *fn,
+                       void *privdata, const char *format, ...) {
     va_list ap;
     int status;
-    va_start(ap,format);
-    status = valkeyvAsyncCommand(ac,fn,privdata,format,ap);
+    va_start(ap, format);
+    status = valkeyvAsyncCommand(ac, fn, privdata, format, ap);
     va_end(ap);
     return status;
 }
 
-int valkeyAsyncCommandArgv(valkeyAsyncContext *ac, valkeyCallbackFn *fn, void *privdata, int argc, const char **argv, const size_t *argvlen) {
+int valkeyAsyncCommandArgv(valkeyAsyncContext *ac, valkeyCallbackFn *fn,
+                           void *privdata, int argc, const char **argv,
+                           const size_t *argvlen) {
     sds cmd;
     long long len;
     int status;
-    len = valkeyFormatSdsCommandArgv(&cmd,argc,argv,argvlen);
+    len = valkeyFormatSdsCommandArgv(&cmd, argc, argv, argvlen);
     if (len < 0)
         return VALKEY_ERR;
-    status = valkeyAsyncAppendCmdLen(ac,fn,privdata,cmd,len);
+    status = valkeyAsyncAppendCmdLen(ac, fn, privdata, cmd, len);
     sdsfree(cmd);
     return status;
 }
 
-int valkeyAsyncFormattedCommand(valkeyAsyncContext *ac, valkeyCallbackFn *fn, void *privdata, const char *cmd, size_t len) {
-    int status = valkeyAsyncAppendCmdLen(ac,fn,privdata,cmd,len);
+int valkeyAsyncFormattedCommand(valkeyAsyncContext *ac, valkeyCallbackFn *fn,
+                                void *privdata, const char *cmd, size_t len) {
+    int status = valkeyAsyncAppendCmdLen(ac, fn, privdata, cmd, len);
     return status;
 }
 
-valkeyAsyncPushFn *valkeyAsyncSetPushCallback(valkeyAsyncContext *ac, valkeyAsyncPushFn *fn) {
+valkeyAsyncPushFn *valkeyAsyncSetPushCallback(valkeyAsyncContext *ac,
+                                              valkeyAsyncPushFn *fn) {
     valkeyAsyncPushFn *old = ac->push_cb;
     ac->push_cb = fn;
     return old;
@@ -1025,8 +1049,7 @@ int valkeyAsyncSetTimeout(valkeyAsyncContext *ac, struct timeval tv) {
     }
 
     if (tv.tv_sec != ac->c.command_timeout->tv_sec ||
-        tv.tv_usec != ac->c.command_timeout->tv_usec)
-    {
+        tv.tv_usec != ac->c.command_timeout->tv_usec) {
         *ac->c.command_timeout = tv;
     }
 

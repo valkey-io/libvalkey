@@ -30,10 +30,10 @@
 
 #ifndef VALKEY_LIBEVENT_H
 #define VALKEY_LIBEVENT_H
-#include <event2/event.h>
-#include "../valkey.h"
 #include "../async.h"
+#include "../valkey.h"
 #include "../valkeycluster.h"
+#include <event2/event.h>
 
 #define VALKEY_LIBEVENT_DELETED 0x01
 #define VALKEY_LIBEVENT_ENTERED 0x02
@@ -47,18 +47,17 @@ typedef struct valkeyLibeventEvents {
     short state;
 } valkeyLibeventEvents;
 
-static void valkeyLibeventDestroy(valkeyLibeventEvents *e) {
-    vk_free(e);
-}
+static void valkeyLibeventDestroy(valkeyLibeventEvents *e) { vk_free(e); }
 
 static void valkeyLibeventHandler(evutil_socket_t fd, short event, void *arg) {
     ((void)fd);
-    valkeyLibeventEvents *e = (valkeyLibeventEvents*)arg;
+    valkeyLibeventEvents *e = (valkeyLibeventEvents *)arg;
     e->state |= VALKEY_LIBEVENT_ENTERED;
 
-    #define CHECK_DELETED() if (e->state & VALKEY_LIBEVENT_DELETED) {\
-        valkeyLibeventDestroy(e);\
-        return; \
+#define CHECK_DELETED()                                                        \
+    if (e->state & VALKEY_LIBEVENT_DELETED) {                                  \
+        valkeyLibeventDestroy(e);                                              \
+        return;                                                                \
     }
 
     if ((event & EV_TIMEOUT) && (e->state & VALKEY_LIBEVENT_DELETED) == 0) {
@@ -66,18 +65,20 @@ static void valkeyLibeventHandler(evutil_socket_t fd, short event, void *arg) {
         CHECK_DELETED();
     }
 
-    if ((event & EV_READ) && e->context && (e->state & VALKEY_LIBEVENT_DELETED) == 0) {
+    if ((event & EV_READ) && e->context &&
+        (e->state & VALKEY_LIBEVENT_DELETED) == 0) {
         valkeyAsyncHandleRead(e->context);
         CHECK_DELETED();
     }
 
-    if ((event & EV_WRITE) && e->context && (e->state & VALKEY_LIBEVENT_DELETED) == 0) {
+    if ((event & EV_WRITE) && e->context &&
+        (e->state & VALKEY_LIBEVENT_DELETED) == 0) {
         valkeyAsyncHandleWrite(e->context);
         CHECK_DELETED();
     }
 
     e->state &= ~VALKEY_LIBEVENT_ENTERED;
-    #undef CHECK_DELETED
+#undef CHECK_DELETED
 }
 
 static void valkeyLibeventUpdate(void *privdata, short flag, int isRemove) {
@@ -121,7 +122,7 @@ static void valkeyLibeventDelWrite(void *privdata) {
 }
 
 static void valkeyLibeventCleanup(void *privdata) {
-    valkeyLibeventEvents *e = (valkeyLibeventEvents*)privdata;
+    valkeyLibeventEvents *e = (valkeyLibeventEvents *)privdata;
     if (!e) {
         return;
     }
@@ -144,7 +145,8 @@ static void valkeyLibeventSetTimeout(void *privdata, struct timeval tv) {
     valkeyLibeventUpdate(e, flags, 0);
 }
 
-static int valkeyLibeventAttach(valkeyAsyncContext *ac, struct event_base *base) {
+static int valkeyLibeventAttach(valkeyAsyncContext *ac,
+                                struct event_base *base) {
     valkeyContext *c = &(ac->c);
     valkeyLibeventEvents *e;
 
@@ -153,7 +155,7 @@ static int valkeyLibeventAttach(valkeyAsyncContext *ac, struct event_base *base)
         return VALKEY_ERR;
 
     /* Create container for context and r/w events */
-    e = (valkeyLibeventEvents*)vk_calloc(1, sizeof(*e));
+    e = (valkeyLibeventEvents *)vk_calloc(1, sizeof(*e));
     if (e == NULL)
         return VALKEY_ERR;
 
@@ -169,7 +171,8 @@ static int valkeyLibeventAttach(valkeyAsyncContext *ac, struct event_base *base)
     ac->ev.data = e;
 
     /* Initialize and install read/write events */
-    e->ev = event_new(base, c->fd, EV_READ | EV_WRITE, valkeyLibeventHandler, e);
+    e->ev =
+        event_new(base, c->fd, EV_READ | EV_WRITE, valkeyLibeventHandler, e);
     e->base = base;
     return VALKEY_OK;
 }

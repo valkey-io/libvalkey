@@ -39,6 +39,6 @@
 
 #include "alloc.h"
 
-#define s_malloc vk_malloc
+#define s_malloc  vk_malloc
 #define s_realloc vk_realloc
-#define s_free vk_free
+#define s_free    vk_free

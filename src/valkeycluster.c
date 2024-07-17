@@ -31,6 +31,15 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 #define _XOPEN_SOURCE 600
+#include "valkeycluster.h"
+
+#include "adlist.h"
+#include "alloc.h"
+#include "command.h"
+#include "dict.h"
+#include "vkutil.h"
+#include "win32.h"
+
 #include <assert.h>
 #include <ctype.h>
 #include <errno.h>
@@ -38,43 +47,35 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "alloc.h"
-#include "adlist.h"
-#include "command.h"
-#include "dict.h"
-#include "valkeycluster.h"
-#include "vkutil.h"
-#include "win32.h"
-
 // Cluster errors are offset by 100 to be sufficiently out of range of
 // standard Valkey errors
 #define VALKEY_ERR_CLUSTER_TOO_MANY_RETRIES 100
 
-#define VALKEY_ERROR_MOVED "MOVED"
-#define VALKEY_ERROR_ASK "ASK"
-#define VALKEY_ERROR_TRYAGAIN "TRYAGAIN"
-#define VALKEY_ERROR_CLUSTERDOWN "CLUSTERDOWN"
+#define VALKEY_ERROR_MOVED                  "MOVED"
+#define VALKEY_ERROR_ASK                    "ASK"
+#define VALKEY_ERROR_TRYAGAIN               "TRYAGAIN"
+#define VALKEY_ERROR_CLUSTERDOWN            "CLUSTERDOWN"
 
-#define VALKEY_STATUS_OK "OK"
+#define VALKEY_STATUS_OK                    "OK"
 
-#define VALKEY_COMMAND_CLUSTER_NODES "CLUSTER NODES"
-#define VALKEY_COMMAND_CLUSTER_SLOTS "CLUSTER SLOTS"
-#define VALKEY_COMMAND_ASKING "ASKING"
+#define VALKEY_COMMAND_CLUSTER_NODES        "CLUSTER NODES"
+#define VALKEY_COMMAND_CLUSTER_SLOTS        "CLUSTER SLOTS"
+#define VALKEY_COMMAND_ASKING               "ASKING"
 
-#define IP_PORT_SEPARATOR ':'
+#define IP_PORT_SEPARATOR                   ':'
 
-#define PORT_CPORT_SEPARATOR '@'
+#define PORT_CPORT_SEPARATOR                '@'
 
-#define CLUSTER_ADDRESS_SEPARATOR ","
+#define CLUSTER_ADDRESS_SEPARATOR           ","
 
-#define CLUSTER_DEFAULT_MAX_RETRY_COUNT 5
-#define NO_RETRY -1
+#define CLUSTER_DEFAULT_MAX_RETRY_COUNT     5
+#define NO_RETRY                            -1
 
-#define CRLF "\x0d\x0a"
-#define CRLF_LEN (sizeof("\x0d\x0a") - 1)
+#define CRLF                                "\x0d\x0a"
+#define CRLF_LEN                            (sizeof("\x0d\x0a") - 1)
 
-#define SLOTMAP_UPDATE_THROTTLE_USEC 1000000
-#define SLOTMAP_UPDATE_ONGOING INT64_MAX
+#define SLOTMAP_UPDATE_THROTTLE_USEC        1000000
+#define SLOTMAP_UPDATE_ONGOING              INT64_MAX
 
 typedef struct cluster_async_data {
     valkeyClusterAsyncContext *acc;

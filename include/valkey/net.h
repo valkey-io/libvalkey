@@ -43,11 +43,13 @@ ssize_t valkeyNetWrite(valkeyContext *c);
 
 int valkeyCheckSocketError(valkeyContext *c);
 int valkeyContextSetTimeout(valkeyContext *c, const struct timeval tv);
-int valkeyContextConnectTcp(valkeyContext *c, const char *addr, int port, const struct timeval *timeout);
+int valkeyContextConnectTcp(valkeyContext *c, const char *addr, int port,
+                            const struct timeval *timeout);
 int valkeyContextConnectBindTcp(valkeyContext *c, const char *addr, int port,
-                               const struct timeval *timeout,
-                               const char *source_addr);
-int valkeyContextConnectUnix(valkeyContext *c, const char *path, const struct timeval *timeout);
+                                const struct timeval *timeout,
+                                const char *source_addr);
+int valkeyContextConnectUnix(valkeyContext *c, const char *path,
+                             const struct timeval *timeout);
 int valkeyKeepAlive(valkeyContext *c, int interval);
 int valkeyCheckConnectDone(valkeyContext *c, int *completed);
 

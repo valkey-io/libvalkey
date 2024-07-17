@@ -13,7 +13,7 @@
 #include <string.h>
 
 #define CLUSTER_NODE "127.0.0.1:7000"
-#define KEY "key:1"
+#define KEY          "key:1"
 
 void pushCallback(valkeyAsyncContext *ac, void *r);
 void setCallback(valkeyClusterAsyncContext *acc, void *r, void *privdata);
@@ -83,7 +83,7 @@ void getCallback1(valkeyClusterAsyncContext *acc, void *r, void *privdata) {
 
 /* Push message callback handling invalidation messages. */
 void pushCallback(valkeyAsyncContext *ac, void *r) {
-    (void) ac;
+    (void)ac;
     valkeyReply *reply = r;
     if (!(reply->type == VALKEY_REPLY_PUSH && reply->elements == 2 &&
           reply->element[0]->type == VALKEY_REPLY_STRING &&
@@ -140,8 +140,8 @@ void modifyKey(const char *key, const char *value) {
 }
 
 int main(int argc, char **argv) {
-    (void) argc;
-    (void) argv;
+    (void)argc;
+    (void)argv;
     valkeyClusterAsyncContext *acc = valkeyClusterAsyncContextInit();
     assert(acc);
 

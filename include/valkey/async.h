@@ -45,10 +45,10 @@ extern "C" {
 #endif
 
 struct valkeyAsyncContext; /* need forward declaration of valkeyAsyncContext */
-struct dict; /* dictionary header is included in async.c */
+struct dict;               /* dictionary header is included in async.c */
 
 /* Reply callback prototype and container */
-typedef void (valkeyCallbackFn)(struct valkeyAsyncContext*, void*, void*);
+typedef void(valkeyCallbackFn)(struct valkeyAsyncContext *, void *, void *);
 typedef struct valkeyCallback {
     struct valkeyCallback *next; /* simple singly linked list */
     valkeyCallbackFn *fn;
@@ -63,9 +63,11 @@ typedef struct valkeyCallbackList {
 } valkeyCallbackList;
 
 /* Connection callback prototypes */
-typedef void (valkeyDisconnectCallback)(const struct valkeyAsyncContext*, int status);
-typedef void (valkeyConnectCallback)(const struct valkeyAsyncContext*, int status);
-typedef void (valkeyConnectCallbackNC)(struct valkeyAsyncContext *, int status);
+typedef void(valkeyDisconnectCallback)(const struct valkeyAsyncContext *,
+                                       int status);
+typedef void(valkeyConnectCallback)(const struct valkeyAsyncContext *,
+                                    int status);
+typedef void(valkeyConnectCallbackNC)(struct valkeyAsyncContext *, int status);
 typedef void(valkeyTimerCallback)(void *timer, void *privdata);
 
 /* Context for an async connection to Valkey */
@@ -125,15 +127,20 @@ typedef struct valkeyAsyncContext {
 /* Functions that proxy to libvalkey */
 valkeyAsyncContext *valkeyAsyncConnectWithOptions(const valkeyOptions *options);
 valkeyAsyncContext *valkeyAsyncConnect(const char *ip, int port);
-valkeyAsyncContext *valkeyAsyncConnectBind(const char *ip, int port, const char *source_addr);
+valkeyAsyncContext *valkeyAsyncConnectBind(const char *ip, int port,
+                                           const char *source_addr);
 valkeyAsyncContext *valkeyAsyncConnectBindWithReuse(const char *ip, int port,
-                                                  const char *source_addr);
+                                                    const char *source_addr);
 valkeyAsyncContext *valkeyAsyncConnectUnix(const char *path);
-int valkeyAsyncSetConnectCallback(valkeyAsyncContext *ac, valkeyConnectCallback *fn);
-int valkeyAsyncSetConnectCallbackNC(valkeyAsyncContext *ac, valkeyConnectCallbackNC *fn);
-int valkeyAsyncSetDisconnectCallback(valkeyAsyncContext *ac, valkeyDisconnectCallback *fn);
+int valkeyAsyncSetConnectCallback(valkeyAsyncContext *ac,
+                                  valkeyConnectCallback *fn);
+int valkeyAsyncSetConnectCallbackNC(valkeyAsyncContext *ac,
+                                    valkeyConnectCallbackNC *fn);
+int valkeyAsyncSetDisconnectCallback(valkeyAsyncContext *ac,
+                                     valkeyDisconnectCallback *fn);
 
-valkeyAsyncPushFn *valkeyAsyncSetPushCallback(valkeyAsyncContext *ac, valkeyAsyncPushFn *fn);
+valkeyAsyncPushFn *valkeyAsyncSetPushCallback(valkeyAsyncContext *ac,
+                                              valkeyAsyncPushFn *fn);
 int valkeyAsyncSetTimeout(valkeyAsyncContext *ac, struct timeval tv);
 void valkeyAsyncDisconnect(valkeyAsyncContext *ac);
 void valkeyAsyncFree(valkeyAsyncContext *ac);
@@ -147,10 +154,15 @@ void valkeyAsyncWrite(valkeyAsyncContext *ac);
 
 /* Command functions for an async context. Write the command to the
  * output buffer and register the provided callback. */
-int valkeyvAsyncCommand(valkeyAsyncContext *ac, valkeyCallbackFn *fn, void *privdata, const char *format, va_list ap);
-int valkeyAsyncCommand(valkeyAsyncContext *ac, valkeyCallbackFn *fn, void *privdata, const char *format, ...);
-int valkeyAsyncCommandArgv(valkeyAsyncContext *ac, valkeyCallbackFn *fn, void *privdata, int argc, const char **argv, const size_t *argvlen);
-int valkeyAsyncFormattedCommand(valkeyAsyncContext *ac, valkeyCallbackFn *fn, void *privdata, const char *cmd, size_t len);
+int valkeyvAsyncCommand(valkeyAsyncContext *ac, valkeyCallbackFn *fn,
+                        void *privdata, const char *format, va_list ap);
+int valkeyAsyncCommand(valkeyAsyncContext *ac, valkeyCallbackFn *fn,
+                       void *privdata, const char *format, ...);
+int valkeyAsyncCommandArgv(valkeyAsyncContext *ac, valkeyCallbackFn *fn,
+                           void *privdata, int argc, const char **argv,
+                           const size_t *argvlen);
+int valkeyAsyncFormattedCommand(valkeyAsyncContext *ac, valkeyCallbackFn *fn,
+                                void *privdata, const char *cmd, size_t len);
 
 #ifdef __cplusplus
 }

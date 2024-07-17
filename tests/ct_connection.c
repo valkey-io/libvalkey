@@ -8,10 +8,10 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define CLUSTER_NODE "127.0.0.1:7000"
+#define CLUSTER_NODE               "127.0.0.1:7000"
 #define CLUSTER_NODE_WITH_PASSWORD "127.0.0.1:7100"
-#define CLUSTER_USERNAME "default"
-#define CLUSTER_PASSWORD "secretword"
+#define CLUSTER_USERNAME           "default"
+#define CLUSTER_PASSWORD           "secretword"
 
 int connect_success_counter;
 int connect_failure_counter;

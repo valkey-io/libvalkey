@@ -4,6 +4,7 @@
 #include "test_utils.h"
 #include "valkeycluster.h"
 #include "win32.h"
+
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -20,17 +21,16 @@ void check_key(char *key, struct cmd *command, char *file, int line) {
     int actual_keylen = command->key.len;
     if ((int)strlen(key) != actual_keylen ||
         strncmp(key, actual_key, actual_keylen)) {
-        fprintf(stderr,
-                "%s:%d: Expected key to be \"%s\" but got \"%.*s\"\n",
+        fprintf(stderr, "%s:%d: Expected key to be \"%s\" but got \"%.*s\"\n",
                 file, line, key, actual_keylen, actual_key);
         assert(0);
     }
 }
 
 /* Checks that a command (struct cmd *) has the given key (string). */
-#define ASSERT_KEY(command, key)                                        \
-    do {                                                                \
-        check_key(key, command, __FILE__, __LINE__);                    \
+#define ASSERT_KEY(command, key)                                               \
+    do {                                                                       \
+        check_key(key, command, __FILE__, __LINE__);                           \
     } while (0)
 
 void test_valkey_parse_error_nonresp(void) {

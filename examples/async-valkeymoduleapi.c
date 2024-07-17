@@ -1,18 +1,19 @@
+#include <valkey/adapters/valkeymoduleapi.h>
+#include <valkey/async.h>
+#include <valkey/valkey.h>
+
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <signal.h>
-
-#include <valkey.h>
-#include <async.h>
-#include <adapters/valkeymoduleapi.h>
 
 void debugCallback(valkeyAsyncContext *c, void *r, void *privdata) {
     (void)privdata; //unused
     valkeyReply *reply = r;
     if (reply == NULL) {
         /* The DEBUG SLEEP command will almost always fail, because we have set a 1 second timeout */
-        printf("`DEBUG SLEEP` error: %s\n", c->errstr ? c->errstr : "unknown error");
+        printf("`DEBUG SLEEP` error: %s\n",
+               c->errstr ? c->errstr : "unknown error");
         return;
     }
     /* Disconnect after receiving the reply of DEBUG SLEEP (which will not)*/
@@ -27,7 +28,7 @@ void getCallback(valkeyAsyncContext *c, void *r, void *privdata) {
         }
         return;
     }
-    printf("argv[%s]: %s\n", (char*)privdata, reply->str);
+    printf("argv[%s]: %s\n", (char *)privdata, reply->str);
 
     /* start another request that demonstrate timeout */
     valkeyAsyncCommand(c, debugCallback, NULL, "DEBUG SLEEP %f", 1.5);
@@ -57,8 +58,10 @@ void disconnectCallback(const valkeyAsyncContext *c, int status) {
  * 2- Load module:
  *       valkey-server --loadmodule ./example-valkeymoduleapi.so value
  */
-int ValkeyModule_OnLoad(ValkeyModuleCtx *ctx, ValkeyModuleString **argv, int argc) {
-    int ret = ValkeyModule_Init(ctx, "example-valkeymoduleapi", 1, VALKEYMODULE_APIVER_1);
+int ValkeyModule_OnLoad(ValkeyModuleCtx *ctx, ValkeyModuleString **argv,
+                        int argc) {
+    int ret = ValkeyModule_Init(ctx, "example-valkeymoduleapi", 1,
+                                VALKEYMODULE_APIVER_1);
     if (ret != VALKEYMODULE_OK) {
         printf("error module init \n");
         return VALKEYMODULE_ERR;
@@ -72,13 +75,14 @@ int ValkeyModule_OnLoad(ValkeyModuleCtx *ctx, ValkeyModuleString **argv, int arg
     }
 
     size_t len;
-    const char *val = ValkeyModule_StringPtrLen(argv[argc-1], &len);
+    const char *val = ValkeyModule_StringPtrLen(argv[argc - 1], &len);
 
-    ValkeyModuleCtx *module_ctx = ValkeyModule_GetDetachedThreadSafeContext(ctx);
+    ValkeyModuleCtx *module_ctx =
+        ValkeyModule_GetDetachedThreadSafeContext(ctx);
     valkeyModuleAttach(c, module_ctx);
-    valkeyAsyncSetConnectCallback(c,connectCallback);
-    valkeyAsyncSetDisconnectCallback(c,disconnectCallback);
-    valkeyAsyncSetTimeout(c, (struct timeval){ .tv_sec = 1, .tv_usec = 0});
+    valkeyAsyncSetConnectCallback(c, connectCallback);
+    valkeyAsyncSetDisconnectCallback(c, disconnectCallback);
+    valkeyAsyncSetTimeout(c, (struct timeval){.tv_sec = 1, .tv_usec = 0});
 
     /*
     In this demo, we first `set key`, then `get key` to demonstrate the basic usage of the adapter.
@@ -88,6 +92,6 @@ int ValkeyModule_OnLoad(ValkeyModuleCtx *ctx, ValkeyModuleString **argv, int arg
     */
 
     valkeyAsyncCommand(c, NULL, NULL, "SET key %b", val, len);
-    valkeyAsyncCommand(c, getCallback, (char*)"end-1", "GET key");
+    valkeyAsyncCommand(c, getCallback, (char *)"end-1", "GET key");
     return 0;
 }

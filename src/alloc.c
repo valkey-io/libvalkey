@@ -29,9 +29,11 @@
  */
 
 #include "fmacros.h"
+
 #include "alloc.h"
-#include <string.h>
+
 #include <stdlib.h>
+#include <string.h>
 
 valkeyAllocFuncs valkeyAllocFns = {
     .mallocFn = malloc,
@@ -52,7 +54,7 @@ valkeyAllocFuncs valkeySetAllocators(valkeyAllocFuncs *override) {
 
 /* Reset allocators to use libc defaults */
 void valkeyResetAllocators(void) {
-    valkeyAllocFns = (valkeyAllocFuncs) {
+    valkeyAllocFns = (valkeyAllocFuncs){
         .mallocFn = malloc,
         .callocFn = calloc,
         .reallocFn = realloc,
@@ -63,9 +65,7 @@ void valkeyResetAllocators(void) {
 
 #ifdef _WIN32
 
-void *vk_malloc(size_t size) {
-    return valkeyAllocFns.mallocFn(size);
-}
+void *vk_malloc(size_t size) { return valkeyAllocFns.mallocFn(size); }
 
 void *vk_calloc(size_t nmemb, size_t size) {
     /* Overflow check as the user can specify any arbitrary allocator */
@@ -79,12 +79,8 @@ void *vk_realloc(void *ptr, size_t size) {
     return valkeyAllocFns.reallocFn(ptr, size);
 }
 
-char *vk_strdup(const char *str) {
-    return valkeyAllocFns.strdupFn(str);
-}
+char *vk_strdup(const char *str) { return valkeyAllocFns.strdupFn(str); }
 
-void vk_free(void *ptr) {
-    valkeyAllocFns.freeFn(ptr);
-}
+void vk_free(void *ptr) { valkeyAllocFns.freeFn(ptr); }
 
 #endif

@@ -36,12 +36,13 @@
 #include "adapters/libevent.h"
 #include "test_utils.h"
 #include "valkeycluster.h"
+
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-#define CMD_SIZE 256
+#define CMD_SIZE      256
 #define HISTORY_DEPTH 16
 
 char cmd_history[HISTORY_DEPTH][CMD_SIZE];

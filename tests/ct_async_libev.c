@@ -1,6 +1,7 @@
 #include "adapters/libev.h"
 #include "test_utils.h"
 #include "valkeycluster.h"
+
 #include <assert.h>
 
 #define CLUSTER_NODE "127.0.0.1:7000"

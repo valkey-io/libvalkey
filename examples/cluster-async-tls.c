@@ -1,9 +1,10 @@
-#include <assert.h>
-#include <stdio.h>
-#include <stdlib.h>
 #include <valkey/adapters/libevent.h>
 #include <valkey/valkeycluster.h>
 #include <valkey/valkeycluster_ssl.h>
+
+#include <assert.h>
+#include <stdio.h>
+#include <stdlib.h>
 
 #define CLUSTER_NODE_TLS "127.0.0.1:7300"
 
