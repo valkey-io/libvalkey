@@ -15,8 +15,8 @@ INCLUDE_DIR = include/valkey
 TEST_SRCS = $(TEST_DIR)/client_test.c
 TEST_BINS = $(patsubst $(TEST_DIR)/%.c,$(TEST_DIR)/%,$(TEST_SRCS))
 
-SOURCES = $(filter-out $(wildcard $(SRC_DIR)/*ssl*.c), $(wildcard $(SRC_DIR)/*.c))
-HEADERS = $(filter-out $(INCLUDE_DIR)/valkey_ssl.h, $(wildcard $(INCLUDE_DIR)/*.h))
+SOURCES = $(filter-out $(wildcard $(SRC_DIR)/*ssl*.c, wildcard $(SRC_DIR)/*rdma*.c), $(wildcard $(SRC_DIR)/*.c))
+HEADERS = $(filter-out $(INCLUDE_DIR)/valkey_ssl.h $(INCLUDE_DIR)/valkey_rdma.h, $(wildcard $(INCLUDE_DIR)/*.h))
 
 OBJS = $(patsubst $(SRC_DIR)/%.c,$(OBJ_DIR)/%.o,$(SOURCES))
 
@@ -25,6 +25,7 @@ PKGCONFNAME=$(LIB_DIR)/valkey.pc
 
 PKGCONF_TEMPLATE = valkey.pc.in
 SSL_PKGCONF_TEMPLATE = valkey_ssl.pc.in
+RDMA_PKGCONF_TEMPLATE = valkey_rdma.pc.in
 
 LIBVALKEY_HEADER=$(INCLUDE_DIR)/valkey.h
 LIBVALKEY_VERSION=$(shell awk '/LIBVALKEY_(MAJOR|MINOR|PATCH|SONAME)/{print $$3}' $(LIBVALKEY_HEADER))
@@ -111,6 +112,38 @@ else
 endif
 ##################### SSL variables end #####################
 
+#################### RDMA variables start ####################
+RDMA_LIBNAME=libvalkey_rdma
+RDMA_PKGCONFNAME=$(LIB_DIR)/valkey_rdma.pc
+RDMA_INSTALLNAME=install-rdma
+RDMA_DYLIB_MINOR_NAME=$(RDMA_LIBNAME).$(DYLIBSUFFIX).$(LIBVALKEY_SONAME)
+RDMA_DYLIB_MAJOR_NAME=$(RDMA_LIBNAME).$(DYLIBSUFFIX).$(LIBVALKEY_MAJOR)
+RDMA_ROOT_DYLIB_NAME=$(RDMA_LIBNAME).$(DYLIBSUFFIX)
+RDMA_DYLIBNAME=$(LIB_DIR)/$(RDMA_LIBNAME).$(DYLIBSUFFIX)
+RDMA_STLIBNAME=$(LIB_DIR)/$(RDMA_LIBNAME).$(STLIBSUFFIX)
+RDMA_DYLIB_MAKE_CMD=$(CC) $(OPTIMIZATION) $(PLATFORM_FLAGS) -shared -Wl,-soname,$(RDMA_DYLIB_MINOR_NAME)
+
+USE_RDMA?=0
+
+ifeq ($(USE_RDMA),1)
+  RDMA_SOURCES = $(wildcard $(SRC_DIR)/*rdma*.c)
+  RDMA_OBJS = $(patsubst $(SRC_DIR)/%.c,$(OBJ_DIR)/%.o,$(RDMA_SOURCES))
+
+  RDMA_LDFLAGS+=-lrdmacm -libverbs
+  # This is required for test.c only
+  CFLAGS+=-DVALKEY_TEST_RDMA
+  RDMA_STLIB=$(RDMA_STLIBNAME)
+  RDMA_DYLIB=$(RDMA_DYLIBNAME)
+  RDMA_PKGCONF=$(RDMA_PKGCONFNAME)
+  RDMA_INSTALL=$(RDMA_INSTALLNAME)
+else
+  RDMA_STLIB=
+  RDMA_DYLIB=
+  RDMA_PKGCONF=
+  RDMA_INSTALL=
+endif
+##################### RDMA variables end #####################
+
 # Platform-specific overrides
 uname_S := $(shell uname -s 2>/dev/null || echo not)
 
@@ -174,6 +207,12 @@ $(SSL_DYLIBNAME): $(SSL_OBJS)
 $(SSL_STLIBNAME): $(SSL_OBJS)
 	$(STLIB_MAKE_CMD) $(SSL_STLIBNAME) $(SSL_OBJS)
 
+$(RDMA_DYLIBNAME): $(RDMA_OBJS)
+	$(RDMA_DYLIB_MAKE_CMD) $(DYLIB_PLUGIN) -o $(RDMA_DYLIBNAME) $(RDMA_OBJS) $(REAL_LDFLAGS) $(LDFLAGS) $(RDMA_LDFLAGS)
+
+$(RDMA_STLIBNAME): $(RDMA_OBJS)
+	$(STLIB_MAKE_CMD) $(RDMA_STLIBNAME) $(RDMA_OBJS)
+
 $(OBJ_DIR)/%.o: $(SRC_DIR)/%.c | $(OBJ_DIR)
 	$(CC) -std=c99 -pedantic $(REAL_CFLAGS) -I$(INCLUDE_DIR) -MMD -MP -c $< -o $@
 
@@ -181,7 +220,7 @@ $(OBJ_DIR)/%.o: $(TEST_DIR)/%.c | $(OBJ_DIR)
 	$(CC) -std=c99 -pedantic $(REAL_CFLAGS) -I$(INCLUDE_DIR) -MMD -MP -c $< -o $@
 
 $(TEST_DIR)/%: $(OBJ_DIR)/%.o $(STLIBNAME)
-	$(CC) -o $@ $< $(STLIBNAME) $(SSL_STLIB) $(LDFLAGS) $(TEST_LDFLAGS)
+	$(CC) -o $@ $< $(RDMA_STLIB) $(STLIBNAME) $(SSL_STLIB) $(LDFLAGS) $(TEST_LDFLAGS)
 
 $(OBJ_DIR):
 	mkdir -p $(OBJ_DIR)
@@ -189,15 +228,15 @@ $(OBJ_DIR):
 $(LIB_DIR):
 	mkdir -p $(LIB_DIR)
 
-dynamic: $(DYLIBNAME) $(SSL_DYLIB)
+dynamic: $(DYLIBNAME) $(SSL_DYLIB) $(RDMA_DYLIB)
 
-static: $(STLIBNAME) $(SSL_STLIB)
+static: $(STLIBNAME) $(SSL_STLIB) $(RDMA_STLIB)
 
-pkgconfig: $(PKGCONFNAME) $(SSL_PKGCONF)
+pkgconfig: $(PKGCONFNAME) $(SSL_PKGCONF) $(RDMA_PKGCONF)
 
 -include $(OBJS:.o=.d)
 
-TEST_LDFLAGS = $(SSL_LDFLAGS)
+TEST_LDFLAGS = $(SSL_LDFLAGS) $(RDMA_LDFLAGS)
 ifeq ($(USE_SSL),1)
   TEST_LDFLAGS += -pthread
 endif
@@ -232,6 +271,14 @@ $(SSL_PKGCONFNAME): $(SSL_PKGCONF_TEMPLATE)
 		-e 's|@PROJECT_VERSION@|$(LIBVALKEY_SONAME)|g' \
 		$< > $@
 
+$(RDMA_PKGCONFNAME): $(RDMA_PKGCONF_TEMPLATE)
+	@echo "Generating $@ for pkgconfig..."
+	sed \
+		-e 's|@CMAKE_INSTALL_PREFIX@|$(PREFIX)|g' \
+		-e 's|@CMAKE_INSTALL_LIBDIR@|$(INSTALL_LIBRARY_PATH)|g' \
+		-e 's|@PROJECT_VERSION@|$(LIBVALKEY_SONAME)|g' \
+		$< > $@
+
 install: $(DYLIBNAME) $(STLIBNAME) $(PKGCONFNAME) $(SSL_INSTALL)
 	mkdir -p $(INSTALL_INCLUDE_PATH)/adapters $(INSTALL_LIBRARY_PATH)
 	$(INSTALL) $(HEADERS) $(INSTALL_INCLUDE_PATH)
@@ -252,6 +299,16 @@ install-ssl: $(SSL_DYLIBNAME) $(SSL_STLIBNAME) $(SSL_PKGCONFNAME)
 	$(INSTALL) $(SSL_STLIBNAME) $(INSTALL_LIBRARY_PATH)
 	mkdir -p $(INSTALL_PKGCONF_PATH)
 	$(INSTALL) $(SSL_PKGCONFNAME) $(INSTALL_PKGCONF_PATH)
+
+install-rdma: $(RDMA_DYLIBNAME) $(RDMA_STLIBNAME) $(RDMA_PKGCONFNAME)
+	mkdir -p $(INSTALL_INCLUDE_PATH) $(INSTALL_LIBRARY_PATH)
+	$(INSTALL) $(INCLUDE_DIR)/valkey_rdma.h $(INSTALL_INCLUDE_PATH)
+	$(INSTALL) $(RDMA_DYLIBNAME) $(INSTALL_LIBRARY_PATH)/$(RDMA_DYLIB_MINOR_NAME)
+	ln -sf $(RDMA_DYLIB_MINOR_NAME) $(INSTALL_LIBRARY_PATH)/$(RDMA_ROOT_DYLIB_NAME)
+	ln -sf $(RDMA_DYLIB_MINOR_NAME) $(INSTALL_LIBRARY_PATH)/$(RDMA_DYLIB_MAJOR_NAME)
+	$(INSTALL) $(RDMA_STLIBNAME) $(INSTALL_LIBRARY_PATH)
+	mkdir -p $(INSTALL_PKGCONF_PATH)
+	$(INSTALL) $(RDMA_PKGCONFNAME) $(INSTALL_PKGCONF_PATH)
 
 32bit:
 	@echo ""

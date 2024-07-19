@@ -25,6 +25,9 @@
 #ifdef VALKEY_TEST_SSL
 #include "valkey_ssl.h"
 #endif
+#ifdef VALKEY_TEST_RDMA
+#include "valkey_rdma.h"
+#endif
 #ifdef VALKEY_TEST_ASYNC
 #include "adapters/libevent.h"
 #include <event2/event.h>
@@ -34,7 +37,8 @@ enum connection_type {
     CONN_TCP,
     CONN_UNIX,
     CONN_FD,
-    CONN_SSL
+    CONN_SSL,
+    CONN_RDMA
 };
 
 struct config {
@@ -57,6 +61,11 @@ struct config {
         const char *cert;
         const char *key;
     } ssl;
+
+    struct {
+        const char *host;
+        /* int port; use the same port as TCP */
+    } rdma;
 };
 
 struct privdata {
@@ -234,6 +243,12 @@ static valkeyContext *do_connect(struct config config) {
         c = valkeyConnect(config.ssl.host, config.ssl.port);
     } else if (config.type == CONN_UNIX) {
         c = valkeyConnectUnix(config.unix_sock.path);
+#ifdef VALKEY_TEST_RDMA
+    } else if (config.type == CONN_RDMA) {
+        valkeyOptions options = {0};
+        VALKEY_OPTIONS_SET_RDMA(&options, config.rdma.host, config.tcp.port);
+        c = valkeyConnectWithOptions(&options);
+#endif
     } else if (config.type == CONN_FD) {
         /* Create a dummy connection just to get an fd to inherit */
         valkeyContext *dummy_ctx = valkeyConnectUnix(config.unix_sock.path);
@@ -1424,6 +1439,13 @@ static void test_invalid_timeout_errors(struct config config) {
         c = valkeyConnectWithTimeout(config.tcp.host, config.tcp.port, config.connect_timeout);
     } else if(config.type == CONN_UNIX) {
         c = valkeyConnectUnixWithTimeout(config.unix_sock.path, config.connect_timeout);
+#ifdef VALKEY_TEST_RDMA
+    } else if(config.type == CONN_RDMA) {
+        valkeyOptions options = {0};
+        VALKEY_OPTIONS_SET_RDMA(&options, config.tcp.host, config.tcp.port);
+        options.connect_timeout = &config.connect_timeout;
+        c = valkeyConnectWithOptions(&options);
+#endif
     } else {
         valkeyTestPanic("Unknown connection type!");
     }
@@ -1440,6 +1462,13 @@ static void test_invalid_timeout_errors(struct config config) {
         c = valkeyConnectWithTimeout(config.tcp.host, config.tcp.port, config.connect_timeout);
     } else if(config.type == CONN_UNIX) {
         c = valkeyConnectUnixWithTimeout(config.unix_sock.path, config.connect_timeout);
+#ifdef VALKEY_TEST_RDMA
+    } else if(config.type == CONN_RDMA) {
+        valkeyOptions options = {0};
+        VALKEY_OPTIONS_SET_RDMA(&options, config.tcp.host, config.tcp.port);
+        options.connect_timeout = &config.connect_timeout;
+        c = valkeyConnectWithOptions(&options);
+#endif
     } else {
         valkeyTestPanic("Unknown connection type!");
     }
@@ -2269,6 +2298,11 @@ int main(int argc, char **argv) {
             argv++; argc--;
             cfg.ssl.key = argv[0];
 #endif
+#ifdef VALKEY_TEST_RDMA
+        } else if (argc >= 1 && !strcmp(argv[0],"--rdma-addr")) {
+            argv++; argc--;
+            cfg.rdma.host = argv[0];
+#endif
         } else {
             fprintf(stderr, "Invalid argument: %s\n", argv[0]);
             exit(1);
@@ -2337,6 +2371,22 @@ int main(int argc, char **argv) {
 
         valkeyFreeSSLContext(_ssl_ctx);
         _ssl_ctx = NULL;
+    }
+#endif
+
+#ifdef VALKEY_TEST_RDMA
+    if (cfg.rdma.host) {
+
+        valkeyInitiateRdma();
+        printf("\nTesting against RDMA connection (%s:%d):\n", cfg.rdma.host, cfg.tcp.port);
+        cfg.type = CONN_RDMA;
+
+        test_blocking_connection(cfg);
+        test_blocking_connection_timeouts(cfg);
+        test_blocking_io_errors(cfg);
+        test_invalid_timeout_errors(cfg);
+        test_append_formatted_commands(cfg);
+        if (throughput) test_throughput(cfg);
     }
 #endif
 
