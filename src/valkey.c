@@ -782,8 +782,10 @@ int valkeyReconnect(valkeyContext *c) {
 
     switch (c->connection_type) {
     case VALKEY_CONN_TCP:
-        options.endpoint.tcp.ip = c->tcp.host;
         options.endpoint.tcp.source_addr = c->tcp.source_addr;
+        /* FALLTHRU */
+    case VALKEY_CONN_RDMA:
+        options.endpoint.tcp.ip = c->tcp.host;
         options.endpoint.tcp.port = c->tcp.port;
         break;
     case VALKEY_CONN_UNIX:

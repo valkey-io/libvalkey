@@ -16,6 +16,8 @@ ENABLE_DEBUG_CMD=
 SSL_TEST_ARGS=
 SKIPS_ARG=${SKIPS_ARG:-}
 VALKEY_DOCKER=${VALKEY_DOCKER:-}
+TEST_RDMA=${TEST_RDMA:-0}
+RDMA_TEST_ARGS=
 
 check_executable "$VALKEY_SERVER"
 
@@ -98,6 +100,15 @@ tls-key-file ${SSL_KEY}
 EOF
 fi
 
+# if doing RDMA, add these
+if [ "$TEST_RDMA" = "1" ]; then
+    cat >> ${CONF_FILE} <<EOF
+loadmodule ${VALKEY_RDMA_MODULE} bind=${VALKEY_RDMA_ADDR} port=${VALKEY_PORT}
+protected-mode no
+EOF
+RDMA_TEST_ARGS="--rdma-addr ${VALKEY_RDMA_ADDR}"
+fi
+
 echo ${tmpdir}
 cat ${CONF_FILE}
 if [ -n "${VALKEY_DOCKER}" ] ; then
@@ -123,4 +134,4 @@ done
 # Treat skips as failures if directed
 [ "$SKIPS_AS_FAILS" = 1 ] && SKIPS_ARG="${SKIPS_ARG} --skips-as-fails"
 
-${TEST_PREFIX:-} ./client_test -h 127.0.0.1 -p ${VALKEY_PORT} -s ${SOCK_FILE} ${SSL_TEST_ARGS} ${SKIPS_ARG}
+${TEST_PREFIX:-} ./client_test -h 127.0.0.1 -p ${VALKEY_PORT} -s ${SOCK_FILE} ${SSL_TEST_ARGS} ${SKIPS_ARG} ${RDMA_TEST_ARGS}

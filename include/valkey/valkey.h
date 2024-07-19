@@ -149,6 +149,7 @@ enum valkeyConnectionType {
     VALKEY_CONN_TCP,
     VALKEY_CONN_UNIX,
     VALKEY_CONN_USERFD,
+    VALKEY_CONN_RDMA, /* experimental, may be removed in any version */
 
     VALKEY_CONN_MAX
 };

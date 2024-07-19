@@ -1,8 +1,11 @@
+
 /*
- * Copyright (c) 2015-2017, Ieshen Zheng <ieshen.zheng at 163 dot com>
- * Copyright (c) 2020, Nick <heronr1 at gmail dot com>
- * Copyright (c) 2020-2021, Bjorn Svensson <bjorn.a.svensson at est dot tech>
- * Copyright (c) 2020-2021, Viktor Söderqvist <viktor.soderqvist at est dot tech>
+ * Copyright (c) 2021-2024 zhenwei pi <pizhenwei@bytedance.com>
+ *
+ * Valkey Over RDMA has been supported as experimental feature since Valkey-8.0.
+ * It's also supported as an experimental feature by libvalkey,
+ * It may be removed or changed in any version.
+ *
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -30,30 +33,28 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef VALKEY_VKUTIL_H
-#define VALKEY_VKUTIL_H
+#ifndef VALKEY_RDMA_H
+#define VALKEY_RDMA_H
 
-#include <stdint.h>
-#include <sys/types.h>
+#ifdef __cplusplus
+extern "C" {
+#endif
 
-/*
- * Wrapper to workaround well known, safe, implicit type conversion when
- * invoking system calls.
+/**
+ * Helper macros to initialize options for RDMA.
+ * It's ok to reuse TCP options.
  */
-#define vk_atoi(_line, _n) _vk_atoi((uint8_t *)_line, (size_t)_n)
+#define VALKEY_OPTIONS_SET_RDMA(opts, ip_, port_) do { \
+        (opts)->type = VALKEY_CONN_RDMA;               \
+        (opts)->endpoint.tcp.ip = ip_;                 \
+        (opts)->endpoint.tcp.port = port_;             \
+    } while(0)
 
-int _vk_atoi(uint8_t *line, size_t n);
 
-int64_t vk_usec_now(void);
+int valkeyInitiateRdma(void);
 
-static inline int64_t vk_msec_now(void) {
-    return vk_usec_now() / 1000;
+#ifdef __cplusplus
 }
+#endif
 
-uint16_t crc16(const char *buf, int len);
-
-static inline int valkeyMin(long long a, long long b) {
-    return (a < b) ? a : b;
-}
-
-#endif /* VALKEY_VKUTIL_H */
+#endif  /* VALKEY_RDMA_H */
