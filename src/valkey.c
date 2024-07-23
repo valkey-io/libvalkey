@@ -760,13 +760,13 @@ int valkeyReconnect(valkeyContext *c) {
     c->err = 0;
     memset(c->errstr, '\0', strlen(c->errstr));
 
+    if (c->funcs && c->funcs->close) {
+        c->funcs->close(c);
+    }
+
     if (c->privctx && c->funcs->free_privctx) {
         c->funcs->free_privctx(c->privctx);
         c->privctx = NULL;
-    }
-
-    if (c->funcs && c->funcs->close) {
-        c->funcs->close(c);
     }
 
     sdsfree(c->obuf);
