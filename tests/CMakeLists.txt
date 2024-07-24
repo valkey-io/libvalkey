@@ -80,6 +80,11 @@ endif()
 if(SSL_LIBRARY)
   set_property(TEST client_test PROPERTY ENVIRONMENT "TEST_SSL=1")
 endif()
+if(ENABLE_RDMA)
+  target_compile_definitions(client_test PUBLIC VALKEY_TEST_RDMA=1)
+  target_link_libraries(client_test valkey_rdma)
+  set_property(TEST client_test PROPERTY ENVIRONMENT "TEST_RDMA=1")
+endif()
 
 # Add cluster tests if we have libevent
 if (LIBEVENT_LIBRARY)

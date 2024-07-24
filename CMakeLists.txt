@@ -23,6 +23,7 @@ OPTION(DISABLE_TESTS "If tests should be compiled or not" OFF)
 OPTION(ENABLE_EXAMPLES "Enable building valkey examples" OFF)
 option(ENABLE_IPV6_TESTS "Enable IPv6 tests requiring special prerequisites" OFF)
 OPTION(ENABLE_NUGET "Install NuGET packaging details" OFF)
+OPTION(ENABLE_RDMA "Build valkey_rdma for RDMA support" OFF)
 
 # valkey requires C99
 SET(CMAKE_C_STANDARD 99)
@@ -226,6 +227,53 @@ IF(ENABLE_SSL)
     INSTALL(FILES ${CMAKE_CURRENT_BINARY_DIR}/valkey_ssl-config.cmake
         DESTINATION ${CMAKE_CONF_INSTALL_DIR})
 ENDIF()
+
+if(ENABLE_RDMA)
+    find_library(RDMACM_LIBRARIES rdmacm)
+    find_library(IBVERBS_LIBRARIES ibverbs)
+    set(valkey_rdma_sources src/rdma.c)
+    add_library(valkey_rdma ${valkey_rdma_sources})
+    add_library(valkey::valkey_rdma ALIAS valkey_rdma)
+
+    target_link_libraries(valkey_rdma LINK_PRIVATE ${RDMACM_LIBRARIES} ${IBVERBS_LIBRARIES})
+    target_include_directories(valkey_rdma
+        PRIVATE
+            $<INSTALL_INTERFACE:include>
+            $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/valkey>
+    )
+
+    set_target_properties(valkey_rdma
+        PROPERTIES
+        WINDOWS_EXPORT_ALL_SYMBOLS TRUE
+        VERSION "${LIBVALKEY_SONAME}")
+    configure_file(valkey_rdma.pc.in valkey_rdma.pc @ONLY)
+
+    install(TARGETS valkey_rdma
+        EXPORT valkey_rdma-targets
+        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
+
+    install(FILES ${CMAKE_CURRENT_BINARY_DIR}/valkey_rdma.pc
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig)
+
+    export(EXPORT valkey_rdma-targets
+           FILE "${CMAKE_CURRENT_BINARY_DIR}/valkey_rdma-targets.cmake"
+           NAMESPACE valkey::)
+
+    set(CMAKE_CONF_INSTALL_DIR ${CMAKE_INSTALL_LIBDIR}/cmake/valkey_rdma)
+    configure_package_config_file(valkey_rdma-config.cmake.in ${CMAKE_CURRENT_BINARY_DIR}/valkey_rdma-config.cmake
+                                  INSTALL_DESTINATION ${CMAKE_CONF_INSTALL_DIR}
+                                  PATH_VARS INCLUDE_INSTALL_DIR)
+
+    install(EXPORT valkey_rdma-targets
+        FILE valkey_rdma-targets.cmake
+        NAMESPACE valkey::
+        DESTINATION ${CMAKE_CONF_INSTALL_DIR})
+
+    install(FILES ${CMAKE_CURRENT_BINARY_DIR}/valkey_rdma-config.cmake
+        DESTINATION ${CMAKE_CONF_INSTALL_DIR})
+endif()
 
 # Add tests
 if(NOT DISABLE_TESTS)
