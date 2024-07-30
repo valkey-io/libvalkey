@@ -35,8 +35,13 @@
 
 #define SDS_MAX_PREALLOC (1024*1024)
 #ifdef _MSC_VER
-typedef long long ssize_t;
-#define SSIZE_MAX (LLONG_MAX >> 1)
+#include <basetsd.h>
+typedef SSIZE_T ssize_t;
+#ifdef _WIN64
+#define SSIZE_MAX (_I64_MAX >> 1)
+#else
+#define SSIZE_MAX (_I32_MAX >> 1)
+#endif
 #ifndef __clang__
 #define __attribute__(x)
 #endif
