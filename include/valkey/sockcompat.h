@@ -53,7 +53,8 @@
 #include <mstcpip.h>
 
 #ifdef _MSC_VER
-typedef long long ssize_t;
+#include <basetsd.h>
+typedef SSIZE_T ssize_t;
 #endif
 
 /* Emulate the parts of the BSD socket API that we need (override the winsock signatures). */

@@ -38,8 +38,9 @@
 #ifndef _MSC_VER
 #include <sys/time.h> /* for struct timeval */
 #else
+#include <basetsd.h>
 struct timeval; /* forward declaration */
-typedef long long ssize_t;
+typedef SSIZE_T ssize_t;
 #endif
 #include <stdint.h> /* uintXX_t, etc */
 #include "sds.h" /* for sds */
