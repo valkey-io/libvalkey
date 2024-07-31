@@ -29,8 +29,8 @@
 #ifndef VALKEYCLUSTER_SSL_H
 #define VALKEYCLUSTER_SSL_H
 
-#include "valkeycluster.h"
 #include "valkey_ssl.h"
+#include "valkeycluster.h"
 
 #ifdef __cplusplus
 extern "C" {

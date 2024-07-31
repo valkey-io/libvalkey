@@ -37,13 +37,12 @@
 #include <limits.h>
 #include <string.h>
 
-
 void valkeySetError(valkeyContext *c, int type, const char *str);
 
-
 /* Helper function. Convert struct timeval to millisecond. */
-static inline int valkeyContextTimeoutMsec(const struct timeval *timeout, long *result) {
-    long max_msec = ((LONG_MAX) - 999) / 1000;
+static inline int valkeyContextTimeoutMsec(const struct timeval *timeout,
+                                           long *result) {
+    long max_msec = ((LONG_MAX)-999) / 1000;
     long msec = INT_MAX;
 
     /* Only use timeout when not NULL. */
@@ -88,8 +87,9 @@ static inline int valkeyCommandTimeoutMsec(valkeyContext *c, long *result) {
     return ret;
 }
 
-static inline int valkeyContextUpdateConnectTimeout(valkeyContext *c,
-                                                    const struct timeval *timeout) {
+static inline int
+valkeyContextUpdateConnectTimeout(valkeyContext *c,
+                                  const struct timeval *timeout) {
     /* Same timeval struct, short circuit */
     if (c->connect_timeout == timeout)
         return VALKEY_OK;
@@ -105,8 +105,9 @@ static inline int valkeyContextUpdateConnectTimeout(valkeyContext *c,
     return VALKEY_OK;
 }
 
-static inline int valkeyContextUpdateCommandTimeout(valkeyContext *c,
-                                                    const struct timeval *timeout) {
+static inline int
+valkeyContextUpdateCommandTimeout(valkeyContext *c,
+                                  const struct timeval *timeout) {
     /* Same timeval struct, short circuit */
     if (c->command_timeout == timeout)
         return VALKEY_OK;
@@ -122,4 +123,4 @@ static inline int valkeyContextUpdateCommandTimeout(valkeyContext *c,
     return VALKEY_OK;
 }
 
-#endif  /* VALKEY_VK_PRIVATE_H */
+#endif /* VALKEY_VK_PRIVATE_H */

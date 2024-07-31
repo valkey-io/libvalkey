@@ -51,15 +51,15 @@ typedef struct valkeySSLContext valkeySSLContext;
  */
 
 typedef enum {
-    VALKEY_SSL_CTX_NONE = 0,                     /* No Error */
-    VALKEY_SSL_CTX_CREATE_FAILED,                /* Failed to create OpenSSL SSL_CTX */
-    VALKEY_SSL_CTX_CERT_KEY_REQUIRED,            /* Client cert and key must both be specified or skipped */
-    VALKEY_SSL_CTX_CA_CERT_LOAD_FAILED,          /* Failed to load CA Certificate or CA Path */
-    VALKEY_SSL_CTX_CLIENT_CERT_LOAD_FAILED,      /* Failed to load client certificate */
-    VALKEY_SSL_CTX_CLIENT_DEFAULT_CERT_FAILED,   /* Failed to set client default certificate directory */
-    VALKEY_SSL_CTX_PRIVATE_KEY_LOAD_FAILED,      /* Failed to load private key */
-    VALKEY_SSL_CTX_OS_CERTSTORE_OPEN_FAILED,     /* Failed to open system certificate store */
-    VALKEY_SSL_CTX_OS_CERT_ADD_FAILED            /* Failed to add CA certificates obtained from system to the SSL context */
+    VALKEY_SSL_CTX_NONE = 0,      /* No Error */
+    VALKEY_SSL_CTX_CREATE_FAILED, /* Failed to create OpenSSL SSL_CTX */
+    VALKEY_SSL_CTX_CERT_KEY_REQUIRED, /* Client cert and key must both be specified or skipped */
+    VALKEY_SSL_CTX_CA_CERT_LOAD_FAILED, /* Failed to load CA Certificate or CA Path */
+    VALKEY_SSL_CTX_CLIENT_CERT_LOAD_FAILED, /* Failed to load client certificate */
+    VALKEY_SSL_CTX_CLIENT_DEFAULT_CERT_FAILED, /* Failed to set client default certificate directory */
+    VALKEY_SSL_CTX_PRIVATE_KEY_LOAD_FAILED, /* Failed to load private key */
+    VALKEY_SSL_CTX_OS_CERTSTORE_OPEN_FAILED, /* Failed to open system certificate store */
+    VALKEY_SSL_CTX_OS_CERT_ADD_FAILED /* Failed to add CA certificates obtained from system to the SSL context */
 } valkeySSLContextError;
 
 /* Constants that mirror OpenSSL's verify modes. By default,
@@ -119,9 +119,12 @@ int valkeyInitOpenSSL(void);
  * (returning a NULL).
  */
 
-valkeySSLContext *valkeyCreateSSLContext(const char *cacert_filename, const char *capath,
-        const char *cert_filename, const char *private_key_filename,
-        const char *server_name, valkeySSLContextError *error);
+valkeySSLContext *valkeyCreateSSLContext(const char *cacert_filename,
+                                         const char *capath,
+                                         const char *cert_filename,
+                                         const char *private_key_filename,
+                                         const char *server_name,
+                                         valkeySSLContextError *error);
 
 /**
   * Helper function to initialize an OpenSSL context that can be used
@@ -132,8 +135,9 @@ valkeySSLContext *valkeyCreateSSLContext(const char *cacert_filename, const char
   * If error is non-null, it will be populated in case the context creation fails
   * (returning a NULL).
 */
-valkeySSLContext *valkeyCreateSSLContextWithOptions(valkeySSLOptions *options,
-        valkeySSLContextError *error);
+valkeySSLContext *
+valkeyCreateSSLContextWithOptions(valkeySSLOptions *options,
+                                  valkeySSLContextError *error);
 
 /**
  * Free a previously created OpenSSL context.
@@ -148,7 +152,8 @@ void valkeyFreeSSLContext(valkeySSLContext *valkey_ssl_ctx);
  * previously created using valkeyCreateSSLContext().
  */
 
-int valkeyInitiateSSLWithContext(valkeyContext *c, valkeySSLContext *valkey_ssl_ctx);
+int valkeyInitiateSSLWithContext(valkeyContext *c,
+                                 valkeySSLContext *valkey_ssl_ctx);
 
 /**
  * Initiate SSL/TLS negotiation on a provided OpenSSL SSL object.
@@ -160,4 +165,4 @@ int valkeyInitiateSSL(valkeyContext *c, struct ssl_st *ssl);
 }
 #endif
 
-#endif  /* VALKEY_SSL_H */
+#endif /* VALKEY_SSL_H */

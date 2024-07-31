@@ -27,20 +27,23 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+#include <valkey/valkey.h>
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <valkey/valkey.h>
 
 #define KEY_COUNT 5
 
-#define panicAbort(fmt, ...) \
-    do { \
-        fprintf(stderr, "%s:%d:%s(): " fmt, __FILE__, __LINE__, __func__, __VA_ARGS__); \
-        exit(-1); \
+#define panicAbort(fmt, ...)                                                   \
+    do {                                                                       \
+        fprintf(stderr, "%s:%d:%s(): " fmt, __FILE__, __LINE__, __func__,      \
+                __VA_ARGS__);                                                  \
+        exit(-1);                                                              \
     } while (0)
 
-static void assertReplyAndFree(valkeyContext *context, valkeyReply *reply, int type) {
+static void assertReplyAndFree(valkeyContext *context, valkeyReply *reply,
+                               int type) {
     if (reply == NULL)
         panicAbort("NULL reply from server (error: %s)", context->errstr);
 
@@ -62,9 +65,11 @@ static void enableClientTracking(valkeyContext *c) {
     }
 
     if (reply->type != VALKEY_REPLY_MAP) {
-        fprintf(stderr, "Error: Can't send HELLO 3 command.  Are you sure you're ");
-        fprintf(stderr, "connected to valkey-server >= 6.0.0?\nServer error: %s\n",
-                        reply->type == VALKEY_REPLY_ERROR ? reply->str : "(unknown)");
+        fprintf(stderr,
+                "Error: Can't send HELLO 3 command.  Are you sure you're ");
+        fprintf(stderr,
+                "connected to valkey-server >= 6.0.0?\nServer error: %s\n",
+                reply->type == VALKEY_REPLY_ERROR ? reply->str : "(unknown)");
         exit(-1);
     }
 
@@ -82,8 +87,7 @@ void pushReplyHandler(void *privdata, void *r) {
     /* Sanity check on the invalidation reply */
     if (reply->type != VALKEY_REPLY_PUSH || reply->elements != 2 ||
         reply->element[1]->type != VALKEY_REPLY_ARRAY ||
-        reply->element[1]->element[0]->type != VALKEY_REPLY_STRING)
-    {
+        reply->element[1]->element[0]->type != VALKEY_REPLY_STRING) {
         panicAbort("%s", "Can't parse PUSH message!");
     }
 
@@ -100,7 +104,8 @@ void pushReplyHandler(void *privdata, void *r) {
  * have libvalkey call our data destructor when freeing the context */
 void privdata_dtor(void *privdata) {
     unsigned int *icount = privdata;
-    printf("privdata_dtor():  In context privdata dtor (invalidations: %u)\n", *icount);
+    printf("privdata_dtor():  In context privdata dtor (invalidations: %u)\n",
+           *icount);
 }
 
 int main(int argc, char **argv) {
@@ -152,7 +157,8 @@ int main(int argc, char **argv) {
         printf("            main(): SET REPLY OK\n");
     }
 
-    printf("\nTotal detected invalidations: %d, expected: %d\n", invalidations, KEY_COUNT);
+    printf("\nTotal detected invalidations: %d, expected: %d\n", invalidations,
+           KEY_COUNT);
 
     /* PING server */
     valkeyFree(c);

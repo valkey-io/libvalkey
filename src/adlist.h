@@ -54,20 +54,20 @@ typedef struct hilist {
 } hilist;
 
 /* Functions implemented as macros */
-#define listLength(l) ((l)->len)
-#define listFirst(l) ((l)->head)
-#define listLast(l) ((l)->tail)
-#define listPrevNode(n) ((n)->prev)
-#define listNextNode(n) ((n)->next)
-#define listNodeValue(n) ((n)->value)
+#define listLength(l)            ((l)->len)
+#define listFirst(l)             ((l)->head)
+#define listLast(l)              ((l)->tail)
+#define listPrevNode(n)          ((n)->prev)
+#define listNextNode(n)          ((n)->next)
+#define listNodeValue(n)         ((n)->value)
 
-#define listSetDupMethod(l, m) ((l)->dup = (m))
-#define listSetFreeMethod(l, m) ((l)->free = (m))
+#define listSetDupMethod(l, m)   ((l)->dup = (m))
+#define listSetFreeMethod(l, m)  ((l)->free = (m))
 #define listSetMatchMethod(l, m) ((l)->match = (m))
 
-#define listGetDupMethod(l) ((l)->dup)
-#define listGetFree(l) ((l)->free)
-#define listGetMatchMethod(l) ((l)->match)
+#define listGetDupMethod(l)      ((l)->dup)
+#define listGetFree(l)           ((l)->free)
+#define listGetMatchMethod(l)    ((l)->match)
 
 /* Prototypes */
 hilist *listCreate(void);

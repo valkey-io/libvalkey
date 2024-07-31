@@ -3,56 +3,45 @@
 
 #include <glib.h>
 
-#include "../valkey.h"
 #include "../async.h"
+#include "../valkey.h"
 #include "../valkeycluster.h"
 
-typedef struct
-{
+typedef struct {
     GSource source;
     valkeyAsyncContext *ac;
     GPollFD poll_fd;
 } ValkeySource;
 
-static void
-valkey_source_add_read (gpointer data)
-{
+static void valkey_source_add_read(gpointer data) {
     ValkeySource *source = (ValkeySource *)data;
     g_return_if_fail(source);
     source->poll_fd.events |= G_IO_IN;
     g_main_context_wakeup(g_source_get_context((GSource *)data));
 }
 
-static void
-valkey_source_del_read (gpointer data)
-{
+static void valkey_source_del_read(gpointer data) {
     ValkeySource *source = (ValkeySource *)data;
     g_return_if_fail(source);
     source->poll_fd.events &= ~G_IO_IN;
     g_main_context_wakeup(g_source_get_context((GSource *)data));
 }
 
-static void
-valkey_source_add_write (gpointer data)
-{
+static void valkey_source_add_write(gpointer data) {
     ValkeySource *source = (ValkeySource *)data;
     g_return_if_fail(source);
     source->poll_fd.events |= G_IO_OUT;
     g_main_context_wakeup(g_source_get_context((GSource *)data));
 }
 
-static void
-valkey_source_del_write (gpointer data)
-{
+static void valkey_source_del_write(gpointer data) {
     ValkeySource *source = (ValkeySource *)data;
     g_return_if_fail(source);
     source->poll_fd.events &= ~G_IO_OUT;
     g_main_context_wakeup(g_source_get_context((GSource *)data));
 }
 
-static void
-valkey_source_cleanup (gpointer data)
-{
+static void valkey_source_cleanup(gpointer data) {
     ValkeySource *source = (ValkeySource *)data;
 
     g_return_if_fail(source);
@@ -69,27 +58,19 @@ valkey_source_cleanup (gpointer data)
     }
 }
 
-static gboolean
-valkey_source_prepare (GSource *source,
-                      gint    *timeout_)
-{
+static gboolean valkey_source_prepare(GSource *source, gint *timeout_) {
     ValkeySource *valkey = (ValkeySource *)source;
     *timeout_ = -1;
     return !!(valkey->poll_fd.events & valkey->poll_fd.revents);
 }
 
-static gboolean
-valkey_source_check (GSource *source)
-{
+static gboolean valkey_source_check(GSource *source) {
     ValkeySource *valkey = (ValkeySource *)source;
     return !!(valkey->poll_fd.events & valkey->poll_fd.revents);
 }
 
-static gboolean
-valkey_source_dispatch (GSource      *source,
-                       GSourceFunc   callback,
-                       gpointer      user_data)
-{
+static gboolean valkey_source_dispatch(GSource *source, GSourceFunc callback,
+                                       gpointer user_data) {
     ValkeySource *valkey = (ValkeySource *)source;
 
     if ((valkey->poll_fd.revents & G_IO_OUT)) {
@@ -109,9 +90,7 @@ valkey_source_dispatch (GSource      *source,
     return TRUE;
 }
 
-static void
-valkey_source_finalize (GSource *source)
-{
+static void valkey_source_finalize(GSource *source) {
     ValkeySource *valkey = (ValkeySource *)source;
 
     if (valkey->poll_fd.fd >= 0) {
@@ -120,12 +99,10 @@ valkey_source_finalize (GSource *source)
     }
 }
 
-static GSource *
-valkey_source_new (valkeyAsyncContext *ac)
-{
+static GSource *valkey_source_new(valkeyAsyncContext *ac) {
     static GSourceFuncs source_funcs = {
-        .prepare  = valkey_source_prepare,
-        .check     = valkey_source_check,
+        .prepare = valkey_source_prepare,
+        .check = valkey_source_check,
         .dispatch = valkey_source_dispatch,
         .finalize = valkey_source_finalize,
     };

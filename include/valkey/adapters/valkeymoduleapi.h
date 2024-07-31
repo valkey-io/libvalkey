@@ -18,31 +18,32 @@ typedef struct valkeyModuleEvents {
 } valkeyModuleEvents;
 
 static inline void valkeyModuleReadEvent(int fd, void *privdata, int mask) {
-    (void) fd;
-    (void) mask;
+    (void)fd;
+    (void)mask;
 
-    valkeyModuleEvents *e = (valkeyModuleEvents*)privdata;
+    valkeyModuleEvents *e = (valkeyModuleEvents *)privdata;
     valkeyAsyncHandleRead(e->context);
 }
 
 static inline void valkeyModuleWriteEvent(int fd, void *privdata, int mask) {
-    (void) fd;
-    (void) mask;
+    (void)fd;
+    (void)mask;
 
-    valkeyModuleEvents *e = (valkeyModuleEvents*)privdata;
+    valkeyModuleEvents *e = (valkeyModuleEvents *)privdata;
     valkeyAsyncHandleWrite(e->context);
 }
 
 static inline void valkeyModuleAddRead(void *privdata) {
-    valkeyModuleEvents *e = (valkeyModuleEvents*)privdata;
+    valkeyModuleEvents *e = (valkeyModuleEvents *)privdata;
     if (!e->reading) {
         e->reading = 1;
-        ValkeyModule_EventLoopAdd(e->fd, VALKEYMODULE_EVENTLOOP_READABLE, valkeyModuleReadEvent, e);
+        ValkeyModule_EventLoopAdd(e->fd, VALKEYMODULE_EVENTLOOP_READABLE,
+                                  valkeyModuleReadEvent, e);
     }
 }
 
 static inline void valkeyModuleDelRead(void *privdata) {
-    valkeyModuleEvents *e = (valkeyModuleEvents*)privdata;
+    valkeyModuleEvents *e = (valkeyModuleEvents *)privdata;
     if (e->reading) {
         e->reading = 0;
         ValkeyModule_EventLoopDel(e->fd, VALKEYMODULE_EVENTLOOP_READABLE);
@@ -50,15 +51,16 @@ static inline void valkeyModuleDelRead(void *privdata) {
 }
 
 static inline void valkeyModuleAddWrite(void *privdata) {
-    valkeyModuleEvents *e = (valkeyModuleEvents*)privdata;
+    valkeyModuleEvents *e = (valkeyModuleEvents *)privdata;
     if (!e->writing) {
         e->writing = 1;
-        ValkeyModule_EventLoopAdd(e->fd, VALKEYMODULE_EVENTLOOP_WRITABLE, valkeyModuleWriteEvent, e);
+        ValkeyModule_EventLoopAdd(e->fd, VALKEYMODULE_EVENTLOOP_WRITABLE,
+                                  valkeyModuleWriteEvent, e);
     }
 }
 
 static inline void valkeyModuleDelWrite(void *privdata) {
-    valkeyModuleEvents *e = (valkeyModuleEvents*)privdata;
+    valkeyModuleEvents *e = (valkeyModuleEvents *)privdata;
     if (e->writing) {
         e->writing = 0;
         ValkeyModule_EventLoopDel(e->fd, VALKEYMODULE_EVENTLOOP_WRITABLE);
@@ -66,7 +68,7 @@ static inline void valkeyModuleDelWrite(void *privdata) {
 }
 
 static inline void valkeyModuleStopTimer(void *privdata) {
-    valkeyModuleEvents *e = (valkeyModuleEvents*)privdata;
+    valkeyModuleEvents *e = (valkeyModuleEvents *)privdata;
     if (e->timer_active) {
         ValkeyModule_StopTimer(e->module_ctx, e->timer_id, NULL);
     }
@@ -74,7 +76,7 @@ static inline void valkeyModuleStopTimer(void *privdata) {
 }
 
 static inline void valkeyModuleCleanup(void *privdata) {
-    valkeyModuleEvents *e = (valkeyModuleEvents*)privdata;
+    valkeyModuleEvents *e = (valkeyModuleEvents *)privdata;
     valkeyModuleDelRead(privdata);
     valkeyModuleDelWrite(privdata);
     valkeyModuleStopTimer(privdata);
@@ -82,35 +84,35 @@ static inline void valkeyModuleCleanup(void *privdata) {
 }
 
 static inline void valkeyModuleTimeout(ValkeyModuleCtx *ctx, void *privdata) {
-    (void) ctx;
+    (void)ctx;
 
-    valkeyModuleEvents *e = (valkeyModuleEvents*)privdata;
+    valkeyModuleEvents *e = (valkeyModuleEvents *)privdata;
     e->timer_active = 0;
     valkeyAsyncHandleTimeout(e->context);
 }
 
 static inline void valkeyModuleSetTimeout(void *privdata, struct timeval tv) {
-    valkeyModuleEvents* e = (valkeyModuleEvents*)privdata;
+    valkeyModuleEvents *e = (valkeyModuleEvents *)privdata;
 
     valkeyModuleStopTimer(privdata);
 
     mstime_t millis = tv.tv_sec * 1000 + tv.tv_usec / 1000.0;
-    e->timer_id = ValkeyModule_CreateTimer(e->module_ctx, millis, valkeyModuleTimeout, e);
+    e->timer_id =
+        ValkeyModule_CreateTimer(e->module_ctx, millis, valkeyModuleTimeout, e);
     e->timer_active = 1;
 }
 
 /* Check if Redis version is compatible with the adapter. */
 static inline int valkeyModuleCompatibilityCheck(void) {
-    if (!ValkeyModule_EventLoopAdd ||
-        !ValkeyModule_EventLoopDel ||
-        !ValkeyModule_CreateTimer ||
-        !ValkeyModule_StopTimer) {
+    if (!ValkeyModule_EventLoopAdd || !ValkeyModule_EventLoopDel ||
+        !ValkeyModule_CreateTimer || !ValkeyModule_StopTimer) {
         return VALKEY_ERR;
     }
     return VALKEY_OK;
 }
 
-static inline int valkeyModuleAttach(valkeyAsyncContext *ac, ValkeyModuleCtx *module_ctx) {
+static inline int valkeyModuleAttach(valkeyAsyncContext *ac,
+                                     ValkeyModuleCtx *module_ctx) {
     valkeyContext *c = &(ac->c);
     valkeyModuleEvents *e;
 
@@ -119,7 +121,7 @@ static inline int valkeyModuleAttach(valkeyAsyncContext *ac, ValkeyModuleCtx *mo
         return VALKEY_ERR;
 
     /* Create container for context and r/w events */
-    e = (valkeyModuleEvents*)vk_malloc(sizeof(*e));
+    e = (valkeyModuleEvents *)vk_malloc(sizeof(*e));
     if (e == NULL)
         return VALKEY_ERR;
 

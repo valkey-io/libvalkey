@@ -1,18 +1,19 @@
+#include <valkey/adapters/libsdevent.h>
+#include <valkey/async.h>
+#include <valkey/valkey.h>
+
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <signal.h>
-
-#include <valkey/valkey.h>
-#include <valkey/async.h>
-#include <valkey/adapters/libsdevent.h>
 
 void debugCallback(valkeyAsyncContext *c, void *r, void *privdata) {
     (void)privdata;
     valkeyReply *reply = r;
     if (reply == NULL) {
         /* The DEBUG SLEEP command will almost always fail, because we have set a 1 second timeout */
-        printf("`DEBUG SLEEP` error: %s\n", c->errstr ? c->errstr : "unknown error");
+        printf("`DEBUG SLEEP` error: %s\n",
+               c->errstr ? c->errstr : "unknown error");
         return;
     }
     /* Disconnect after receiving the reply of DEBUG SLEEP (which will not)*/
@@ -22,10 +23,11 @@ void debugCallback(valkeyAsyncContext *c, void *r, void *privdata) {
 void getCallback(valkeyAsyncContext *c, void *r, void *privdata) {
     valkeyReply *reply = r;
     if (reply == NULL) {
-        printf("`GET key` error: %s\n", c->errstr ? c->errstr : "unknown error");
+        printf("`GET key` error: %s\n",
+               c->errstr ? c->errstr : "unknown error");
         return;
     }
-    printf("`GET key` result: argv[%s]: %s\n", (char*)privdata, reply->str);
+    printf("`GET key` result: argv[%s]: %s\n", (char *)privdata, reply->str);
 
     /* start another request that demonstrate timeout */
     valkeyAsyncCommand(c, debugCallback, NULL, "DEBUG SLEEP %f", 1.5);
@@ -47,7 +49,7 @@ void disconnectCallback(const valkeyAsyncContext *c, int status) {
     printf("Disconnected...\n");
 }
 
-int main (int argc, char **argv) {
+int main(int argc, char **argv) {
     signal(SIGPIPE, SIG_IGN);
 
     struct sd_event *event;
@@ -60,10 +62,10 @@ int main (int argc, char **argv) {
         return 1;
     }
 
-    valkeyLibsdeventAttach(c,event);
-    valkeyAsyncSetConnectCallback(c,connectCallback);
-    valkeyAsyncSetDisconnectCallback(c,disconnectCallback);
-    valkeyAsyncSetTimeout(c, (struct timeval){ .tv_sec = 1, .tv_usec = 0});
+    valkeyLibsdeventAttach(c, event);
+    valkeyAsyncSetConnectCallback(c, connectCallback);
+    valkeyAsyncSetDisconnectCallback(c, disconnectCallback);
+    valkeyAsyncSetTimeout(c, (struct timeval){.tv_sec = 1, .tv_usec = 0});
 
     /*
     In this demo, we first `set key`, then `get key` to demonstrate the basic usage of libsdevent adapter.
@@ -72,12 +74,14 @@ int main (int argc, char **argv) {
     timeout error, which is shown in the `debugCallback`.
     */
 
-    valkeyAsyncCommand(c, NULL, NULL, "SET key %b", argv[argc-1], strlen(argv[argc-1]));
-    valkeyAsyncCommand(c, getCallback, (char*)"end-1", "GET key");
+    valkeyAsyncCommand(c, NULL, NULL, "SET key %b", argv[argc - 1],
+                       strlen(argv[argc - 1]));
+    valkeyAsyncCommand(c, getCallback, (char *)"end-1", "GET key");
 
     /* sd-event does not quit when there are no handlers registered. Manually exit after 1.5 seconds */
     sd_event_source *s;
-    sd_event_add_time_relative(event, &s, CLOCK_MONOTONIC, 1500000, 1, NULL, NULL);
+    sd_event_add_time_relative(event, &s, CLOCK_MONOTONIC, 1500000, 1, NULL,
+                               NULL);
 
     sd_event_loop(event);
     sd_event_source_disable_unref(s);
