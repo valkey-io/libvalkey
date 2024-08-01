@@ -114,15 +114,21 @@ jobs:
     name: macOS
     runs-on: macos-latest
     steps:
-      - name: Prepare
-        run: |
-          brew install cmake ninja openssl
       - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
-      - name: Build
+      - name: Install dependencies
+        run: brew install ninja valkey
+      - name: Build using CMake
         run: |
           mkdir build && cd build
           cmake .. -G Ninja -DCMAKE_BUILD_TYPE=Release -DENABLE_SSL=ON
           ninja -v
+      - name: Build using Makefile
+        run: USE_SSL=1 make
+      - name: Run tests
+        working-directory: tests
+        env:
+          TEST_SSL: 1
+        run: ./test.sh
 
   windows:
     name: Windows

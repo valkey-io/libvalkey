@@ -138,25 +138,6 @@ jobs:
             gmake
             mkdir build && cd build && cmake .. && gmake
 
-  macos:
-    name: macOS
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
-
-      - name: Install dependencies
-        run: |
-          brew install openssl valkey
-
-      - name: Build library
-        run: USE_SSL=1 make
-
-      - name: Run tests
-        working-directory: tests
-        env:
-          TEST_SSL: 1
-        run: ./test.sh
-
   windows:
     name: Windows
     runs-on: windows-latest
