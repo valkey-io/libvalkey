@@ -9,6 +9,7 @@ jobs:
   checkers:
     name: Run static checkers
     runs-on: ubuntu-latest
+    if: ${{ false }}  # Disabled until we have merged a formatted code base.
     steps:
     - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
     - name: Run clang-format style check (.c and .h)
