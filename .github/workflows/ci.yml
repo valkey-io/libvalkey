@@ -98,12 +98,12 @@ jobs:
       run: |
         make CFLAGS="-I${{ github.workspace }}/make-install/usr/local/include" \
              STLIBNAME="${{ github.workspace }}/make-install/usr/local/lib/libvalkey.a" \
-             -C examples
+             USE_SSL=1 -C examples
     - name: Build examples with Makefile using a CMake-installed libvalkey
       run: |
         make CFLAGS="-I${{ github.workspace }}/cmake-install/usr/local/include" \
              STLIBNAME="${{ github.workspace }}/cmake-install/usr/local/lib/libvalkey.a" \
-             -C examples
+             USE_SSL=1 -C examples
     - name: Build examples with CMake using a CMake-installed libvalkey
       run: |
         cd examples && mkdir build && cd build
