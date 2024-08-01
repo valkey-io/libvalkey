@@ -15,8 +15,8 @@ INCLUDE_DIR = include/valkey
 TEST_SRCS = $(TEST_DIR)/client_test.c
 TEST_BINS = $(patsubst $(TEST_DIR)/%.c,$(TEST_DIR)/%,$(TEST_SRCS))
 
-SOURCES = $(filter-out $(wildcard $(SRC_DIR)/*ssl*.c, wildcard $(SRC_DIR)/*rdma*.c), $(wildcard $(SRC_DIR)/*.c))
-HEADERS = $(filter-out $(INCLUDE_DIR)/valkey_ssl.h $(INCLUDE_DIR)/valkey_rdma.h, $(wildcard $(INCLUDE_DIR)/*.h))
+SOURCES = $(filter-out $(wildcard $(SRC_DIR)/*ssl.c) $(SRC_DIR)/rdma.c, $(wildcard $(SRC_DIR)/*.c))
+HEADERS = $(filter-out $(wildcard $(INCLUDE_DIR)/*_ssl.h) $(INCLUDE_DIR)/valkey_rdma.h, $(wildcard $(INCLUDE_DIR)/*.h))
 
 OBJS = $(patsubst $(SRC_DIR)/%.c,$(OBJ_DIR)/%.o,$(SOURCES))
 
@@ -95,7 +95,7 @@ SSL_DYLIB_MAKE_CMD=$(CC) $(OPTIMIZATION) $(PLATFORM_FLAGS) -shared -Wl,-soname,$
 USE_SSL?=0
 
 ifeq ($(USE_SSL),1)
-  SSL_SOURCES = $(wildcard $(SRC_DIR)/*ssl*.c)
+  SSL_SOURCES = $(wildcard $(SRC_DIR)/*ssl.c)
   SSL_OBJS = $(patsubst $(SRC_DIR)/%.c,$(OBJ_DIR)/%.o,$(SSL_SOURCES))
 
   # This is required for test.c only
@@ -126,7 +126,7 @@ RDMA_DYLIB_MAKE_CMD=$(CC) $(OPTIMIZATION) $(PLATFORM_FLAGS) -shared -Wl,-soname,
 USE_RDMA?=0
 
 ifeq ($(USE_RDMA),1)
-  RDMA_SOURCES = $(wildcard $(SRC_DIR)/*rdma*.c)
+  RDMA_SOURCES = $(wildcard $(SRC_DIR)/*rdma.c)
   RDMA_OBJS = $(patsubst $(SRC_DIR)/%.c,$(OBJ_DIR)/%.o,$(RDMA_SOURCES))
 
   RDMA_LDFLAGS+=-lrdmacm -libverbs
@@ -293,6 +293,7 @@ install: $(DYLIBNAME) $(STLIBNAME) $(PKGCONFNAME) $(SSL_INSTALL)
 install-ssl: $(SSL_DYLIBNAME) $(SSL_STLIBNAME) $(SSL_PKGCONFNAME)
 	mkdir -p $(INSTALL_INCLUDE_PATH) $(INSTALL_LIBRARY_PATH)
 	$(INSTALL) $(INCLUDE_DIR)/valkey_ssl.h $(INSTALL_INCLUDE_PATH)
+	$(INSTALL) $(INCLUDE_DIR)/valkeycluster_ssl.h $(INSTALL_INCLUDE_PATH)
 	$(INSTALL) $(SSL_DYLIBNAME) $(INSTALL_LIBRARY_PATH)/$(SSL_DYLIB_MINOR_NAME)
 	ln -sf $(SSL_DYLIB_MINOR_NAME) $(INSTALL_LIBRARY_PATH)/$(SSL_ROOT_DYLIB_NAME)
 	ln -sf $(SSL_DYLIB_MINOR_NAME) $(INSTALL_LIBRARY_PATH)/$(SSL_DYLIB_MAJOR_NAME)
