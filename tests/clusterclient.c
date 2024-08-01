@@ -19,6 +19,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+#ifdef _MSC_VER
+#include <winsock2.h> /* For struct timeval */
+#endif
+
 void printReply(const valkeyReply *reply) {
     switch (reply->type) {
     case VALKEY_REPLY_ERROR:

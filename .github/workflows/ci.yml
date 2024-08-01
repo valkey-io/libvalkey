@@ -136,15 +136,24 @@ jobs:
     steps:
       - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
       - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1.13.0
-      - name: Prepare
+      - name: Install dependencies
         run: |
-          choco install -y ninja
+          choco install -y ninja memurai-developer
           vcpkg install --triplet x64-windows pkgconf libevent
       - name: Build
         run: |
           mkdir build && cd build
-          cmake .. -G Ninja -DCMAKE_BUILD_TYPE=Release -DDISABLE_TESTS=ON -DCMAKE_TOOLCHAIN_FILE=C:\vcpkg\scripts\buildsystems\vcpkg.cmake
+          cmake .. -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE=C:\vcpkg\scripts\buildsystems\vcpkg.cmake
           ninja -v
+      - name: Run tests
+        working-directory: build
+        run: .\tests\client_test.exe
+      - name: Install Cygwin Action
+        uses: cygwin/cygwin-install-action@006ad0b0946ca6d0a3ea2d4437677fa767392401 # v4
+        with:
+          packages: make gcc-core
+      - name: Build in Cygwin
+        run: make clean && make
 
   windows-mingw64:
     name: Windows (MinGW64)
