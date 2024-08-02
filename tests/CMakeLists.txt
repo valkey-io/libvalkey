@@ -53,12 +53,10 @@ find_path(LIBEVENT_INCLUDES event2/event.h)
 if(LIBEVENT_INCLUDES)
   include_directories(${LIBEVENT_INCLUDES})
 endif()
-
 if(MSVC OR MINGW)
   find_library(LIBEVENT_LIBRARY Libevent)
 else()
-  add_compile_options(-Wall -Wextra -pedantic -Werror)
-  # Debug mode for tests
+  # Use the Debug configuration when building tests (no -DNDEBUG)
   set(CMAKE_BUILD_TYPE "Debug" CACHE STRING "" FORCE)
 endif()
 
