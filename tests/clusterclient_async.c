@@ -41,6 +41,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+#ifdef _MSC_VER
+#include <winsock2.h> /* For struct timeval */
+#endif
+
 #define CMD_SIZE 256
 #define HISTORY_DEPTH 16
 

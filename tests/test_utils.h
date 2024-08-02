@@ -1,6 +1,10 @@
 #ifndef VALKEY_TEST_UTILS_H
 #define VALKEY_TEST_UTILS_H
 
+#ifdef _MSC_VER
+#include <winsock2.h> /* For struct timeval */
+#endif
+
 #define ASSERT_MSG(_x, _msg)                                                   \
     if (!(_x)) {                                                               \
         fprintf(stderr, "ERROR: %s (%s)\n", _msg, #_x);                        \
