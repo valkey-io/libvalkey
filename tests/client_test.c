@@ -1583,7 +1583,7 @@ void async_disconnect(valkeyAsyncContext *ac) {
 }
 
 /* Testcase timeout, will trigger a failure */
-void timeout_cb(int fd, short event, void *arg) {
+void timeout_cb(evutil_socket_t fd, short event, void *arg) {
     (void) fd; (void) event; (void) arg;
     printf("Timeout in async testing!\n");
     exit(1);
