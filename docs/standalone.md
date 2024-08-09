@@ -1,4 +1,4 @@
-# standalone API documentation
+# Standalone API documentation
 
 This document describes using `libvalkey` in standalone (non-cluster) mode, including an overview of the synchronous and asynchronous APIs. It is not intended as a complete reference. For that it's always best to refer to the source code.
 
@@ -15,7 +15,7 @@ This document describes using `libvalkey` in standalone (non-cluster) mode, incl
   - [Errors](#errors)
   - [Thread safety](#thread-safety)
   - [Reader configuration](#reader-configuration)
-    - [Input buffer size](#maxinput-buffer-size)
+    - [Input buffer size](#maximum-input-buffer-size)
     - [Maximum array elements](#maximum-array-elements)
     - [RESP3 Push Replies](#resp3-push-replies)
     - [Allocator injection](#allocator-injection)
@@ -59,7 +59,7 @@ valkeyOptions opt = {0};
 if (tcp)  {
     VALKEY_OPTIONS_SET_TCP(&opt, "localhost", 6379);
 } else {
-    VALKEY_OPTIONS_SET_UNIX(&opt, "/tmp/redis.sock");
+    VALKEY_OPTIONS_SET_UNIX(&opt, "/tmp/valkey.sock");
 }
 
 // You may attach any arbitrary data to the context
@@ -79,16 +79,16 @@ There are also several flags you can specify when using the `valkeyOptions` help
 
 ### Executing commands
 
-The primary command interface is a `printf`-like function that takes a format string along with a variable number of arguments. This will construct a resp command and deliver it to the server.
+The primary command interface is a `printf`-like function that takes a format string along with a variable number of arguments. This will construct a `RESP` command and deliver it to the server.
 
 ```c
 valkeyReply *reply = valkeyCommand(ctx, "INCRBY %s %d", "counter", 42);
 
 if (reply == NULL) {
     fprintf(stderr, "Communication error: %s\n", c->err ? c->errstr : "Unknown error");
-} else if (reply->type == REDIS_REPLY_ERROR) {
+} else if (reply->type == VALKEY_REPLY_ERROR) {
     fprintf(stderr, "Error response from server: %s\n", reply->str);
-} else if (reply->type != REDIS_REPLY_INTEGER) {
+} else if (reply->type != VALKEY_REPLY_INTEGER) {
     // Very unlikely but should be checked.
     fprintf(stderr, "Error:  Non-integer reply to INCRBY?\n");
 }
@@ -124,7 +124,7 @@ When a `valkeyReply` is returned, you should test the `valkeyReply->type` field 
 
 ### Reply types
 
-- `VALKEY_REPLY_ERROR` - An error reply. The error string is in `reply->str`
+- `VALKEY_REPLY_ERROR` - An error reply. The error string is in `reply->str`.
 - `VALKEY_REPLY_STATUS` - A status reply which will be in `reply->str`.
 - `VALKEY_REPLY_INTEGER` - An integer reply, which will be in `reply->integer`.
 - `VALKEY_REPLY_DOUBLE` - A double reply which will be in `reply->dval` as well as `reply->str`.
@@ -133,15 +133,15 @@ When a `valkeyReply` is returned, you should test the `valkeyReply->type` field 
 - `VALKEY_REPLY_BIGNUM` - As of yet unused, but the string would be in `reply->str`.
 - `VALKEY_REPLY_STRING` - A string reply which will be in `reply->str`.
 - `VALKEY_REPLY_VERB` - A verbatim string reply which will be in `reply->str` and who's type will be in `reply->vtype`.
-- `VALKEY_REPLY_ARRAY` - An array reply where each element is in `reply->element` with the number of elements in `reply->elements`.
-- `VALKEY_REPLY_MAP` - A map reply, which structurally looks just like `VALKEY_REPLY_ARRAY` only is meant to represent keys and values. As with an array reply you can access the elements with `reply->element` and `reply->elements`.
-- `VALKEY_REPLY_SET` - Another array-like reply representing a set (e.g. a reply from `SMEMBERS`). Access via `reply->elemeent` and `reply->elements`.
+- `VALKEY_REPLY_ARRAY` - An array reply where each element is in `reply->element` with the number of elements in `reply->element`.
+- `VALKEY_REPLY_MAP` - A map reply, which structurally looks just like `VALKEY_REPLY_ARRAY` only is meant to represent keys and values. As with an array reply you can access the elements with `reply->element` and `reply->element`.
+- `VALKEY_REPLY_SET` - Another array-like reply representing a set (e.g. a reply from `SMEMBERS`). Access via `reply->elemeent` and `reply->element`.
 - `VALKEY_REPLY_ATTR` - An attribute reply. As of yet unused by valkey-server.
 - `VALKEY_REPLY_PUSH` - An out of band push reply. This is also array-like in nature.
 
 ### Disconnecting / cleanup
 
-When libvalkey returns non-null `valkeyRepy` struts you are responsible for freeing them with `freeReplyObject`.  In order to disconnect and free the context simply call `valkeyFree`.
+When libvalkey returns non-null `valkeyReply` struts you are responsible for freeing them with `freeReplyObject`.  In order to disconnect and free the context simply call `valkeyFree`.
 
 ```c
 valkeyReply *reply = valkeyCommand(ctx, "set %s %s", "foo", "bar");
@@ -154,7 +154,7 @@ valkeyFree(ctx);
 
 ### Pipelining
 
-`valkeyCommand` and `valkeyCommandArgv` each make a round-trip to the server, by sending the command and then waiting for a reply`. Alternatively commands may be pipelined with the `valkeyAppendCommand` and `valkeyAppendCommandArgv` functions.
+`valkeyCommand` and `valkeyCommandArgv` each make a round-trip to the server, by sending the command and then waiting for a reply. Alternatively commands may be pipelined with the `valkeyAppendCommand` and `valkeyAppendCommandArgv` functions.
 
 When you use `valkeyAppendCommand` the command is simply appended to the output buffer of `valkeyContext` but not delivered to the server, until you attempt to read the first response, at which point the entire buffer will be delivered.
 
@@ -207,7 +207,7 @@ As previously mentioned, when there is a communication error libvalkey will retu
 
 ### Thread safety
 
-Libvalkey context structs are not thread safe. You should not attempt to share them between threads, unless you really know what you're doing.
+Libvalkey context structs are **not** thread safe. You should not attempt to share them between threads, unless you really know what you're doing.
 
 ### Reader configuration
 
@@ -215,7 +215,7 @@ Libvalkey contexts have a few more mechanisms you can customize to your needs.
 
 #### Maximum input buffer size
 
-libvalkey uses a buffer to hold incoming bytes, which is typically restored to the configurable max buffer size (`16KB`) when it is empty. To avoid continually reallocating this buffer you can set the value higher, or to zero which means "no limit".
+Libvalkey uses a buffer to hold incoming bytes, which is typically restored to the configurable max buffer size (`16KB`) when it is empty. To avoid continually reallocating this buffer you can set the value higher, or to zero which means "no limit".
 
 ```c
 context->reader->maxbuf = 0;
@@ -267,7 +267,7 @@ Internally libvalkey uses a layer of indirection from the standard allocation fu
 These can be overridden like so
 
 ```c
-valkeyAllocatorFuncs my_allocators = {
+valkeyAllocFuncs my_allocators = {
     .mallocFn = my_malloc,
     .callocFn = my_calloc,
     .reallocFn = my_realloc,
@@ -289,7 +289,7 @@ valkeyResetAllocators();
 
 ## Asynchronous API
 
-Libvalkey also has an asynchronous API which supports a great many different event libraries. See the [examples](examples) directory for specific information about each individual event library.
+Libvalkey also has an asynchronous API which supports a great many different event libraries. See the [examples](../examples) directory for specific information about each individual event library.
 
 ### Connecting
 
@@ -350,5 +350,3 @@ int exec_some_commands(struct my_app_data *data) {
 }
 
 ```
-
-See the [examples](../examples) directory for specific information on each supported event library.

@@ -10,7 +10,7 @@ Libvalkey is the official C client for the [Valkey](https://valkey.io) database.
   - [Building with make](#building-with-make)
   - [Building with CMake](#building-with-cmake)
 - [Contributing](#contributing)
-- [Using the library]
+- Using the library
   - [Standalone mode](docs/standalone.md)
   - [Cluster mode](docs/cluster.md)
 
@@ -38,7 +38,7 @@ We support plain GNU make and CMake. Following is information on how to build th
 
 ```bash
 # Build and install the default library
-make & sudo make install
+sudo make install
 
 # With all options
 sudo USE_SSL=1 USE_RDMA=1 make install
