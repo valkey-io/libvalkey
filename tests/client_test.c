@@ -94,6 +94,7 @@ static void millisleep(int ms) {
     Sleep(ms);
 #else
     struct timespec ts = { ms / 1000, (ms % 1000) * 1000000 };
+
     nanosleep(&ts, NULL);
 #endif
 }
@@ -1319,15 +1320,13 @@ static void test_blocking_connection_timeouts(struct config config) {
     valkeyContext *c;
     valkeyReply *reply;
     ssize_t s;
-    const char *sleep_cmd = "DEBUG SLEEP 3\r\n";
-    struct timeval tv;
+    const char *sleep_cmd = "DEBUG SLEEP 1\r\n";
+    struct timeval tv = {.tv_sec = 0, .tv_usec = 10000};
 
     c = do_connect(config);
     test("Successfully completes a command when the timeout is not exceeded: ");
     reply = valkeyCommand(c,"SET foo fast");
     freeReplyObject(reply);
-    tv.tv_sec = 0;
-    tv.tv_usec = 10000;
     valkeySetTimeout(c, tv);
     reply = valkeyCommand(c, "GET foo");
     test_cond(reply != NULL && reply->type == VALKEY_REPLY_STRING && memcmp(reply->str, "fast", 4) == 0);
@@ -1345,8 +1344,6 @@ static void test_blocking_connection_timeouts(struct config config) {
         sdsfree(c->obuf);
         c->obuf = sdsempty();
 
-        tv.tv_sec = 0;
-        tv.tv_usec = 10000;
         valkeySetTimeout(c, tv);
         reply = valkeyCommand(c, "GET foo");
 #ifndef _WIN32
@@ -1359,7 +1356,7 @@ static void test_blocking_connection_timeouts(struct config config) {
         freeReplyObject(reply);
 
         // wait for the DEBUG SLEEP to complete so that the server is unblocked for the following tests
-        millisleep(3000);
+        millisleep(1500);
     } else {
         test_skipped();
     }
