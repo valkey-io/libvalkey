@@ -306,10 +306,10 @@ void test_command_timeout_set_while_connected(void) {
 //------------------------------------------------------------------------------
 typedef struct ExpectedResult {
     int type;
-    char *str;
+    const char *str;
     bool disconnect;
     bool noreply;
-    char *errstr;
+    const char *errstr;
 } ExpectedResult;
 
 // Callback for Valkey connects and disconnects

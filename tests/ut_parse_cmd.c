@@ -10,7 +10,7 @@
 #include <string.h>
 
 /* Helper for the macro ASSERT_KEY below. */
-void check_key(char *key, struct cmd *command, char *file, int line) {
+void check_key(const char *key, struct cmd *command, const char *file, int line) {
     if (command->result != CMD_PARSE_OK) {
         fprintf(stderr, "%s:%d: Command parsing failed: %s\n", file, line,
                 command->errstr);
