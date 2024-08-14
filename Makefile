@@ -60,7 +60,7 @@ export VALKEY_TEST_CONFIG
 CC := $(if $(shell command -v $(firstword $(CC)) >/dev/null 2>&1 && echo OK),$(CC),gcc)
 
 OPTIMIZATION?=-O3
-WARNINGS=-Wall -Wextra -Wstrict-prototypes -Wwrite-strings -Wno-missing-field-initializers
+WARNINGS=-Wall -Wextra -pedantic -Wstrict-prototypes -Wwrite-strings -Wno-missing-field-initializers
 USE_WERROR?=1
 ifeq ($(USE_WERROR),1)
   WARNINGS+=-Werror

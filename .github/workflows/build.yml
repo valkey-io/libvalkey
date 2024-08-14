@@ -22,8 +22,6 @@ jobs:
       - name: Build using cmake
         env:
           EXTRA_CMAKE_OPTS: -DENABLE_EXAMPLES:BOOL=ON -DENABLE_SSL:BOOL=ON
-          CFLAGS: -Werror
-          CXXFLAGS: -Werror
         run: mkdir build && cd build && cmake .. && make
 
       - name: Build using makefile
@@ -57,8 +55,6 @@ jobs:
       - name: Build using cmake
         env:
           EXTRA_CMAKE_OPTS: -DENABLE_EXAMPLES:BOOL=ON -DENABLE_SSL:BOOL=ON
-          CFLAGS: -Werror
-          CXXFLAGS: -Werror
         run: mkdir build && cd build && cmake3 .. && make
 
       - name: Build using Makefile
@@ -102,8 +98,6 @@ jobs:
       - name: Build using cmake
         env:
           EXTRA_CMAKE_OPTS: -DENABLE_EXAMPLES:BOOL=ON -DENABLE_SSL:BOOL=ON
-          CFLAGS: -Werror
-          CXXFLAGS: -Werror
         run: mkdir build && cd build && cmake .. && make
 
       - name: Build using Makefile

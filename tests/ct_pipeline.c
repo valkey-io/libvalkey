@@ -63,7 +63,7 @@ void test_pipeline(void) {
 
 typedef struct ExpectedResult {
     int type;
-    char *str;
+    const char *str;
     bool disconnect;
 } ExpectedResult;
 

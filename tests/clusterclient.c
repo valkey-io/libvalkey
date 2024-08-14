@@ -43,7 +43,7 @@ void printReply(const valkeyReply *reply) {
 void eventCallback(const valkeyClusterContext *cc, int event, void *privdata) {
     (void)cc;
     (void)privdata;
-    char *e = NULL;
+    const char *e;
     switch (event) {
     case VALKEYCLUSTER_EVENT_SLOTMAP_UPDATED:
         e = "slotmap-updated";

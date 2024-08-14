@@ -29,6 +29,14 @@ OPTION(ENABLE_RDMA "Build valkey_rdma for RDMA support" OFF)
 SET(CMAKE_C_STANDARD 99)
 SET(CMAKE_DEBUG_POSTFIX d)
 
+# Set target-common flags
+if(NOT WIN32)
+  add_compile_options(-Werror -Wall -Wextra -pedantic)
+  add_compile_options(-Wstrict-prototypes -Wwrite-strings -Wno-missing-field-initializers)
+else()
+  add_definitions(-D_CRT_SECURE_NO_WARNINGS -DWIN32_LEAN_AND_MEAN)
+endif()
+
 SET(valkey_sources
     src/adlist.c
     src/alloc.c
@@ -44,10 +52,6 @@ SET(valkey_sources
     src/valkey.c
     src/valkeycluster.c
     src/vkutil.c)
-
-IF(WIN32)
-    ADD_DEFINITIONS(-D_CRT_SECURE_NO_WARNINGS -DWIN32_LEAN_AND_MEAN)
-ENDIF()
 
 ADD_LIBRARY(valkey ${valkey_sources})
 ADD_LIBRARY(valkey::valkey ALIAS valkey)

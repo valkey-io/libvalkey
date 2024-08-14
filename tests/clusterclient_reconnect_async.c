@@ -20,7 +20,7 @@
 /* Unfortunately there is no error code for this error to match */
 #define VALKEY_ENOCLUSTER "ERR This instance has cluster support disabled"
 
-void sendNextCommand(int, short, void *);
+void sendNextCommand(evutil_socket_t, short, void *);
 
 void connectToValkey(valkeyClusterAsyncContext *acc) {
     /* reset context in case of reconnect */
@@ -61,7 +61,7 @@ void replyCallback(valkeyClusterAsyncContext *acc, void *r, void *privdata) {
     event_base_once(acc->adapter, -1, EV_TIMEOUT, sendNextCommand, acc, NULL);
 }
 
-void sendNextCommand(int fd, short kind, void *arg) {
+void sendNextCommand(evutil_socket_t fd, short kind, void *arg) {
     UNUSED(fd);
     UNUSED(kind);
     valkeyClusterAsyncContext *acc = arg;
