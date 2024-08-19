@@ -22,6 +22,8 @@
  *           Will send following commands using the `..ToNode()` API and a
  *           cluster node iterator to send each command to all known nodes.
  *
+ * !disconnect - Disconnect the client.
+ *
  * An example input of first sending 2 commands and waiting for their responses,
  * before sending a single command and waiting for its response:
  *
@@ -139,6 +141,8 @@ void sendNextCommand(evutil_socket_t fd, short kind, void *arg) {
                            "!all in !resend not supported");
                 send_to_all = 1;
             }
+            if (strcmp(cmd, "!disconnect") == 0)
+                valkeyClusterAsyncDisconnect(acc);
             continue; /* Skip line */
         }
 
@@ -202,9 +206,25 @@ void eventCallback(const valkeyClusterContext *cc, int event, void *privdata) {
     printf("Event: %s\n", e);
 }
 
+void connectCallback(const valkeyAsyncContext *ac, int status) {
+    const char *s = "";
+    if (status != VALKEY_OK)
+        s = "failed to ";
+    printf("Event: %sconnect to %s:%d\n", s, ac->c.tcp.host, ac->c.tcp.port);
+}
+
+void disconnectCallback(const valkeyAsyncContext *ac, int status) {
+    const char *s = "";
+    if (status != VALKEY_OK)
+        s = "failed to ";
+    printf("Event: %sdisconnect from %s:%d\n", s, ac->c.tcp.host,
+           ac->c.tcp.port);
+}
+
 int main(int argc, char **argv) {
     int use_cluster_slots = 1; // Get topology via CLUSTER SLOTS
     int show_events = 0;
+    int show_connection_events = 0;
 
     int optind;
     for (optind = 1; optind < argc && argv[optind][0] == '-'; optind++) {
@@ -212,6 +232,8 @@ int main(int argc, char **argv) {
             use_cluster_slots = 0; // Use the default CLUSTER NODES instead
         } else if (strcmp(argv[optind], "--events") == 0) {
             show_events = 1;
+        } else if (strcmp(argv[optind], "--connection-events") == 0) {
+            show_connection_events = 1;
         } else {
             fprintf(stderr, "Unknown argument: '%s'\n", argv[optind]);
         }
@@ -236,6 +258,10 @@ int main(int argc, char **argv) {
     }
     if (show_events) {
         valkeyClusterSetEventCallback(acc->cc, eventCallback, NULL);
+    }
+    if (show_connection_events) {
+        valkeyClusterAsyncSetConnectCallback(acc, connectCallback);
+        valkeyClusterAsyncSetDisconnectCallback(acc, disconnectCallback);
     }
 
     if (valkeyClusterConnect2(acc->cc) != VALKEY_OK) {
