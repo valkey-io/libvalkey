@@ -226,6 +226,9 @@ void *valkeyClusterCommandToNode(valkeyClusterContext *cc,
 /* Variadic using va_list */
 void *valkeyClustervCommand(valkeyClusterContext *cc, const char *format,
                             va_list ap);
+void *valkeyClustervCommandToNode(valkeyClusterContext *cc,
+                                  valkeyClusterNode *node, const char *format,
+                                  va_list ap);
 /* Using argc and argv */
 void *valkeyClusterCommandArgv(valkeyClusterContext *cc, int argc,
                                const char **argv, const size_t *argvlen);
@@ -248,6 +251,9 @@ int valkeyClusterAppendCommandToNode(valkeyClusterContext *cc,
 /* Variadic using va_list */
 int valkeyClustervAppendCommand(valkeyClusterContext *cc, const char *format,
                                 va_list ap);
+int valkeyClustervAppendCommandToNode(valkeyClusterContext *cc,
+                                      valkeyClusterNode *node,
+                                      const char *format, va_list ap);
 /* Using argc and argv */
 int valkeyClusterAppendCommandArgv(valkeyClusterContext *cc, int argc,
                                    const char **argv, const size_t *argvlen);

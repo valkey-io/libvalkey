@@ -2383,11 +2383,10 @@ void *valkeyClusterCommand(valkeyClusterContext *cc, const char *format, ...) {
     return reply;
 }
 
-void *valkeyClusterCommandToNode(valkeyClusterContext *cc,
-                                 valkeyClusterNode *node, const char *format,
-                                 ...) {
+void *valkeyClustervCommandToNode(valkeyClusterContext *cc,
+                                  valkeyClusterNode *node, const char *format,
+                                  va_list ap) {
     valkeyContext *c;
-    va_list ap;
     int ret;
     void *reply;
     int updating_slotmap = 0;
@@ -2405,9 +2404,7 @@ void *valkeyClusterCommandToNode(valkeyClusterContext *cc,
         memset(cc->errstr, '\0', sizeof(cc->errstr));
     }
 
-    va_start(ap, format);
     ret = valkeyvAppendCommand(c, format, ap);
-    va_end(ap);
 
     if (ret != VALKEY_OK) {
         valkeyClusterSetError(cc, c->err, c->errstr);
@@ -2436,6 +2433,19 @@ void *valkeyClusterCommandToNode(valkeyClusterContext *cc,
             cc->errstr[0] = '\0';
         }
     }
+
+    return reply;
+}
+
+void *valkeyClusterCommandToNode(valkeyClusterContext *cc,
+                                 valkeyClusterNode *node, const char *format,
+                                 ...) {
+    va_list ap;
+    valkeyReply *reply = NULL;
+
+    va_start(ap, format);
+    reply = valkeyClustervCommandToNode(cc, node, format, ap);
+    va_end(ap);
 
     return reply;
 }
@@ -2544,11 +2554,10 @@ int valkeyClusterAppendCommand(valkeyClusterContext *cc, const char *format,
     return ret;
 }
 
-int valkeyClusterAppendCommandToNode(valkeyClusterContext *cc,
-                                     valkeyClusterNode *node,
-                                     const char *format, ...) {
+int valkeyClustervAppendCommandToNode(valkeyClusterContext *cc,
+                                      valkeyClusterNode *node,
+                                      const char *format, va_list ap) {
     valkeyContext *c;
-    va_list ap;
     struct cmd *command = NULL;
     char *cmd = NULL;
     int len;
@@ -2569,10 +2578,7 @@ int valkeyClusterAppendCommandToNode(valkeyClusterContext *cc,
         return VALKEY_ERR;
     }
 
-    /* Allocate cmd and encode the variadic command */
-    va_start(ap, format);
     len = valkeyvFormatCommand(&cmd, format, ap);
-    va_end(ap);
 
     if (len == -1) {
         goto oom;
@@ -2609,6 +2615,23 @@ oom:
     command_destroy(command);
     valkeyClusterSetError(cc, VALKEY_ERR_OOM, "Out of memory");
     return VALKEY_ERR;
+}
+
+int valkeyClusterAppendCommandToNode(valkeyClusterContext *cc,
+                                     valkeyClusterNode *node,
+                                     const char *format, ...) {
+    int ret;
+    va_list ap;
+
+    if (cc == NULL || node == NULL || format == NULL) {
+        return VALKEY_ERR;
+    }
+
+    va_start(ap, format);
+    ret = valkeyClustervAppendCommandToNode(cc, node, format, ap);
+    va_end(ap);
+
+    return ret;
 }
 
 int valkeyClusterAppendCommandArgv(valkeyClusterContext *cc, int argc,
