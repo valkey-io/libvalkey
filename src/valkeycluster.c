@@ -3175,6 +3175,10 @@ static int updateSlotMapAsync(valkeyClusterAsyncContext *acc,
         /* Don't allow concurrent slot map updates. */
         return VALKEY_ERR;
     }
+    if (acc->cc->flags & VALKEYCLUSTER_FLAG_DISCONNECTING) {
+        /* No slot map updates during a cluster client disconnect. */
+        return VALKEY_ERR;
+    }
 
     if (ac == NULL) {
         if (acc->cc->nodes == NULL) {
