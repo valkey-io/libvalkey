@@ -3417,6 +3417,7 @@ int valkeyClusterAsyncFormattedCommand(valkeyClusterAsyncContext *acc,
     status = valkeyAsyncFormattedCommand(ac, valkeyClusterAsyncCallback, cad,
                                          cmd, len);
     if (status != VALKEY_OK) {
+        valkeyClusterAsyncSetError(acc, ac->err, ac->errstr);
         goto error;
     }
     return VALKEY_OK;
@@ -3485,8 +3486,10 @@ int valkeyClusterAsyncFormattedCommandToNode(valkeyClusterAsyncContext *acc,
 
     status = valkeyAsyncFormattedCommand(ac, valkeyClusterAsyncCallback, cad,
                                          cmd, len);
-    if (status != VALKEY_OK)
+    if (status != VALKEY_OK) {
+        valkeyClusterAsyncSetError(acc, ac->err, ac->errstr);
         goto error;
+    }
 
     return VALKEY_OK;
 
