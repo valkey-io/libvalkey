@@ -1795,6 +1795,10 @@ int valkeyClusterConnect2(valkeyClusterContext *cc) {
                               "server address not configured");
         return VALKEY_ERR;
     }
+    /* Clear a previously set shutdown flag since we allow a
+     * reconnection of an async context using this API (legacy). */
+    cc->flags &= ~VALKEYCLUSTER_FLAG_DISCONNECTING;
+
     return valkeyClusterUpdateSlotmap(cc);
 }
 
@@ -3383,6 +3387,12 @@ int valkeyClusterAsyncFormattedCommand(valkeyClusterAsyncContext *acc,
 
     cc = acc->cc;
 
+    /* Don't accept new commands when the client is about to disconnect. */
+    if (cc->flags & VALKEYCLUSTER_FLAG_DISCONNECTING) {
+        valkeyClusterAsyncSetError(acc, VALKEY_ERR_OTHER, "disconnecting");
+        return VALKEY_ERR;
+    }
+
     if (cc->err) {
         cc->err = 0;
         memset(cc->errstr, '\0', strlen(cc->errstr));
@@ -3460,19 +3470,23 @@ int valkeyClusterAsyncFormattedCommandToNode(valkeyClusterAsyncContext *acc,
                                              valkeyClusterCallbackFn *fn,
                                              void *privdata, char *cmd,
                                              int len) {
-    valkeyClusterContext *cc;
+    valkeyClusterContext *cc = acc->cc;
     valkeyAsyncContext *ac;
     int status;
     cluster_async_data *cad = NULL;
     struct cmd *command = NULL;
+
+    /* Don't accept new commands when the client is about to disconnect. */
+    if (cc->flags & VALKEYCLUSTER_FLAG_DISCONNECTING) {
+        valkeyClusterAsyncSetError(acc, VALKEY_ERR_OTHER, "disconnecting");
+        return VALKEY_ERR;
+    }
 
     ac = actx_get_by_node(acc, node);
     if (ac == NULL) {
         /* Specific error already set */
         return VALKEY_ERR;
     }
-
-    cc = acc->cc;
 
     if (cc->err) {
         cc->err = 0;
@@ -3653,6 +3667,7 @@ void valkeyClusterAsyncDisconnect(valkeyClusterAsyncContext *acc) {
     }
 
     cc = acc->cc;
+    cc->flags |= VALKEYCLUSTER_FLAG_DISCONNECTING;
 
     if (cc->nodes == NULL) {
         return;
@@ -3682,6 +3697,7 @@ void valkeyClusterAsyncFree(valkeyClusterAsyncContext *acc) {
     }
 
     cc = acc->cc;
+    cc->flags |= VALKEYCLUSTER_FLAG_DISCONNECTING;
 
     valkeyClusterFree(cc);
 

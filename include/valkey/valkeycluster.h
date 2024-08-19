@@ -58,6 +58,9 @@
 /* Flag to enable routing table updates using the command 'cluster slots'.
  * Default is the 'cluster nodes' command. */
 #define VALKEYCLUSTER_FLAG_ROUTE_USE_SLOTS 0x4000
+/* Flag specific to the async API which means that the user requested a
+ * client disconnect or free. */
+#define VALKEYCLUSTER_FLAG_DISCONNECTING 0x8000
 
 /* Events, for valkeyClusterSetEventCallback() */
 #define VALKEYCLUSTER_EVENT_SLOTMAP_UPDATED 1
