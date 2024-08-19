@@ -3267,7 +3267,8 @@ static void valkeyClusterAsyncCallback(valkeyAsyncContext *ac, void *r,
         goto done;
     }
 
-    if (cad->retry_count == NO_RETRY) /* Skip retry handling */
+    /* Skip retry handling when not expected, or during a client disconnect. */
+    if (cad->retry_count == NO_RETRY || cc->flags & VALKEYCLUSTER_FLAG_DISCONNECTING)
         goto done;
 
     error_type = cluster_reply_error_type(reply);
