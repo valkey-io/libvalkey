@@ -22,7 +22,6 @@ OPTION(ENABLE_SSL "Build valkey_ssl for SSL support" OFF)
 OPTION(DISABLE_TESTS "If tests should be compiled or not" OFF)
 OPTION(ENABLE_EXAMPLES "Enable building valkey examples" OFF)
 option(ENABLE_IPV6_TESTS "Enable IPv6 tests requiring special prerequisites" OFF)
-OPTION(ENABLE_NUGET "Install NuGET packaging details" OFF)
 OPTION(ENABLE_RDMA "Build valkey_rdma for RDMA support" OFF)
 
 # valkey requires C99
@@ -117,12 +116,6 @@ if (MSVC AND BUILD_SHARED_LIBS)
     INSTALL(FILES $<TARGET_PDB_FILE:valkey>
         DESTINATION ${CMAKE_INSTALL_BINDIR}
         CONFIGURATIONS Debug RelWithDebInfo)
-endif()
-
-if (ENABLE_NUGET)
-    # For NuGet packages
-    INSTALL(FILES valkey.targets
-        DESTINATION build/native)
 endif()
 
 install(DIRECTORY include/valkey
