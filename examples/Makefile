@@ -1,7 +1,7 @@
 CC?=gcc
 CXX?=g++
 
-CFLAGS?=-Wall -Wextra -g -O2 -I../include
+CFLAGS?=-fPIC -Wall -Wextra -g -O2 -I../include
 STLIBNAME?=../lib/libvalkey.a
 
 # Define examples
@@ -88,11 +88,11 @@ example-async-qt:
 	@false
 else
 example-async-qt: async-qt.cpp $(STLIBNAME)
-	$(QT_MOC) .adapters/qt.h  -I$(QT_INCLUDE_DIR) -I$(QT_INCLUDE_DIR)/QtCore | \
+	$(QT_MOC) ../include/valkey/adapters/qt.h | \
 	    $(CXX) -x c++ -o qt-adapter-moc.o -c - $(CFLAGS) -I$(QT_INCLUDE_DIR) -I$(QT_INCLUDE_DIR)/QtCore
-	$(QT_MOC) async-qt.h -I$(QT_INCLUDE_DIR) -I$(QT_INCLUDE_DIR)/QtCore | \
+	$(QT_MOC) async-qt.h | \
 	    $(CXX) -x c++ -o qt-example-moc.o -c - $(CFLAGS) -I$(QT_INCLUDE_DIR) -I$(QT_INCLUDE_DIR)/QtCore
-	$(CXX) -o $@ $(CFLAGS) $(LDFLAGS) -I$(QT_INCLUDE_DIR) -I$(QT_INCLUDE_DIR)/QtCore -L$(QT_LIBRARY_DIR) qt-adapter-moc.o qt-example-moc.o $< -pthread $(STLIBNAME) -lQtCore
+	$(CXX) -o $@ $(CFLAGS) $(LDFLAGS) -I$(QT_INCLUDE_DIR) -I$(QT_INCLUDE_DIR)/QtCore -L$(QT_LIBRARY_DIR) qt-adapter-moc.o qt-example-moc.o $< -pthread $(STLIBNAME) -lQt6Core
 endif
 
 example-cluster-async: cluster-async.c $(STLIBNAME)
