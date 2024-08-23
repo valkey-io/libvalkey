@@ -3375,7 +3375,7 @@ int valkeyClusterAsyncFormattedCommand(valkeyClusterAsyncContext *acc,
     valkeyClusterNode *node;
     valkeyAsyncContext *ac;
     struct cmd *command = NULL;
-    cluster_async_data *cad;
+    cluster_async_data *cad = NULL;
 
     if (acc == NULL) {
         return VALKEY_ERR;
@@ -3433,12 +3433,14 @@ int valkeyClusterAsyncFormattedCommand(valkeyClusterAsyncContext *acc,
 
     cad->acc = acc;
     cad->command = command;
+    command = NULL; /* Memory ownership moved. */
     cad->callback = fn;
     cad->privdata = privdata;
 
     status = valkeyAsyncFormattedCommand(ac, valkeyClusterAsyncCallback, cad,
                                          cmd, len);
     if (status != VALKEY_OK) {
+        valkeyClusterAsyncSetError(acc, ac->err, ac->errstr);
         goto error;
     }
     return VALKEY_OK;
@@ -3448,6 +3450,7 @@ oom:
     // passthrough
 
 error:
+    cluster_async_data_free(cad);
     command_destroy(command);
     return VALKEY_ERR;
 }
@@ -3499,14 +3502,17 @@ int valkeyClusterAsyncFormattedCommandToNode(valkeyClusterAsyncContext *acc,
 
     cad->acc = acc;
     cad->command = command;
+    command = NULL; /* Memory ownership moved. */
     cad->callback = fn;
     cad->privdata = privdata;
     cad->retry_count = NO_RETRY;
 
     status = valkeyAsyncFormattedCommand(ac, valkeyClusterAsyncCallback, cad,
                                          cmd, len);
-    if (status != VALKEY_OK)
+    if (status != VALKEY_OK) {
+        valkeyClusterAsyncSetError(acc, ac->err, ac->errstr);
         goto error;
+    }
 
     return VALKEY_OK;
 
@@ -3515,6 +3521,7 @@ oom:
     // passthrough
 
 error:
+    cluster_async_data_free(cad);
     command_destroy(command);
     return VALKEY_ERR;
 }
