@@ -29,9 +29,11 @@
  */
 
 #include "fmacros.h"
+
 #include "alloc.h"
-#include <string.h>
+
 #include <stdlib.h>
+#include <string.h>
 
 valkeyAllocFuncs valkeyAllocFns = {
     .mallocFn = malloc,
@@ -52,7 +54,7 @@ valkeyAllocFuncs valkeySetAllocators(valkeyAllocFuncs *override) {
 
 /* Reset allocators to use libc defaults */
 void valkeyResetAllocators(void) {
-    valkeyAllocFns = (valkeyAllocFuncs) {
+    valkeyAllocFns = (valkeyAllocFuncs){
         .mallocFn = malloc,
         .callocFn = calloc,
         .reallocFn = realloc,

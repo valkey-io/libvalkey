@@ -27,6 +27,7 @@
 #include "adapters/libevent.h"
 #include "test_utils.h"
 #include "valkeycluster.h"
+
 #include <assert.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -202,7 +203,7 @@ void test_alloc_failure_handling(void) {
         valkeyReply *reply;
         const char *cmd = "SET key value";
 
-        valkeyClusterNode *node = valkeyClusterGetNodeByKey(cc, (char*)"key");
+        valkeyClusterNode *node = valkeyClusterGetNodeByKey(cc, (char *)"key");
         assert(node);
 
         // OOM failing commands
@@ -265,7 +266,7 @@ void test_alloc_failure_handling(void) {
         valkeyReply *reply;
         const char *cmd = "SET foo one";
 
-        valkeyClusterNode *node = valkeyClusterGetNodeByKey(cc, (char*)"foo");
+        valkeyClusterNode *node = valkeyClusterGetNodeByKey(cc, (char *)"foo");
         assert(node);
 
         // OOM failing appends
@@ -313,8 +314,8 @@ void test_alloc_failure_handling(void) {
         prepare_allocation_test(cc, 1000);
 
         /* Get the source information for the migration. */
-        unsigned int slot = valkeyClusterGetSlotByKey((char*)"foo");
-        valkeyClusterNode *srcNode = valkeyClusterGetNodeByKey(cc, (char*)"foo");
+        unsigned int slot = valkeyClusterGetSlotByKey((char *)"foo");
+        valkeyClusterNode *srcNode = valkeyClusterGetNodeByKey(cc, (char *)"foo");
         int srcPort = srcNode->port;
 
         /* Get a destination node to migrate the slot to. */
@@ -371,7 +372,7 @@ void test_alloc_failure_handling(void) {
          * allowing a high number of allocations. */
         prepare_allocation_test(cc, 1000);
         /* Fetch the nodes again, in case the slotmap has been reloaded. */
-        srcNode = valkeyClusterGetNodeByKey(cc, (char*)"foo");
+        srcNode = valkeyClusterGetNodeByKey(cc, (char *)"foo");
         dstNode = getNodeByPort(cc, dstPort);
         reply = valkeyClusterCommandToNode(
             cc, srcNode, "CLUSTER SETSLOT %d NODE %s", slot, replyDstId->str);

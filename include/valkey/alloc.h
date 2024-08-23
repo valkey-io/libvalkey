@@ -41,10 +41,10 @@ extern "C" {
 /* Structure pointing to our actually configured allocators */
 typedef struct valkeyAllocFuncs {
     void *(*mallocFn)(size_t);
-    void *(*callocFn)(size_t,size_t);
-    void *(*reallocFn)(void*,size_t);
-    char *(*strdupFn)(const char*);
-    void (*freeFn)(void*);
+    void *(*callocFn)(size_t, size_t);
+    void *(*reallocFn)(void *, size_t);
+    char *(*strdupFn)(const char *);
+    void (*freeFn)(void *);
 } valkeyAllocFuncs;
 
 valkeyAllocFuncs valkeySetAllocators(valkeyAllocFuncs *fns);

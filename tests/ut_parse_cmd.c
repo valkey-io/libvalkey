@@ -1,9 +1,11 @@
 /* Some unit tests that don't require Valkey to be running. */
 
+#include "win32.h"
+
 #include "command.h"
 #include "test_utils.h"
 #include "valkeycluster.h"
-#include "win32.h"
+
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -28,9 +30,9 @@ void check_key(const char *key, struct cmd *command, const char *file, int line)
 }
 
 /* Checks that a command (struct cmd *) has the given key (string). */
-#define ASSERT_KEY(command, key)                                        \
-    do {                                                                \
-        check_key(key, command, __FILE__, __LINE__);                    \
+#define ASSERT_KEY(command, key)                     \
+    do {                                             \
+        check_key(key, command, __FILE__, __LINE__); \
     } while (0)
 
 void test_valkey_parse_error_nonresp(void) {

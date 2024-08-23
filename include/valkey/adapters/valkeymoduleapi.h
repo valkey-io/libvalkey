@@ -1,10 +1,9 @@
 #ifndef VALKEY_VALKEYMODULEAPI_H
 #define VALKEY_VALKEYMODULEAPI_H
 
-#include "valkeymodule.h"
-
 #include "../async.h"
 #include "../valkey.h"
+#include "valkeymodule.h"
 
 #include <sys/types.h>
 
@@ -18,23 +17,23 @@ typedef struct valkeyModuleEvents {
 } valkeyModuleEvents;
 
 static inline void valkeyModuleReadEvent(int fd, void *privdata, int mask) {
-    (void) fd;
-    (void) mask;
+    (void)fd;
+    (void)mask;
 
-    valkeyModuleEvents *e = (valkeyModuleEvents*)privdata;
+    valkeyModuleEvents *e = (valkeyModuleEvents *)privdata;
     valkeyAsyncHandleRead(e->context);
 }
 
 static inline void valkeyModuleWriteEvent(int fd, void *privdata, int mask) {
-    (void) fd;
-    (void) mask;
+    (void)fd;
+    (void)mask;
 
-    valkeyModuleEvents *e = (valkeyModuleEvents*)privdata;
+    valkeyModuleEvents *e = (valkeyModuleEvents *)privdata;
     valkeyAsyncHandleWrite(e->context);
 }
 
 static inline void valkeyModuleAddRead(void *privdata) {
-    valkeyModuleEvents *e = (valkeyModuleEvents*)privdata;
+    valkeyModuleEvents *e = (valkeyModuleEvents *)privdata;
     if (!e->reading) {
         e->reading = 1;
         ValkeyModule_EventLoopAdd(e->fd, VALKEYMODULE_EVENTLOOP_READABLE, valkeyModuleReadEvent, e);
@@ -42,7 +41,7 @@ static inline void valkeyModuleAddRead(void *privdata) {
 }
 
 static inline void valkeyModuleDelRead(void *privdata) {
-    valkeyModuleEvents *e = (valkeyModuleEvents*)privdata;
+    valkeyModuleEvents *e = (valkeyModuleEvents *)privdata;
     if (e->reading) {
         e->reading = 0;
         ValkeyModule_EventLoopDel(e->fd, VALKEYMODULE_EVENTLOOP_READABLE);
@@ -50,7 +49,7 @@ static inline void valkeyModuleDelRead(void *privdata) {
 }
 
 static inline void valkeyModuleAddWrite(void *privdata) {
-    valkeyModuleEvents *e = (valkeyModuleEvents*)privdata;
+    valkeyModuleEvents *e = (valkeyModuleEvents *)privdata;
     if (!e->writing) {
         e->writing = 1;
         ValkeyModule_EventLoopAdd(e->fd, VALKEYMODULE_EVENTLOOP_WRITABLE, valkeyModuleWriteEvent, e);
@@ -58,7 +57,7 @@ static inline void valkeyModuleAddWrite(void *privdata) {
 }
 
 static inline void valkeyModuleDelWrite(void *privdata) {
-    valkeyModuleEvents *e = (valkeyModuleEvents*)privdata;
+    valkeyModuleEvents *e = (valkeyModuleEvents *)privdata;
     if (e->writing) {
         e->writing = 0;
         ValkeyModule_EventLoopDel(e->fd, VALKEYMODULE_EVENTLOOP_WRITABLE);
@@ -66,7 +65,7 @@ static inline void valkeyModuleDelWrite(void *privdata) {
 }
 
 static inline void valkeyModuleStopTimer(void *privdata) {
-    valkeyModuleEvents *e = (valkeyModuleEvents*)privdata;
+    valkeyModuleEvents *e = (valkeyModuleEvents *)privdata;
     if (e->timer_active) {
         ValkeyModule_StopTimer(e->module_ctx, e->timer_id, NULL);
     }
@@ -74,7 +73,7 @@ static inline void valkeyModuleStopTimer(void *privdata) {
 }
 
 static inline void valkeyModuleCleanup(void *privdata) {
-    valkeyModuleEvents *e = (valkeyModuleEvents*)privdata;
+    valkeyModuleEvents *e = (valkeyModuleEvents *)privdata;
     valkeyModuleDelRead(privdata);
     valkeyModuleDelWrite(privdata);
     valkeyModuleStopTimer(privdata);
@@ -82,15 +81,15 @@ static inline void valkeyModuleCleanup(void *privdata) {
 }
 
 static inline void valkeyModuleTimeout(ValkeyModuleCtx *ctx, void *privdata) {
-    (void) ctx;
+    (void)ctx;
 
-    valkeyModuleEvents *e = (valkeyModuleEvents*)privdata;
+    valkeyModuleEvents *e = (valkeyModuleEvents *)privdata;
     e->timer_active = 0;
     valkeyAsyncHandleTimeout(e->context);
 }
 
 static inline void valkeyModuleSetTimeout(void *privdata, struct timeval tv) {
-    valkeyModuleEvents* e = (valkeyModuleEvents*)privdata;
+    valkeyModuleEvents *e = (valkeyModuleEvents *)privdata;
 
     valkeyModuleStopTimer(privdata);
 
@@ -119,7 +118,7 @@ static inline int valkeyModuleAttach(valkeyAsyncContext *ac, ValkeyModuleCtx *mo
         return VALKEY_ERR;
 
     /* Create container for context and r/w events */
-    e = (valkeyModuleEvents*)vk_malloc(sizeof(*e));
+    e = (valkeyModuleEvents *)vk_malloc(sizeof(*e));
     if (e == NULL)
         return VALKEY_ERR;
 

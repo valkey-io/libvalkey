@@ -30,11 +30,12 @@
 
 #ifndef VALKEY_AE_H
 #define VALKEY_AE_H
-#include <sys/types.h>
-#include <ae.h>
-#include "../valkey.h"
 #include "../async.h"
+#include "../valkey.h"
 #include "../valkeycluster.h"
+
+#include <ae.h>
+#include <sys/types.h>
 
 typedef struct valkeyAeEvents {
     valkeyAsyncContext *context;
@@ -44,57 +45,61 @@ typedef struct valkeyAeEvents {
 } valkeyAeEvents;
 
 static void valkeyAeReadEvent(aeEventLoop *el, int fd, void *privdata, int mask) {
-    ((void)el); ((void)fd); ((void)mask);
+    ((void)el);
+    ((void)fd);
+    ((void)mask);
 
-    valkeyAeEvents *e = (valkeyAeEvents*)privdata;
+    valkeyAeEvents *e = (valkeyAeEvents *)privdata;
     valkeyAsyncHandleRead(e->context);
 }
 
 static void valkeyAeWriteEvent(aeEventLoop *el, int fd, void *privdata, int mask) {
-    ((void)el); ((void)fd); ((void)mask);
+    ((void)el);
+    ((void)fd);
+    ((void)mask);
 
-    valkeyAeEvents *e = (valkeyAeEvents*)privdata;
+    valkeyAeEvents *e = (valkeyAeEvents *)privdata;
     valkeyAsyncHandleWrite(e->context);
 }
 
 static void valkeyAeAddRead(void *privdata) {
-    valkeyAeEvents *e = (valkeyAeEvents*)privdata;
+    valkeyAeEvents *e = (valkeyAeEvents *)privdata;
     aeEventLoop *loop = e->loop;
     if (!e->reading) {
         e->reading = 1;
-        aeCreateFileEvent(loop,e->fd,AE_READABLE,valkeyAeReadEvent,e);
+        aeCreateFileEvent(loop, e->fd, AE_READABLE, valkeyAeReadEvent, e);
     }
 }
 
 static void valkeyAeDelRead(void *privdata) {
-    valkeyAeEvents *e = (valkeyAeEvents*)privdata;
+    valkeyAeEvents *e = (valkeyAeEvents *)privdata;
     aeEventLoop *loop = e->loop;
     if (e->reading) {
         e->reading = 0;
-        aeDeleteFileEvent(loop,e->fd,AE_READABLE);
+        aeDeleteFileEvent(loop, e->fd, AE_READABLE);
     }
 }
 
 static void valkeyAeAddWrite(void *privdata) {
-    valkeyAeEvents *e = (valkeyAeEvents*)privdata;
+    valkeyAeEvents *e = (valkeyAeEvents *)privdata;
     aeEventLoop *loop = e->loop;
     if (!e->writing) {
         e->writing = 1;
-        aeCreateFileEvent(loop,e->fd,AE_WRITABLE,valkeyAeWriteEvent,e);
+        aeCreateFileEvent(loop, e->fd, AE_WRITABLE, valkeyAeWriteEvent, e);
     }
 }
 
 static void valkeyAeDelWrite(void *privdata) {
-    valkeyAeEvents *e = (valkeyAeEvents*)privdata;
+    valkeyAeEvents *e = (valkeyAeEvents *)privdata;
     aeEventLoop *loop = e->loop;
     if (e->writing) {
         e->writing = 0;
-        aeDeleteFileEvent(loop,e->fd,AE_WRITABLE);
+        aeDeleteFileEvent(loop, e->fd, AE_WRITABLE);
     }
 }
 
 static void valkeyAeCleanup(void *privdata) {
-    valkeyAeEvents *e = (valkeyAeEvents*)privdata;
+    valkeyAeEvents *e = (valkeyAeEvents *)privdata;
     valkeyAeDelRead(privdata);
     valkeyAeDelWrite(privdata);
     vk_free(e);
@@ -109,7 +114,7 @@ static int valkeyAeAttach(aeEventLoop *loop, valkeyAsyncContext *ac) {
         return VALKEY_ERR;
 
     /* Create container for context and r/w events */
-    e = (valkeyAeEvents*)vk_malloc(sizeof(*e));
+    e = (valkeyAeEvents *)vk_malloc(sizeof(*e));
     if (e == NULL)
         return VALKEY_ERR;
 

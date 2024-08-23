@@ -1,17 +1,18 @@
 #ifndef VALKEY_LIBHV_H
 #define VALKEY_LIBHV_H
 
-#include <hv/hloop.h>
-#include "../valkey.h"
 #include "../async.h"
+#include "../valkey.h"
+
+#include <hv/hloop.h>
 
 typedef struct valkeyLibhvEvents {
     hio_t *io;
     htimer_t *timer;
 } valkeyLibhvEvents;
 
-static void valkeyLibhvHandleEvents(hio_t* io) {
-    valkeyAsyncContext* context = (valkeyAsyncContext*)hevent_userdata(io);
+static void valkeyLibhvHandleEvents(hio_t *io) {
+    valkeyAsyncContext *context = (valkeyAsyncContext *)hevent_userdata(io);
     int events = hio_events(io);
     int revents = hio_revents(io);
     if (context && (events & HV_READ) && (revents & HV_READ)) {
@@ -23,27 +24,27 @@ static void valkeyLibhvHandleEvents(hio_t* io) {
 }
 
 static void valkeyLibhvAddRead(void *privdata) {
-    valkeyLibhvEvents* events = (valkeyLibhvEvents*)privdata;
+    valkeyLibhvEvents *events = (valkeyLibhvEvents *)privdata;
     hio_add(events->io, valkeyLibhvHandleEvents, HV_READ);
 }
 
 static void valkeyLibhvDelRead(void *privdata) {
-    valkeyLibhvEvents* events = (valkeyLibhvEvents*)privdata;
+    valkeyLibhvEvents *events = (valkeyLibhvEvents *)privdata;
     hio_del(events->io, HV_READ);
 }
 
 static void valkeyLibhvAddWrite(void *privdata) {
-    valkeyLibhvEvents* events = (valkeyLibhvEvents*)privdata;
+    valkeyLibhvEvents *events = (valkeyLibhvEvents *)privdata;
     hio_add(events->io, valkeyLibhvHandleEvents, HV_WRITE);
 }
 
 static void valkeyLibhvDelWrite(void *privdata) {
-    valkeyLibhvEvents* events = (valkeyLibhvEvents*)privdata;
+    valkeyLibhvEvents *events = (valkeyLibhvEvents *)privdata;
     hio_del(events->io, HV_WRITE);
 }
 
 static void valkeyLibhvCleanup(void *privdata) {
-    valkeyLibhvEvents* events = (valkeyLibhvEvents*)privdata;
+    valkeyLibhvEvents *events = (valkeyLibhvEvents *)privdata;
 
     if (events->timer)
         htimer_del(events->timer);
@@ -54,17 +55,17 @@ static void valkeyLibhvCleanup(void *privdata) {
     vk_free(events);
 }
 
-static void valkeyLibhvTimeout(htimer_t* timer) {
-    hio_t* io = (hio_t*)hevent_userdata(timer);
-    valkeyAsyncHandleTimeout((valkeyAsyncContext*)hevent_userdata(io));
+static void valkeyLibhvTimeout(htimer_t *timer) {
+    hio_t *io = (hio_t *)hevent_userdata(timer);
+    valkeyAsyncHandleTimeout((valkeyAsyncContext *)hevent_userdata(io));
 }
 
 static void valkeyLibhvSetTimeout(void *privdata, struct timeval tv) {
-    valkeyLibhvEvents* events;
+    valkeyLibhvEvents *events;
     uint32_t millis;
-    hloop_t* loop;
+    hloop_t *loop;
 
-    events = (valkeyLibhvEvents*)privdata;
+    events = (valkeyLibhvEvents *)privdata;
     millis = tv.tv_sec * 1000 + tv.tv_usec / 1000;
 
     if (millis == 0) {
@@ -84,17 +85,17 @@ static void valkeyLibhvSetTimeout(void *privdata, struct timeval tv) {
     }
 }
 
-static int valkeyLibhvAttach(valkeyAsyncContext* ac, hloop_t* loop) {
+static int valkeyLibhvAttach(valkeyAsyncContext *ac, hloop_t *loop) {
     valkeyContext *c = &(ac->c);
     valkeyLibhvEvents *events;
-    hio_t* io = NULL;
+    hio_t *io = NULL;
 
     if (ac->ev.data != NULL) {
         return VALKEY_ERR;
     }
 
     /* Create container struct to keep track of our io and any timer */
-    events = (valkeyLibhvEvents*)vk_malloc(sizeof(*events));
+    events = (valkeyLibhvEvents *)vk_malloc(sizeof(*events));
     if (events == NULL) {
         return VALKEY_ERR;
     }
@@ -110,11 +111,11 @@ static int valkeyLibhvAttach(valkeyAsyncContext* ac, hloop_t* loop) {
     events->io = io;
     events->timer = NULL;
 
-    ac->ev.addRead  = valkeyLibhvAddRead;
-    ac->ev.delRead  = valkeyLibhvDelRead;
+    ac->ev.addRead = valkeyLibhvAddRead;
+    ac->ev.delRead = valkeyLibhvDelRead;
     ac->ev.addWrite = valkeyLibhvAddWrite;
     ac->ev.delWrite = valkeyLibhvDelWrite;
-    ac->ev.cleanup  = valkeyLibhvCleanup;
+    ac->ev.cleanup = valkeyLibhvCleanup;
     ac->ev.scheduleTimer = valkeyLibhvSetTimeout;
     ac->ev.data = events;
 

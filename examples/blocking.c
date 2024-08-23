@@ -1,7 +1,8 @@
+#include <valkey/valkey.h>
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <valkey/valkey.h>
 
 #ifdef _MSC_VER
 #include <winsock2.h> /* For struct timeval */
@@ -17,11 +18,11 @@ static void example_argv_command(valkeyContext *c, size_t n) {
     argvlen = malloc(sizeof(*argvlen) * (2 + n));
 
     /* First the command */
-    argv[0] = (char*)"RPUSH";
+    argv[0] = (char *)"RPUSH";
     argvlen[0] = sizeof("RPUSH") - 1;
 
     /* Now our key */
-    argv[1] = (char*)"argvlist";
+    argv[1] = (char *)"argvlist";
     argvlen[1] = sizeof("argvlist") - 1;
 
     /* Now add the entries we wish to add to the list */
@@ -33,7 +34,8 @@ static void example_argv_command(valkeyContext *c, size_t n) {
     /* Execute the command using valkeyCommandArgv.  We're sending the arguments with
      * two explicit arrays.  One for each argument's string, and the other for its
      * length. */
-    reply = valkeyCommandArgv(c, n + 2, (const char **)argv, (const size_t*)argvlen);
+    reply = valkeyCommandArgv(
+        c, n + 2, (const char **)argv, (const size_t *)argvlen);
 
     if (reply == NULL || c->err) {
         fprintf(stderr, "Error:  Couldn't execute valkeyCommandArgv\n");
@@ -71,7 +73,7 @@ int main(int argc, char **argv) {
 
     int port = (argc > 2) ? atoi(argv[2]) : 6379;
 
-    struct timeval timeout = { 1, 500000 }; // 1.5 seconds
+    struct timeval timeout = {1, 500000}; // 1.5 seconds
     if (isunix) {
         c = valkeyConnectUnixWithTimeout(hostname, timeout);
     } else {
@@ -88,46 +90,46 @@ int main(int argc, char **argv) {
     }
 
     /* PING server */
-    reply = valkeyCommand(c,"PING");
+    reply = valkeyCommand(c, "PING");
     printf("PING: %s\n", reply->str);
     freeReplyObject(reply);
 
     /* Set a key */
-    reply = valkeyCommand(c,"SET %s %s", "foo", "hello world");
+    reply = valkeyCommand(c, "SET %s %s", "foo", "hello world");
     printf("SET: %s\n", reply->str);
     freeReplyObject(reply);
 
     /* Set a key using binary safe API */
-    reply = valkeyCommand(c,"SET %b %b", "bar", (size_t) 3, "hello", (size_t) 5);
+    reply = valkeyCommand(c, "SET %b %b", "bar", (size_t)3, "hello", (size_t)5);
     printf("SET (binary API): %s\n", reply->str);
     freeReplyObject(reply);
 
     /* Try a GET and two INCR */
-    reply = valkeyCommand(c,"GET foo");
+    reply = valkeyCommand(c, "GET foo");
     printf("GET foo: %s\n", reply->str);
     freeReplyObject(reply);
 
-    reply = valkeyCommand(c,"INCR counter");
+    reply = valkeyCommand(c, "INCR counter");
     printf("INCR counter: %lld\n", reply->integer);
     freeReplyObject(reply);
     /* again ... */
-    reply = valkeyCommand(c,"INCR counter");
+    reply = valkeyCommand(c, "INCR counter");
     printf("INCR counter: %lld\n", reply->integer);
     freeReplyObject(reply);
 
     /* Create a list of numbers, from 0 to 9 */
-    reply = valkeyCommand(c,"DEL mylist");
+    reply = valkeyCommand(c, "DEL mylist");
     freeReplyObject(reply);
     for (j = 0; j < 10; j++) {
         char buf[64];
 
-        snprintf(buf,64,"%u",j);
-        reply = valkeyCommand(c,"LPUSH mylist element-%s", buf);
+        snprintf(buf, 64, "%u", j);
+        reply = valkeyCommand(c, "LPUSH mylist element-%s", buf);
         freeReplyObject(reply);
     }
 
     /* Let's check what we have inside the list */
-    reply = valkeyCommand(c,"LRANGE mylist 0 -1");
+    reply = valkeyCommand(c, "LRANGE mylist 0 -1");
     if (reply->type == VALKEY_REPLY_ARRAY) {
         for (j = 0; j < reply->elements; j++) {
             printf("%u) %s\n", j, reply->element[j]->str);

@@ -113,8 +113,8 @@ typedef struct valkeyClusterContext {
     char *username;                  /* Authenticate using user */
     char *password;                  /* Authentication password */
 
-    struct dict *nodes;     /* Known valkeyClusterNode's */
-    uint64_t route_version; /* Increased when the node lookup table changes */
+    struct dict *nodes;        /* Known valkeyClusterNode's */
+    uint64_t route_version;    /* Increased when the node lookup table changes */
     valkeyClusterNode **table; /* valkeyClusterNode lookup table */
 
     struct hilist *requests; /* Outstanding commands (Pipelining) */
@@ -122,7 +122,7 @@ typedef struct valkeyClusterContext {
     int retry_count;       /* Current number of failing attempts */
     int need_update_route; /* Indicator for valkeyClusterReset() (Pipel.) */
 
-    void *ssl; /* Pointer to a valkeySSLContext when using SSL/TLS. */
+    void *ssl;              /* Pointer to a valkeySSLContext when using SSL/TLS. */
     sslInitFn *ssl_init_fn; /* Func ptr for SSL context initiation */
 
     void (*on_connect)(const struct valkeyContext *c, int status);

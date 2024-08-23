@@ -41,14 +41,15 @@
 #else
 #include <malloc.h>
 #endif
-#include <stdio.h>
-#include <string.h>
+#include "win32.h"
 
 #include "alloc.h"
 #include "command.h"
 #include "sds.h"
 #include "vkutil.h"
-#include "win32.h"
+
+#include <stdio.h>
+#include <string.h>
 
 #define LF (uint8_t)10
 #define CR (uint8_t)13
@@ -71,12 +72,12 @@ typedef struct {
 
 /* Populate the table with code in cmddef.h generated from JSON files. */
 static cmddef server_commands[] = {
-#define COMMAND(_type, _name, _subname, _arity, _keymethod, _keypos)           \
-    {.type = CMD_REQ_VALKEY_##_type,                                           \
-     .name = _name,                                                            \
-     .subname = _subname,                                                      \
-     .firstkeymethod = KEYPOS_##_keymethod,                                    \
-     .firstkeypos = _keypos,                                                   \
+#define COMMAND(_type, _name, _subname, _arity, _keymethod, _keypos) \
+    {.type = CMD_REQ_VALKEY_##_type,                                 \
+     .name = _name,                                                  \
+     .subname = _subname,                                            \
+     .firstkeymethod = KEYPOS_##_keymethod,                          \
+     .firstkeypos = _keypos,                                         \
      .arity = _arity},
 #include "cmddef.h"
 #undef COMMAND

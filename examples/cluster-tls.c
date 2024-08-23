@@ -1,9 +1,10 @@
-#include <stdio.h>
-#include <stdlib.h>
 #include <valkey/valkey.h>
 #include <valkey/valkey_ssl.h>
 #include <valkey/valkeycluster.h>
 #include <valkey/valkeycluster_ssl.h>
+
+#include <stdio.h>
+#include <stdlib.h>
 
 #define CLUSTER_NODE_TLS "127.0.0.1:7301"
 

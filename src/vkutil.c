@@ -35,9 +35,10 @@
 #include <sys/time.h>
 #endif
 
+#include "win32.h"
+
 #include "alloc.h"
 #include "vkutil.h"
-#include "win32.h"
 
 int _vk_atoi(uint8_t *line, size_t n) {
     int value;

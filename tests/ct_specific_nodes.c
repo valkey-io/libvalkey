@@ -45,7 +45,7 @@ void test_command_to_all_nodes(valkeyClusterContext *cc) {
 
 void test_transaction(valkeyClusterContext *cc) {
 
-    valkeyClusterNode *node = valkeyClusterGetNodeByKey(cc, (char*)"foo");
+    valkeyClusterNode *node = valkeyClusterGetNodeByKey(cc, (char *)"foo");
     assert(node);
 
     valkeyReply *reply;
@@ -73,7 +73,7 @@ void test_streams(valkeyClusterContext *cc) {
     char *id;
 
     /* Get the node that handles given stream */
-    valkeyClusterNode *node = valkeyClusterGetNodeByKey(cc, (char*)"mystream");
+    valkeyClusterNode *node = valkeyClusterGetNodeByKey(cc, (char *)"mystream");
     assert(node);
 
     /* Preparation: remove old stream/key */
@@ -82,7 +82,7 @@ void test_streams(valkeyClusterContext *cc) {
     freeReplyObject(reply);
 
     /* Query wrong node */
-    valkeyClusterNode *wrongNode = valkeyClusterGetNodeByKey(cc, (char*)"otherstream");
+    valkeyClusterNode *wrongNode = valkeyClusterGetNodeByKey(cc, (char *)"otherstream");
     assert(node != wrongNode);
     reply = valkeyClusterCommandToNode(cc, wrongNode, "XLEN mystream");
     CHECK_REPLY_ERROR(cc, reply, "MOVED");
@@ -235,7 +235,7 @@ void test_pipeline_transaction(valkeyClusterContext *cc) {
     int status;
     valkeyReply *reply;
 
-    valkeyClusterNode *node = valkeyClusterGetNodeByKey(cc, (char*)"foo");
+    valkeyClusterNode *node = valkeyClusterGetNodeByKey(cc, (char *)"foo");
     assert(node);
 
     status = valkeyClusterAppendCommandToNode(cc, node, "MULTI");
@@ -487,7 +487,7 @@ void test_async_transaction(void) {
     status = valkeyClusterLibeventAttach(acc, base);
     assert(status == VALKEY_OK);
 
-    valkeyClusterNode *node = valkeyClusterGetNodeByKey(acc->cc, (char*)"foo");
+    valkeyClusterNode *node = valkeyClusterGetNodeByKey(acc->cc, (char *)"foo");
     assert(node);
 
     ExpectedResult r1 = {.type = VALKEY_REPLY_STATUS, .str = "OK"};

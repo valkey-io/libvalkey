@@ -4,12 +4,13 @@
 
 #include "../async.h"
 #include "../sockcompat.h"
-#include <string.h> // for memset
+
 #include <errno.h>
+#include <string.h> // for memset
 
 /* Values to return from valkeyPollTick */
-#define VALKEY_POLL_HANDLED_READ    1
-#define VALKEY_POLL_HANDLED_WRITE   2
+#define VALKEY_POLL_HANDLED_READ 1
+#define VALKEY_POLL_HANDLED_WRITE 2
 #define VALKEY_POLL_HANDLED_TIMEOUT 4
 
 /* An adapter to allow manual polling of the async context by checking the state
@@ -34,7 +35,7 @@ static double valkeyPollTimevalToDouble(struct timeval *tv) {
 static double valkeyPollGetNow(void) {
 #ifndef _MSC_VER
     struct timeval tv;
-    gettimeofday(&tv,NULL);
+    gettimeofday(&tv, NULL);
     return valkeyPollTimevalToDouble(&tv);
 #else
     FILETIME ft;
@@ -56,7 +57,7 @@ static int valkeyPollTick(valkeyAsyncContext *ac, double timeout) {
     int ns;
     int itimeout;
 
-    valkeyPollEvents *e = (valkeyPollEvents*)ac->ev.data;
+    valkeyPollEvents *e = (valkeyPollEvents *)ac->ev.data;
     if (!e)
         return 0;
 
@@ -127,27 +128,27 @@ static int valkeyPollTick(valkeyAsyncContext *ac, double timeout) {
 }
 
 static void valkeyPollAddRead(void *data) {
-    valkeyPollEvents *e = (valkeyPollEvents*)data;
+    valkeyPollEvents *e = (valkeyPollEvents *)data;
     e->reading = 1;
 }
 
 static void valkeyPollDelRead(void *data) {
-    valkeyPollEvents *e = (valkeyPollEvents*)data;
+    valkeyPollEvents *e = (valkeyPollEvents *)data;
     e->reading = 0;
 }
 
 static void valkeyPollAddWrite(void *data) {
-    valkeyPollEvents *e = (valkeyPollEvents*)data;
+    valkeyPollEvents *e = (valkeyPollEvents *)data;
     e->writing = 1;
 }
 
 static void valkeyPollDelWrite(void *data) {
-    valkeyPollEvents *e = (valkeyPollEvents*)data;
+    valkeyPollEvents *e = (valkeyPollEvents *)data;
     e->writing = 0;
 }
 
 static void valkeyPollCleanup(void *data) {
-    valkeyPollEvents *e = (valkeyPollEvents*)data;
+    valkeyPollEvents *e = (valkeyPollEvents *)data;
 
     /* if we are currently processing a tick, postpone deletion */
     if (e->in_tick)
@@ -156,9 +157,8 @@ static void valkeyPollCleanup(void *data) {
         vk_free(e);
 }
 
-static void valkeyPollScheduleTimer(void *data, struct timeval tv)
-{
-    valkeyPollEvents *e = (valkeyPollEvents*)data;
+static void valkeyPollScheduleTimer(void *data, struct timeval tv) {
+    valkeyPollEvents *e = (valkeyPollEvents *)data;
     double now = valkeyPollGetNow();
     e->deadline = now + valkeyPollTimevalToDouble(&tv);
 }
@@ -172,7 +172,7 @@ static int valkeyPollAttach(valkeyAsyncContext *ac) {
         return VALKEY_ERR;
 
     /* Create container for context and r/w events */
-    e = (valkeyPollEvents*)vk_malloc(sizeof(*e));
+    e = (valkeyPollEvents *)vk_malloc(sizeof(*e));
     if (e == NULL)
         return VALKEY_ERR;
     memset(e, 0, sizeof(*e));
