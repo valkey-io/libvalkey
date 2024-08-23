@@ -1,7 +1,9 @@
+#include <valkey/valkeycluster.h>
+
+#include <valkey/adapters/libevent.h>
+
 #include <stdio.h>
 #include <stdlib.h>
-#include <valkey/adapters/libevent.h>
-#include <valkey/valkeycluster.h>
 
 void getCallback(valkeyClusterAsyncContext *cc, void *r, void *privdata) {
     valkeyReply *reply = (valkeyReply *)r;
@@ -45,8 +47,8 @@ void disconnectCallback(const valkeyAsyncContext *ac, int status) {
 }
 
 int main(int argc, char **argv) {
-    (void) argc;
-    (void) argv;
+    (void)argc;
+    (void)argv;
     printf("Connecting...\n");
     valkeyClusterAsyncContext *cc =
         valkeyClusterAsyncConnect("127.0.0.1:7000", VALKEYCLUSTER_FLAG_NULL);

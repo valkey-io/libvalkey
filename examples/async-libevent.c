@@ -1,11 +1,12 @@
+#include <valkey/async.h>
+#include <valkey/valkey.h>
+
+#include <valkey/adapters/libevent.h>
+
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <signal.h>
-
-#include <valkey/valkey.h>
-#include <valkey/async.h>
-#include <valkey/adapters/libevent.h>
 
 void getCallback(valkeyAsyncContext *c, void *r, void *privdata) {
     valkeyReply *reply = r;
@@ -15,7 +16,7 @@ void getCallback(valkeyAsyncContext *c, void *r, void *privdata) {
         }
         return;
     }
-    printf("argv[%s]: %s\n", (char*)privdata, reply->str);
+    printf("argv[%s]: %s\n", (char *)privdata, reply->str);
 
     /* Disconnect after receiving the reply to GET */
     valkeyAsyncDisconnect(c);
@@ -37,7 +38,7 @@ void disconnectCallback(const valkeyAsyncContext *c, int status) {
     printf("Disconnected...\n");
 }
 
-int main (int argc, char **argv) {
+int main(int argc, char **argv) {
 #ifndef _WIN32
     signal(SIGPIPE, SIG_IGN);
 #endif
@@ -49,7 +50,6 @@ int main (int argc, char **argv) {
     tv.tv_sec = 1;
     options.connect_timeout = &tv;
 
-
     valkeyAsyncContext *c = valkeyAsyncConnectWithOptions(&options);
     if (c->err) {
         /* Let *c leak for now... */
@@ -57,11 +57,12 @@ int main (int argc, char **argv) {
         return 1;
     }
 
-    valkeyLibeventAttach(c,base);
-    valkeyAsyncSetConnectCallback(c,connectCallback);
-    valkeyAsyncSetDisconnectCallback(c,disconnectCallback);
-    valkeyAsyncCommand(c, NULL, NULL, "SET key %b", argv[argc-1], strlen(argv[argc-1]));
-    valkeyAsyncCommand(c, getCallback, (char*)"end-1", "GET key");
+    valkeyLibeventAttach(c, base);
+    valkeyAsyncSetConnectCallback(c, connectCallback);
+    valkeyAsyncSetDisconnectCallback(c, disconnectCallback);
+    valkeyAsyncCommand(
+        c, NULL, NULL, "SET key %b", argv[argc - 1], strlen(argv[argc - 1]));
+    valkeyAsyncCommand(c, getCallback, (char *)"end-1", "GET key");
     event_base_dispatch(base);
     return 0;
 }

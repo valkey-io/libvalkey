@@ -1,19 +1,21 @@
+#include <valkey/async.h>
+#include <valkey/valkey.h>
+
+#include <valkey/adapters/ae.h>
+
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <signal.h>
-
-#include <valkey/valkey.h>
-#include <valkey/async.h>
-#include <valkey/adapters/ae.h>
 
 /* Put event loop in the global scope, so it can be explicitly stopped */
 static aeEventLoop *loop;
 
 void getCallback(valkeyAsyncContext *c, void *r, void *privdata) {
     valkeyReply *reply = r;
-    if (reply == NULL) return;
-    printf("argv[%s]: %s\n", (char*)privdata, reply->str);
+    if (reply == NULL)
+        return;
+    printf("argv[%s]: %s\n", (char *)privdata, reply->str);
 
     /* Disconnect after receiving the reply to GET */
     valkeyAsyncDisconnect(c);
@@ -40,7 +42,7 @@ void disconnectCallback(const valkeyAsyncContext *c, int status) {
     aeStop(loop);
 }
 
-int main (int argc, char **argv) {
+int main(int argc, char **argv) {
     signal(SIGPIPE, SIG_IGN);
 
     valkeyAsyncContext *c = valkeyAsyncConnect("127.0.0.1", 6379);
@@ -52,11 +54,11 @@ int main (int argc, char **argv) {
 
     loop = aeCreateEventLoop(64);
     valkeyAeAttach(loop, c);
-    valkeyAsyncSetConnectCallback(c,connectCallback);
-    valkeyAsyncSetDisconnectCallback(c,disconnectCallback);
-    valkeyAsyncCommand(c, NULL, NULL, "SET key %b", argv[argc-1], strlen(argv[argc-1]));
-    valkeyAsyncCommand(c, getCallback, (char*)"end-1", "GET key");
+    valkeyAsyncSetConnectCallback(c, connectCallback);
+    valkeyAsyncSetDisconnectCallback(c, disconnectCallback);
+    valkeyAsyncCommand(
+        c, NULL, NULL, "SET key %b", argv[argc - 1], strlen(argv[argc - 1]));
+    valkeyAsyncCommand(c, getCallback, (char *)"end-1", "GET key");
     aeMain(loop);
     return 0;
 }
-

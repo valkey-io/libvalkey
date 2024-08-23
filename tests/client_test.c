@@ -2,26 +2,27 @@
 #define _POSIX_C_SOURCE 200112L
 #endif
 #include "sockcompat.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #ifndef _WIN32
 #include <strings.h>
-#include <time.h>
 #include <sys/time.h>
+#include <time.h>
 #include <unistd.h>
 #else
 #define strcasecmp _stricmp
 #endif
+#include "adapters/poll.h"
+#include "async.h"
+#include "valkey.h"
+
 #include <assert.h>
-#include <signal.h>
 #include <errno.h>
 #include <limits.h>
 #include <math.h>
-
-#include "valkey.h"
-#include "async.h"
-#include "adapters/poll.h"
+#include <signal.h>
 #ifdef VALKEY_TEST_SSL
 #include "valkey_ssl.h"
 #endif
@@ -30,6 +31,7 @@
 #endif
 #ifdef VALKEY_TEST_ASYNC
 #include "adapters/libevent.h"
+
 #include <event2/event.h>
 #endif
 
@@ -85,15 +87,29 @@ valkeySSLContext *_ssl_ctx = NULL;
 
 /* The following lines make up our testing "framework" :) */
 static int tests = 0, fails = 0, skips = 0;
-#define test(_s) { printf("#%02d ", ++tests); printf(_s); }
-#define test_cond(_c) if(_c) printf("\033[0;32mPASSED\033[0;0m\n"); else {printf("\033[0;31mFAILED\033[0;0m\n"); fails++;}
-#define test_skipped() { printf("\033[01;33mSKIPPED\033[0;0m\n"); skips++; }
+#define test(_s)                   \
+    {                              \
+        printf("#%02d ", ++tests); \
+        printf(_s);                \
+    }
+#define test_cond(_c)                          \
+    if (_c)                                    \
+        printf("\033[0;32mPASSED\033[0;0m\n"); \
+    else {                                     \
+        printf("\033[0;31mFAILED\033[0;0m\n"); \
+        fails++;                               \
+    }
+#define test_skipped()                           \
+    {                                            \
+        printf("\033[01;33mSKIPPED\033[0;0m\n"); \
+        skips++;                                 \
+    }
 
 static void millisleep(int ms) {
 #ifdef _MSC_VER
     Sleep(ms);
 #else
-    struct timespec ts = { ms / 1000, (ms % 1000) * 1000000 };
+    struct timespec ts = {ms / 1000, (ms % 1000) * 1000000};
 
     nanosleep(&ts, NULL);
 #endif
@@ -102,8 +118,8 @@ static void millisleep(int ms) {
 static long long usec(void) {
 #ifndef _MSC_VER
     struct timeval tv;
-    gettimeofday(&tv,NULL);
-    return (((long long)tv.tv_sec)*1000000)+tv.tv_usec;
+    gettimeofday(&tv, NULL);
+    return (((long long)tv.tv_sec) * 1000000) + tv.tv_usec;
 #else
     FILETIME ft;
     GetSystemTimeAsFileTime(&ft);
@@ -118,11 +134,11 @@ static long long usec(void) {
 #define assert(e) (void)(e)
 #endif
 
-#define valkeyTestPanic(msg) \
-    do { \
+#define valkeyTestPanic(msg)                                                      \
+    do {                                                                          \
         fprintf(stderr, "PANIC: %s (In function \"%s\", file \"%s\", line %d)\n", \
-                msg, __func__, __FILE__, __LINE__); \
-        exit(1); \
+                msg, __func__, __FILE__, __LINE__);                               \
+        exit(1);                                                                  \
     } while (1)
 
 /* Helper to extract server version information.  Aborts on any failure. */
@@ -146,12 +162,15 @@ void get_server_version(valkeyContext *c, int *majorptr, int *minorptr) {
 
     /* Extract version info */
     major = strtol(s, &eptr, 10);
-    if (*eptr != '.') goto abort;
-    minor = strtol(eptr+1, NULL, 10);
+    if (*eptr != '.')
+        goto abort;
+    minor = strtol(eptr + 1, NULL, 10);
 
     /* Push info the caller wants */
-    if (majorptr) *majorptr = major;
-    if (minorptr) *minorptr = minor;
+    if (majorptr)
+        *majorptr = major;
+    if (minorptr)
+        *minorptr = minor;
 
     freeReplyObject(reply);
     return;
@@ -166,12 +185,12 @@ static valkeyContext *select_database(valkeyContext *c) {
     valkeyReply *reply;
 
     /* Switch to DB 9 for testing, now that we know we can chat. */
-    reply = valkeyCommand(c,"SELECT 9");
+    reply = valkeyCommand(c, "SELECT 9");
     assert(reply != NULL);
     freeReplyObject(reply);
 
     /* Make sure the DB is empty */
-    reply = valkeyCommand(c,"DBSIZE");
+    reply = valkeyCommand(c, "DBSIZE");
     assert(reply != NULL);
     if (reply->type == VALKEY_REPLY_INTEGER && reply->integer == 0) {
         /* Awesome, DB 9 is empty and we can continue. */
@@ -208,10 +227,10 @@ static int disconnect(valkeyContext *c, int keep_fd) {
     valkeyReply *reply;
 
     /* Make sure we're on DB 9. */
-    reply = valkeyCommand(c,"SELECT 9");
+    reply = valkeyCommand(c, "SELECT 9");
     assert(reply != NULL);
     freeReplyObject(reply);
-    reply = valkeyCommand(c,"FLUSHDB");
+    reply = valkeyCommand(c, "FLUSHDB");
     assert(reply != NULL);
     freeReplyObject(reply);
 
@@ -231,7 +250,7 @@ static void do_ssl_handshake(valkeyContext *c) {
         exit(1);
     }
 #else
-    (void) c;
+    (void)c;
 #endif
 }
 
@@ -291,67 +310,69 @@ static void test_format_commands(void) {
     int len;
 
     test("Format command without interpolation: ");
-    len = valkeyFormatCommand(&cmd,"SET foo bar");
-    test_cond(strncmp(cmd,"*3\r\n$3\r\nSET\r\n$3\r\nfoo\r\n$3\r\nbar\r\n",len) == 0 &&
-        len == 4+4+(3+2)+4+(3+2)+4+(3+2));
+    len = valkeyFormatCommand(&cmd, "SET foo bar");
+    test_cond(strncmp(cmd, "*3\r\n$3\r\nSET\r\n$3\r\nfoo\r\n$3\r\nbar\r\n", len) == 0 &&
+              len == 4 + 4 + (3 + 2) + 4 + (3 + 2) + 4 + (3 + 2));
     vk_free(cmd);
 
     test("Format command with %%s string interpolation: ");
-    len = valkeyFormatCommand(&cmd,"SET %s %s","foo","bar");
-    test_cond(strncmp(cmd,"*3\r\n$3\r\nSET\r\n$3\r\nfoo\r\n$3\r\nbar\r\n",len) == 0 &&
-        len == 4+4+(3+2)+4+(3+2)+4+(3+2));
+    len = valkeyFormatCommand(&cmd, "SET %s %s", "foo", "bar");
+    test_cond(strncmp(cmd, "*3\r\n$3\r\nSET\r\n$3\r\nfoo\r\n$3\r\nbar\r\n", len) == 0 &&
+              len == 4 + 4 + (3 + 2) + 4 + (3 + 2) + 4 + (3 + 2));
     vk_free(cmd);
 
     test("Format command with %%s and an empty string: ");
-    len = valkeyFormatCommand(&cmd,"SET %s %s","foo","");
-    test_cond(strncmp(cmd,"*3\r\n$3\r\nSET\r\n$3\r\nfoo\r\n$0\r\n\r\n",len) == 0 &&
-        len == 4+4+(3+2)+4+(3+2)+4+(0+2));
+    len = valkeyFormatCommand(&cmd, "SET %s %s", "foo", "");
+    test_cond(strncmp(cmd, "*3\r\n$3\r\nSET\r\n$3\r\nfoo\r\n$0\r\n\r\n", len) == 0 &&
+              len == 4 + 4 + (3 + 2) + 4 + (3 + 2) + 4 + (0 + 2));
     vk_free(cmd);
 
     test("Format command with an empty string in between proper interpolations: ");
-    len = valkeyFormatCommand(&cmd,"SET %s %s","","foo");
-    test_cond(strncmp(cmd,"*3\r\n$3\r\nSET\r\n$0\r\n\r\n$3\r\nfoo\r\n",len) == 0 &&
-        len == 4+4+(3+2)+4+(0+2)+4+(3+2));
+    len = valkeyFormatCommand(&cmd, "SET %s %s", "", "foo");
+    test_cond(strncmp(cmd, "*3\r\n$3\r\nSET\r\n$0\r\n\r\n$3\r\nfoo\r\n", len) == 0 &&
+              len == 4 + 4 + (3 + 2) + 4 + (0 + 2) + 4 + (3 + 2));
     vk_free(cmd);
 
     test("Format command with %%b string interpolation: ");
-    len = valkeyFormatCommand(&cmd,"SET %b %b","foo",(size_t)3,"b\0r",(size_t)3);
-    test_cond(strncmp(cmd,"*3\r\n$3\r\nSET\r\n$3\r\nfoo\r\n$3\r\nb\0r\r\n",len) == 0 &&
-        len == 4+4+(3+2)+4+(3+2)+4+(3+2));
+    len = valkeyFormatCommand(&cmd, "SET %b %b", "foo", (size_t)3, "b\0r", (size_t)3);
+    test_cond(strncmp(cmd, "*3\r\n$3\r\nSET\r\n$3\r\nfoo\r\n$3\r\nb\0r\r\n", len) == 0 &&
+              len == 4 + 4 + (3 + 2) + 4 + (3 + 2) + 4 + (3 + 2));
     vk_free(cmd);
 
     test("Format command with %%b and an empty string: ");
-    len = valkeyFormatCommand(&cmd,"SET %b %b","foo",(size_t)3,"",(size_t)0);
-    test_cond(strncmp(cmd,"*3\r\n$3\r\nSET\r\n$3\r\nfoo\r\n$0\r\n\r\n",len) == 0 &&
-        len == 4+4+(3+2)+4+(3+2)+4+(0+2));
+    len = valkeyFormatCommand(&cmd, "SET %b %b", "foo", (size_t)3, "", (size_t)0);
+    test_cond(strncmp(cmd, "*3\r\n$3\r\nSET\r\n$3\r\nfoo\r\n$0\r\n\r\n", len) == 0 &&
+              len == 4 + 4 + (3 + 2) + 4 + (3 + 2) + 4 + (0 + 2));
     vk_free(cmd);
 
     test("Format command with literal %%: ");
-    len = valkeyFormatCommand(&cmd,"SET %% %%");
-    test_cond(strncmp(cmd,"*3\r\n$3\r\nSET\r\n$1\r\n%\r\n$1\r\n%\r\n",len) == 0 &&
-        len == 4+4+(3+2)+4+(1+2)+4+(1+2));
+    len = valkeyFormatCommand(&cmd, "SET %% %%");
+    test_cond(strncmp(cmd, "*3\r\n$3\r\nSET\r\n$1\r\n%\r\n$1\r\n%\r\n", len) == 0 &&
+              len == 4 + 4 + (3 + 2) + 4 + (1 + 2) + 4 + (1 + 2));
     vk_free(cmd);
 
     /* Vararg width depends on the type. These tests make sure that the
      * width is correctly determined using the format and subsequent varargs
      * can correctly be interpolated. */
-#define INTEGER_WIDTH_TEST(fmt, type) do {                                                \
-    type value = 123;                                                                     \
-    test("Format command with printf-delegation (" #type "): ");                          \
-    len = valkeyFormatCommand(&cmd,"key:%08" fmt " str:%s", value, "hello");               \
-    test_cond(strncmp(cmd,"*2\r\n$12\r\nkey:00000123\r\n$9\r\nstr:hello\r\n",len) == 0 && \
-        len == 4+5+(12+2)+4+(9+2));                                                       \
-    vk_free(cmd);                                                                         \
-} while(0)
+#define INTEGER_WIDTH_TEST(fmt, type)                                                           \
+    do {                                                                                        \
+        type value = 123;                                                                       \
+        test("Format command with printf-delegation (" #type "): ");                            \
+        len = valkeyFormatCommand(&cmd, "key:%08" fmt " str:%s", value, "hello");               \
+        test_cond(strncmp(cmd, "*2\r\n$12\r\nkey:00000123\r\n$9\r\nstr:hello\r\n", len) == 0 && \
+                  len == 4 + 5 + (12 + 2) + 4 + (9 + 2));                                       \
+        vk_free(cmd);                                                                           \
+    } while (0)
 
-#define FLOAT_WIDTH_TEST(type) do {                                                       \
-    type value = 123.0;                                                                   \
-    test("Format command with printf-delegation (" #type "): ");                          \
-    len = valkeyFormatCommand(&cmd,"key:%08.3f str:%s", value, "hello");                   \
-    test_cond(strncmp(cmd,"*2\r\n$12\r\nkey:0123.000\r\n$9\r\nstr:hello\r\n",len) == 0 && \
-        len == 4+5+(12+2)+4+(9+2));                                                       \
-    vk_free(cmd);                                                                         \
-} while(0)
+#define FLOAT_WIDTH_TEST(type)                                                                  \
+    do {                                                                                        \
+        type value = 123.0;                                                                     \
+        test("Format command with printf-delegation (" #type "): ");                            \
+        len = valkeyFormatCommand(&cmd, "key:%08.3f str:%s", value, "hello");                   \
+        test_cond(strncmp(cmd, "*2\r\n$12\r\nkey:0123.000\r\n$9\r\nstr:hello\r\n", len) == 0 && \
+                  len == 4 + 5 + (12 + 2) + 4 + (9 + 2));                                       \
+        vk_free(cmd);                                                                           \
+    } while (0)
 
     INTEGER_WIDTH_TEST("d", int);
     INTEGER_WIDTH_TEST("hhd", char);
@@ -367,46 +388,46 @@ static void test_format_commands(void) {
     FLOAT_WIDTH_TEST(double);
 
     test("Format command with unhandled printf format (specifier 'p' not supported): ");
-    len = valkeyFormatCommand(&cmd,"key:%08p %b",(void*)1234,"foo",(size_t)3);
+    len = valkeyFormatCommand(&cmd, "key:%08p %b", (void *)1234, "foo", (size_t)3);
     test_cond(len == -1);
 
     test("Format command with invalid printf format (specifier missing): ");
-    len = valkeyFormatCommand(&cmd,"%-");
+    len = valkeyFormatCommand(&cmd, "%-");
     test_cond(len == -1);
 
     const char *argv[3];
     argv[0] = "SET";
     argv[1] = "foo\0xxx";
     argv[2] = "bar";
-    size_t lens[3] = { 3, 7, 3 };
+    size_t lens[3] = {3, 7, 3};
     int argc = 3;
 
     test("Format command by passing argc/argv without lengths: ");
-    len = valkeyFormatCommandArgv(&cmd,argc,argv,NULL);
-    test_cond(strncmp(cmd,"*3\r\n$3\r\nSET\r\n$3\r\nfoo\r\n$3\r\nbar\r\n",len) == 0 &&
-        len == 4+4+(3+2)+4+(3+2)+4+(3+2));
+    len = valkeyFormatCommandArgv(&cmd, argc, argv, NULL);
+    test_cond(strncmp(cmd, "*3\r\n$3\r\nSET\r\n$3\r\nfoo\r\n$3\r\nbar\r\n", len) == 0 &&
+              len == 4 + 4 + (3 + 2) + 4 + (3 + 2) + 4 + (3 + 2));
     vk_free(cmd);
 
     test("Format command by passing argc/argv with lengths: ");
-    len = valkeyFormatCommandArgv(&cmd,argc,argv,lens);
-    test_cond(strncmp(cmd,"*3\r\n$3\r\nSET\r\n$7\r\nfoo\0xxx\r\n$3\r\nbar\r\n",len) == 0 &&
-        len == 4+4+(3+2)+4+(7+2)+4+(3+2));
+    len = valkeyFormatCommandArgv(&cmd, argc, argv, lens);
+    test_cond(strncmp(cmd, "*3\r\n$3\r\nSET\r\n$7\r\nfoo\0xxx\r\n$3\r\nbar\r\n", len) == 0 &&
+              len == 4 + 4 + (3 + 2) + 4 + (7 + 2) + 4 + (3 + 2));
     vk_free(cmd);
 
     sds sds_cmd;
 
     sds_cmd = NULL;
     test("Format command into sds by passing argc/argv without lengths: ");
-    len = valkeyFormatSdsCommandArgv(&sds_cmd,argc,argv,NULL);
-    test_cond(strncmp(sds_cmd,"*3\r\n$3\r\nSET\r\n$3\r\nfoo\r\n$3\r\nbar\r\n",len) == 0 &&
-        len == 4+4+(3+2)+4+(3+2)+4+(3+2));
+    len = valkeyFormatSdsCommandArgv(&sds_cmd, argc, argv, NULL);
+    test_cond(strncmp(sds_cmd, "*3\r\n$3\r\nSET\r\n$3\r\nfoo\r\n$3\r\nbar\r\n", len) == 0 &&
+              len == 4 + 4 + (3 + 2) + 4 + (3 + 2) + 4 + (3 + 2));
     sdsfree(sds_cmd);
 
     sds_cmd = NULL;
     test("Format command into sds by passing argc/argv with lengths: ");
-    len = valkeyFormatSdsCommandArgv(&sds_cmd,argc,argv,lens);
-    test_cond(strncmp(sds_cmd,"*3\r\n$3\r\nSET\r\n$7\r\nfoo\0xxx\r\n$3\r\nbar\r\n",len) == 0 &&
-        len == 4+4+(3+2)+4+(7+2)+4+(3+2));
+    len = valkeyFormatSdsCommandArgv(&sds_cmd, argc, argv, lens);
+    test_cond(strncmp(sds_cmd, "*3\r\n$3\r\nSET\r\n$7\r\nfoo\0xxx\r\n$3\r\nbar\r\n", len) == 0 &&
+              len == 4 + 4 + (3 + 2) + 4 + (7 + 2) + 4 + (3 + 2));
     sdsfree(sds_cmd);
 }
 
@@ -424,7 +445,7 @@ static void test_append_formatted_commands(struct config config) {
 
     test_cond(valkeyAppendFormattedCommand(c, cmd, len) == VALKEY_OK);
 
-    assert(valkeyGetReply(c, (void*)&reply) == VALKEY_OK);
+    assert(valkeyGetReply(c, (void *)&reply) == VALKEY_OK);
 
     vk_free(cmd);
     freeReplyObject(reply);
@@ -477,99 +498,99 @@ static void test_reply_reader(void) {
 
     test("Error handling in reply parser: ");
     reader = valkeyReaderCreate();
-    valkeyReaderFeed(reader,(char*)"@foo\r\n",6);
-    ret = valkeyReaderGetReply(reader,NULL);
+    valkeyReaderFeed(reader, (char *)"@foo\r\n", 6);
+    ret = valkeyReaderGetReply(reader, NULL);
     test_cond(ret == VALKEY_ERR &&
-              strcasecmp(reader->errstr,"Protocol error, got \"@\" as reply type byte") == 0);
+              strcasecmp(reader->errstr, "Protocol error, got \"@\" as reply type byte") == 0);
     valkeyReaderFree(reader);
 
     /* when the reply already contains multiple items, they must be free'd
      * on an error. valgrind will bark when this doesn't happen. */
     test("Memory cleanup in reply parser: ");
     reader = valkeyReaderCreate();
-    valkeyReaderFeed(reader,(char*)"*2\r\n",4);
-    valkeyReaderFeed(reader,(char*)"$5\r\nhello\r\n",11);
-    valkeyReaderFeed(reader,(char*)"@foo\r\n",6);
-    ret = valkeyReaderGetReply(reader,NULL);
+    valkeyReaderFeed(reader, (char *)"*2\r\n", 4);
+    valkeyReaderFeed(reader, (char *)"$5\r\nhello\r\n", 11);
+    valkeyReaderFeed(reader, (char *)"@foo\r\n", 6);
+    ret = valkeyReaderGetReply(reader, NULL);
     test_cond(ret == VALKEY_ERR &&
-              strcasecmp(reader->errstr,"Protocol error, got \"@\" as reply type byte") == 0);
+              strcasecmp(reader->errstr, "Protocol error, got \"@\" as reply type byte") == 0);
     valkeyReaderFree(reader);
 
     reader = valkeyReaderCreate();
     test("Can handle arbitrarily nested multi-bulks: ");
     for (i = 0; i < 128; i++) {
-        valkeyReaderFeed(reader,(char*)"*1\r\n", 4);
+        valkeyReaderFeed(reader, (char *)"*1\r\n", 4);
     }
-    valkeyReaderFeed(reader,(char*)"$6\r\nLOLWUT\r\n",12);
-    ret = valkeyReaderGetReply(reader,&reply);
+    valkeyReaderFeed(reader, (char *)"$6\r\nLOLWUT\r\n", 12);
+    ret = valkeyReaderGetReply(reader, &reply);
     root = reply; /* Keep track of the root reply */
     test_cond(ret == VALKEY_OK &&
-        ((valkeyReply*)reply)->type == VALKEY_REPLY_ARRAY &&
-        ((valkeyReply*)reply)->elements == 1);
+              ((valkeyReply *)reply)->type == VALKEY_REPLY_ARRAY &&
+              ((valkeyReply *)reply)->elements == 1);
 
     test("Can parse arbitrarily nested multi-bulks correctly: ");
-    while(i--) {
-        assert(reply != NULL && ((valkeyReply*)reply)->type == VALKEY_REPLY_ARRAY);
-        reply = ((valkeyReply*)reply)->element[0];
+    while (i--) {
+        assert(reply != NULL && ((valkeyReply *)reply)->type == VALKEY_REPLY_ARRAY);
+        reply = ((valkeyReply *)reply)->element[0];
     }
-    test_cond(((valkeyReply*)reply)->type == VALKEY_REPLY_STRING &&
-        !memcmp(((valkeyReply*)reply)->str, "LOLWUT", 6));
+    test_cond(((valkeyReply *)reply)->type == VALKEY_REPLY_STRING &&
+              !memcmp(((valkeyReply *)reply)->str, "LOLWUT", 6));
     freeReplyObject(root);
     valkeyReaderFree(reader);
 
     test("Correctly parses LLONG_MAX: ");
     reader = valkeyReaderCreate();
-    valkeyReaderFeed(reader, ":9223372036854775807\r\n",22);
-    ret = valkeyReaderGetReply(reader,&reply);
+    valkeyReaderFeed(reader, ":9223372036854775807\r\n", 22);
+    ret = valkeyReaderGetReply(reader, &reply);
     test_cond(ret == VALKEY_OK &&
-            ((valkeyReply*)reply)->type == VALKEY_REPLY_INTEGER &&
-            ((valkeyReply*)reply)->integer == LLONG_MAX);
+              ((valkeyReply *)reply)->type == VALKEY_REPLY_INTEGER &&
+              ((valkeyReply *)reply)->integer == LLONG_MAX);
     freeReplyObject(reply);
     valkeyReaderFree(reader);
 
     test("Set error when > LLONG_MAX: ");
     reader = valkeyReaderCreate();
-    valkeyReaderFeed(reader, ":9223372036854775808\r\n",22);
-    ret = valkeyReaderGetReply(reader,&reply);
+    valkeyReaderFeed(reader, ":9223372036854775808\r\n", 22);
+    ret = valkeyReaderGetReply(reader, &reply);
     test_cond(ret == VALKEY_ERR &&
-              strcasecmp(reader->errstr,"Bad integer value") == 0);
+              strcasecmp(reader->errstr, "Bad integer value") == 0);
     freeReplyObject(reply);
     valkeyReaderFree(reader);
 
     test("Correctly parses LLONG_MIN: ");
     reader = valkeyReaderCreate();
-    valkeyReaderFeed(reader, ":-9223372036854775808\r\n",23);
-    ret = valkeyReaderGetReply(reader,&reply);
+    valkeyReaderFeed(reader, ":-9223372036854775808\r\n", 23);
+    ret = valkeyReaderGetReply(reader, &reply);
     test_cond(ret == VALKEY_OK &&
-            ((valkeyReply*)reply)->type == VALKEY_REPLY_INTEGER &&
-            ((valkeyReply*)reply)->integer == LLONG_MIN);
+              ((valkeyReply *)reply)->type == VALKEY_REPLY_INTEGER &&
+              ((valkeyReply *)reply)->integer == LLONG_MIN);
     freeReplyObject(reply);
     valkeyReaderFree(reader);
 
     test("Set error when < LLONG_MIN: ");
     reader = valkeyReaderCreate();
-    valkeyReaderFeed(reader, ":-9223372036854775809\r\n",23);
-    ret = valkeyReaderGetReply(reader,&reply);
+    valkeyReaderFeed(reader, ":-9223372036854775809\r\n", 23);
+    ret = valkeyReaderGetReply(reader, &reply);
     test_cond(ret == VALKEY_ERR &&
-              strcasecmp(reader->errstr,"Bad integer value") == 0);
+              strcasecmp(reader->errstr, "Bad integer value") == 0);
     freeReplyObject(reply);
     valkeyReaderFree(reader);
 
     test("Set error when array < -1: ");
     reader = valkeyReaderCreate();
-    valkeyReaderFeed(reader, "*-2\r\n+asdf\r\n",12);
-    ret = valkeyReaderGetReply(reader,&reply);
+    valkeyReaderFeed(reader, "*-2\r\n+asdf\r\n", 12);
+    ret = valkeyReaderGetReply(reader, &reply);
     test_cond(ret == VALKEY_ERR &&
-              strcasecmp(reader->errstr,"Multi-bulk length out of range") == 0);
+              strcasecmp(reader->errstr, "Multi-bulk length out of range") == 0);
     freeReplyObject(reply);
     valkeyReaderFree(reader);
 
     test("Set error when bulk < -1: ");
     reader = valkeyReaderCreate();
-    valkeyReaderFeed(reader, "$-2\r\nasdf\r\n",11);
-    ret = valkeyReaderGetReply(reader,&reply);
+    valkeyReaderFeed(reader, "$-2\r\nasdf\r\n", 11);
+    ret = valkeyReaderGetReply(reader, &reply);
     test_cond(ret == VALKEY_ERR &&
-              strcasecmp(reader->errstr,"Bulk string length out of range") == 0);
+              strcasecmp(reader->errstr, "Bulk string length out of range") == 0);
     freeReplyObject(reply);
     valkeyReaderFree(reader);
 
@@ -577,7 +598,7 @@ static void test_reply_reader(void) {
     reader = valkeyReaderCreate();
     reader->maxelements = 1024;
     valkeyReaderFeed(reader, "*1025\r\n", 7);
-    ret = valkeyReaderGetReply(reader,&reply);
+    ret = valkeyReaderGetReply(reader, &reply);
     test_cond(ret == VALKEY_ERR &&
               strcasecmp(reader->errstr, "Multi-bulk length out of range") == 0);
     freeReplyObject(reply);
@@ -587,12 +608,12 @@ static void test_reply_reader(void) {
     size_t bad_mbulk_len = (SIZE_MAX / sizeof(void *)) + 3;
     char bad_mbulk_reply[100];
     snprintf(bad_mbulk_reply, sizeof(bad_mbulk_reply), "*%llu\r\n+asdf\r\n",
-        (unsigned long long) bad_mbulk_len);
+             (unsigned long long)bad_mbulk_len);
 
     reader = valkeyReaderCreate();
-    reader->maxelements = 0;    /* Don't rely on default limit */
+    reader->maxelements = 0; /* Don't rely on default limit */
     valkeyReaderFeed(reader, bad_mbulk_reply, strlen(bad_mbulk_reply));
-    ret = valkeyReaderGetReply(reader,&reply);
+    ret = valkeyReaderGetReply(reader, &reply);
     test_cond(ret == VALKEY_ERR && strcasecmp(reader->errstr, "Out of memory") == 0);
     freeReplyObject(reply);
     valkeyReaderFree(reader);
@@ -600,19 +621,19 @@ static void test_reply_reader(void) {
 #if LLONG_MAX > SIZE_MAX
     test("Set error when array > SIZE_MAX: ");
     reader = valkeyReaderCreate();
-    valkeyReaderFeed(reader, "*9223372036854775807\r\n+asdf\r\n",29);
-    ret = valkeyReaderGetReply(reader,&reply);
+    valkeyReaderFeed(reader, "*9223372036854775807\r\n+asdf\r\n", 29);
+    ret = valkeyReaderGetReply(reader, &reply);
     test_cond(ret == VALKEY_ERR &&
-            strcasecmp(reader->errstr,"Multi-bulk length out of range") == 0);
+              strcasecmp(reader->errstr, "Multi-bulk length out of range") == 0);
     freeReplyObject(reply);
     valkeyReaderFree(reader);
 
     test("Set error when bulk > SIZE_MAX: ");
     reader = valkeyReaderCreate();
-    valkeyReaderFeed(reader, "$9223372036854775807\r\nasdf\r\n",28);
-    ret = valkeyReaderGetReply(reader,&reply);
+    valkeyReaderFeed(reader, "$9223372036854775807\r\nasdf\r\n", 28);
+    ret = valkeyReaderGetReply(reader, &reply);
     test_cond(ret == VALKEY_ERR &&
-            strcasecmp(reader->errstr,"Bulk string length out of range") == 0);
+              strcasecmp(reader->errstr, "Bulk string length out of range") == 0);
     freeReplyObject(reply);
     valkeyReaderFree(reader);
 #endif
@@ -620,121 +641,121 @@ static void test_reply_reader(void) {
     test("Works with NULL functions for reply: ");
     reader = valkeyReaderCreate();
     reader->fn = NULL;
-    valkeyReaderFeed(reader,(char*)"+OK\r\n",5);
-    ret = valkeyReaderGetReply(reader,&reply);
-    test_cond(ret == VALKEY_OK && reply == (void*)VALKEY_REPLY_STATUS);
+    valkeyReaderFeed(reader, (char *)"+OK\r\n", 5);
+    ret = valkeyReaderGetReply(reader, &reply);
+    test_cond(ret == VALKEY_OK && reply == (void *)VALKEY_REPLY_STATUS);
     valkeyReaderFree(reader);
 
     test("Works when a single newline (\\r\\n) covers two calls to feed: ");
     reader = valkeyReaderCreate();
     reader->fn = NULL;
-    valkeyReaderFeed(reader,(char*)"+OK\r",4);
-    ret = valkeyReaderGetReply(reader,&reply);
+    valkeyReaderFeed(reader, (char *)"+OK\r", 4);
+    ret = valkeyReaderGetReply(reader, &reply);
     assert(ret == VALKEY_OK && reply == NULL);
-    valkeyReaderFeed(reader,(char*)"\n",1);
-    ret = valkeyReaderGetReply(reader,&reply);
-    test_cond(ret == VALKEY_OK && reply == (void*)VALKEY_REPLY_STATUS);
+    valkeyReaderFeed(reader, (char *)"\n", 1);
+    ret = valkeyReaderGetReply(reader, &reply);
+    test_cond(ret == VALKEY_OK && reply == (void *)VALKEY_REPLY_STATUS);
     valkeyReaderFree(reader);
 
     test("Don't reset state after protocol error: ");
     reader = valkeyReaderCreate();
     reader->fn = NULL;
-    valkeyReaderFeed(reader,(char*)"x",1);
-    ret = valkeyReaderGetReply(reader,&reply);
+    valkeyReaderFeed(reader, (char *)"x", 1);
+    ret = valkeyReaderGetReply(reader, &reply);
     assert(ret == VALKEY_ERR);
-    ret = valkeyReaderGetReply(reader,&reply);
+    ret = valkeyReaderGetReply(reader, &reply);
     test_cond(ret == VALKEY_ERR && reply == NULL);
     valkeyReaderFree(reader);
 
     test("Don't reset state after protocol error(not segfault): ");
     reader = valkeyReaderCreate();
-    valkeyReaderFeed(reader,(char*)"*3\r\n$3\r\nSET\r\n$5\r\nhello\r\n$", 25);
-    ret = valkeyReaderGetReply(reader,&reply);
+    valkeyReaderFeed(reader, (char *)"*3\r\n$3\r\nSET\r\n$5\r\nhello\r\n$", 25);
+    ret = valkeyReaderGetReply(reader, &reply);
     assert(ret == VALKEY_OK);
-    valkeyReaderFeed(reader,(char*)"3\r\nval\r\n", 8);
-    ret = valkeyReaderGetReply(reader,&reply);
+    valkeyReaderFeed(reader, (char *)"3\r\nval\r\n", 8);
+    ret = valkeyReaderGetReply(reader, &reply);
     test_cond(ret == VALKEY_OK &&
-        ((valkeyReply*)reply)->type == VALKEY_REPLY_ARRAY &&
-        ((valkeyReply*)reply)->elements == 3);
+              ((valkeyReply *)reply)->type == VALKEY_REPLY_ARRAY &&
+              ((valkeyReply *)reply)->elements == 3);
     freeReplyObject(reply);
     valkeyReaderFree(reader);
 
     /* Regression test for issue #45 on GitHub. */
     test("Don't do empty allocation for empty multi bulk: ");
     reader = valkeyReaderCreate();
-    valkeyReaderFeed(reader,(char*)"*0\r\n",4);
-    ret = valkeyReaderGetReply(reader,&reply);
+    valkeyReaderFeed(reader, (char *)"*0\r\n", 4);
+    ret = valkeyReaderGetReply(reader, &reply);
     test_cond(ret == VALKEY_OK &&
-        ((valkeyReply*)reply)->type == VALKEY_REPLY_ARRAY &&
-        ((valkeyReply*)reply)->elements == 0);
+              ((valkeyReply *)reply)->type == VALKEY_REPLY_ARRAY &&
+              ((valkeyReply *)reply)->elements == 0);
     freeReplyObject(reply);
     valkeyReaderFree(reader);
 
     /* RESP3 verbatim strings (GitHub issue #802) */
     test("Can parse RESP3 verbatim strings: ");
     reader = valkeyReaderCreate();
-    valkeyReaderFeed(reader,(char*)"=10\r\ntxt:LOLWUT\r\n",17);
-    ret = valkeyReaderGetReply(reader,&reply);
+    valkeyReaderFeed(reader, (char *)"=10\r\ntxt:LOLWUT\r\n", 17);
+    ret = valkeyReaderGetReply(reader, &reply);
     test_cond(ret == VALKEY_OK &&
-        ((valkeyReply*)reply)->type == VALKEY_REPLY_VERB &&
-         !memcmp(((valkeyReply*)reply)->str,"LOLWUT", 6));
+              ((valkeyReply *)reply)->type == VALKEY_REPLY_VERB &&
+              !memcmp(((valkeyReply *)reply)->str, "LOLWUT", 6));
     freeReplyObject(reply);
     valkeyReaderFree(reader);
 
     /* RESP3 push messages (Github issue #815) */
     test("Can parse RESP3 push messages: ");
     reader = valkeyReaderCreate();
-    valkeyReaderFeed(reader,(char*)">2\r\n$6\r\nLOLWUT\r\n:42\r\n",21);
-    ret = valkeyReaderGetReply(reader,&reply);
+    valkeyReaderFeed(reader, (char *)">2\r\n$6\r\nLOLWUT\r\n:42\r\n", 21);
+    ret = valkeyReaderGetReply(reader, &reply);
     test_cond(ret == VALKEY_OK &&
-        ((valkeyReply*)reply)->type == VALKEY_REPLY_PUSH &&
-        ((valkeyReply*)reply)->elements == 2 &&
-        ((valkeyReply*)reply)->element[0]->type == VALKEY_REPLY_STRING &&
-        !memcmp(((valkeyReply*)reply)->element[0]->str,"LOLWUT",6) &&
-        ((valkeyReply*)reply)->element[1]->type == VALKEY_REPLY_INTEGER &&
-        ((valkeyReply*)reply)->element[1]->integer == 42);
+              ((valkeyReply *)reply)->type == VALKEY_REPLY_PUSH &&
+              ((valkeyReply *)reply)->elements == 2 &&
+              ((valkeyReply *)reply)->element[0]->type == VALKEY_REPLY_STRING &&
+              !memcmp(((valkeyReply *)reply)->element[0]->str, "LOLWUT", 6) &&
+              ((valkeyReply *)reply)->element[1]->type == VALKEY_REPLY_INTEGER &&
+              ((valkeyReply *)reply)->element[1]->integer == 42);
     freeReplyObject(reply);
     valkeyReaderFree(reader);
 
     test("Can parse RESP3 doubles: ");
     reader = valkeyReaderCreate();
-    valkeyReaderFeed(reader, ",3.14159265358979323846\r\n",25);
-    ret = valkeyReaderGetReply(reader,&reply);
+    valkeyReaderFeed(reader, ",3.14159265358979323846\r\n", 25);
+    ret = valkeyReaderGetReply(reader, &reply);
     test_cond(ret == VALKEY_OK &&
-              ((valkeyReply*)reply)->type == VALKEY_REPLY_DOUBLE &&
-              fabs(((valkeyReply*)reply)->dval - 3.14159265358979323846) < 0.00000001 &&
-              ((valkeyReply*)reply)->len == 22 &&
-              strcmp(((valkeyReply*)reply)->str, "3.14159265358979323846") == 0);
+              ((valkeyReply *)reply)->type == VALKEY_REPLY_DOUBLE &&
+              fabs(((valkeyReply *)reply)->dval - 3.14159265358979323846) < 0.00000001 &&
+              ((valkeyReply *)reply)->len == 22 &&
+              strcmp(((valkeyReply *)reply)->str, "3.14159265358979323846") == 0);
     freeReplyObject(reply);
     valkeyReaderFree(reader);
 
     test("Set error on invalid RESP3 double: ");
     reader = valkeyReaderCreate();
-    valkeyReaderFeed(reader, ",3.14159\000265358979323846\r\n",26);
-    ret = valkeyReaderGetReply(reader,&reply);
+    valkeyReaderFeed(reader, ",3.14159\000265358979323846\r\n", 26);
+    ret = valkeyReaderGetReply(reader, &reply);
     test_cond(ret == VALKEY_ERR &&
-              strcasecmp(reader->errstr,"Bad double value") == 0);
+              strcasecmp(reader->errstr, "Bad double value") == 0);
     freeReplyObject(reply);
     valkeyReaderFree(reader);
 
     test("Correctly parses RESP3 double INFINITY: ");
     reader = valkeyReaderCreate();
-    valkeyReaderFeed(reader, ",inf\r\n",6);
-    ret = valkeyReaderGetReply(reader,&reply);
+    valkeyReaderFeed(reader, ",inf\r\n", 6);
+    ret = valkeyReaderGetReply(reader, &reply);
     test_cond(ret == VALKEY_OK &&
-              ((valkeyReply*)reply)->type == VALKEY_REPLY_DOUBLE &&
-              isinf(((valkeyReply*)reply)->dval) &&
-              ((valkeyReply*)reply)->dval > 0);
+              ((valkeyReply *)reply)->type == VALKEY_REPLY_DOUBLE &&
+              isinf(((valkeyReply *)reply)->dval) &&
+              ((valkeyReply *)reply)->dval > 0);
     freeReplyObject(reply);
     valkeyReaderFree(reader);
 
     test("Correctly parses RESP3 double NaN: ");
     reader = valkeyReaderCreate();
-    valkeyReaderFeed(reader, ",nan\r\n",6);
-    ret = valkeyReaderGetReply(reader,&reply);
+    valkeyReaderFeed(reader, ",nan\r\n", 6);
+    ret = valkeyReaderGetReply(reader, &reply);
     test_cond(ret == VALKEY_OK &&
-              ((valkeyReply*)reply)->type == VALKEY_REPLY_DOUBLE &&
-              isnan(((valkeyReply*)reply)->dval));
+              ((valkeyReply *)reply)->type == VALKEY_REPLY_DOUBLE &&
+              isnan(((valkeyReply *)reply)->dval));
     freeReplyObject(reply);
     valkeyReaderFree(reader);
 
@@ -743,142 +764,142 @@ static void test_reply_reader(void) {
     valkeyReaderFeed(reader, ",-nan\r\n", 7);
     ret = valkeyReaderGetReply(reader, &reply);
     test_cond(ret == VALKEY_OK &&
-              ((valkeyReply*)reply)->type == VALKEY_REPLY_DOUBLE &&
-              isnan(((valkeyReply*)reply)->dval));
+              ((valkeyReply *)reply)->type == VALKEY_REPLY_DOUBLE &&
+              isnan(((valkeyReply *)reply)->dval));
     freeReplyObject(reply);
     valkeyReaderFree(reader);
 
     test("Can parse RESP3 nil: ");
     reader = valkeyReaderCreate();
-    valkeyReaderFeed(reader, "_\r\n",3);
-    ret = valkeyReaderGetReply(reader,&reply);
+    valkeyReaderFeed(reader, "_\r\n", 3);
+    ret = valkeyReaderGetReply(reader, &reply);
     test_cond(ret == VALKEY_OK &&
-              ((valkeyReply*)reply)->type == VALKEY_REPLY_NIL);
+              ((valkeyReply *)reply)->type == VALKEY_REPLY_NIL);
     freeReplyObject(reply);
     valkeyReaderFree(reader);
 
     test("Set error on invalid RESP3 nil: ");
     reader = valkeyReaderCreate();
-    valkeyReaderFeed(reader, "_nil\r\n",6);
-    ret = valkeyReaderGetReply(reader,&reply);
+    valkeyReaderFeed(reader, "_nil\r\n", 6);
+    ret = valkeyReaderGetReply(reader, &reply);
     test_cond(ret == VALKEY_ERR &&
-              strcasecmp(reader->errstr,"Bad nil value") == 0);
+              strcasecmp(reader->errstr, "Bad nil value") == 0);
     freeReplyObject(reply);
     valkeyReaderFree(reader);
 
     test("Can parse RESP3 bool (true): ");
     reader = valkeyReaderCreate();
-    valkeyReaderFeed(reader, "#t\r\n",4);
-    ret = valkeyReaderGetReply(reader,&reply);
+    valkeyReaderFeed(reader, "#t\r\n", 4);
+    ret = valkeyReaderGetReply(reader, &reply);
     test_cond(ret == VALKEY_OK &&
-              ((valkeyReply*)reply)->type == VALKEY_REPLY_BOOL &&
-              ((valkeyReply*)reply)->integer);
+              ((valkeyReply *)reply)->type == VALKEY_REPLY_BOOL &&
+              ((valkeyReply *)reply)->integer);
     freeReplyObject(reply);
     valkeyReaderFree(reader);
 
     test("Can parse RESP3 bool (false): ");
     reader = valkeyReaderCreate();
-    valkeyReaderFeed(reader, "#f\r\n",4);
-    ret = valkeyReaderGetReply(reader,&reply);
+    valkeyReaderFeed(reader, "#f\r\n", 4);
+    ret = valkeyReaderGetReply(reader, &reply);
     test_cond(ret == VALKEY_OK &&
-              ((valkeyReply*)reply)->type == VALKEY_REPLY_BOOL &&
-              !((valkeyReply*)reply)->integer);
+              ((valkeyReply *)reply)->type == VALKEY_REPLY_BOOL &&
+              !((valkeyReply *)reply)->integer);
     freeReplyObject(reply);
     valkeyReaderFree(reader);
 
     test("Set error on invalid RESP3 bool: ");
     reader = valkeyReaderCreate();
-    valkeyReaderFeed(reader, "#foobar\r\n",9);
-    ret = valkeyReaderGetReply(reader,&reply);
+    valkeyReaderFeed(reader, "#foobar\r\n", 9);
+    ret = valkeyReaderGetReply(reader, &reply);
     test_cond(ret == VALKEY_ERR &&
-              strcasecmp(reader->errstr,"Bad bool value") == 0);
+              strcasecmp(reader->errstr, "Bad bool value") == 0);
     freeReplyObject(reply);
     valkeyReaderFree(reader);
 
     test("Can parse RESP3 map: ");
     reader = valkeyReaderCreate();
-    valkeyReaderFeed(reader, "%2\r\n+first\r\n:123\r\n$6\r\nsecond\r\n#t\r\n",34);
-    ret = valkeyReaderGetReply(reader,&reply);
+    valkeyReaderFeed(reader, "%2\r\n+first\r\n:123\r\n$6\r\nsecond\r\n#t\r\n", 34);
+    ret = valkeyReaderGetReply(reader, &reply);
     test_cond(ret == VALKEY_OK &&
-        ((valkeyReply*)reply)->type == VALKEY_REPLY_MAP &&
-        ((valkeyReply*)reply)->elements == 4 &&
-        ((valkeyReply*)reply)->element[0]->type == VALKEY_REPLY_STATUS &&
-        ((valkeyReply*)reply)->element[0]->len == 5 &&
-        !strcmp(((valkeyReply*)reply)->element[0]->str,"first") &&
-        ((valkeyReply*)reply)->element[1]->type == VALKEY_REPLY_INTEGER &&
-        ((valkeyReply*)reply)->element[1]->integer == 123 &&
-        ((valkeyReply*)reply)->element[2]->type == VALKEY_REPLY_STRING &&
-        ((valkeyReply*)reply)->element[2]->len == 6 &&
-        !strcmp(((valkeyReply*)reply)->element[2]->str,"second") &&
-        ((valkeyReply*)reply)->element[3]->type == VALKEY_REPLY_BOOL &&
-        ((valkeyReply*)reply)->element[3]->integer);
+              ((valkeyReply *)reply)->type == VALKEY_REPLY_MAP &&
+              ((valkeyReply *)reply)->elements == 4 &&
+              ((valkeyReply *)reply)->element[0]->type == VALKEY_REPLY_STATUS &&
+              ((valkeyReply *)reply)->element[0]->len == 5 &&
+              !strcmp(((valkeyReply *)reply)->element[0]->str, "first") &&
+              ((valkeyReply *)reply)->element[1]->type == VALKEY_REPLY_INTEGER &&
+              ((valkeyReply *)reply)->element[1]->integer == 123 &&
+              ((valkeyReply *)reply)->element[2]->type == VALKEY_REPLY_STRING &&
+              ((valkeyReply *)reply)->element[2]->len == 6 &&
+              !strcmp(((valkeyReply *)reply)->element[2]->str, "second") &&
+              ((valkeyReply *)reply)->element[3]->type == VALKEY_REPLY_BOOL &&
+              ((valkeyReply *)reply)->element[3]->integer);
     freeReplyObject(reply);
     valkeyReaderFree(reader);
 
     test("Can parse RESP3 attribute: ");
     reader = valkeyReaderCreate();
-    valkeyReaderFeed(reader, "|2\r\n+foo\r\n:123\r\n+bar\r\n#t\r\n",26);
-    ret = valkeyReaderGetReply(reader,&reply);
+    valkeyReaderFeed(reader, "|2\r\n+foo\r\n:123\r\n+bar\r\n#t\r\n", 26);
+    ret = valkeyReaderGetReply(reader, &reply);
     test_cond(ret == VALKEY_OK &&
-        ((valkeyReply*)reply)->type == VALKEY_REPLY_ATTR &&
-        ((valkeyReply*)reply)->elements == 4 &&
-        ((valkeyReply*)reply)->element[0]->type == VALKEY_REPLY_STATUS &&
-        ((valkeyReply*)reply)->element[0]->len == 3 &&
-        !strcmp(((valkeyReply*)reply)->element[0]->str,"foo") &&
-        ((valkeyReply*)reply)->element[1]->type == VALKEY_REPLY_INTEGER &&
-        ((valkeyReply*)reply)->element[1]->integer == 123 &&
-        ((valkeyReply*)reply)->element[2]->type == VALKEY_REPLY_STATUS &&
-        ((valkeyReply*)reply)->element[2]->len == 3 &&
-        !strcmp(((valkeyReply*)reply)->element[2]->str,"bar") &&
-        ((valkeyReply*)reply)->element[3]->type == VALKEY_REPLY_BOOL &&
-        ((valkeyReply*)reply)->element[3]->integer);
+              ((valkeyReply *)reply)->type == VALKEY_REPLY_ATTR &&
+              ((valkeyReply *)reply)->elements == 4 &&
+              ((valkeyReply *)reply)->element[0]->type == VALKEY_REPLY_STATUS &&
+              ((valkeyReply *)reply)->element[0]->len == 3 &&
+              !strcmp(((valkeyReply *)reply)->element[0]->str, "foo") &&
+              ((valkeyReply *)reply)->element[1]->type == VALKEY_REPLY_INTEGER &&
+              ((valkeyReply *)reply)->element[1]->integer == 123 &&
+              ((valkeyReply *)reply)->element[2]->type == VALKEY_REPLY_STATUS &&
+              ((valkeyReply *)reply)->element[2]->len == 3 &&
+              !strcmp(((valkeyReply *)reply)->element[2]->str, "bar") &&
+              ((valkeyReply *)reply)->element[3]->type == VALKEY_REPLY_BOOL &&
+              ((valkeyReply *)reply)->element[3]->integer);
     freeReplyObject(reply);
     valkeyReaderFree(reader);
 
     test("Can parse RESP3 set: ");
     reader = valkeyReaderCreate();
-    valkeyReaderFeed(reader, "~5\r\n+orange\r\n$5\r\napple\r\n#f\r\n:100\r\n:999\r\n",40);
-    ret = valkeyReaderGetReply(reader,&reply);
+    valkeyReaderFeed(reader, "~5\r\n+orange\r\n$5\r\napple\r\n#f\r\n:100\r\n:999\r\n", 40);
+    ret = valkeyReaderGetReply(reader, &reply);
     test_cond(ret == VALKEY_OK &&
-        ((valkeyReply*)reply)->type == VALKEY_REPLY_SET &&
-        ((valkeyReply*)reply)->elements == 5 &&
-        ((valkeyReply*)reply)->element[0]->type == VALKEY_REPLY_STATUS &&
-        ((valkeyReply*)reply)->element[0]->len == 6 &&
-        !strcmp(((valkeyReply*)reply)->element[0]->str,"orange") &&
-        ((valkeyReply*)reply)->element[1]->type == VALKEY_REPLY_STRING &&
-        ((valkeyReply*)reply)->element[1]->len == 5 &&
-        !strcmp(((valkeyReply*)reply)->element[1]->str,"apple") &&
-        ((valkeyReply*)reply)->element[2]->type == VALKEY_REPLY_BOOL &&
-        !((valkeyReply*)reply)->element[2]->integer &&
-        ((valkeyReply*)reply)->element[3]->type == VALKEY_REPLY_INTEGER &&
-        ((valkeyReply*)reply)->element[3]->integer == 100 &&
-        ((valkeyReply*)reply)->element[4]->type == VALKEY_REPLY_INTEGER &&
-        ((valkeyReply*)reply)->element[4]->integer == 999);
+              ((valkeyReply *)reply)->type == VALKEY_REPLY_SET &&
+              ((valkeyReply *)reply)->elements == 5 &&
+              ((valkeyReply *)reply)->element[0]->type == VALKEY_REPLY_STATUS &&
+              ((valkeyReply *)reply)->element[0]->len == 6 &&
+              !strcmp(((valkeyReply *)reply)->element[0]->str, "orange") &&
+              ((valkeyReply *)reply)->element[1]->type == VALKEY_REPLY_STRING &&
+              ((valkeyReply *)reply)->element[1]->len == 5 &&
+              !strcmp(((valkeyReply *)reply)->element[1]->str, "apple") &&
+              ((valkeyReply *)reply)->element[2]->type == VALKEY_REPLY_BOOL &&
+              !((valkeyReply *)reply)->element[2]->integer &&
+              ((valkeyReply *)reply)->element[3]->type == VALKEY_REPLY_INTEGER &&
+              ((valkeyReply *)reply)->element[3]->integer == 100 &&
+              ((valkeyReply *)reply)->element[4]->type == VALKEY_REPLY_INTEGER &&
+              ((valkeyReply *)reply)->element[4]->integer == 999);
     freeReplyObject(reply);
     valkeyReaderFree(reader);
 
     test("Can parse RESP3 bignum: ");
     reader = valkeyReaderCreate();
-    valkeyReaderFeed(reader,"(3492890328409238509324850943850943825024385\r\n",46);
-    ret = valkeyReaderGetReply(reader,&reply);
+    valkeyReaderFeed(reader, "(3492890328409238509324850943850943825024385\r\n", 46);
+    ret = valkeyReaderGetReply(reader, &reply);
     test_cond(ret == VALKEY_OK &&
-        ((valkeyReply*)reply)->type == VALKEY_REPLY_BIGNUM &&
-        ((valkeyReply*)reply)->len == 43 &&
-        !strcmp(((valkeyReply*)reply)->str,"3492890328409238509324850943850943825024385"));
+              ((valkeyReply *)reply)->type == VALKEY_REPLY_BIGNUM &&
+              ((valkeyReply *)reply)->len == 43 &&
+              !strcmp(((valkeyReply *)reply)->str, "3492890328409238509324850943850943825024385"));
     freeReplyObject(reply);
     valkeyReaderFree(reader);
 
     test("Can parse RESP3 doubles in an array: ");
     reader = valkeyReaderCreate();
-    valkeyReaderFeed(reader, "*1\r\n,3.14159265358979323846\r\n",31);
-    ret = valkeyReaderGetReply(reader,&reply);
+    valkeyReaderFeed(reader, "*1\r\n,3.14159265358979323846\r\n", 31);
+    ret = valkeyReaderGetReply(reader, &reply);
     test_cond(ret == VALKEY_OK &&
-        ((valkeyReply*)reply)->type == VALKEY_REPLY_ARRAY &&
-        ((valkeyReply*)reply)->elements == 1 &&
-        ((valkeyReply*)reply)->element[0]->type == VALKEY_REPLY_DOUBLE &&
-        fabs(((valkeyReply*)reply)->element[0]->dval - 3.14159265358979323846) < 0.00000001 &&
-        ((valkeyReply*)reply)->element[0]->len == 22 &&
-        strcmp(((valkeyReply*)reply)->element[0]->str, "3.14159265358979323846") == 0);
+              ((valkeyReply *)reply)->type == VALKEY_REPLY_ARRAY &&
+              ((valkeyReply *)reply)->elements == 1 &&
+              ((valkeyReply *)reply)->element[0]->type == VALKEY_REPLY_DOUBLE &&
+              fabs(((valkeyReply *)reply)->element[0]->dval - 3.14159265358979323846) < 0.00000001 &&
+              ((valkeyReply *)reply)->element[0]->len == 22 &&
+              strcmp(((valkeyReply *)reply)->element[0]->str, "3.14159265358979323846") == 0);
     freeReplyObject(reply);
     valkeyReaderFree(reader);
 }
@@ -923,7 +944,7 @@ static void *vk_calloc_insecure(size_t nmemb, size_t size) {
     (void)nmemb;
     (void)size;
     insecure_calloc_calls++;
-    return (void*)0xdeadc0de;
+    return (void *)0xdeadc0de;
 }
 
 static void *vk_realloc_fail(void *ptr, size_t size) {
@@ -939,7 +960,7 @@ static char *vk_test_strdup(const char *s) {
     len = strlen(s);
     dup = vk_malloc_safe(len + 1);
 
-    memcpy(dup,s,len + 1);
+    memcpy(dup, s, len + 1);
 
     return dup;
 }
@@ -970,7 +991,7 @@ static void test_allocator_injection(void) {
     test("libvalkey calloc wrapper protects against overflow: ");
     ha.callocFn = vk_calloc_insecure;
     valkeySetAllocators(&ha);
-    ptr = vk_calloc((SIZE_MAX / sizeof(void*)) + 3, sizeof(void*));
+    ptr = vk_calloc((SIZE_MAX / sizeof(void *)) + 3, sizeof(void *));
     test_cond(ptr == NULL && insecure_calloc_calls == 0);
 
     // Return allocators to default
@@ -1012,11 +1033,10 @@ static void test_blocking_connection_errors(void) {
     struct timeval tv;
 
     test("Returns error when the port is not open: ");
-    c = valkeyConnect((char*)"localhost", 1);
+    c = valkeyConnect((char *)"localhost", 1);
     test_cond(c->err == VALKEY_ERR_IO &&
-        strcmp(c->errstr,"Connection refused") == 0);
+              strcmp(c->errstr, "Connection refused") == 0);
     valkeyFree(c);
-
 
     /* Verify we don't regress from the fix in PR #1180 */
     test("We don't clobber connection exception with setsockopt error: ");
@@ -1029,7 +1049,7 @@ static void test_blocking_connection_errors(void) {
     valkeyFree(c);
 
     test("Returns error when the unix_sock socket path doesn't accept connections: ");
-    c = valkeyConnectUnix((char*)"/tmp/idontexist.sock");
+    c = valkeyConnectUnix((char *)"/tmp/idontexist.sock");
     test_cond(c->err == VALKEY_ERR_IO); /* Don't care about the message... */
     valkeyFree(c);
 #endif
@@ -1122,7 +1142,7 @@ static void test_resp3_push_handler(valkeyContext *c) {
     freeReplyObject(reply);
 
     test("With no PUSH handler, no replies are lost: ");
-    assert(valkeyGetReply(c, (void**)&reply) == VALKEY_OK);
+    assert(valkeyGetReply(c, (void **)&reply) == VALKEY_OK);
     test_cond(reply != NULL && reply->type == VALKEY_REPLY_STATUS);
     freeReplyObject(reply);
 
@@ -1210,78 +1230,78 @@ static void test_blocking_connection(struct config config) {
     c = do_connect(config);
 
     test("Is able to deliver commands: ");
-    reply = valkeyCommand(c,"PING");
+    reply = valkeyCommand(c, "PING");
     test_cond(reply->type == VALKEY_REPLY_STATUS &&
-        strcasecmp(reply->str,"pong") == 0)
+              strcasecmp(reply->str, "pong") == 0);
     freeReplyObject(reply);
 
     test("Is a able to send commands verbatim: ");
-    reply = valkeyCommand(c,"SET foo bar");
-    test_cond (reply->type == VALKEY_REPLY_STATUS &&
-        strcasecmp(reply->str,"ok") == 0)
+    reply = valkeyCommand(c, "SET foo bar");
+    test_cond(reply->type == VALKEY_REPLY_STATUS &&
+              strcasecmp(reply->str, "ok") == 0);
     freeReplyObject(reply);
 
     test("%%s String interpolation works: ");
-    reply = valkeyCommand(c,"SET %s %s","foo","hello world");
+    reply = valkeyCommand(c, "SET %s %s", "foo", "hello world");
     freeReplyObject(reply);
-    reply = valkeyCommand(c,"GET foo");
+    reply = valkeyCommand(c, "GET foo");
     test_cond(reply->type == VALKEY_REPLY_STRING &&
-        strcmp(reply->str,"hello world") == 0);
+              strcmp(reply->str, "hello world") == 0);
     freeReplyObject(reply);
 
     test("%%b String interpolation works: ");
-    reply = valkeyCommand(c,"SET %b %b","foo",(size_t)3,"hello\x00world",(size_t)11);
+    reply = valkeyCommand(c, "SET %b %b", "foo", (size_t)3, "hello\x00world", (size_t)11);
     freeReplyObject(reply);
-    reply = valkeyCommand(c,"GET foo");
+    reply = valkeyCommand(c, "GET foo");
     test_cond(reply->type == VALKEY_REPLY_STRING &&
-        memcmp(reply->str,"hello\x00world",11) == 0)
+              memcmp(reply->str, "hello\x00world", 11) == 0);
 
     test("Binary reply length is correct: ");
     test_cond(reply->len == 11)
-    freeReplyObject(reply);
+        freeReplyObject(reply);
 
     test("Can parse nil replies: ");
-    reply = valkeyCommand(c,"GET nokey");
+    reply = valkeyCommand(c, "GET nokey");
     test_cond(reply->type == VALKEY_REPLY_NIL)
-    freeReplyObject(reply);
+        freeReplyObject(reply);
 
     /* test 7 */
     test("Can parse integer replies: ");
-    reply = valkeyCommand(c,"INCR mycounter");
-    test_cond(reply->type == VALKEY_REPLY_INTEGER && reply->integer == 1)
+    reply = valkeyCommand(c, "INCR mycounter");
+    test_cond(reply->type == VALKEY_REPLY_INTEGER && reply->integer == 1);
     freeReplyObject(reply);
 
     test("Can parse multi bulk replies: ");
-    freeReplyObject(valkeyCommand(c,"LPUSH mylist foo"));
-    freeReplyObject(valkeyCommand(c,"LPUSH mylist bar"));
-    reply = valkeyCommand(c,"LRANGE mylist 0 -1");
+    freeReplyObject(valkeyCommand(c, "LPUSH mylist foo"));
+    freeReplyObject(valkeyCommand(c, "LPUSH mylist bar"));
+    reply = valkeyCommand(c, "LRANGE mylist 0 -1");
     test_cond(reply->type == VALKEY_REPLY_ARRAY &&
               reply->elements == 2 &&
-              !memcmp(reply->element[0]->str,"bar",3) &&
-              !memcmp(reply->element[1]->str,"foo",3))
+              !memcmp(reply->element[0]->str, "bar", 3) &&
+              !memcmp(reply->element[1]->str, "foo", 3));
     freeReplyObject(reply);
 
     /* m/e with multi bulk reply *before* other reply.
      * specifically test ordering of reply items to parse. */
     test("Can handle nested multi bulk replies: ");
-    freeReplyObject(valkeyCommand(c,"MULTI"));
-    freeReplyObject(valkeyCommand(c,"LRANGE mylist 0 -1"));
-    freeReplyObject(valkeyCommand(c,"PING"));
-    reply = (valkeyCommand(c,"EXEC"));
+    freeReplyObject(valkeyCommand(c, "MULTI"));
+    freeReplyObject(valkeyCommand(c, "LRANGE mylist 0 -1"));
+    freeReplyObject(valkeyCommand(c, "PING"));
+    reply = (valkeyCommand(c, "EXEC"));
     test_cond(reply->type == VALKEY_REPLY_ARRAY &&
               reply->elements == 2 &&
               reply->element[0]->type == VALKEY_REPLY_ARRAY &&
               reply->element[0]->elements == 2 &&
-              !memcmp(reply->element[0]->element[0]->str,"bar",3) &&
-              !memcmp(reply->element[0]->element[1]->str,"foo",3) &&
+              !memcmp(reply->element[0]->element[0]->str, "bar", 3) &&
+              !memcmp(reply->element[0]->element[1]->str, "foo", 3) &&
               reply->element[1]->type == VALKEY_REPLY_STATUS &&
-              strcasecmp(reply->element[1]->str,"pong") == 0);
+              strcasecmp(reply->element[1]->str, "pong") == 0);
     freeReplyObject(reply);
 
     test("Send command by passing argc/argv: ");
     const char *argv[3] = {"SET", "foo", "bar"};
     size_t argvlen[3] = {3, 3, 3};
-    reply = valkeyCommandArgv(c,3,argv,argvlen);
+    reply = valkeyCommandArgv(c, 3, argv, argvlen);
     test_cond(reply->type == VALKEY_REPLY_STATUS);
     freeReplyObject(reply);
 
@@ -1291,7 +1311,8 @@ static void test_blocking_connection(struct config config) {
     test_cond(valkeyGetReply(c, NULL) == VALKEY_OK);
 
     get_server_version(c, &major, NULL);
-    if (major >= 6) test_resp3_push_handler(c);
+    if (major >= 6)
+        test_resp3_push_handler(c);
     test_resp3_push_options(config);
 
     test_privdata_hooks(config);
@@ -1325,7 +1346,7 @@ static void test_blocking_connection_timeouts(struct config config) {
 
     c = do_connect(config);
     test("Successfully completes a command when the timeout is not exceeded: ");
-    reply = valkeyCommand(c,"SET foo fast");
+    reply = valkeyCommand(c, "SET foo fast");
     freeReplyObject(reply);
     valkeySetTimeout(c, tv);
     reply = valkeyCommand(c, "GET foo");
@@ -1389,12 +1410,12 @@ static void test_blocking_io_errors(struct config config) {
     get_server_version(c, &major, &minor);
 
     test("Returns I/O error when the connection is lost: ");
-    reply = valkeyCommand(c,"QUIT");
+    reply = valkeyCommand(c, "QUIT");
     if (major > 2 || (major == 2 && minor > 0)) {
         /* > 2.0 returns OK on QUIT and read() should be issued once more
          * to know the descriptor is at EOF. */
-        test_cond(strcasecmp(reply->str,"OK") == 0 &&
-            valkeyGetReply(c,&_reply) == VALKEY_ERR);
+        test_cond(strcasecmp(reply->str, "OK") == 0 &&
+                  valkeyGetReply(c, &_reply) == VALKEY_ERR);
         freeReplyObject(reply);
     } else {
         test_cond(reply == NULL);
@@ -1407,15 +1428,15 @@ static void test_blocking_io_errors(struct config config) {
      * issued to find out the socket was closed by the server. In both
      * conditions, the error will be set to EOF. */
     assert(c->err == VALKEY_ERR_EOF &&
-        strcmp(c->errstr,"Server closed the connection") == 0);
+           strcmp(c->errstr, "Server closed the connection") == 0);
 #endif
     valkeyFree(c);
 
     c = do_connect(config);
     test("Returns I/O error on socket timeout: ");
-    struct timeval tv = { 0, 1000 };
-    assert(valkeySetTimeout(c,tv) == VALKEY_OK);
-    int respcode = valkeyGetReply(c,&_reply);
+    struct timeval tv = {0, 1000};
+    assert(valkeySetTimeout(c, tv) == VALKEY_OK);
+    int respcode = valkeyGetReply(c, &_reply);
 #ifndef _WIN32
     test_cond(respcode == VALKEY_ERR && c->err == VALKEY_ERR_IO && errno == EAGAIN);
 #else
@@ -1434,10 +1455,10 @@ static void test_invalid_timeout_errors(struct config config) {
 
     if (config.type == CONN_TCP || config.type == CONN_SSL) {
         c = valkeyConnectWithTimeout(config.tcp.host, config.tcp.port, config.connect_timeout);
-    } else if(config.type == CONN_UNIX) {
+    } else if (config.type == CONN_UNIX) {
         c = valkeyConnectUnixWithTimeout(config.unix_sock.path, config.connect_timeout);
 #ifdef VALKEY_TEST_RDMA
-    } else if(config.type == CONN_RDMA) {
+    } else if (config.type == CONN_RDMA) {
         valkeyOptions options = {0};
         VALKEY_OPTIONS_SET_RDMA(&options, config.tcp.host, config.tcp.port);
         options.connect_timeout = &config.connect_timeout;
@@ -1452,15 +1473,15 @@ static void test_invalid_timeout_errors(struct config config) {
 
     test("Set error when an invalid timeout sec value is used during connect: ");
 
-    config.connect_timeout.tv_sec = (((LONG_MAX) - 999) / 1000) + 1;
+    config.connect_timeout.tv_sec = (((LONG_MAX)-999) / 1000) + 1;
     config.connect_timeout.tv_usec = 0;
 
     if (config.type == CONN_TCP || config.type == CONN_SSL) {
         c = valkeyConnectWithTimeout(config.tcp.host, config.tcp.port, config.connect_timeout);
-    } else if(config.type == CONN_UNIX) {
+    } else if (config.type == CONN_UNIX) {
         c = valkeyConnectUnixWithTimeout(config.unix_sock.path, config.connect_timeout);
 #ifdef VALKEY_TEST_RDMA
-    } else if(config.type == CONN_RDMA) {
+    } else if (config.type == CONN_RDMA) {
         valkeyOptions options = {0};
         VALKEY_OPTIONS_SET_RDMA(&options, config.tcp.host, config.tcp.port);
         options.connect_timeout = &config.connect_timeout;
@@ -1482,98 +1503,104 @@ static void test_throughput(struct config config) {
 
     test("Throughput:\n");
     for (i = 0; i < 500; i++)
-        freeReplyObject(valkeyCommand(c,"LPUSH mylist foo"));
+        freeReplyObject(valkeyCommand(c, "LPUSH mylist foo"));
 
     num = 1000;
-    replies = vk_malloc_safe(sizeof(valkeyReply*)*num);
+    replies = vk_malloc_safe(sizeof(valkeyReply *) * num);
     t1 = usec();
     for (i = 0; i < num; i++) {
-        replies[i] = valkeyCommand(c,"PING");
+        replies[i] = valkeyCommand(c, "PING");
         assert(replies[i] != NULL && replies[i]->type == VALKEY_REPLY_STATUS);
     }
     t2 = usec();
-    for (i = 0; i < num; i++) freeReplyObject(replies[i]);
+    for (i = 0; i < num; i++)
+        freeReplyObject(replies[i]);
     vk_free(replies);
-    printf("\t(%dx PING: %.3fs)\n", num, (t2-t1)/1000000.0);
+    printf("\t(%dx PING: %.3fs)\n", num, (t2 - t1) / 1000000.0);
 
-    replies = vk_malloc_safe(sizeof(valkeyReply*)*num);
+    replies = vk_malloc_safe(sizeof(valkeyReply *) * num);
     t1 = usec();
     for (i = 0; i < num; i++) {
-        replies[i] = valkeyCommand(c,"LRANGE mylist 0 499");
+        replies[i] = valkeyCommand(c, "LRANGE mylist 0 499");
         assert(replies[i] != NULL && replies[i]->type == VALKEY_REPLY_ARRAY);
         assert(replies[i] != NULL && replies[i]->elements == 500);
     }
     t2 = usec();
-    for (i = 0; i < num; i++) freeReplyObject(replies[i]);
+    for (i = 0; i < num; i++)
+        freeReplyObject(replies[i]);
     vk_free(replies);
-    printf("\t(%dx LRANGE with 500 elements: %.3fs)\n", num, (t2-t1)/1000000.0);
+    printf("\t(%dx LRANGE with 500 elements: %.3fs)\n", num, (t2 - t1) / 1000000.0);
 
-    replies = vk_malloc_safe(sizeof(valkeyReply*)*num);
+    replies = vk_malloc_safe(sizeof(valkeyReply *) * num);
     t1 = usec();
     for (i = 0; i < num; i++) {
         replies[i] = valkeyCommand(c, "INCRBY incrkey %d", 1000000);
         assert(replies[i] != NULL && replies[i]->type == VALKEY_REPLY_INTEGER);
     }
     t2 = usec();
-    for (i = 0; i < num; i++) freeReplyObject(replies[i]);
+    for (i = 0; i < num; i++)
+        freeReplyObject(replies[i]);
     vk_free(replies);
-    printf("\t(%dx INCRBY: %.3fs)\n", num, (t2-t1)/1000000.0);
+    printf("\t(%dx INCRBY: %.3fs)\n", num, (t2 - t1) / 1000000.0);
 
     num = 10000;
-    replies = vk_malloc_safe(sizeof(valkeyReply*)*num);
+    replies = vk_malloc_safe(sizeof(valkeyReply *) * num);
     for (i = 0; i < num; i++)
-        valkeyAppendCommand(c,"PING");
+        valkeyAppendCommand(c, "PING");
     t1 = usec();
     for (i = 0; i < num; i++) {
-        assert(valkeyGetReply(c, (void*)&replies[i]) == VALKEY_OK);
+        assert(valkeyGetReply(c, (void *)&replies[i]) == VALKEY_OK);
         assert(replies[i] != NULL && replies[i]->type == VALKEY_REPLY_STATUS);
     }
     t2 = usec();
-    for (i = 0; i < num; i++) freeReplyObject(replies[i]);
-    vk_free(replies);
-    printf("\t(%dx PING (pipelined): %.3fs)\n", num, (t2-t1)/1000000.0);
-
-    replies = vk_malloc_safe(sizeof(valkeyReply*)*num);
     for (i = 0; i < num; i++)
-        valkeyAppendCommand(c,"LRANGE mylist 0 499");
+        freeReplyObject(replies[i]);
+    vk_free(replies);
+    printf("\t(%dx PING (pipelined): %.3fs)\n", num, (t2 - t1) / 1000000.0);
+
+    replies = vk_malloc_safe(sizeof(valkeyReply *) * num);
+    for (i = 0; i < num; i++)
+        valkeyAppendCommand(c, "LRANGE mylist 0 499");
     t1 = usec();
     for (i = 0; i < num; i++) {
-        assert(valkeyGetReply(c, (void*)&replies[i]) == VALKEY_OK);
+        assert(valkeyGetReply(c, (void *)&replies[i]) == VALKEY_OK);
         assert(replies[i] != NULL && replies[i]->type == VALKEY_REPLY_ARRAY);
         assert(replies[i] != NULL && replies[i]->elements == 500);
     }
     t2 = usec();
-    for (i = 0; i < num; i++) freeReplyObject(replies[i]);
-    vk_free(replies);
-    printf("\t(%dx LRANGE with 500 elements (pipelined): %.3fs)\n", num, (t2-t1)/1000000.0);
-
-    replies = vk_malloc_safe(sizeof(valkeyReply*)*num);
     for (i = 0; i < num; i++)
-        valkeyAppendCommand(c,"INCRBY incrkey %d", 1000000);
+        freeReplyObject(replies[i]);
+    vk_free(replies);
+    printf("\t(%dx LRANGE with 500 elements (pipelined): %.3fs)\n", num, (t2 - t1) / 1000000.0);
+
+    replies = vk_malloc_safe(sizeof(valkeyReply *) * num);
+    for (i = 0; i < num; i++)
+        valkeyAppendCommand(c, "INCRBY incrkey %d", 1000000);
     t1 = usec();
     for (i = 0; i < num; i++) {
-        assert(valkeyGetReply(c, (void*)&replies[i]) == VALKEY_OK);
+        assert(valkeyGetReply(c, (void *)&replies[i]) == VALKEY_OK);
         assert(replies[i] != NULL && replies[i]->type == VALKEY_REPLY_INTEGER);
     }
     t2 = usec();
-    for (i = 0; i < num; i++) freeReplyObject(replies[i]);
+    for (i = 0; i < num; i++)
+        freeReplyObject(replies[i]);
     vk_free(replies);
-    printf("\t(%dx INCRBY (pipelined): %.3fs)\n", num, (t2-t1)/1000000.0);
+    printf("\t(%dx INCRBY (pipelined): %.3fs)\n", num, (t2 - t1) / 1000000.0);
 
     disconnect(c, 0);
 }
 
 #ifdef VALKEY_TEST_ASYNC
 
-#pragma GCC diagnostic ignored "-Woverlength-strings"   /* required on gcc 4.8.x due to assert statements */
+#pragma GCC diagnostic ignored "-Woverlength-strings" /* required on gcc 4.8.x due to assert statements */
 
 struct event_base *base;
 
 typedef struct TestState {
     valkeyOptions *options;
-    int           checkpoint;
-    int           resp3;
-    int           disconnect;
+    int checkpoint;
+    int resp3;
+    int disconnect;
 } TestState;
 
 /* Helper to disconnect and stop event loop */
@@ -1584,23 +1611,26 @@ void async_disconnect(valkeyAsyncContext *ac) {
 
 /* Testcase timeout, will trigger a failure */
 void timeout_cb(evutil_socket_t fd, short event, void *arg) {
-    (void) fd; (void) event; (void) arg;
+    (void)fd;
+    (void)event;
+    (void)arg;
     printf("Timeout in async testing!\n");
     exit(1);
 }
 
 /* Unexpected call, will trigger a failure */
 void unexpected_cb(valkeyAsyncContext *ac, void *r, void *privdata) {
-    (void) ac; (void) r;
-    printf("Unexpected call: %s\n",(char*)privdata);
+    (void)ac;
+    (void)r;
+    printf("Unexpected call: %s\n", (char *)privdata);
     exit(1);
 }
 
 /* Helper function to publish a message via own client. */
-void publish_msg(valkeyOptions *options, const char* channel, const char* msg) {
+void publish_msg(valkeyOptions *options, const char *channel, const char *msg) {
     valkeyContext *c = valkeyConnectWithOptions(options);
     assert(c != NULL);
-    valkeyReply *reply = valkeyCommand(c,"PUBLISH %s %s",channel,msg);
+    valkeyReply *reply = valkeyCommand(c, "PUBLISH %s %s", channel, msg);
     assert(reply->type == VALKEY_REPLY_INTEGER && reply->integer == 1);
     freeReplyObject(reply);
     disconnect(c, 0);
@@ -1612,7 +1642,8 @@ void integer_cb(valkeyAsyncContext *ac, void *r, void *privdata) {
     TestState *state = privdata;
     assert(reply != NULL && reply->type == VALKEY_REPLY_INTEGER);
     state->checkpoint++;
-    if (state->disconnect) async_disconnect(ac);
+    if (state->disconnect)
+        async_disconnect(ac);
 }
 
 /* Subscribe callback for test_pubsub_handling and test_pubsub_handling_resp3:
@@ -1626,26 +1657,26 @@ void subscribe_cb(valkeyAsyncContext *ac, void *r, void *privdata) {
            reply->type == (state->resp3 ? VALKEY_REPLY_PUSH : VALKEY_REPLY_ARRAY) &&
            reply->elements == 3);
 
-    if (strcmp(reply->element[0]->str,"subscribe") == 0) {
-        assert(strcmp(reply->element[1]->str,"mychannel") == 0 &&
+    if (strcmp(reply->element[0]->str, "subscribe") == 0) {
+        assert(strcmp(reply->element[1]->str, "mychannel") == 0 &&
                reply->element[2]->str == NULL);
-        publish_msg(state->options,"mychannel","Hello!");
-    } else if (strcmp(reply->element[0]->str,"message") == 0) {
-        assert(strcmp(reply->element[1]->str,"mychannel") == 0 &&
-               strcmp(reply->element[2]->str,"Hello!") == 0);
+        publish_msg(state->options, "mychannel", "Hello!");
+    } else if (strcmp(reply->element[0]->str, "message") == 0) {
+        assert(strcmp(reply->element[1]->str, "mychannel") == 0 &&
+               strcmp(reply->element[2]->str, "Hello!") == 0);
         state->checkpoint++;
 
         /* Unsubscribe after receiving the published message. Send unsubscribe
          * which should call the callback registered during subscribe */
-        valkeyAsyncCommand(ac,unexpected_cb,
-                          (void*)"unsubscribe should call subscribe_cb()",
-                          "unsubscribe");
+        valkeyAsyncCommand(ac, unexpected_cb,
+                           (void *)"unsubscribe should call subscribe_cb()",
+                           "unsubscribe");
         /* Send a regular command after unsubscribing, then disconnect */
         state->disconnect = 1;
-        valkeyAsyncCommand(ac,integer_cb,state,"LPUSH mylist foo");
+        valkeyAsyncCommand(ac, integer_cb, state, "LPUSH mylist foo");
 
-    } else if (strcmp(reply->element[0]->str,"unsubscribe") == 0) {
-        assert(strcmp(reply->element[1]->str,"mychannel") == 0 &&
+    } else if (strcmp(reply->element[0]->str, "unsubscribe") == 0) {
+        assert(strcmp(reply->element[1]->str, "mychannel") == 0 &&
                reply->element[2]->str == NULL);
     } else {
         printf("Unexpected pubsub command: %s\n", reply->element[0]->str);
@@ -1659,12 +1690,13 @@ void array_cb(valkeyAsyncContext *ac, void *r, void *privdata) {
     TestState *state = privdata;
     assert(reply != NULL && reply->type == VALKEY_REPLY_ARRAY);
     state->checkpoint++;
-    if (state->disconnect) async_disconnect(ac);
+    if (state->disconnect)
+        async_disconnect(ac);
 }
 
 /* Expect a NULL reply */
 void null_cb(valkeyAsyncContext *ac, void *r, void *privdata) {
-    (void) ac;
+    (void)ac;
     assert(r == NULL);
     TestState *state = privdata;
     state->checkpoint++;
@@ -1677,7 +1709,7 @@ static void test_pubsub_handling(struct config config) {
     struct event *timeout = evtimer_new(base, timeout_cb, NULL);
     assert(timeout != NULL);
 
-    evtimer_assign(timeout,base,timeout_cb,NULL);
+    evtimer_assign(timeout, base, timeout_cb, NULL);
     struct timeval timeout_tv = {.tv_sec = 10};
     evtimer_add(timeout, &timeout_tv);
 
@@ -1685,14 +1717,14 @@ static void test_pubsub_handling(struct config config) {
     valkeyOptions options = get_server_tcp_options(config);
     valkeyAsyncContext *ac = valkeyAsyncConnectWithOptions(&options);
     assert(ac != NULL && ac->err == 0);
-    valkeyLibeventAttach(ac,base);
+    valkeyLibeventAttach(ac, base);
 
     /* Start subscribe */
     TestState state = {.options = &options};
-    valkeyAsyncCommand(ac,subscribe_cb,&state,"subscribe mychannel");
+    valkeyAsyncCommand(ac, subscribe_cb, &state, "subscribe mychannel");
 
     /* Make sure non-subscribe commands are handled */
-    valkeyAsyncCommand(ac,array_cb,&state,"PING");
+    valkeyAsyncCommand(ac, array_cb, &state, "PING");
 
     /* Start event dispatching loop */
     test_cond(event_base_dispatch(base) == 0);
@@ -1705,7 +1737,8 @@ static void test_pubsub_handling(struct config config) {
 
 /* Unexpected push message, will trigger a failure */
 void unexpected_push_cb(valkeyAsyncContext *ac, void *r) {
-    (void) ac; (void) r;
+    (void)ac;
+    (void)r;
     printf("Unexpected call to the PUSH callback!\n");
     exit(1);
 }
@@ -1717,7 +1750,7 @@ static void test_pubsub_handling_resp3(struct config config) {
     struct event *timeout = evtimer_new(base, timeout_cb, NULL);
     assert(timeout != NULL);
 
-    evtimer_assign(timeout,base,timeout_cb,NULL);
+    evtimer_assign(timeout, base, timeout_cb, NULL);
     struct timeval timeout_tv = {.tv_sec = 10};
     evtimer_add(timeout, &timeout_tv);
 
@@ -1725,24 +1758,24 @@ static void test_pubsub_handling_resp3(struct config config) {
     valkeyOptions options = get_server_tcp_options(config);
     valkeyAsyncContext *ac = valkeyAsyncConnectWithOptions(&options);
     assert(ac != NULL && ac->err == 0);
-    valkeyLibeventAttach(ac,base);
+    valkeyLibeventAttach(ac, base);
 
     /* Not expecting any push messages in this test */
     valkeyAsyncSetPushCallback(ac, unexpected_push_cb);
 
     /* Switch protocol */
-    valkeyAsyncCommand(ac,NULL,NULL,"HELLO 3");
+    valkeyAsyncCommand(ac, NULL, NULL, "HELLO 3");
 
     /* Start subscribe */
     TestState state = {.options = &options, .resp3 = 1};
-    valkeyAsyncCommand(ac,subscribe_cb,&state,"subscribe mychannel");
+    valkeyAsyncCommand(ac, subscribe_cb, &state, "subscribe mychannel");
 
     /* Make sure non-subscribe commands are handled in RESP3 */
-    valkeyAsyncCommand(ac,integer_cb,&state,"LPUSH mylist foo");
-    valkeyAsyncCommand(ac,integer_cb,&state,"LPUSH mylist foo");
-    valkeyAsyncCommand(ac,integer_cb,&state,"LPUSH mylist foo");
+    valkeyAsyncCommand(ac, integer_cb, &state, "LPUSH mylist foo");
+    valkeyAsyncCommand(ac, integer_cb, &state, "LPUSH mylist foo");
+    valkeyAsyncCommand(ac, integer_cb, &state, "LPUSH mylist foo");
     /* Handle an array with 3 elements as a non-subscribe command */
-    valkeyAsyncCommand(ac,array_cb,&state,"LRANGE mylist 0 2");
+    valkeyAsyncCommand(ac, array_cb, &state, "LRANGE mylist 0 2");
 
     /* Start event dispatching loop */
     test_cond(event_base_dispatch(base) == 0);
@@ -1772,19 +1805,19 @@ void subscribe_with_timeout_cb(valkeyAsyncContext *ac, void *r, void *privdata) 
     assert(reply->type == (state->resp3 ? VALKEY_REPLY_PUSH : VALKEY_REPLY_ARRAY) &&
            reply->elements == 3);
 
-    if (strcmp(reply->element[0]->str,"subscribe") == 0) {
-        assert(strcmp(reply->element[1]->str,"mychannel") == 0 &&
+    if (strcmp(reply->element[0]->str, "subscribe") == 0) {
+        assert(strcmp(reply->element[1]->str, "mychannel") == 0 &&
                reply->element[2]->str == NULL);
-        publish_msg(state->options,"mychannel","Hello!");
+        publish_msg(state->options, "mychannel", "Hello!");
         state->checkpoint++;
-    } else if (strcmp(reply->element[0]->str,"message") == 0) {
-        assert(strcmp(reply->element[1]->str,"mychannel") == 0 &&
-               strcmp(reply->element[2]->str,"Hello!") == 0);
+    } else if (strcmp(reply->element[0]->str, "message") == 0) {
+        assert(strcmp(reply->element[1]->str, "mychannel") == 0 &&
+               strcmp(reply->element[2]->str, "Hello!") == 0);
         state->checkpoint++;
 
         /* Send a command that will trigger a timeout */
-        valkeyAsyncCommand(ac,null_cb,state,"DEBUG SLEEP 3");
-        valkeyAsyncCommand(ac,null_cb,state,"LPUSH mylist foo");
+        valkeyAsyncCommand(ac, null_cb, state, "DEBUG SLEEP 3");
+        valkeyAsyncCommand(ac, null_cb, state, "LPUSH mylist foo");
     } else {
         printf("Unexpected pubsub command: %s\n", reply->element[0]->str);
         exit(1);
@@ -1795,32 +1828,32 @@ static void test_command_timeout_during_pubsub(struct config config) {
     test("Command timeout during Pub/Sub: ");
     /* Setup event dispatcher with a testcase timeout */
     base = event_base_new();
-    struct event *timeout = evtimer_new(base,timeout_cb,NULL);
+    struct event *timeout = evtimer_new(base, timeout_cb, NULL);
     assert(timeout != NULL);
 
-    evtimer_assign(timeout,base,timeout_cb,NULL);
+    evtimer_assign(timeout, base, timeout_cb, NULL);
     struct timeval timeout_tv = {.tv_sec = 10};
-    evtimer_add(timeout,&timeout_tv);
+    evtimer_add(timeout, &timeout_tv);
 
     /* Connect */
     valkeyOptions options = get_server_tcp_options(config);
     valkeyAsyncContext *ac = valkeyAsyncConnectWithOptions(&options);
     assert(ac != NULL && ac->err == 0);
-    valkeyLibeventAttach(ac,base);
+    valkeyLibeventAttach(ac, base);
 
     /* Configure a command timout */
     struct timeval command_timeout = {.tv_sec = 2};
-    valkeyAsyncSetTimeout(ac,command_timeout);
+    valkeyAsyncSetTimeout(ac, command_timeout);
 
     /* Not expecting any push messages in this test */
-    valkeyAsyncSetPushCallback(ac,unexpected_push_cb);
+    valkeyAsyncSetPushCallback(ac, unexpected_push_cb);
 
     /* Switch protocol */
-    valkeyAsyncCommand(ac,NULL,NULL,"HELLO 3");
+    valkeyAsyncCommand(ac, NULL, NULL, "HELLO 3");
 
     /* Start subscribe */
     TestState state = {.options = &options, .resp3 = 1};
-    valkeyAsyncCommand(ac,subscribe_with_timeout_cb,&state,"subscribe mychannel");
+    valkeyAsyncCommand(ac, subscribe_with_timeout_cb, &state, "subscribe mychannel");
 
     /* Start event dispatching loop */
     assert(event_base_dispatch(base) == 0);
@@ -1839,28 +1872,28 @@ void subscribe_channel_a_cb(valkeyAsyncContext *ac, void *r, void *privdata) {
     assert(reply != NULL && reply->type == VALKEY_REPLY_ARRAY &&
            reply->elements == 3);
 
-    if (strcmp(reply->element[0]->str,"subscribe") == 0) {
-        assert(strcmp(reply->element[1]->str,"A") == 0);
-        publish_msg(state->options,"A","Hello!");
+    if (strcmp(reply->element[0]->str, "subscribe") == 0) {
+        assert(strcmp(reply->element[1]->str, "A") == 0);
+        publish_msg(state->options, "A", "Hello!");
         state->checkpoint++;
-    } else if (strcmp(reply->element[0]->str,"message") == 0) {
-        assert(strcmp(reply->element[1]->str,"A") == 0 &&
-               strcmp(reply->element[2]->str,"Hello!") == 0);
+    } else if (strcmp(reply->element[0]->str, "message") == 0) {
+        assert(strcmp(reply->element[1]->str, "A") == 0 &&
+               strcmp(reply->element[2]->str, "Hello!") == 0);
         state->checkpoint++;
 
         /* Unsubscribe to channels, including channel X & Z which we don't subscribe to */
-        valkeyAsyncCommand(ac,unexpected_cb,
-                          (void*)"unsubscribe should not call unexpected_cb()",
-                          "unsubscribe B X A A Z");
+        valkeyAsyncCommand(ac, unexpected_cb,
+                           (void *)"unsubscribe should not call unexpected_cb()",
+                           "unsubscribe B X A A Z");
         /* Unsubscribe to patterns, none which we subscribe to */
-        valkeyAsyncCommand(ac,unexpected_cb,
-                          (void*)"punsubscribe should not call unexpected_cb()",
-                          "punsubscribe");
+        valkeyAsyncCommand(ac, unexpected_cb,
+                           (void *)"punsubscribe should not call unexpected_cb()",
+                           "punsubscribe");
         /* Send a regular command after unsubscribing, then disconnect */
         state->disconnect = 1;
-        valkeyAsyncCommand(ac,integer_cb,state,"LPUSH mylist foo");
-    } else if (strcmp(reply->element[0]->str,"unsubscribe") == 0) {
-        assert(strcmp(reply->element[1]->str,"A") == 0);
+        valkeyAsyncCommand(ac, integer_cb, state, "LPUSH mylist foo");
+    } else if (strcmp(reply->element[0]->str, "unsubscribe") == 0) {
+        assert(strcmp(reply->element[1]->str, "A") == 0);
         state->checkpoint++;
     } else {
         printf("Unexpected pubsub command: %s\n", reply->element[0]->str);
@@ -1877,11 +1910,11 @@ void subscribe_channel_b_cb(valkeyAsyncContext *ac, void *r, void *privdata) {
     assert(reply != NULL && reply->type == VALKEY_REPLY_ARRAY &&
            reply->elements == 3);
 
-    if (strcmp(reply->element[0]->str,"subscribe") == 0) {
-        assert(strcmp(reply->element[1]->str,"B") == 0);
+    if (strcmp(reply->element[0]->str, "subscribe") == 0) {
+        assert(strcmp(reply->element[1]->str, "B") == 0);
         state->checkpoint++;
-    } else if (strcmp(reply->element[0]->str,"unsubscribe") == 0) {
-        assert(strcmp(reply->element[1]->str,"B") == 0);
+    } else if (strcmp(reply->element[0]->str, "unsubscribe") == 0) {
+        assert(strcmp(reply->element[1]->str, "B") == 0);
         state->checkpoint++;
     } else {
         printf("Unexpected pubsub command: %s\n", reply->element[0]->str);
@@ -1900,26 +1933,26 @@ static void test_pubsub_multiple_channels(struct config config) {
     test("Subscribe to multiple channels: ");
     /* Setup event dispatcher with a testcase timeout */
     base = event_base_new();
-    struct event *timeout = evtimer_new(base,timeout_cb,NULL);
+    struct event *timeout = evtimer_new(base, timeout_cb, NULL);
     assert(timeout != NULL);
 
-    evtimer_assign(timeout,base,timeout_cb,NULL);
+    evtimer_assign(timeout, base, timeout_cb, NULL);
     struct timeval timeout_tv = {.tv_sec = 10};
-    evtimer_add(timeout,&timeout_tv);
+    evtimer_add(timeout, &timeout_tv);
 
     /* Connect */
     valkeyOptions options = get_server_tcp_options(config);
     valkeyAsyncContext *ac = valkeyAsyncConnectWithOptions(&options);
     assert(ac != NULL && ac->err == 0);
-    valkeyLibeventAttach(ac,base);
+    valkeyLibeventAttach(ac, base);
 
     /* Not expecting any push messages in this test */
-    valkeyAsyncSetPushCallback(ac,unexpected_push_cb);
+    valkeyAsyncSetPushCallback(ac, unexpected_push_cb);
 
     /* Start subscribing to two channels */
     TestState state = {.options = &options};
-    valkeyAsyncCommand(ac,subscribe_channel_a_cb,&state,"subscribe A");
-    valkeyAsyncCommand(ac,subscribe_channel_b_cb,&state,"subscribe B");
+    valkeyAsyncCommand(ac, subscribe_channel_a_cb, &state, "subscribe A");
+    valkeyAsyncCommand(ac, subscribe_channel_b_cb, &state, "subscribe B");
 
     /* Start event dispatching loop */
     assert(event_base_dispatch(base) == 0);
@@ -1948,24 +1981,24 @@ void monitor_cb(valkeyAsyncContext *ac, void *r, void *privdata) {
         /* Response from MONITOR */
         valkeyContext *c = valkeyConnectWithOptions(state->options);
         assert(c != NULL);
-        valkeyReply *reply = valkeyCommand(c,"SET first 1");
+        valkeyReply *reply = valkeyCommand(c, "SET first 1");
         assert(reply->type == VALKEY_REPLY_STATUS);
         freeReplyObject(reply);
         valkeyFree(c);
     } else if (state->checkpoint == 2) {
         /* Response for monitored command 'SET first 1' */
-        assert(strstr(reply->str,"first") != NULL);
+        assert(strstr(reply->str, "first") != NULL);
         valkeyContext *c = valkeyConnectWithOptions(state->options);
         assert(c != NULL);
-        valkeyReply *reply = valkeyCommand(c,"SET second 2");
+        valkeyReply *reply = valkeyCommand(c, "SET second 2");
         assert(reply->type == VALKEY_REPLY_STATUS);
         freeReplyObject(reply);
         valkeyFree(c);
     } else if (state->checkpoint == 3) {
         /* Response for monitored command 'SET second 2' */
-        assert(strstr(reply->str,"second") != NULL);
+        assert(strstr(reply->str, "second") != NULL);
         /* Send QUIT to disconnect */
-        valkeyAsyncCommand(ac,NULL,NULL,"QUIT");
+        valkeyAsyncCommand(ac, NULL, NULL, "QUIT");
     }
 }
 
@@ -1980,7 +2013,7 @@ static void test_monitor(struct config config) {
     struct event *timeout = evtimer_new(base, timeout_cb, NULL);
     assert(timeout != NULL);
 
-    evtimer_assign(timeout,base,timeout_cb,NULL);
+    evtimer_assign(timeout, base, timeout_cb, NULL);
     struct timeval timeout_tv = {.tv_sec = 10};
     evtimer_add(timeout, &timeout_tv);
 
@@ -1988,14 +2021,14 @@ static void test_monitor(struct config config) {
     valkeyOptions options = get_server_tcp_options(config);
     valkeyAsyncContext *ac = valkeyAsyncConnectWithOptions(&options);
     assert(ac != NULL && ac->err == 0);
-    valkeyLibeventAttach(ac,base);
+    valkeyLibeventAttach(ac, base);
 
     /* Not expecting any push messages in this test */
-    valkeyAsyncSetPushCallback(ac,unexpected_push_cb);
+    valkeyAsyncSetPushCallback(ac, unexpected_push_cb);
 
     /* Start monitor */
     TestState state = {.options = &options};
-    valkeyAsyncCommand(ac,monitor_cb,&state,"monitor");
+    valkeyAsyncCommand(ac, monitor_cb, &state, "monitor");
 
     /* Start event dispatching loop */
     test_cond(event_base_dispatch(base) == 0);
@@ -2010,15 +2043,14 @@ static void test_monitor(struct config config) {
 /* tests for async api using polling adapter, requires no extra libraries*/
 
 /* enum for the test cases, the callbacks have different logic based on them */
-typedef enum astest_no
-{
-    ASTEST_CONNECT=0,
+typedef enum astest_no {
+    ASTEST_CONNECT = 0,
     ASTEST_CONN_TIMEOUT,
     ASTEST_PINGPONG,
     ASTEST_PINGPONG_TIMEOUT,
     ASTEST_ISSUE_931,
     ASTEST_ISSUE_931_PING
-}astest_no;
+} astest_no;
 
 /* a static context for the async tests */
 struct _astest {
@@ -2037,13 +2069,12 @@ struct _astest {
 static struct _astest astest;
 
 /* async callbacks */
-static void asCleanup(void* data)
-{
+static void asCleanup(void *data) {
     struct _astest *t = (struct _astest *)data;
     t->ac = NULL;
 }
 
-static void commandCallback(struct valkeyAsyncContext *ac, void* _reply, void* _privdata);
+static void commandCallback(struct valkeyAsyncContext *ac, void *_reply, void *_privdata);
 
 static void connectCallback(valkeyAsyncContext *c, int status) {
     struct _astest *t = (struct _astest *)c->data;
@@ -2058,14 +2089,12 @@ static void connectCallback(valkeyAsyncContext *c, int status) {
     if (t->testno == ASTEST_ISSUE_931) {
         /* disconnect again */
         valkeyAsyncDisconnect(c);
-    }
-    else if (t->testno == ASTEST_ISSUE_931_PING)
-    {
+    } else if (t->testno == ASTEST_ISSUE_931_PING) {
         valkeyAsyncCommand(c, commandCallback, NULL, "PING");
     }
 }
 static void disconnectCallback(const valkeyAsyncContext *c, int status) {
-    assert(c->data == (void*)&astest);
+    assert(c->data == (void *)&astest);
     assert(astest.disconnects == 0);
     astest.err = c->err;
     strcpy(astest.errstr, c->errstr);
@@ -2074,23 +2103,20 @@ static void disconnectCallback(const valkeyAsyncContext *c, int status) {
     astest.connected = 0;
 }
 
-static void commandCallback(struct valkeyAsyncContext *ac, void* _reply, void* _privdata)
-{
-    valkeyReply *reply = (valkeyReply*)_reply;
+static void commandCallback(struct valkeyAsyncContext *ac, void *_reply, void *_privdata) {
+    valkeyReply *reply = (valkeyReply *)_reply;
     struct _astest *t = (struct _astest *)ac->data;
     assert(t == &astest);
     (void)_privdata;
     t->err = ac->err;
     strcpy(t->errstr, ac->errstr);
     t->counter++;
-    if (t->testno == ASTEST_PINGPONG ||t->testno == ASTEST_ISSUE_931_PING)
-    {
+    if (t->testno == ASTEST_PINGPONG || t->testno == ASTEST_ISSUE_931_PING) {
         assert(reply != NULL && reply->type == VALKEY_REPLY_STATUS && strcmp(reply->str, "PONG") == 0);
         t->pongs++;
         valkeyAsyncFree(ac);
     }
-    if (t->testno == ASTEST_PINGPONG_TIMEOUT)
-    {
+    if (t->testno == ASTEST_PINGPONG_TIMEOUT) {
         /* two ping pongs */
         assert(reply != NULL && reply->type == VALKEY_REPLY_STATUS && strcmp(reply->str, "PONG") == 0);
         t->pongs++;
@@ -2103,8 +2129,7 @@ static void commandCallback(struct valkeyAsyncContext *ac, void* _reply, void* _
     }
 }
 
-static valkeyAsyncContext *do_aconnect(struct config config, astest_no testno)
-{
+static valkeyAsyncContext *do_aconnect(struct config config, astest_no testno) {
     valkeyOptions options = {0};
     memset(&astest, 0, sizeof(astest));
 
@@ -2147,11 +2172,12 @@ static void as_printerr(void) {
     printf("Async err %d : %s\n", astest.err, astest.errstr);
 }
 
-#define ASASSERT(e) do { \
-    if (!(e)) \
-        as_printerr(); \
-    assert(e); \
-} while (0);
+#define ASASSERT(e)        \
+    do {                   \
+        if (!(e))          \
+            as_printerr(); \
+        assert(e);         \
+    } while (0);
 
 static void test_async_polling(struct config config) {
     int status;
@@ -2161,7 +2187,7 @@ static void test_async_polling(struct config config) {
     test("Async connect: ");
     c = do_aconnect(config, ASTEST_CONNECT);
     assert(c);
-    while(astest.connected == 0)
+    while (astest.connected == 0)
         valkeyPollTick(c, 0.1);
     assert(astest.connects == 1);
     ASASSERT(astest.connect_status == VALKEY_OK);
@@ -2178,12 +2204,12 @@ static void test_async_polling(struct config config) {
     if (config.type == CONN_TCP || config.type == CONN_SSL) {
         /* timeout can only be simulated with network */
         test("Async connect timeout: ");
-        config.tcp.host = "192.168.254.254";  /* blackhole ip */
+        config.tcp.host = "192.168.254.254"; /* blackhole ip */
         config.connect_timeout.tv_usec = 100000;
         c = do_aconnect(config, ASTEST_CONN_TIMEOUT);
         assert(c);
         assert(c->err == 0);
-        while(astest.connected == 0)
+        while (astest.connected == 0)
             valkeyPollTick(c, 0.1);
         assert(astest.connected == -1);
         /*
@@ -2198,11 +2224,11 @@ static void test_async_polling(struct config config) {
     /* Test a ping/pong after connection */
     test("Async PING/PONG: ");
     c = do_aconnect(config, ASTEST_PINGPONG);
-    while(astest.connected == 0)
+    while (astest.connected == 0)
         valkeyPollTick(c, 0.1);
     status = valkeyAsyncCommand(c, commandCallback, NULL, "PING");
     assert(status == VALKEY_OK);
-    while(astest.ac)
+    while (astest.ac)
         valkeyPollTick(c, 0.1);
     test_cond(astest.pongs == 1);
 
@@ -2211,13 +2237,13 @@ static void test_async_polling(struct config config) {
         test("Async PING/PONG after connect timeout: ");
         config.connect_timeout.tv_usec = 10000; /* 10ms  */
         c = do_aconnect(config, ASTEST_PINGPONG_TIMEOUT);
-        while(astest.connected == 0)
+        while (astest.connected == 0)
             valkeyPollTick(c, 0.1);
         /* sleep 0.1 s, allowing old timeout to arrive */
         millisleep(10);
         status = valkeyAsyncCommand(c, commandCallback, NULL, "PING");
         assert(status == VALKEY_OK);
-        while(astest.ac)
+        while (astest.ac)
             valkeyPollTick(c, 0.1);
         test_cond(astest.pongs == 2);
         config = defaultconfig;
@@ -2226,7 +2252,7 @@ static void test_async_polling(struct config config) {
     /* Test disconnect from an on_connect callback */
     test("Disconnect from onConnected callback (Issue #931): ");
     c = do_aconnect(config, ASTEST_ISSUE_931);
-    while(astest.disconnects == 0)
+    while (astest.disconnects == 0)
         valkeyPollTick(c, 0.1);
     assert(astest.connected == 0);
     assert(astest.connects == 1);
@@ -2236,7 +2262,7 @@ static void test_async_polling(struct config config) {
     test("Ping/Pong from onConnected callback (Issue #931): ");
     c = do_aconnect(config, ASTEST_ISSUE_931_PING);
     /* connect callback issues ping, response callback destroys context */
-    while(astest.ac)
+    while (astest.ac)
         valkeyPollTick(c, 0.1);
     assert(astest.connected == 0);
     assert(astest.connects == 1);
@@ -2249,11 +2275,10 @@ int main(int argc, char **argv) {
     struct config cfg = {
         .tcp = {
             .host = "127.0.0.1",
-            .port = 6379
-        },
+            .port = 6379},
         .unix_sock = {
-            .path = "/tmp/valkey.sock"
-        }
+            .path = "/tmp/valkey.sock",
+        },
     };
     int throughput = 1;
     int test_inherit_fd = 1;
@@ -2261,50 +2286,61 @@ int main(int argc, char **argv) {
     int test_unix_socket;
 
     /* Parse command line options. */
-    argv++; argc--;
+    argv++;
+    argc--;
     while (argc) {
-        if (argc >= 2 && !strcmp(argv[0],"-h")) {
-            argv++; argc--;
+        if (argc >= 2 && !strcmp(argv[0], "-h")) {
+            argv++;
+            argc--;
             cfg.tcp.host = argv[0];
-        } else if (argc >= 2 && !strcmp(argv[0],"-p")) {
-            argv++; argc--;
+        } else if (argc >= 2 && !strcmp(argv[0], "-p")) {
+            argv++;
+            argc--;
             cfg.tcp.port = atoi(argv[0]);
-        } else if (argc >= 2 && !strcmp(argv[0],"-s")) {
-            argv++; argc--;
+        } else if (argc >= 2 && !strcmp(argv[0], "-s")) {
+            argv++;
+            argc--;
             cfg.unix_sock.path = argv[0];
-        } else if (argc >= 1 && !strcmp(argv[0],"--skip-throughput")) {
+        } else if (argc >= 1 && !strcmp(argv[0], "--skip-throughput")) {
             throughput = 0;
-        } else if (argc >= 1 && !strcmp(argv[0],"--skip-inherit-fd")) {
+        } else if (argc >= 1 && !strcmp(argv[0], "--skip-inherit-fd")) {
             test_inherit_fd = 0;
-        } else if (argc >= 1 && !strcmp(argv[0],"--skips-as-fails")) {
+        } else if (argc >= 1 && !strcmp(argv[0], "--skips-as-fails")) {
             skips_as_fails = 1;
 #ifdef VALKEY_TEST_SSL
-        } else if (argc >= 2 && !strcmp(argv[0],"--ssl-port")) {
-            argv++; argc--;
+        } else if (argc >= 2 && !strcmp(argv[0], "--ssl-port")) {
+            argv++;
+            argc--;
             cfg.ssl.port = atoi(argv[0]);
-        } else if (argc >= 2 && !strcmp(argv[0],"--ssl-host")) {
-            argv++; argc--;
+        } else if (argc >= 2 && !strcmp(argv[0], "--ssl-host")) {
+            argv++;
+            argc--;
             cfg.ssl.host = argv[0];
-        } else if (argc >= 2 && !strcmp(argv[0],"--ssl-ca-cert")) {
-            argv++; argc--;
-            cfg.ssl.ca_cert  = argv[0];
-        } else if (argc >= 2 && !strcmp(argv[0],"--ssl-cert")) {
-            argv++; argc--;
+        } else if (argc >= 2 && !strcmp(argv[0], "--ssl-ca-cert")) {
+            argv++;
+            argc--;
+            cfg.ssl.ca_cert = argv[0];
+        } else if (argc >= 2 && !strcmp(argv[0], "--ssl-cert")) {
+            argv++;
+            argc--;
             cfg.ssl.cert = argv[0];
-        } else if (argc >= 2 && !strcmp(argv[0],"--ssl-key")) {
-            argv++; argc--;
+        } else if (argc >= 2 && !strcmp(argv[0], "--ssl-key")) {
+            argv++;
+            argc--;
             cfg.ssl.key = argv[0];
 #endif
 #ifdef VALKEY_TEST_RDMA
-        } else if (argc >= 1 && !strcmp(argv[0],"--rdma-addr")) {
-            argv++; argc--;
+        } else if (argc >= 1 && !strcmp(argv[0], "--rdma-addr")) {
+            argv++;
+            argc--;
             cfg.rdma.host = argv[0];
 #endif
         } else {
             fprintf(stderr, "Invalid argument: %s\n", argv[0]);
             exit(1);
         }
-        argv++; argc--;
+        argv++;
+        argc--;
     }
 
 #ifndef _WIN32
@@ -2333,7 +2369,8 @@ int main(int argc, char **argv) {
     test_invalid_timeout_errors(cfg);
     test_append_formatted_commands(cfg);
     test_tcp_options(cfg);
-    if (throughput) test_throughput(cfg);
+    if (throughput)
+        test_throughput(cfg);
 
     printf("\nTesting against Unix socket connection (%s): ", cfg.unix_sock.path);
     if (test_unix_socket) {
@@ -2344,7 +2381,8 @@ int main(int argc, char **argv) {
         test_blocking_io_errors(cfg);
         test_invalid_timeout_errors(cfg);
         test_unix_keepalive(cfg);
-        if (throughput) test_throughput(cfg);
+        if (throughput)
+            test_throughput(cfg);
     } else {
         test_skipped();
     }
@@ -2364,7 +2402,8 @@ int main(int argc, char **argv) {
         test_blocking_io_errors(cfg);
         test_invalid_timeout_errors(cfg);
         test_append_formatted_commands(cfg);
-        if (throughput) test_throughput(cfg);
+        if (throughput)
+            test_throughput(cfg);
 
         valkeyFreeSSLContext(_ssl_ctx);
         _ssl_ctx = NULL;
@@ -2383,7 +2422,8 @@ int main(int argc, char **argv) {
         test_blocking_io_errors(cfg);
         test_invalid_timeout_errors(cfg);
         test_append_formatted_commands(cfg);
-        if (throughput) test_throughput(cfg);
+        if (throughput)
+            test_throughput(cfg);
     }
 #endif
 

@@ -44,12 +44,12 @@ extern "C" {
  * Helper macros to initialize options for RDMA.
  * It's ok to reuse TCP options.
  */
-#define VALKEY_OPTIONS_SET_RDMA(opts, ip_, port_) do { \
-        (opts)->type = VALKEY_CONN_RDMA;               \
-        (opts)->endpoint.tcp.ip = ip_;                 \
-        (opts)->endpoint.tcp.port = port_;             \
-    } while(0)
-
+#define VALKEY_OPTIONS_SET_RDMA(opts, ip_, port_) \
+    do {                                          \
+        (opts)->type = VALKEY_CONN_RDMA;          \
+        (opts)->endpoint.tcp.ip = ip_;            \
+        (opts)->endpoint.tcp.port = port_;        \
+    } while (0)
 
 int valkeyInitiateRdma(void);
 
@@ -57,4 +57,4 @@ int valkeyInitiateRdma(void);
 }
 #endif
 
-#endif  /* VALKEY_RDMA_H */
+#endif /* VALKEY_RDMA_H */

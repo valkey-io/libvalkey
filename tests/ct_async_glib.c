@@ -1,6 +1,7 @@
 #include "adapters/glib.h"
 #include "test_utils.h"
 #include "valkeycluster.h"
+
 #include <assert.h>
 
 #define CLUSTER_NODE "127.0.0.1:7000"
@@ -53,10 +54,10 @@ int main(int argc, char **argv) {
     valkeyClusterAsyncSetConnectCallback(acc, connectCallback);
     valkeyClusterAsyncSetDisconnectCallback(acc, disconnectCallback);
 
-    status = valkeyClusterAsyncCommand(acc, setCallback, (char*)"id", "SET key value");
+    status = valkeyClusterAsyncCommand(acc, setCallback, (char *)"id", "SET key value");
     ASSERT_MSG(status == VALKEY_OK, acc->errstr);
 
-    status = valkeyClusterAsyncCommand(acc, getCallback, (char*)"id", "GET key");
+    status = valkeyClusterAsyncCommand(acc, getCallback, (char *)"id", "GET key");
     ASSERT_MSG(status == VALKEY_OK, acc->errstr);
 
     g_main_loop_run(mainloop);

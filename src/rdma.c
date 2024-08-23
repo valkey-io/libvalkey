@@ -28,14 +28,14 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifdef __linux__    /* currently RDMA is only supported on Linux */
+#ifdef __linux__ /* currently RDMA is only supported on Linux */
 
 #define _GNU_SOURCE
-#include "valkey.h"
 #include "async.h"
-#include "vkutil.h"
-#include "valkey_rdma.h"
+#include "valkey.h"
 #include "valkey_private.h"
+#include "valkey_rdma.h"
+#include "vkutil.h"
 
 #include <arpa/inet.h>
 #include <assert.h>
@@ -95,7 +95,7 @@ typedef enum valkeyRdmaOpcode {
 } valkeyRdmaOpcode;
 
 #define VALKEY_RDMA_MAX_WQE 1024
-#define VALKEY_RDMA_DEFAULT_RX_LEN  (1024*1024)
+#define VALKEY_RDMA_DEFAULT_RX_LEN (1024 * 1024)
 #define VALKEY_RDMA_INVALID_OPCODE 0xffff
 
 typedef struct RdmaContext {
@@ -156,7 +156,6 @@ static int rdmaPostRecv(RdmaContext *ctx, struct rdma_cm_id *cm_id, valkeyRdmaCm
     size_t length = sizeof(valkeyRdmaCmd);
     struct ibv_recv_wr recv_wr, *bad_wr;
 
-
     sge.addr = (uint64_t)(uintptr_t)cmd;
     sge.length = length;
     sge.lkey = ctx->cmd_mr->lkey;
@@ -173,8 +172,7 @@ static int rdmaPostRecv(RdmaContext *ctx, struct rdma_cm_id *cm_id, valkeyRdmaCm
     return VALKEY_OK;
 }
 
-static void rdmaDestroyIoBuf(RdmaContext *ctx)
-{
+static void rdmaDestroyIoBuf(RdmaContext *ctx) {
     if (ctx->recv_mr) {
         ibv_dereg_mr(ctx->recv_mr);
         ctx->recv_mr = NULL;
@@ -275,7 +273,6 @@ static int rdmaAdjustSendbuf(valkeyContext *c, RdmaContext *ctx, unsigned int le
     return VALKEY_OK;
 }
 
-
 static int rdmaSendCommand(valkeyContext *c, struct rdma_cm_id *cm_id, valkeyRdmaCmd *cmd) {
     RdmaContext *ctx = c->privctx;
     struct ibv_send_wr send_wr, *bad_wr;
@@ -319,7 +316,7 @@ static int rdmaSendCommand(valkeyContext *c, struct rdma_cm_id *cm_id, valkeyRdm
 
 static int connRdmaRegisterRx(valkeyContext *c, struct rdma_cm_id *cm_id) {
     RdmaContext *ctx = c->privctx;
-    valkeyRdmaCmd cmd = { 0 };
+    valkeyRdmaCmd cmd = {0};
 
     cmd.memory.opcode = htons(RegisterXferMemory);
     cmd.memory.addr = htobe64((uint64_t)ctx->recv_buf);
@@ -458,8 +455,8 @@ pollcq:
  * Return OK on CQ event ready, then CQ event should be handled outside.
  */
 static int valkeyRdmaPollCqCm(valkeyContext *c, long timed) {
-#define VALKEY_RDMA_POLLFD_CM  0
-#define VALKEY_RDMA_POLLFD_CQ  1
+#define VALKEY_RDMA_POLLFD_CM 0
+#define VALKEY_RDMA_POLLFD_CQ 1
 #define VALKEY_RDMA_POLLFD_MAX 2
     struct pollfd pfd[VALKEY_RDMA_POLLFD_MAX];
     RdmaContext *ctx = c->privctx;
@@ -538,7 +535,6 @@ pollcq:
         return VALKEY_ERR;
     }
 }
-
 
 static size_t connRdmaSend(RdmaContext *ctx, struct rdma_cm_id *cm_id, const void *data, size_t data_len) {
     struct ibv_send_wr send_wr, *bad_wr;
@@ -802,7 +798,7 @@ static int valkeyRdmaWaitConn(valkeyContext *c, long timeout) {
     long now, end;
     RdmaContext *ctx = c->privctx;
 
-    assert (timeout >= 0);
+    assert(timeout >= 0);
     end = vk_msec_now() + timeout;
 
     while (1) {
@@ -835,7 +831,7 @@ static int valkeyContextConnectRdma(valkeyContext *c, const valkeyOptions *optio
     const char *addr = options->endpoint.tcp.ip;
     int port = options->endpoint.tcp.port;
     int ret;
-    char _port[6];  /* strlen("65535"); */
+    char _port[6]; /* strlen("65535"); */
     struct addrinfo hints, *servinfo, *p;
     long timeout_msec = -1;
     struct rdma_event_channel *cm_channel = NULL;
@@ -885,8 +881,8 @@ static int valkeyContextConnectRdma(valkeyContext *c, const valkeyOptions *optio
     hints.ai_socktype = SOCK_STREAM;
 
     if ((ret = getaddrinfo(c->tcp.host, _port, &hints, &servinfo)) != 0) {
-         hints.ai_family = AF_INET6;
-         if ((ret = getaddrinfo(addr, _port, &hints, &servinfo)) != 0) {
+        hints.ai_family = AF_INET6;
+        if ((ret = getaddrinfo(addr, _port, &hints, &servinfo)) != 0) {
             valkeySetError(c, VALKEY_ERR_OTHER, gai_strerror(ret));
             return VALKEY_ERR;
         }
@@ -921,11 +917,11 @@ static int valkeyContextConnectRdma(valkeyContext *c, const valkeyOptions *optio
 
     for (p = servinfo; p != NULL; p = p->ai_next) {
         if (p->ai_family == PF_INET) {
-                memcpy(&saddr, p->ai_addr, sizeof(struct sockaddr_in));
-                ((struct sockaddr_in *)&saddr)->sin_port = htons(port);
+            memcpy(&saddr, p->ai_addr, sizeof(struct sockaddr_in));
+            ((struct sockaddr_in *)&saddr)->sin_port = htons(port);
         } else if (p->ai_family == PF_INET6) {
-                memcpy(&saddr, p->ai_addr, sizeof(struct sockaddr_in6));
-                ((struct sockaddr_in6 *)&saddr)->sin6_port = htons(port);
+            memcpy(&saddr, p->ai_addr, sizeof(struct sockaddr_in6));
+            ((struct sockaddr_in6 *)&saddr)->sin6_port = htons(port);
         } else {
             valkeySetError(c, VALKEY_ERR_PROTOCOL, "RDMA: unsupported family");
             goto free_rdma;
@@ -962,7 +958,7 @@ error:
     }
 
 end:
-    if(servinfo) {
+    if (servinfo) {
         freeaddrinfo(servinfo);
     }
 
@@ -982,8 +978,7 @@ static valkeyContextFuncs valkeyContextRdmaFuncs = {
     .async_write = valkeyRdmaAsyncWrite,
     .read = valkeyRdmaRead,
     .write = valkeyRdmaWrite,
-    .set_timeout = valkeyRdmaSetTimeout
-};
+    .set_timeout = valkeyRdmaSetTimeout};
 
 int valkeyInitiateRdma(void) {
     valkeyContextRegisterFuncs(&valkeyContextRdmaFuncs, VALKEY_CONN_RDMA);
@@ -991,8 +986,8 @@ int valkeyInitiateRdma(void) {
     return VALKEY_OK;
 }
 
-#else    /* __linux__ */
+#else /* __linux__ */
 
 #error "BUILD ERROR: RDMA is only supported on linux"
 
-#endif   /* __linux__ */
+#endif /* __linux__ */

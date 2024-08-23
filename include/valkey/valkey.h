@@ -34,6 +34,7 @@
 #ifndef VALKEY_H
 #define VALKEY_H
 #include "read.h"
+
 #include <stdarg.h> /* for va_list */
 #ifndef _MSC_VER
 #include <sys/time.h> /* for struct timeval */
@@ -42,14 +43,17 @@
 struct timeval; /* forward declaration */
 typedef SSIZE_T ssize_t;
 #endif
-#include <stdint.h> /* uintXX_t, etc */
-#include "sds.h" /* for sds */
 #include "alloc.h" /* for allocation wrappers */
+#include "sds.h"   /* for sds */
+
+#include <stdint.h> /* uintXX_t, etc */
 
 #define LIBVALKEY_MAJOR 1
 #define LIBVALKEY_MINOR 2
 #define LIBVALKEY_PATCH 0
+/* clang-format off */
 #define LIBVALKEY_SONAME 1.2.1-dev
+/* clang-format on */
 
 /* Connection type can be blocking or non-blocking and is set in the
  * least significant bit of the flags field in valkeyContext. */
@@ -102,16 +106,16 @@ typedef SSIZE_T ssize_t;
 
 /* number of times we retry to connect in the case of EADDRNOTAVAIL and
  * SO_REUSEADDR is being used. */
-#define VALKEY_CONNECT_RETRIES  10
+#define VALKEY_CONNECT_RETRIES 10
 
 /* Forward declarations for structs defined elsewhere */
 struct valkeyAsyncContext;
 struct valkeyContext;
 
 /* RESP3 push helpers and callback prototypes */
-#define valkeyIsPushReply(r) (((valkeyReply*)(r))->type == VALKEY_REPLY_PUSH)
-typedef void (valkeyPushFn)(void *, void *);
-typedef void (valkeyAsyncPushFn)(struct valkeyAsyncContext *, void *);
+#define valkeyIsPushReply(r) (((valkeyReply *)(r))->type == VALKEY_REPLY_PUSH)
+typedef void(valkeyPushFn)(void *, void *);
+typedef void(valkeyAsyncPushFn)(struct valkeyAsyncContext *, void *);
 
 #ifdef __cplusplus
 extern "C" {
@@ -119,16 +123,18 @@ extern "C" {
 
 /* This is the reply object returned by valkeyCommand() */
 typedef struct valkeyReply {
-    int type; /* VALKEY_REPLY_* */
-    long long integer; /* The integer when type is VALKEY_REPLY_INTEGER */
-    double dval; /* The double when type is VALKEY_REPLY_DOUBLE */
-    size_t len; /* Length of string */
-    char *str; /* Used for VALKEY_REPLY_ERROR, VALKEY_REPLY_STRING
-                  VALKEY_REPLY_VERB, VALKEY_REPLY_DOUBLE (in additional to dval),
-                  and VALKEY_REPLY_BIGNUM. */
-    char vtype[4]; /* Used for VALKEY_REPLY_VERB, contains the null
-                      terminated 3 character content type, such as "txt". */
-    size_t elements; /* number of elements, for VALKEY_REPLY_ARRAY */
+    int type;                     /* VALKEY_REPLY_* */
+    long long integer;            /* The integer when type is VALKEY_REPLY_INTEGER */
+    double dval;                  /* The double when type is VALKEY_REPLY_DOUBLE */
+    size_t len;                   /* Length of string */
+    char *str;                    /* Used for VALKEY_REPLY_ERROR, VALKEY_REPLY_STRING
+                                   * VALKEY_REPLY_VERB,
+                                   * VALKEY_REPLY_DOUBLE (in additional to dval),
+                                   * and VALKEY_REPLY_BIGNUM. */
+    char vtype[4];                /* Used for VALKEY_REPLY_VERB, contains the null
+                                   * terminated 3 character content type,
+                                   * such as "txt". */
+    size_t elements;              /* number of elements, for VALKEY_REPLY_ARRAY */
     struct valkeyReply **element; /* elements vector for VALKEY_REPLY_ARRAY */
 } valkeyReply;
 
@@ -141,7 +147,7 @@ void freeReplyObject(void *reply);
 int valkeyvFormatCommand(char **target, const char *format, va_list ap);
 int valkeyFormatCommand(char **target, const char *format, ...);
 long long valkeyFormatCommandArgv(char **target, int argc, const char **argv, const size_t *argvlen);
-long long valkeyFormatSdsCommandArgv(sds *target, int argc, const char ** argv, const size_t *argvlen);
+long long valkeyFormatSdsCommandArgv(sds *target, int argc, const char **argv, const size_t *argvlen);
 void valkeyFreeCommand(char *cmd);
 void valkeyFreeSdsCommand(sds cmd);
 
@@ -181,7 +187,7 @@ typedef int valkeyFD;
 #ifdef _WIN64
 typedef unsigned long long valkeyFD; /* SOCKET = 64-bit UINT_PTR */
 #else
-typedef unsigned long valkeyFD;      /* SOCKET = 32-bit UINT_PTR */
+typedef unsigned long valkeyFD; /* SOCKET = 32-bit UINT_PTR */
 #endif
 #define VALKEY_INVALID_FD ((valkeyFD)(~0)) /* INVALID_SOCKET */
 #endif
@@ -226,21 +232,24 @@ typedef struct {
 /**
  * Helper macros to initialize options to their specified fields.
  */
-#define VALKEY_OPTIONS_SET_TCP(opts, ip_, port_) do { \
-        (opts)->type = VALKEY_CONN_TCP;               \
-        (opts)->endpoint.tcp.ip = ip_;               \
-        (opts)->endpoint.tcp.port = port_;           \
-    } while(0)
+#define VALKEY_OPTIONS_SET_TCP(opts, ip_, port_) \
+    do {                                         \
+        (opts)->type = VALKEY_CONN_TCP;          \
+        (opts)->endpoint.tcp.ip = ip_;           \
+        (opts)->endpoint.tcp.port = port_;       \
+    } while (0)
 
-#define VALKEY_OPTIONS_SET_UNIX(opts, path) do { \
-        (opts)->type = VALKEY_CONN_UNIX;         \
-        (opts)->endpoint.unix_socket = path;    \
-    } while(0)
+#define VALKEY_OPTIONS_SET_UNIX(opts, path)  \
+    do {                                     \
+        (opts)->type = VALKEY_CONN_UNIX;     \
+        (opts)->endpoint.unix_socket = path; \
+    } while (0)
 
-#define VALKEY_OPTIONS_SET_PRIVDATA(opts, data, dtor) do {  \
-        (opts)->privdata = data;                           \
-        (opts)->free_privdata = dtor;                      \
-    } while(0)
+#define VALKEY_OPTIONS_SET_PRIVDATA(opts, data, dtor) \
+    do {                                              \
+        (opts)->privdata = data;                      \
+        (opts)->free_privdata = dtor;                 \
+    } while (0)
 
 typedef struct valkeyContextFuncs {
     int (*connect)(struct valkeyContext *, const valkeyOptions *);
@@ -258,16 +267,15 @@ typedef struct valkeyContextFuncs {
     int (*set_timeout)(struct valkeyContext *, const struct timeval);
 } valkeyContextFuncs;
 
-
 /* Context for a connection to Valkey */
 typedef struct valkeyContext {
-    const valkeyContextFuncs *funcs;   /* Function table */
+    const valkeyContextFuncs *funcs; /* Function table */
 
-    int err; /* Error flags, 0 when there is no error */
+    int err;          /* Error flags, 0 when there is no error */
     char errstr[128]; /* String representation of error when applicable */
     valkeyFD fd;
     int flags;
-    char *obuf; /* Write buffer */
+    char *obuf;           /* Write buffer */
     valkeyReader *reader; /* Protocol reader */
 
     enum valkeyConnectionType connection_type;
@@ -306,9 +314,9 @@ valkeyContext *valkeyConnect(const char *ip, int port);
 valkeyContext *valkeyConnectWithTimeout(const char *ip, int port, const struct timeval tv);
 valkeyContext *valkeyConnectNonBlock(const char *ip, int port);
 valkeyContext *valkeyConnectBindNonBlock(const char *ip, int port,
-                                       const char *source_addr);
+                                         const char *source_addr);
 valkeyContext *valkeyConnectBindNonBlockWithReuse(const char *ip, int port,
-                                                const char *source_addr);
+                                                  const char *source_addr);
 valkeyContext *valkeyConnectUnix(const char *path);
 valkeyContext *valkeyConnectUnixWithTimeout(const char *path, const struct timeval tv);
 valkeyContext *valkeyConnectUnixNonBlock(const char *path);

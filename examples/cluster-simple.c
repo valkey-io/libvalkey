@@ -1,6 +1,7 @@
+#include <valkey/valkeycluster.h>
+
 #include <stdio.h>
 #include <stdlib.h>
-#include <valkey/valkeycluster.h>
 
 int main(int argc, char **argv) {
     UNUSED(argc);

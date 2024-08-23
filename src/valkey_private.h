@@ -31,19 +31,18 @@
 #ifndef VALKEY_VK_PRIVATE_H
 #define VALKEY_VK_PRIVATE_H
 
-#include "valkey.h"
 #include "win32.h"
+
+#include "valkey.h"
 
 #include <limits.h>
 #include <string.h>
 
-
 void valkeySetError(valkeyContext *c, int type, const char *str);
-
 
 /* Helper function. Convert struct timeval to millisecond. */
 static inline int valkeyContextTimeoutMsec(const struct timeval *timeout, long *result) {
-    long max_msec = ((LONG_MAX) - 999) / 1000;
+    long max_msec = (LONG_MAX - 999) / 1000;
     long msec = INT_MAX;
 
     /* Only use timeout when not NULL. */
@@ -129,4 +128,4 @@ void valkeyContextRegisterUserfdFuncs(void);
 
 void valkeyContextSetFuncs(valkeyContext *c);
 
-#endif  /* VALKEY_VK_PRIVATE_H */
+#endif /* VALKEY_VK_PRIVATE_H */

@@ -45,10 +45,10 @@ extern "C" {
 #endif
 
 struct valkeyAsyncContext; /* need forward declaration of valkeyAsyncContext */
-struct dict; /* dictionary header is included in async.c */
+struct dict;               /* dictionary header is included in async.c */
 
 /* Reply callback prototype and container */
-typedef void (valkeyCallbackFn)(struct valkeyAsyncContext*, void*, void*);
+typedef void(valkeyCallbackFn)(struct valkeyAsyncContext *, void *, void *);
 typedef struct valkeyCallback {
     struct valkeyCallback *next; /* simple singly linked list */
     valkeyCallbackFn *fn;
@@ -63,9 +63,9 @@ typedef struct valkeyCallbackList {
 } valkeyCallbackList;
 
 /* Connection callback prototypes */
-typedef void (valkeyDisconnectCallback)(const struct valkeyAsyncContext*, int status);
-typedef void (valkeyConnectCallback)(const struct valkeyAsyncContext*, int status);
-typedef void (valkeyConnectCallbackNC)(struct valkeyAsyncContext *, int status);
+typedef void(valkeyDisconnectCallback)(const struct valkeyAsyncContext *, int status);
+typedef void(valkeyConnectCallback)(const struct valkeyAsyncContext *, int status);
+typedef void(valkeyConnectCallbackNC)(struct valkeyAsyncContext *, int status);
 typedef void(valkeyTimerCallback)(void *timer, void *privdata);
 
 /* Context for an async connection to Valkey */
@@ -127,7 +127,7 @@ valkeyAsyncContext *valkeyAsyncConnectWithOptions(const valkeyOptions *options);
 valkeyAsyncContext *valkeyAsyncConnect(const char *ip, int port);
 valkeyAsyncContext *valkeyAsyncConnectBind(const char *ip, int port, const char *source_addr);
 valkeyAsyncContext *valkeyAsyncConnectBindWithReuse(const char *ip, int port,
-                                                  const char *source_addr);
+                                                    const char *source_addr);
 valkeyAsyncContext *valkeyAsyncConnectUnix(const char *path);
 int valkeyAsyncSetConnectCallback(valkeyAsyncContext *ac, valkeyConnectCallback *fn);
 int valkeyAsyncSetConnectCallbackNC(valkeyAsyncContext *ac, valkeyConnectCallbackNC *fn);

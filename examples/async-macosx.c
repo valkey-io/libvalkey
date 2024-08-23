@@ -31,16 +31,18 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <stdio.h>
-
-#include <valkey/valkey.h>
 #include <valkey/async.h>
+#include <valkey/valkey.h>
+
 #include <valkey/adapters/macosx.h>
+
+#include <stdio.h>
 
 void getCallback(valkeyAsyncContext *c, void *r, void *privdata) {
     valkeyReply *reply = r;
-    if (reply == NULL) return;
-    printf("argv[%s]: %s\n", (char*)privdata, reply->str);
+    if (reply == NULL)
+        return;
+    printf("argv[%s]: %s\n", (char *)privdata, reply->str);
 
     /* Disconnect after receiving the reply to GET */
     valkeyAsyncDisconnect(c);
@@ -63,11 +65,11 @@ void disconnectCallback(const valkeyAsyncContext *c, int status) {
     printf("Disconnected...\n");
 }
 
-int main (int argc, char **argv) {
+int main(int argc, char **argv) {
     signal(SIGPIPE, SIG_IGN);
 
     CFRunLoopRef loop = CFRunLoopGetCurrent();
-    if( !loop ) {
+    if (!loop) {
         printf("Error: Cannot get current run loop\n");
         return 1;
     }
@@ -81,14 +83,14 @@ int main (int argc, char **argv) {
 
     valkeyMacOSAttach(c, loop);
 
-    valkeyAsyncSetConnectCallback(c,connectCallback);
-    valkeyAsyncSetDisconnectCallback(c,disconnectCallback);
+    valkeyAsyncSetConnectCallback(c, connectCallback);
+    valkeyAsyncSetDisconnectCallback(c, disconnectCallback);
 
-    valkeyAsyncCommand(c, NULL, NULL, "SET key %b", argv[argc-1], strlen(argv[argc-1]));
-    valkeyAsyncCommand(c, getCallback, (char*)"end-1", "GET key");
+    valkeyAsyncCommand(
+        c, NULL, NULL, "SET key %b", argv[argc - 1], strlen(argv[argc - 1]));
+    valkeyAsyncCommand(c, getCallback, (char *)"end-1", "GET key");
 
     CFRunLoopRun();
 
     return 0;
 }
-

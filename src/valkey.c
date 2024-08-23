@@ -32,17 +32,19 @@
  */
 
 #include "fmacros.h"
-#include <string.h>
-#include <stdlib.h>
-#include <assert.h>
-#include <errno.h>
-#include <ctype.h>
+#include "win32.h"
 
 #include "valkey.h"
-#include "valkey_private.h"
+
 #include "net.h"
 #include "sds.h"
-#include "win32.h"
+#include "valkey_private.h"
+
+#include <assert.h>
+#include <ctype.h>
+#include <errno.h>
+#include <stdlib.h>
+#include <string.h>
 
 static valkeyReply *createReplyObject(int type);
 static void *createStringObject(const valkeyReadTask *task, char *str, size_t len);
@@ -61,12 +63,11 @@ static valkeyReplyObjectFunctions defaultFunctions = {
     createDoubleObject,
     createNilObject,
     createBoolObject,
-    freeReplyObject
-};
+    freeReplyObject};
 
 /* Create a reply object */
 static valkeyReply *createReplyObject(int type) {
-    valkeyReply *r = vk_calloc(1,sizeof(*r));
+    valkeyReply *r = vk_calloc(1, sizeof(*r));
 
     if (r == NULL)
         return NULL;
@@ -83,7 +84,7 @@ void freeReplyObject(void *reply) {
     if (r == NULL)
         return;
 
-    switch(r->type) {
+    switch (r->type) {
     case VALKEY_REPLY_INTEGER:
     case VALKEY_REPLY_NIL:
     case VALKEY_REPLY_BOOL:
@@ -119,27 +120,29 @@ static void *createStringObject(const valkeyReadTask *task, char *str, size_t le
     if (r == NULL)
         return NULL;
 
-    assert(task->type == VALKEY_REPLY_ERROR  ||
+    assert(task->type == VALKEY_REPLY_ERROR ||
            task->type == VALKEY_REPLY_STATUS ||
            task->type == VALKEY_REPLY_STRING ||
-           task->type == VALKEY_REPLY_VERB   ||
+           task->type == VALKEY_REPLY_VERB ||
            task->type == VALKEY_REPLY_BIGNUM);
 
     /* Copy string value */
     if (task->type == VALKEY_REPLY_VERB) {
-        buf = vk_malloc(len-4+1); /* Skip 4 bytes of verbatim type header. */
-        if (buf == NULL) goto oom;
+        buf = vk_malloc(len - 4 + 1); /* Skip 4 bytes of verbatim type header. */
+        if (buf == NULL)
+            goto oom;
 
-        memcpy(r->vtype,str,3);
+        memcpy(r->vtype, str, 3);
         r->vtype[3] = '\0';
-        memcpy(buf,str+4,len-4);
-        buf[len-4] = '\0';
+        memcpy(buf, str + 4, len - 4);
+        buf[len - 4] = '\0';
         r->len = len - 4;
     } else {
-        buf = vk_malloc(len+1);
-        if (buf == NULL) goto oom;
+        buf = vk_malloc(len + 1);
+        if (buf == NULL)
+            goto oom;
 
-        memcpy(buf,str,len);
+        memcpy(buf, str, len);
         buf[len] = '\0';
         r->len = len;
     }
@@ -169,7 +172,7 @@ static void *createArrayObject(const valkeyReadTask *task, size_t elements) {
         return NULL;
 
     if (elements > 0) {
-        r->element = vk_calloc(elements,sizeof(valkeyReply*));
+        r->element = vk_calloc(elements, sizeof(valkeyReply *));
         if (r->element == NULL) {
             freeReplyObject(r);
             return NULL;
@@ -222,7 +225,7 @@ static void *createDoubleObject(const valkeyReadTask *task, double value, char *
         return NULL;
 
     r->dval = value;
-    r->str = vk_malloc(len+1);
+    r->str = vk_malloc(len + 1);
     if (r->str == NULL) {
         freeReplyObject(r);
         return NULL;
@@ -292,28 +295,32 @@ static void *createBoolObject(const valkeyReadTask *task, int bval) {
 /* Return the number of digits of 'v' when converted to string in radix 10.
  * Implementation borrowed from link in valkey/src/util.c:string2ll(). */
 static uint32_t countDigits(uint64_t v) {
-  uint32_t result = 1;
-  for (;;) {
-    if (v < 10) return result;
-    if (v < 100) return result + 1;
-    if (v < 1000) return result + 2;
-    if (v < 10000) return result + 3;
-    v /= 10000U;
-    result += 4;
-  }
+    uint32_t result = 1;
+    for (;;) {
+        if (v < 10)
+            return result;
+        if (v < 100)
+            return result + 1;
+        if (v < 1000)
+            return result + 2;
+        if (v < 10000)
+            return result + 3;
+        v /= 10000U;
+        result += 4;
+    }
 }
 
 /* Helper that calculates the bulk length given a certain string length. */
 static size_t bulklen(size_t len) {
-    return 1+countDigits(len)+2+len+2;
+    return 1 + countDigits(len) + 2 + len + 2;
 }
 
 int valkeyvFormatCommand(char **target, const char *format, va_list ap) {
     const char *c = format;
-    char *cmd = NULL; /* final command */
-    int pos; /* position in final command */
+    char *cmd = NULL;   /* final command */
+    int pos;            /* position in final command */
     sds curarg, newarg; /* current argument */
-    int touched = 0; /* was the current argument touched? */
+    int touched = 0;    /* was the current argument touched? */
     char **curargv = NULL, **newargv = NULL;
     int argc = 0;
     int totlen = 0;
@@ -329,24 +336,27 @@ int valkeyvFormatCommand(char **target, const char *format, va_list ap) {
     if (curarg == NULL)
         return -1;
 
-    while(*c != '\0') {
+    while (*c != '\0') {
         if (*c != '%' || c[1] == '\0') {
             if (*c == ' ') {
                 if (touched) {
-                    newargv = vk_realloc(curargv,sizeof(char*)*(argc+1));
-                    if (newargv == NULL) goto memory_err;
+                    newargv = vk_realloc(curargv, sizeof(char *) * (argc + 1));
+                    if (newargv == NULL)
+                        goto memory_err;
                     curargv = newargv;
                     curargv[argc++] = curarg;
                     totlen += bulklen(sdslen(curarg));
 
                     /* curarg is put in argv so it can be overwritten. */
                     curarg = sdsempty();
-                    if (curarg == NULL) goto memory_err;
+                    if (curarg == NULL)
+                        goto memory_err;
                     touched = 0;
                 }
             } else {
-                newarg = sdscatlen(curarg,c,1);
-                if (newarg == NULL) goto memory_err;
+                newarg = sdscatlen(curarg, c, 1);
+                if (newarg == NULL)
+                    goto memory_err;
                 curarg = newarg;
                 touched = 1;
             }
@@ -357,21 +367,21 @@ int valkeyvFormatCommand(char **target, const char *format, va_list ap) {
             /* Set newarg so it can be checked even if it is not touched. */
             newarg = curarg;
 
-            switch(c[1]) {
+            switch (c[1]) {
             case 's':
-                arg = va_arg(ap,char*);
+                arg = va_arg(ap, char *);
                 size = strlen(arg);
                 if (size > 0)
-                    newarg = sdscatlen(curarg,arg,size);
+                    newarg = sdscatlen(curarg, arg, size);
                 break;
             case 'b':
-                arg = va_arg(ap,char*);
-                size = va_arg(ap,size_t);
+                arg = va_arg(ap, char *);
+                size = va_arg(ap, size_t);
                 if (size > 0)
-                    newarg = sdscatlen(curarg,arg,size);
+                    newarg = sdscatlen(curarg, arg, size);
                 break;
             case '%':
-                newarg = sdscat(curarg,"%");
+                newarg = sdscat(curarg, "%");
                 break;
             default:
                 /* Try to detect printf format */
@@ -379,47 +389,51 @@ int valkeyvFormatCommand(char **target, const char *format, va_list ap) {
                     static const char intfmts[] = "diouxX";
                     static const char flags[] = "#0-+ ";
                     char _format[16];
-                    const char *_p = c+1;
+                    const char *_p = c + 1;
                     size_t _l = 0;
                     va_list _cpy;
 
                     /* Flags */
-                    while (*_p != '\0' && strchr(flags,*_p) != NULL) _p++;
+                    while (*_p != '\0' && strchr(flags, *_p) != NULL)
+                        _p++;
 
                     /* Field width */
-                    while (*_p != '\0' && isdigit((int) *_p)) _p++;
+                    while (*_p != '\0' && isdigit((int)*_p))
+                        _p++;
 
                     /* Precision */
                     if (*_p == '.') {
                         _p++;
-                        while (*_p != '\0' && isdigit((int) *_p)) _p++;
+                        while (*_p != '\0' && isdigit((int)*_p))
+                            _p++;
                     }
 
                     /* Copy va_list before consuming with va_arg */
-                    va_copy(_cpy,ap);
+                    va_copy(_cpy, ap);
 
                     /* Make sure we have more characters otherwise strchr() accepts
                      * '\0' as an integer specifier. This is checked after above
                      * va_copy() to avoid UB in fmt_invalid's call to va_end(). */
-                    if (*_p == '\0') goto fmt_invalid;
+                    if (*_p == '\0')
+                        goto fmt_invalid;
 
                     /* Integer conversion (without modifiers) */
-                    if (strchr(intfmts,*_p) != NULL) {
-                        va_arg(ap,int);
+                    if (strchr(intfmts, *_p) != NULL) {
+                        va_arg(ap, int);
                         goto fmt_valid;
                     }
 
                     /* Double conversion (without modifiers) */
-                    if (strchr("eEfFgGaA",*_p) != NULL) {
-                        va_arg(ap,double);
+                    if (strchr("eEfFgGaA", *_p) != NULL) {
+                        va_arg(ap, double);
                         goto fmt_valid;
                     }
 
                     /* Size: char */
                     if (_p[0] == 'h' && _p[1] == 'h') {
                         _p += 2;
-                        if (*_p != '\0' && strchr(intfmts,*_p) != NULL) {
-                            va_arg(ap,int); /* char gets promoted to int */
+                        if (*_p != '\0' && strchr(intfmts, *_p) != NULL) {
+                            va_arg(ap, int); /* char gets promoted to int */
                             goto fmt_valid;
                         }
                         goto fmt_invalid;
@@ -428,8 +442,8 @@ int valkeyvFormatCommand(char **target, const char *format, va_list ap) {
                     /* Size: short */
                     if (_p[0] == 'h') {
                         _p += 1;
-                        if (*_p != '\0' && strchr(intfmts,*_p) != NULL) {
-                            va_arg(ap,int); /* short gets promoted to int */
+                        if (*_p != '\0' && strchr(intfmts, *_p) != NULL) {
+                            va_arg(ap, int); /* short gets promoted to int */
                             goto fmt_valid;
                         }
                         goto fmt_invalid;
@@ -438,8 +452,8 @@ int valkeyvFormatCommand(char **target, const char *format, va_list ap) {
                     /* Size: long long */
                     if (_p[0] == 'l' && _p[1] == 'l') {
                         _p += 2;
-                        if (*_p != '\0' && strchr(intfmts,*_p) != NULL) {
-                            va_arg(ap,long long);
+                        if (*_p != '\0' && strchr(intfmts, *_p) != NULL) {
+                            va_arg(ap, long long);
                             goto fmt_valid;
                         }
                         goto fmt_invalid;
@@ -448,8 +462,8 @@ int valkeyvFormatCommand(char **target, const char *format, va_list ap) {
                     /* Size: long */
                     if (_p[0] == 'l') {
                         _p += 1;
-                        if (*_p != '\0' && strchr(intfmts,*_p) != NULL) {
-                            va_arg(ap,long);
+                        if (*_p != '\0' && strchr(intfmts, *_p) != NULL) {
+                            va_arg(ap, long);
                             goto fmt_valid;
                         }
                         goto fmt_invalid;
@@ -460,15 +474,15 @@ int valkeyvFormatCommand(char **target, const char *format, va_list ap) {
                     goto format_err;
 
                 fmt_valid:
-                    _l = (_p+1)-c;
-                    if (_l < sizeof(_format)-2) {
-                        memcpy(_format,c,_l);
+                    _l = (_p + 1) - c;
+                    if (_l < sizeof(_format) - 2) {
+                        memcpy(_format, c, _l);
                         _format[_l] = '\0';
-                        newarg = sdscatvprintf(curarg,_format,_cpy);
+                        newarg = sdscatvprintf(curarg, _format, _cpy);
 
                         /* Update current position (note: outer blocks
                          * increment c twice so compensate here) */
-                        c = _p-1;
+                        c = _p - 1;
                     }
 
                     va_end(_cpy);
@@ -476,7 +490,8 @@ int valkeyvFormatCommand(char **target, const char *format, va_list ap) {
                 }
             }
 
-            if (newarg == NULL) goto memory_err;
+            if (newarg == NULL)
+                goto memory_err;
             curarg = newarg;
 
             touched = 1;
@@ -489,8 +504,9 @@ int valkeyvFormatCommand(char **target, const char *format, va_list ap) {
 
     /* Add the last argument if needed */
     if (touched) {
-        newargv = vk_realloc(curargv,sizeof(char*)*(argc+1));
-        if (newargv == NULL) goto memory_err;
+        newargv = vk_realloc(curargv, sizeof(char *) * (argc + 1));
+        if (newargv == NULL)
+            goto memory_err;
         curargv = newargv;
         curargv[argc++] = curarg;
         totlen += bulklen(sdslen(curarg));
@@ -502,16 +518,17 @@ int valkeyvFormatCommand(char **target, const char *format, va_list ap) {
     curarg = NULL;
 
     /* Add bytes needed to hold multi bulk count */
-    totlen += 1+countDigits(argc)+2;
+    totlen += 1 + countDigits(argc) + 2;
 
     /* Build the command at protocol level */
-    cmd = vk_malloc(totlen+1);
-    if (cmd == NULL) goto memory_err;
+    cmd = vk_malloc(totlen + 1);
+    if (cmd == NULL)
+        goto memory_err;
 
-    pos = sprintf(cmd,"*%d\r\n",argc);
+    pos = sprintf(cmd, "*%d\r\n", argc);
     for (j = 0; j < argc; j++) {
-        pos += sprintf(cmd+pos,"$%zu\r\n",sdslen(curargv[j]));
-        memcpy(cmd+pos,curargv[j],sdslen(curargv[j]));
+        pos += sprintf(cmd + pos, "$%zu\r\n", sdslen(curargv[j]));
+        memcpy(cmd + pos, curargv[j], sdslen(curargv[j]));
         pos += sdslen(curargv[j]);
         sdsfree(curargv[j]);
         cmd[pos++] = '\r';
@@ -534,7 +551,7 @@ memory_err:
 
 cleanup:
     if (curargv) {
-        while(argc--)
+        while (argc--)
             sdsfree(curargv[argc]);
         vk_free(curargv);
     }
@@ -560,8 +577,8 @@ cleanup:
 int valkeyFormatCommand(char **target, const char *format, ...) {
     va_list ap;
     int len;
-    va_start(ap,format);
-    len = valkeyvFormatCommand(target,format,ap);
+    va_start(ap, format);
+    len = valkeyvFormatCommand(target, format, ap);
     va_end(ap);
 
     /* The API says "-1" means bad result, but we now also return "-2" in some
@@ -579,8 +596,7 @@ int valkeyFormatCommand(char **target, const char *format, ...) {
  * argument lengths.
  */
 long long valkeyFormatSdsCommandArgv(sds *target, int argc, const char **argv,
-                                    const size_t *argvlen)
-{
+                                     const size_t *argvlen) {
     sds cmd, aux;
     unsigned long long totlen, len;
     int j;
@@ -590,7 +606,7 @@ long long valkeyFormatSdsCommandArgv(sds *target, int argc, const char **argv,
         return -1;
 
     /* Calculate our total size */
-    totlen = 1+countDigits(argc)+2;
+    totlen = 1 + countDigits(argc) + 2;
     for (j = 0; j < argc; j++) {
         len = argvlen ? argvlen[j] : strlen(argv[j]);
         totlen += bulklen(len);
@@ -612,14 +628,14 @@ long long valkeyFormatSdsCommandArgv(sds *target, int argc, const char **argv,
 
     /* Construct command */
     cmd = sdscatfmt(cmd, "*%i\r\n", argc);
-    for (j=0; j < argc; j++) {
+    for (j = 0; j < argc; j++) {
         len = argvlen ? argvlen[j] : strlen(argv[j]);
         cmd = sdscatfmt(cmd, "$%U\r\n", len);
         cmd = sdscatlen(cmd, argv[j], len);
-        cmd = sdscatlen(cmd, "\r\n", sizeof("\r\n")-1);
+        cmd = sdscatlen(cmd, "\r\n", sizeof("\r\n") - 1);
     }
 
-    assert(sdslen(cmd)==totlen);
+    assert(sdslen(cmd) == totlen);
 
     *target = cmd;
     return totlen;
@@ -636,7 +652,7 @@ void valkeyFreeSdsCommand(sds cmd) {
  */
 long long valkeyFormatCommandArgv(char **target, int argc, const char **argv, const size_t *argvlen) {
     char *cmd = NULL; /* final command */
-    size_t pos; /* position in final command */
+    size_t pos;       /* position in final command */
     size_t len, totlen;
     int j;
 
@@ -645,22 +661,22 @@ long long valkeyFormatCommandArgv(char **target, int argc, const char **argv, co
         return -1;
 
     /* Calculate number of bytes needed for the command */
-    totlen = 1+countDigits(argc)+2;
+    totlen = 1 + countDigits(argc) + 2;
     for (j = 0; j < argc; j++) {
         len = argvlen ? argvlen[j] : strlen(argv[j]);
         totlen += bulklen(len);
     }
 
     /* Build the command at protocol level */
-    cmd = vk_malloc(totlen+1);
+    cmd = vk_malloc(totlen + 1);
     if (cmd == NULL)
         return -1;
 
-    pos = sprintf(cmd,"*%d\r\n",argc);
+    pos = sprintf(cmd, "*%d\r\n", argc);
     for (j = 0; j < argc; j++) {
         len = argvlen ? argvlen[j] : strlen(argv[j]);
-        pos += sprintf(cmd+pos,"$%zu\r\n",len);
-        memcpy(cmd+pos,argv[j],len);
+        pos += sprintf(cmd + pos, "$%zu\r\n", len);
+        memcpy(cmd + pos, argv[j], len);
         pos += len;
         cmd[pos++] = '\r';
         cmd[pos++] = '\n';
@@ -682,8 +698,8 @@ void valkeySetError(valkeyContext *c, int type, const char *str) {
     c->err = type;
     if (str != NULL) {
         len = strlen(str);
-        len = len < (sizeof(c->errstr)-1) ? len : (sizeof(c->errstr)-1);
-        memcpy(c->errstr,str,len);
+        len = len < (sizeof(c->errstr) - 1) ? len : (sizeof(c->errstr) - 1);
+        memcpy(c->errstr, str, len);
         c->errstr[len] = '\0';
     } else {
         /* Only VALKEY_ERR_IO may lack a description! */
@@ -755,7 +771,7 @@ valkeyFD valkeyFreeKeepFd(valkeyContext *c) {
 }
 
 int valkeyReconnect(valkeyContext *c) {
-    valkeyOptions options = { .connect_timeout = c->connect_timeout };
+    valkeyOptions options = {.connect_timeout = c->connect_timeout};
 
     c->err = 0;
     memset(c->errstr, '\0', strlen(c->errstr));
@@ -794,7 +810,7 @@ int valkeyReconnect(valkeyContext *c) {
     default:
         /* Something bad happened here and shouldn't have. There isn't
            enough information in the context to reconnect. */
-        valkeySetError(c,VALKEY_ERR_OTHER,"Not enough information to reconnect");
+        valkeySetError(c, VALKEY_ERR_OTHER, "Not enough information to reconnect");
         return VALKEY_ERR;
     }
 
@@ -859,8 +875,7 @@ valkeyContext *valkeyConnectWithOptions(const valkeyOptions *options) {
     valkeyContextSetFuncs(c);
     c->funcs->connect(c, options);
     if (c->err == 0 && c->fd != VALKEY_INVALID_FD &&
-        options->command_timeout != NULL && (c->flags & VALKEY_BLOCK))
-    {
+        options->command_timeout != NULL && (c->flags & VALKEY_BLOCK)) {
         c->funcs->set_timeout(c, *options->command_timeout);
     }
 
@@ -891,7 +906,7 @@ valkeyContext *valkeyConnectNonBlock(const char *ip, int port) {
 }
 
 valkeyContext *valkeyConnectBindNonBlock(const char *ip, int port,
-                                       const char *source_addr) {
+                                         const char *source_addr) {
     valkeyOptions options = {0};
     VALKEY_OPTIONS_SET_TCP(&options, ip, port);
     options.endpoint.tcp.source_addr = source_addr;
@@ -900,11 +915,11 @@ valkeyContext *valkeyConnectBindNonBlock(const char *ip, int port,
 }
 
 valkeyContext *valkeyConnectBindNonBlockWithReuse(const char *ip, int port,
-                                                const char *source_addr) {
+                                                  const char *source_addr) {
     valkeyOptions options = {0};
     VALKEY_OPTIONS_SET_TCP(&options, ip, port);
     options.endpoint.tcp.source_addr = source_addr;
-    options.options |= VALKEY_OPT_NONBLOCK|VALKEY_OPT_REUSEADDR;
+    options.options |= VALKEY_OPT_NONBLOCK | VALKEY_OPT_REUSEADDR;
     return valkeyConnectWithOptions(&options);
 }
 
@@ -945,7 +960,7 @@ int valkeySetTimeout(valkeyContext *c, const struct timeval tv) {
         return VALKEY_ERR;
     }
 
-    return c->funcs->set_timeout(c,tv);
+    return c->funcs->set_timeout(c, tv);
 }
 
 int valkeyEnableKeepAliveWithInterval(valkeyContext *c, int interval) {
@@ -975,7 +990,7 @@ valkeyPushFn *valkeySetPushCallback(valkeyContext *c, valkeyPushFn *fn) {
  * After this function is called, you may use valkeyGetReplyFromReader to
  * see if there is a reply available. */
 int valkeyBufferRead(valkeyContext *c) {
-    char buf[1024*16];
+    char buf[1024 * 16];
     int nread;
 
     /* Return early when the context has seen an error. */
@@ -1019,11 +1034,13 @@ int valkeyBufferWrite(valkeyContext *c, int *done) {
                 if (c->obuf == NULL)
                     goto oom;
             } else {
-                if (sdsrange(c->obuf,nwritten,-1) < 0) goto oom;
+                if (sdsrange(c->obuf, nwritten, -1) < 0)
+                    goto oom;
             }
         }
     }
-    if (done != NULL) *done = (sdslen(c->obuf) == 0);
+    if (done != NULL)
+        *done = (sdslen(c->obuf) == 0);
     return VALKEY_OK;
 
 oom:
@@ -1045,7 +1062,7 @@ static int valkeyHandledPushReply(valkeyContext *c, void *reply) {
 /* Get a reply from our reader or set an error in the context. */
 int valkeyGetReplyFromReader(valkeyContext *c, void **reply) {
     if (valkeyReaderGetReply(c->reader, reply) == VALKEY_ERR) {
-        valkeySetError(c,c->reader->err,c->reader->errstr);
+        valkeySetError(c, c->reader->err, c->reader->errstr);
         return VALKEY_ERR;
     }
 
@@ -1069,14 +1086,14 @@ int valkeyGetReply(valkeyContext *c, void **reply) {
     void *aux = NULL;
 
     /* Try to read pending replies */
-    if (valkeyNextInBandReplyFromReader(c,&aux) == VALKEY_ERR)
+    if (valkeyNextInBandReplyFromReader(c, &aux) == VALKEY_ERR)
         return VALKEY_ERR;
 
     /* For the blocking context, flush output buffer and read reply */
     if (aux == NULL && c->flags & VALKEY_BLOCK) {
         /* Write until done */
         do {
-            if (valkeyBufferWrite(c,&wdone) == VALKEY_ERR)
+            if (valkeyBufferWrite(c, &wdone) == VALKEY_ERR)
                 return VALKEY_ERR;
         } while (!wdone);
 
@@ -1085,7 +1102,7 @@ int valkeyGetReply(valkeyContext *c, void **reply) {
             if (valkeyBufferRead(c) == VALKEY_ERR)
                 return VALKEY_ERR;
 
-            if (valkeyNextInBandReplyFromReader(c,&aux) == VALKEY_ERR)
+            if (valkeyNextInBandReplyFromReader(c, &aux) == VALKEY_ERR)
                 return VALKEY_ERR;
         } while (aux == NULL);
     }
@@ -1100,7 +1117,6 @@ int valkeyGetReply(valkeyContext *c, void **reply) {
     return VALKEY_OK;
 }
 
-
 /* Helper function for the valkeyAppendCommand* family of functions.
  *
  * Write a formatted command to the output buffer. When this family
@@ -1110,9 +1126,9 @@ int valkeyGetReply(valkeyContext *c, void **reply) {
 int valkeyAppendCmdLen(valkeyContext *c, const char *cmd, size_t len) {
     sds newbuf;
 
-    newbuf = sdscatlen(c->obuf,cmd,len);
+    newbuf = sdscatlen(c->obuf, cmd, len);
     if (newbuf == NULL) {
-        valkeySetError(c,VALKEY_ERR_OOM,"Out of memory");
+        valkeySetError(c, VALKEY_ERR_OOM, "Out of memory");
         return VALKEY_ERR;
     }
 
@@ -1133,16 +1149,16 @@ int valkeyvAppendCommand(valkeyContext *c, const char *format, va_list ap) {
     char *cmd;
     int len;
 
-    len = valkeyvFormatCommand(&cmd,format,ap);
+    len = valkeyvFormatCommand(&cmd, format, ap);
     if (len == -1) {
-        valkeySetError(c,VALKEY_ERR_OOM,"Out of memory");
+        valkeySetError(c, VALKEY_ERR_OOM, "Out of memory");
         return VALKEY_ERR;
     } else if (len == -2) {
-        valkeySetError(c,VALKEY_ERR_OTHER,"Invalid format string");
+        valkeySetError(c, VALKEY_ERR_OTHER, "Invalid format string");
         return VALKEY_ERR;
     }
 
-    if (valkeyAppendCmdLen(c,cmd,len) != VALKEY_OK) {
+    if (valkeyAppendCmdLen(c, cmd, len) != VALKEY_OK) {
         vk_free(cmd);
         return VALKEY_ERR;
     }
@@ -1155,8 +1171,8 @@ int valkeyAppendCommand(valkeyContext *c, const char *format, ...) {
     va_list ap;
     int ret;
 
-    va_start(ap,format);
-    ret = valkeyvAppendCommand(c,format,ap);
+    va_start(ap, format);
+    ret = valkeyvAppendCommand(c, format, ap);
     va_end(ap);
     return ret;
 }
@@ -1165,13 +1181,13 @@ int valkeyAppendCommandArgv(valkeyContext *c, int argc, const char **argv, const
     sds cmd;
     long long len;
 
-    len = valkeyFormatSdsCommandArgv(&cmd,argc,argv,argvlen);
+    len = valkeyFormatSdsCommandArgv(&cmd, argc, argv, argvlen);
     if (len == -1) {
-        valkeySetError(c,VALKEY_ERR_OOM,"Out of memory");
+        valkeySetError(c, VALKEY_ERR_OOM, "Out of memory");
         return VALKEY_ERR;
     }
 
-    if (valkeyAppendCmdLen(c,cmd,len) != VALKEY_OK) {
+    if (valkeyAppendCmdLen(c, cmd, len) != VALKEY_OK) {
         sdsfree(cmd);
         return VALKEY_ERR;
     }
@@ -1195,7 +1211,7 @@ static void *valkeyBlockForReply(valkeyContext *c) {
     void *reply;
 
     if (c->flags & VALKEY_BLOCK) {
-        if (valkeyGetReply(c,&reply) != VALKEY_OK)
+        if (valkeyGetReply(c, &reply) != VALKEY_OK)
             return NULL;
         return reply;
     }
@@ -1203,21 +1219,21 @@ static void *valkeyBlockForReply(valkeyContext *c) {
 }
 
 void *valkeyvCommand(valkeyContext *c, const char *format, va_list ap) {
-    if (valkeyvAppendCommand(c,format,ap) != VALKEY_OK)
+    if (valkeyvAppendCommand(c, format, ap) != VALKEY_OK)
         return NULL;
     return valkeyBlockForReply(c);
 }
 
 void *valkeyCommand(valkeyContext *c, const char *format, ...) {
     va_list ap;
-    va_start(ap,format);
-    void *reply = valkeyvCommand(c,format,ap);
+    va_start(ap, format);
+    void *reply = valkeyvCommand(c, format, ap);
     va_end(ap);
     return reply;
 }
 
 void *valkeyCommandArgv(valkeyContext *c, int argc, const char **argv, const size_t *argvlen) {
-    if (valkeyAppendCommandArgv(c,argc,argv,argvlen) != VALKEY_OK)
+    if (valkeyAppendCommandArgv(c, argc, argv, argvlen) != VALKEY_OK)
         return NULL;
     return valkeyBlockForReply(c);
 }

@@ -31,20 +31,22 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 #define _XOPEN_SOURCE 600
+#include "win32.h"
+
+#include "valkeycluster.h"
+
+#include "adlist.h"
+#include "alloc.h"
+#include "command.h"
+#include "dict.h"
+#include "vkutil.h"
+
 #include <assert.h>
 #include <ctype.h>
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
-#include "alloc.h"
-#include "adlist.h"
-#include "command.h"
-#include "dict.h"
-#include "valkeycluster.h"
-#include "vkutil.h"
-#include "win32.h"
 
 // Cluster errors are offset by 100 to be sufficiently out of range of
 // standard Valkey errors
@@ -3122,8 +3124,8 @@ void clusterNodesReplyCallback(valkeyAsyncContext *ac, void *r,
     }
 }
 
-#define nodeIsConnected(n)                                                     \
-    ((n)->acon != NULL && (n)->acon->err == 0 &&                               \
+#define nodeIsConnected(n)                       \
+    ((n)->acon != NULL && (n)->acon->err == 0 && \
      (n)->acon->c.flags & VALKEY_CONNECTED)
 
 /* Select a node.

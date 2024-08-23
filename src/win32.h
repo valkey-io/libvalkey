@@ -51,14 +51,13 @@
 #endif
 
 #ifndef va_copy
-#define va_copy(d,s) ((d) = (s))
+#define va_copy(d, s) ((d) = (s))
 #endif
 
-#ifndef snprintf
+#if !defined(snprintf) && _MSC_VER < 1900
 #define snprintf c99_snprintf
 
-__inline int c99_vsnprintf(char* str, size_t size, const char* format, va_list ap)
-{
+__inline int c99_vsnprintf(char *str, size_t size, const char *format, va_list ap) {
     int count = -1;
 
     if (size != 0)
@@ -69,8 +68,7 @@ __inline int c99_vsnprintf(char* str, size_t size, const char* format, va_list a
     return count;
 }
 
-__inline int c99_snprintf(char* str, size_t size, const char* format, ...)
-{
+__inline int c99_snprintf(char *str, size_t size, const char *format, ...) {
     int count;
     va_list ap;
 

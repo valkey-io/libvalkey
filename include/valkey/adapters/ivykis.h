@@ -1,8 +1,9 @@
 #ifndef VALKEY_IVYKIS_H
 #define VALKEY_IVYKIS_H
-#include <iv.h>
-#include "../valkey.h"
 #include "../async.h"
+#include "../valkey.h"
+
+#include <iv.h>
 
 typedef struct valkeyIvykisEvents {
     valkeyAsyncContext *context;
@@ -20,27 +21,27 @@ static void valkeyIvykisWriteEvent(void *arg) {
 }
 
 static void valkeyIvykisAddRead(void *privdata) {
-    valkeyIvykisEvents *e = (valkeyIvykisEvents*)privdata;
+    valkeyIvykisEvents *e = (valkeyIvykisEvents *)privdata;
     iv_fd_set_handler_in(&e->fd, valkeyIvykisReadEvent);
 }
 
 static void valkeyIvykisDelRead(void *privdata) {
-    valkeyIvykisEvents *e = (valkeyIvykisEvents*)privdata;
+    valkeyIvykisEvents *e = (valkeyIvykisEvents *)privdata;
     iv_fd_set_handler_in(&e->fd, NULL);
 }
 
 static void valkeyIvykisAddWrite(void *privdata) {
-    valkeyIvykisEvents *e = (valkeyIvykisEvents*)privdata;
+    valkeyIvykisEvents *e = (valkeyIvykisEvents *)privdata;
     iv_fd_set_handler_out(&e->fd, valkeyIvykisWriteEvent);
 }
 
 static void valkeyIvykisDelWrite(void *privdata) {
-    valkeyIvykisEvents *e = (valkeyIvykisEvents*)privdata;
+    valkeyIvykisEvents *e = (valkeyIvykisEvents *)privdata;
     iv_fd_set_handler_out(&e->fd, NULL);
 }
 
 static void valkeyIvykisCleanup(void *privdata) {
-    valkeyIvykisEvents *e = (valkeyIvykisEvents*)privdata;
+    valkeyIvykisEvents *e = (valkeyIvykisEvents *)privdata;
 
     iv_fd_unregister(&e->fd);
     vk_free(e);
@@ -55,7 +56,7 @@ static int valkeyIvykisAttach(valkeyAsyncContext *ac) {
         return VALKEY_ERR;
 
     /* Create container for context and r/w events */
-    e = (valkeyIvykisEvents*)vk_malloc(sizeof(*e));
+    e = (valkeyIvykisEvents *)vk_malloc(sizeof(*e));
     if (e == NULL)
         return VALKEY_ERR;
 

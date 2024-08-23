@@ -33,22 +33,24 @@
  */
 
 #include "fmacros.h"
-#include <sys/types.h>
-#include <fcntl.h>
-#include <string.h>
-#include <errno.h>
-#include <stdarg.h>
-#include <stdio.h>
-#include <limits.h>
-#include <stdlib.h>
-#include <time.h>
+#include "win32.h"
+
+#include "net.h"
 
 #include "async.h"
-#include "net.h"
 #include "sds.h"
 #include "sockcompat.h"
-#include "win32.h"
 #include "valkey_private.h"
+
+#include <errno.h>
+#include <fcntl.h>
+#include <limits.h>
+#include <stdarg.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/types.h>
+#include <time.h>
 
 void valkeyNetClose(valkeyContext *c) {
     if (c && c->fd != VALKEY_INVALID_FD) {
@@ -63,7 +65,7 @@ static ssize_t valkeyNetRead(valkeyContext *c, char *buf, size_t bufcap) {
         if ((errno == EWOULDBLOCK && !(c->flags & VALKEY_BLOCK)) || (errno == EINTR)) {
             /* Try again later */
             return 0;
-        } else if(errno == ETIMEDOUT && (c->flags & VALKEY_BLOCK)) {
+        } else if (errno == ETIMEDOUT && (c->flags & VALKEY_BLOCK)) {
             /* especially in windows */
             valkeySetError(c, VALKEY_ERR_TIMEOUT, "recv timeout");
             return -1;
@@ -97,20 +99,20 @@ static ssize_t valkeyNetWrite(valkeyContext *c) {
 }
 
 static void valkeySetErrorFromErrno(valkeyContext *c, int type, const char *prefix) {
-    int errorno = errno;  /* snprintf() may change errno */
-    char buf[128] = { 0 };
+    int errorno = errno; /* snprintf() may change errno */
+    char buf[128] = {0};
     size_t len = 0;
 
     if (prefix != NULL)
-        len = snprintf(buf,sizeof(buf),"%s: ",prefix);
+        len = snprintf(buf, sizeof(buf), "%s: ", prefix);
     strerror_r(errorno, (char *)(buf + len), sizeof(buf) - len);
-    valkeySetError(c,type,buf);
+    valkeySetError(c, type, buf);
 }
 
 static int valkeySetReuseAddr(valkeyContext *c) {
     int on = 1;
     if (setsockopt(c->fd, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on)) == -1) {
-        valkeySetErrorFromErrno(c,VALKEY_ERR_IO,NULL);
+        valkeySetErrorFromErrno(c, VALKEY_ERR_IO, NULL);
         valkeyNetClose(c);
         return VALKEY_ERR;
     }
@@ -120,7 +122,7 @@ static int valkeySetReuseAddr(valkeyContext *c) {
 static int valkeyCreateSocket(valkeyContext *c, int type) {
     valkeyFD s;
     if ((s = socket(type, SOCK_STREAM, 0)) == VALKEY_INVALID_FD) {
-        valkeySetErrorFromErrno(c,VALKEY_ERR_IO,NULL);
+        valkeySetErrorFromErrno(c, VALKEY_ERR_IO, NULL);
         return VALKEY_ERR;
     }
     c->fd = s;
@@ -140,7 +142,7 @@ static int valkeySetBlocking(valkeyContext *c, int blocking) {
      * Note that fcntl(2) for F_GETFL and F_SETFL can't be
      * interrupted by a signal. */
     if ((flags = fcntl(c->fd, F_GETFL)) == -1) {
-        valkeySetErrorFromErrno(c,VALKEY_ERR_IO,"fcntl(F_GETFL)");
+        valkeySetErrorFromErrno(c, VALKEY_ERR_IO, "fcntl(F_GETFL)");
         valkeyNetClose(c);
         return VALKEY_ERR;
     }
@@ -151,7 +153,7 @@ static int valkeySetBlocking(valkeyContext *c, int blocking) {
         flags |= O_NONBLOCK;
 
     if (fcntl(c->fd, F_SETFL, flags) == -1) {
-        valkeySetErrorFromErrno(c,VALKEY_ERR_IO,"fcntl(F_SETFL)");
+        valkeySetErrorFromErrno(c, VALKEY_ERR_IO, "fcntl(F_SETFL)");
         valkeyNetClose(c);
         return VALKEY_ERR;
     }
@@ -175,8 +177,8 @@ int valkeyKeepAlive(valkeyContext *c, int interval) {
         return VALKEY_ERR;
 
 #ifndef _WIN32
-    if (setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, &val, sizeof(val)) == -1){
-        valkeySetError(c,VALKEY_ERR_OTHER,strerror(errno));
+    if (setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, &val, sizeof(val)) == -1) {
+        valkeySetError(c, VALKEY_ERR_OTHER, strerror(errno));
         return VALKEY_ERR;
     }
 
@@ -184,26 +186,27 @@ int valkeyKeepAlive(valkeyContext *c, int interval) {
 
 #if defined(__APPLE__) && defined(__MACH__)
     if (setsockopt(fd, IPPROTO_TCP, TCP_KEEPALIVE, &val, sizeof(val)) < 0) {
-        valkeySetError(c,VALKEY_ERR_OTHER,strerror(errno));
+        valkeySetError(c, VALKEY_ERR_OTHER, strerror(errno));
         return VALKEY_ERR;
     }
 #else
 #if defined(__GLIBC__) && !defined(__FreeBSD_kernel__)
     if (setsockopt(fd, IPPROTO_TCP, TCP_KEEPIDLE, &val, sizeof(val)) < 0) {
-        valkeySetError(c,VALKEY_ERR_OTHER,strerror(errno));
+        valkeySetError(c, VALKEY_ERR_OTHER, strerror(errno));
         return VALKEY_ERR;
     }
 
-    val = interval/3;
-    if (val == 0) val = 1;
+    val = interval / 3;
+    if (val == 0)
+        val = 1;
     if (setsockopt(fd, IPPROTO_TCP, TCP_KEEPINTVL, &val, sizeof(val)) < 0) {
-        valkeySetError(c,VALKEY_ERR_OTHER,strerror(errno));
+        valkeySetError(c, VALKEY_ERR_OTHER, strerror(errno));
         return VALKEY_ERR;
     }
 
     val = 3;
     if (setsockopt(fd, IPPROTO_TCP, TCP_KEEPCNT, &val, sizeof(val)) < 0) {
-        valkeySetError(c,VALKEY_ERR_OTHER,strerror(errno));
+        valkeySetError(c, VALKEY_ERR_OTHER, strerror(errno));
         return VALKEY_ERR;
     }
 #endif
@@ -223,7 +226,7 @@ int valkeyKeepAlive(valkeyContext *c, int interval) {
 int valkeySetTcpNoDelay(valkeyContext *c) {
     int yes = 1;
     if (setsockopt(c->fd, IPPROTO_TCP, TCP_NODELAY, &yes, sizeof(yes)) == -1) {
-        valkeySetErrorFromErrno(c,VALKEY_ERR_IO,"setsockopt(TCP_NODELAY)");
+        valkeySetErrorFromErrno(c, VALKEY_ERR_IO, "setsockopt(TCP_NODELAY)");
         valkeyNetClose(c);
         return VALKEY_ERR;
     }
@@ -240,7 +243,7 @@ int valkeyContextSetTcpUserTimeout(valkeyContext *c, unsigned int timeout) {
     (void)timeout;
 #endif
     if (res == -1) {
-        valkeySetErrorFromErrno(c,VALKEY_ERR_IO,"setsockopt(TCP_USER_TIMEOUT)");
+        valkeySetErrorFromErrno(c, VALKEY_ERR_IO, "setsockopt(TCP_USER_TIMEOUT)");
         valkeyNetClose(c);
         return VALKEY_ERR;
     }
@@ -265,7 +268,7 @@ static int valkeyContextWaitReady(valkeyContext *c, long msec) {
     int res;
 
     if (errno != EINPROGRESS) {
-        valkeySetErrorFromErrno(c,VALKEY_ERR_IO,NULL);
+        valkeySetErrorFromErrno(c, VALKEY_ERR_IO, NULL);
         valkeyNetClose(c);
         return VALKEY_ERR;
     }
@@ -338,7 +341,7 @@ int valkeyCheckSocketError(valkeyContext *c) {
     socklen_t errlen = sizeof(err);
 
     if (getsockopt(c->fd, SOL_SOCKET, SO_ERROR, &err, &errlen) == -1) {
-        valkeySetErrorFromErrno(c,VALKEY_ERR_IO,"getsockopt(SO_ERROR)");
+        valkeySetErrorFromErrno(c, VALKEY_ERR_IO, "getsockopt(SO_ERROR)");
         return VALKEY_ERR;
     }
 
@@ -348,7 +351,7 @@ int valkeyCheckSocketError(valkeyContext *c) {
 
     if (err) {
         errno = err;
-        valkeySetErrorFromErrno(c,VALKEY_ERR_IO,NULL);
+        valkeySetErrorFromErrno(c, VALKEY_ERR_IO, NULL);
         return VALKEY_ERR;
     }
 
@@ -359,12 +362,12 @@ int valkeyTcpSetTimeout(valkeyContext *c, const struct timeval tv) {
     const void *to_ptr = &tv;
     size_t to_sz = sizeof(tv);
 
-    if (setsockopt(c->fd,SOL_SOCKET,SO_RCVTIMEO,to_ptr,to_sz) == -1) {
-        valkeySetErrorFromErrno(c,VALKEY_ERR_IO,"setsockopt(SO_RCVTIMEO)");
+    if (setsockopt(c->fd, SOL_SOCKET, SO_RCVTIMEO, to_ptr, to_sz) == -1) {
+        valkeySetErrorFromErrno(c, VALKEY_ERR_IO, "setsockopt(SO_RCVTIMEO)");
         return VALKEY_ERR;
     }
-    if (setsockopt(c->fd,SOL_SOCKET,SO_SNDTIMEO,to_ptr,to_sz) == -1) {
-        valkeySetErrorFromErrno(c,VALKEY_ERR_IO,"setsockopt(SO_SNDTIMEO)");
+    if (setsockopt(c->fd, SOL_SOCKET, SO_SNDTIMEO, to_ptr, to_sz) == -1) {
+        valkeySetErrorFromErrno(c, VALKEY_ERR_IO, "setsockopt(SO_SNDTIMEO)");
         return VALKEY_ERR;
     }
     return VALKEY_OK;
@@ -377,7 +380,7 @@ int valkeyContextConnectTcp(valkeyContext *c, const valkeyOptions *options) {
     int port = options->endpoint.tcp.port;
     valkeyFD s;
     int rv, n;
-    char _port[6];  /* strlen("65535"); */
+    char _port[6]; /* strlen("65535"); */
     struct addrinfo hints, *servinfo, *bservinfo, *p, *b;
     int blocking = (c->flags & VALKEY_BLOCK);
     int reuseaddr = (c->flags & VALKEY_REUSEADDR);
@@ -424,7 +427,7 @@ int valkeyContextConnectTcp(valkeyContext *c, const valkeyOptions *options) {
     }
 
     snprintf(_port, 6, "%d", port);
-    memset(&hints,0,sizeof(hints));
+    memset(&hints, 0, sizeof(hints));
     hints.ai_family = AF_INET;
     hints.ai_socktype = SOCK_STREAM;
 
@@ -449,26 +452,26 @@ int valkeyContextConnectTcp(valkeyContext *c, const valkeyOptions *options) {
         return VALKEY_ERR;
     }
     for (p = servinfo; p != NULL; p = p->ai_next) {
-addrretry:
-        if ((s = socket(p->ai_family,p->ai_socktype,p->ai_protocol)) == VALKEY_INVALID_FD)
+    addrretry:
+        if ((s = socket(p->ai_family, p->ai_socktype, p->ai_protocol)) == VALKEY_INVALID_FD)
             continue;
 
         c->fd = s;
-        if (valkeySetBlocking(c,0) != VALKEY_OK)
+        if (valkeySetBlocking(c, 0) != VALKEY_OK)
             goto error;
         if (c->tcp.source_addr) {
             int bound = 0;
             /* Using getaddrinfo saves us from self-determining IPv4 vs IPv6 */
             if ((rv = getaddrinfo(c->tcp.source_addr, NULL, &hints, &bservinfo)) != 0) {
                 char buf[128];
-                snprintf(buf,sizeof(buf),"Can't get addr: %s",gai_strerror(rv));
-                valkeySetError(c,VALKEY_ERR_OTHER,buf);
+                snprintf(buf, sizeof(buf), "Can't get addr: %s", gai_strerror(rv));
+                valkeySetError(c, VALKEY_ERR_OTHER, buf);
                 goto error;
             }
 
             if (reuseaddr) {
                 n = 1;
-                if (setsockopt(s, SOL_SOCKET, SO_REUSEADDR, (char*) &n,
+                if (setsockopt(s, SOL_SOCKET, SO_REUSEADDR, (char *)&n,
                                sizeof(n)) < 0) {
                     freeaddrinfo(bservinfo);
                     goto error;
@@ -476,7 +479,7 @@ addrretry:
             }
 
             for (b = bservinfo; b != NULL; b = b->ai_next) {
-                if (bind(s,b->ai_addr,b->ai_addrlen) != -1) {
+                if (bind(s, b->ai_addr, b->ai_addrlen) != -1) {
                     bound = 1;
                     break;
                 }
@@ -484,8 +487,8 @@ addrretry:
             freeaddrinfo(bservinfo);
             if (!bound) {
                 char buf[128];
-                snprintf(buf,sizeof(buf),"Can't bind socket: %s",strerror(errno));
-                valkeySetError(c,VALKEY_ERR_OTHER,buf);
+                snprintf(buf, sizeof(buf), "Can't bind socket: %s", strerror(errno));
+                valkeySetError(c, VALKEY_ERR_OTHER, buf);
                 goto error;
             }
         }
@@ -499,7 +502,7 @@ addrretry:
         memcpy(c->saddr, p->ai_addr, p->ai_addrlen);
         c->addrlen = p->ai_addrlen;
 
-        if (connect(s,p->ai_addr,p->ai_addrlen) == -1) {
+        if (connect(s, p->ai_addr, p->ai_addrlen) == -1) {
             if (errno == EHOSTUNREACH) {
                 valkeyNetClose(c);
                 continue;
@@ -519,14 +522,14 @@ addrretry:
                     goto addrretry;
                 }
             } else {
-                wait_for_ready:
-                if (valkeyContextWaitReady(c,timeout_msec) != VALKEY_OK)
+            wait_for_ready:
+                if (valkeyContextWaitReady(c, timeout_msec) != VALKEY_OK)
                     goto error;
                 if (valkeySetTcpNoDelay(c) != VALKEY_OK)
                     goto error;
             }
         }
-        if (blocking && valkeySetBlocking(c,1) != VALKEY_OK)
+        if (blocking && valkeySetBlocking(c, 1) != VALKEY_OK)
             goto error;
 
         c->flags |= VALKEY_CONNECTED;
@@ -535,8 +538,8 @@ addrretry:
     }
     if (p == NULL) {
         char buf[128];
-        snprintf(buf,sizeof(buf),"Can't create socket: %s",strerror(errno));
-        valkeySetError(c,VALKEY_ERR_OTHER,buf);
+        snprintf(buf, sizeof(buf), "Can't create socket: %s", strerror(errno));
+        valkeySetError(c, VALKEY_ERR_OTHER, buf);
         goto error;
     }
 
@@ -545,11 +548,11 @@ oom:
 error:
     rv = VALKEY_ERR;
 end:
-    if(servinfo) {
+    if (servinfo) {
         freeaddrinfo(servinfo);
     }
 
-    return rv;  // Need to return VALKEY_OK if alright
+    return rv; // Need to return VALKEY_OK if alright
 }
 
 static int valkeyContextConnectUnix(valkeyContext *c, const valkeyOptions *options) {
@@ -560,9 +563,9 @@ static int valkeyContextConnectUnix(valkeyContext *c, const valkeyOptions *optio
     struct sockaddr_un *sa;
     long timeout_msec = -1;
 
-    if (valkeyCreateSocket(c,AF_UNIX) < 0)
+    if (valkeyCreateSocket(c, AF_UNIX) < 0)
         return VALKEY_ERR;
-    if (valkeySetBlocking(c,0) != VALKEY_OK)
+    if (valkeySetBlocking(c, 0) != VALKEY_OK)
         return VALKEY_ERR;
 
     c->connection_type = VALKEY_CONN_UNIX;
@@ -582,30 +585,31 @@ static int valkeyContextConnectUnix(valkeyContext *c, const valkeyOptions *optio
         c->connect_timeout = NULL;
     }
 
-    if (valkeyConnectTimeoutMsec(c,&timeout_msec) != VALKEY_OK)
+    if (valkeyConnectTimeoutMsec(c, &timeout_msec) != VALKEY_OK)
         return VALKEY_ERR;
 
     /* Don't leak sockaddr if we're reconnecting */
-    if (c->saddr) vk_free(c->saddr);
+    if (c->saddr)
+        vk_free(c->saddr);
 
-    sa = (struct sockaddr_un*)(c->saddr = vk_malloc(sizeof(struct sockaddr_un)));
+    sa = (struct sockaddr_un *)(c->saddr = vk_malloc(sizeof(struct sockaddr_un)));
     if (sa == NULL)
         goto oom;
 
     c->addrlen = sizeof(struct sockaddr_un);
     sa->sun_family = AF_UNIX;
     strncpy(sa->sun_path, path, sizeof(sa->sun_path) - 1);
-    if (connect(c->fd, (struct sockaddr*)sa, sizeof(*sa)) == -1) {
+    if (connect(c->fd, (struct sockaddr *)sa, sizeof(*sa)) == -1) {
         if (errno == EINPROGRESS && !blocking) {
             /* This is ok. */
         } else {
-            if (valkeyContextWaitReady(c,timeout_msec) != VALKEY_OK)
+            if (valkeyContextWaitReady(c, timeout_msec) != VALKEY_OK)
                 return VALKEY_ERR;
         }
     }
 
     /* Reset socket to be blocking after connect(2). */
-    if (blocking && valkeySetBlocking(c,1) != VALKEY_OK)
+    if (blocking && valkeySetBlocking(c, 1) != VALKEY_OK)
         return VALKEY_ERR;
 
     c->flags |= VALKEY_CONNECTED;
@@ -629,7 +633,7 @@ static valkeyContextFuncs valkeyContextTcpFuncs = {
     .async_write = valkeyAsyncWrite,
     .read = valkeyNetRead,
     .write = valkeyNetWrite,
-    .set_timeout = valkeyTcpSetTimeout
+    .set_timeout = valkeyTcpSetTimeout,
 };
 
 void valkeyContextRegisterTcpFuncs(void) {
@@ -644,7 +648,7 @@ static valkeyContextFuncs valkeyContextUnixFuncs = {
     .async_write = valkeyAsyncWrite,
     .read = valkeyNetRead,
     .write = valkeyNetWrite,
-    .set_timeout = valkeyTcpSetTimeout
+    .set_timeout = valkeyTcpSetTimeout,
 };
 
 void valkeyContextRegisterUnixFuncs(void) {
@@ -666,7 +670,7 @@ static valkeyContextFuncs valkeyContextUserfdFuncs = {
     .async_write = valkeyAsyncWrite,
     .read = valkeyNetRead,
     .write = valkeyNetWrite,
-    .set_timeout = valkeyTcpSetTimeout
+    .set_timeout = valkeyTcpSetTimeout,
 };
 
 void valkeyContextRegisterUserfdFuncs(void) {

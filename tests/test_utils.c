@@ -1,6 +1,7 @@
+#include "test_utils.h"
+
 #include "valkeycluster.h"
 
-#include "test_utils.h"
 #include <stdlib.h>
 #include <string.h>
 

@@ -1,8 +1,9 @@
 #ifndef VALKEY_LIBSDEVENT_H
 #define VALKEY_LIBSDEVENT_H
-#include <systemd/sd-event.h>
-#include "../valkey.h"
 #include "../async.h"
+#include "../valkey.h"
+
+#include <systemd/sd-event.h>
 
 #define VALKEY_LIBSDEVENT_DELETED 0x01
 #define VALKEY_LIBSDEVENT_ENTERED 0x02
@@ -31,7 +32,7 @@ static void valkeyLibsdeventDestroy(valkeyLibsdeventEvents *e) {
 static int valkeyLibsdeventTimeoutHandler(sd_event_source *s, uint64_t usec, void *userdata) {
     ((void)s);
     ((void)usec);
-    valkeyLibsdeventEvents *e = (valkeyLibsdeventEvents*)userdata;
+    valkeyLibsdeventEvents *e = (valkeyLibsdeventEvents *)userdata;
     valkeyAsyncHandleTimeout(e->context);
     return 0;
 }
@@ -39,12 +40,13 @@ static int valkeyLibsdeventTimeoutHandler(sd_event_source *s, uint64_t usec, voi
 static int valkeyLibsdeventHandler(sd_event_source *s, int fd, uint32_t event, void *userdata) {
     ((void)s);
     ((void)fd);
-    valkeyLibsdeventEvents *e = (valkeyLibsdeventEvents*)userdata;
+    valkeyLibsdeventEvents *e = (valkeyLibsdeventEvents *)userdata;
     e->state |= VALKEY_LIBSDEVENT_ENTERED;
 
-#define CHECK_DELETED() if (e->state & VALKEY_LIBSDEVENT_DELETED) {\
-        valkeyLibsdeventDestroy(e);\
-        return 0; \
+#define CHECK_DELETED()                         \
+    if (e->state & VALKEY_LIBSDEVENT_DELETED) { \
+        valkeyLibsdeventDestroy(e);             \
+        return 0;                               \
     }
 
     if ((event & EPOLLIN) && e->context && (e->state & VALKEY_LIBSDEVENT_DELETED) == 0) {
@@ -64,7 +66,7 @@ static int valkeyLibsdeventHandler(sd_event_source *s, int fd, uint32_t event, v
 }
 
 static void valkeyLibsdeventAddRead(void *userdata) {
-    valkeyLibsdeventEvents *e = (valkeyLibsdeventEvents*)userdata;
+    valkeyLibsdeventEvents *e = (valkeyLibsdeventEvents *)userdata;
 
     if (e->flags & EPOLLIN) {
         return;
@@ -80,7 +82,7 @@ static void valkeyLibsdeventAddRead(void *userdata) {
 }
 
 static void valkeyLibsdeventDelRead(void *userdata) {
-    valkeyLibsdeventEvents *e = (valkeyLibsdeventEvents*)userdata;
+    valkeyLibsdeventEvents *e = (valkeyLibsdeventEvents *)userdata;
 
     e->flags &= ~EPOLLIN;
 
@@ -92,7 +94,7 @@ static void valkeyLibsdeventDelRead(void *userdata) {
 }
 
 static void valkeyLibsdeventAddWrite(void *userdata) {
-    valkeyLibsdeventEvents *e = (valkeyLibsdeventEvents*)userdata;
+    valkeyLibsdeventEvents *e = (valkeyLibsdeventEvents *)userdata;
 
     if (e->flags & EPOLLOUT) {
         return;
@@ -108,7 +110,7 @@ static void valkeyLibsdeventAddWrite(void *userdata) {
 }
 
 static void valkeyLibsdeventDelWrite(void *userdata) {
-    valkeyLibsdeventEvents *e = (valkeyLibsdeventEvents*)userdata;
+    valkeyLibsdeventEvents *e = (valkeyLibsdeventEvents *)userdata;
 
     e->flags &= ~EPOLLOUT;
 
@@ -120,7 +122,7 @@ static void valkeyLibsdeventDelWrite(void *userdata) {
 }
 
 static void valkeyLibsdeventCleanup(void *userdata) {
-    valkeyLibsdeventEvents *e = (valkeyLibsdeventEvents*)userdata;
+    valkeyLibsdeventEvents *e = (valkeyLibsdeventEvents *)userdata;
 
     if (!e) {
         return;
@@ -153,7 +155,7 @@ static int valkeyLibsdeventAttach(valkeyAsyncContext *ac, struct sd_event *event
         return VALKEY_ERR;
 
     /* Create container for context and r/w events */
-    e = (valkeyLibsdeventEvents*)vk_calloc(1, sizeof(*e));
+    e = (valkeyLibsdeventEvents *)vk_calloc(1, sizeof(*e));
     if (e == NULL)
         return VALKEY_ERR;
 

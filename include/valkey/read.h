@@ -29,7 +29,6 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-
 #ifndef VALKEY_READ_H
 #define VALKEY_READ_H
 #include <stdio.h> /* for size_t */
@@ -41,12 +40,12 @@
  * error that occurred. VALKEY_ERR_IO means there was an I/O error and you
  * should use the "errno" variable to find out what is wrong.
  * For other values, the "errstr" field will hold a description. */
-#define VALKEY_ERR_IO 1 /* Error in read or write */
-#define VALKEY_ERR_EOF 3 /* End of file */
+#define VALKEY_ERR_IO 1       /* Error in read or write */
+#define VALKEY_ERR_EOF 3      /* End of file */
 #define VALKEY_ERR_PROTOCOL 4 /* Protocol error */
-#define VALKEY_ERR_OOM 5 /* Out of memory */
-#define VALKEY_ERR_TIMEOUT 6 /* Timed out */
-#define VALKEY_ERR_OTHER 2 /* Everything else... */
+#define VALKEY_ERR_OOM 5      /* Out of memory */
+#define VALKEY_ERR_TIMEOUT 6  /* Timed out */
+#define VALKEY_ERR_OTHER 2    /* Everything else... */
 
 #define VALKEY_REPLY_STRING 1
 #define VALKEY_REPLY_ARRAY 2
@@ -64,10 +63,10 @@
 #define VALKEY_REPLY_VERB 14
 
 /* Default max unused reader buffer. */
-#define VALKEY_READER_MAX_BUF (1024*16)
+#define VALKEY_READER_MAX_BUF (1024 * 16)
 
 /* Default multi-bulk element limit */
-#define VALKEY_READER_MAX_ARRAY_ELEMENTS ((1LL<<32) - 1)
+#define VALKEY_READER_MAX_ARRAY_ELEMENTS ((1LL << 32) - 1)
 
 #ifdef __cplusplus
 extern "C" {
@@ -75,37 +74,37 @@ extern "C" {
 
 typedef struct valkeyReadTask {
     int type;
-    long long elements; /* number of elements in multibulk container */
-    int idx; /* index in parent (array) object */
-    void *obj; /* holds user-generated value for a read task */
+    long long elements;            /* number of elements in multibulk container */
+    int idx;                       /* index in parent (array) object */
+    void *obj;                     /* holds user-generated value for a read task */
     struct valkeyReadTask *parent; /* parent task */
-    void *privdata; /* user-settable arbitrary field */
+    void *privdata;                /* user-settable arbitrary field */
 } valkeyReadTask;
 
 typedef struct valkeyReplyObjectFunctions {
-    void *(*createString)(const valkeyReadTask*, char*, size_t);
-    void *(*createArray)(const valkeyReadTask*, size_t);
-    void *(*createInteger)(const valkeyReadTask*, long long);
-    void *(*createDouble)(const valkeyReadTask*, double, char*, size_t);
-    void *(*createNil)(const valkeyReadTask*);
-    void *(*createBool)(const valkeyReadTask*, int);
-    void (*freeObject)(void*);
+    void *(*createString)(const valkeyReadTask *, char *, size_t);
+    void *(*createArray)(const valkeyReadTask *, size_t);
+    void *(*createInteger)(const valkeyReadTask *, long long);
+    void *(*createDouble)(const valkeyReadTask *, double, char *, size_t);
+    void *(*createNil)(const valkeyReadTask *);
+    void *(*createBool)(const valkeyReadTask *, int);
+    void (*freeObject)(void *);
 } valkeyReplyObjectFunctions;
 
 typedef struct valkeyReader {
-    int err; /* Error flags, 0 when there is no error */
+    int err;          /* Error flags, 0 when there is no error */
     char errstr[128]; /* String representation of error when applicable */
 
-    char *buf; /* Read buffer */
-    size_t pos; /* Buffer cursor */
-    size_t len; /* Buffer length */
-    size_t maxbuf; /* Max length of unused buffer */
+    char *buf;             /* Read buffer */
+    size_t pos;            /* Buffer cursor */
+    size_t len;            /* Buffer length */
+    size_t maxbuf;         /* Max length of unused buffer */
     long long maxelements; /* Max multi-bulk elements */
 
     valkeyReadTask **task;
     int tasks;
 
-    int ridx; /* Index of current read task */
+    int ridx;    /* Index of current read task */
     void *reply; /* Temporary reply pointer */
 
     valkeyReplyObjectFunctions *fn;
@@ -118,9 +117,9 @@ void valkeyReaderFree(valkeyReader *r);
 int valkeyReaderFeed(valkeyReader *r, const char *buf, size_t len);
 int valkeyReaderGetReply(valkeyReader *r, void **reply);
 
-#define valkeyReaderSetPrivdata(_r, _p) (int)(((valkeyReader*)(_r))->privdata = (_p))
-#define valkeyReaderGetObject(_r) (((valkeyReader*)(_r))->reply)
-#define valkeyReaderGetError(_r) (((valkeyReader*)(_r))->errstr)
+#define valkeyReaderSetPrivdata(_r, _p) (int)(((valkeyReader *)(_r))->privdata = (_p))
+#define valkeyReaderGetObject(_r) (((valkeyReader *)(_r))->reply)
+#define valkeyReaderGetError(_r) (((valkeyReader *)(_r))->errstr)
 
 #ifdef __cplusplus
 }

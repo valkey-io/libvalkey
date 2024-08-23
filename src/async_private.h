@@ -32,35 +32,43 @@
 #ifndef VALKEY_ASYNC_PRIVATE_H
 #define VALKEY_ASYNC_PRIVATE_H
 
-#define _EL_ADD_READ(ctx)                                         \
-    do {                                                          \
-        refreshTimeout(ctx);                                      \
-        if ((ctx)->ev.addRead) (ctx)->ev.addRead((ctx)->ev.data); \
+#define _EL_ADD_READ(ctx)                      \
+    do {                                       \
+        refreshTimeout(ctx);                   \
+        if ((ctx)->ev.addRead)                 \
+            (ctx)->ev.addRead((ctx)->ev.data); \
     } while (0)
-#define _EL_DEL_READ(ctx) do { \
-        if ((ctx)->ev.delRead) (ctx)->ev.delRead((ctx)->ev.data); \
-    } while(0)
-#define _EL_ADD_WRITE(ctx)                                          \
-    do {                                                            \
-        refreshTimeout(ctx);                                        \
-        if ((ctx)->ev.addWrite) (ctx)->ev.addWrite((ctx)->ev.data); \
+#define _EL_DEL_READ(ctx)                      \
+    do {                                       \
+        if ((ctx)->ev.delRead)                 \
+            (ctx)->ev.delRead((ctx)->ev.data); \
     } while (0)
-#define _EL_DEL_WRITE(ctx) do { \
-        if ((ctx)->ev.delWrite) (ctx)->ev.delWrite((ctx)->ev.data); \
-    } while(0)
-#define _EL_CLEANUP(ctx) do { \
-        if ((ctx)->ev.cleanup) (ctx)->ev.cleanup((ctx)->ev.data); \
-        ctx->ev.cleanup = NULL; \
-    } while(0)
+#define _EL_ADD_WRITE(ctx)                      \
+    do {                                        \
+        refreshTimeout(ctx);                    \
+        if ((ctx)->ev.addWrite)                 \
+            (ctx)->ev.addWrite((ctx)->ev.data); \
+    } while (0)
+#define _EL_DEL_WRITE(ctx)                      \
+    do {                                        \
+        if ((ctx)->ev.delWrite)                 \
+            (ctx)->ev.delWrite((ctx)->ev.data); \
+    } while (0)
+#define _EL_CLEANUP(ctx)                       \
+    do {                                       \
+        if ((ctx)->ev.cleanup)                 \
+            (ctx)->ev.cleanup((ctx)->ev.data); \
+        ctx->ev.cleanup = NULL;                \
+    } while (0)
 
 static inline void refreshTimeout(valkeyAsyncContext *ctx) {
-    #define VALKEY_TIMER_ISSET(tvp) \
-        (tvp && ((tvp)->tv_sec || (tvp)->tv_usec))
+#define VALKEY_TIMER_ISSET(tvp) \
+    (tvp && ((tvp)->tv_sec || (tvp)->tv_usec))
 
-    #define VALKEY_EL_TIMER(ac, tvp) \
-        if ((ac)->ev.scheduleTimer && VALKEY_TIMER_ISSET(tvp)) { \
-            (ac)->ev.scheduleTimer((ac)->ev.data, *(tvp)); \
-        }
+#define VALKEY_EL_TIMER(ac, tvp)                             \
+    if ((ac)->ev.scheduleTimer && VALKEY_TIMER_ISSET(tvp)) { \
+        (ac)->ev.scheduleTimer((ac)->ev.data, *(tvp));       \
+    }
 
     if (ctx->c.flags & VALKEY_CONNECTED) {
         VALKEY_EL_TIMER(ctx, ctx->c.command_timeout);
@@ -72,4 +80,4 @@ static inline void refreshTimeout(valkeyAsyncContext *ctx) {
 void valkeyAsyncDisconnectInternal(valkeyAsyncContext *ac);
 void valkeyProcessCallbacks(valkeyAsyncContext *ac);
 
-#endif  /* VALKEY_ASYNC_PRIVATE_H */
+#endif /* VALKEY_ASYNC_PRIVATE_H */

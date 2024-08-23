@@ -1,11 +1,12 @@
+#include <valkey/async.h>
+#include <valkey/valkey.h>
+
+#include <valkey/adapters/libuv.h>
+
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <signal.h>
-
-#include <valkey/valkey.h>
-#include <valkey/async.h>
-#include <valkey/adapters/libuv.h>
 
 void debugCallback(valkeyAsyncContext *c, void *r, void *privdata) {
     (void)privdata; //unused
@@ -25,7 +26,7 @@ void getCallback(valkeyAsyncContext *c, void *r, void *privdata) {
         printf("`GET key` error: %s\n", c->errstr ? c->errstr : "unknown error");
         return;
     }
-    printf("`GET key` result: argv[%s]: %s\n", (char*)privdata, reply->str);
+    printf("`GET key` result: argv[%s]: %s\n", (char *)privdata, reply->str);
 
     /* start another request that demonstrate timeout */
     valkeyAsyncCommand(c, debugCallback, NULL, "DEBUG SLEEP %f", 1.5);
@@ -47,12 +48,12 @@ void disconnectCallback(const valkeyAsyncContext *c, int status) {
     printf("Disconnected...\n");
 }
 
-int main (int argc, char **argv) {
+int main(int argc, char **argv) {
 #ifndef _WIN32
     signal(SIGPIPE, SIG_IGN);
 #endif
 
-    uv_loop_t* loop = uv_default_loop();
+    uv_loop_t *loop = uv_default_loop();
 
     valkeyAsyncContext *c = valkeyAsyncConnect("127.0.0.1", 6379);
     if (c->err) {
@@ -61,10 +62,10 @@ int main (int argc, char **argv) {
         return 1;
     }
 
-    valkeyLibuvAttach(c,loop);
-    valkeyAsyncSetConnectCallback(c,connectCallback);
-    valkeyAsyncSetDisconnectCallback(c,disconnectCallback);
-    valkeyAsyncSetTimeout(c, (struct timeval){ .tv_sec = 1, .tv_usec = 0});
+    valkeyLibuvAttach(c, loop);
+    valkeyAsyncSetConnectCallback(c, connectCallback);
+    valkeyAsyncSetDisconnectCallback(c, disconnectCallback);
+    valkeyAsyncSetTimeout(c, (struct timeval){.tv_sec = 1, .tv_usec = 0});
 
     /*
     In this demo, we first `set key`, then `get key` to demonstrate the basic usage of libuv adapter.
@@ -73,8 +74,9 @@ int main (int argc, char **argv) {
     timeout error, which is shown in the `debugCallback`.
     */
 
-    valkeyAsyncCommand(c, NULL, NULL, "SET key %b", argv[argc-1], strlen(argv[argc-1]));
-    valkeyAsyncCommand(c, getCallback, (char*)"end-1", "GET key");
+    valkeyAsyncCommand(
+        c, NULL, NULL, "SET key %b", argv[argc - 1], strlen(argv[argc - 1]));
+    valkeyAsyncCommand(c, getCallback, (char *)"end-1", "GET key");
 
     uv_run(loop, UV_RUN_DEFAULT);
     return 0;
