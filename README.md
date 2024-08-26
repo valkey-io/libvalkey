@@ -66,3 +66,5 @@ sudo make install
 ## Contributing
 
 Contributions from the community are welcome. Feel free to open a PR with a bugfix or new feature. Note that if you would like to merge a large feature it's probably a good idea to open an issue first rather than spending a lot of time on a PR that may not be accepted.
+
+When making a change, please use `git clang-format` or [format-files.sh](./scripts/format-files.sh) to format your changes properly. This repository is currently using `clang-format` 18.1.3 to format the code.
