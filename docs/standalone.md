@@ -29,7 +29,7 @@ The synchronous API has a pretty small surface area, with only a few commands to
 
 ### Connecting
 
-There are several convenience functions to connect in various ways (e.g. host and port, Unix socket, etc). See [include/valkey.h](include/valkey.h) for more details.
+There are several convenience functions to connect in various ways (e.g. host and port, Unix socket, etc). See [include/valkey/valkey.h](../include/valkey/valkey.h) for more details.
 
 ```c
 valkeyContext *valkeyConnect(const char *host, int port);
