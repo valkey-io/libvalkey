@@ -9,14 +9,14 @@ It is not intended as a complete reference. For that it's always best to refer t
   - [Connecting](#connecting)
   - [Executing commands](#executing-commands)
   - [Executing commands on a specific node](#executing-commands-on-a-specific-node)
-  - [Disconnecting / cleanup](#disconnecting--cleanup)
+  - [Disconnecting/cleanup](#disconnecting-cleanup)
   - [Pipelining](#pipelining)
   - [Events](#events)
 - [Asynchronous API](#asynchronous-api)
   - [Connecting](#connecting-1)
   - [Executing commands](#executing-commands-1)
   - [Executing commands on a specific node](#executing-commands-on-a-specific-node-1)
-  - [Disconnecting / cleanup](#disconnecting--cleanup-1)
+  - [Disconnecting/cleanup](#disconnecting-cleanup-1)
   - [Events](#events-1)
 - [Miscellaneous](#miscellaneous)
   - [Extend the list of supported commands](#extend-the-list-of-supported-commands)
@@ -96,7 +96,7 @@ This function handles `printf`-like arguments similar to `valkeyClusterCommand()
 If the command times out or the connection to the node fails, a slot map update is scheduled to be performed when the next command is sent.
 `valkeyClusterCommandToNode` also performs a slot map update if it has previously been scheduled.
 
-### Disconnecting / cleanup
+### Disconnecting/cleanup
 
 To disconnect and free the context the following function can be used:
 
@@ -267,7 +267,7 @@ status = valkeyClusterAsyncCommandToNode(acc, node, commandCallback, privdata, "
 This functions will only attempt to send the command to a specific node and will not perform redirects or retries, but communication errors will trigger a slot map update just like the commonly used API.
 
 
-### Disconnecting / cleanup
+### Disconnecting/cleanup
 
 Asynchronous cluster connections can be terminated using:
 
