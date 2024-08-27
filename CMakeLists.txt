@@ -4,7 +4,8 @@ MACRO(getVersionBit name)
   SET(VERSION_REGEX "^#define ${name} (.+)$")
   FILE(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/include/valkey/valkey.h"
     VERSION_BIT REGEX ${VERSION_REGEX})
-  STRING(REGEX REPLACE ${VERSION_REGEX} "\\1" ${name} "${VERSION_BIT}")
+  STRING(REGEX REPLACE ${VERSION_REGEX} "\\1" VERSION_MATCHED "${VERSION_BIT}")
+  STRING(REPLACE "\"" "" ${name} "${VERSION_MATCHED}")
 ENDMACRO(getVersionBit)
 
 getVersionBit(LIBVALKEY_MAJOR)

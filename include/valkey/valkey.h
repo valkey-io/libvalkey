@@ -51,9 +51,7 @@ typedef SSIZE_T ssize_t;
 #define LIBVALKEY_MAJOR 1
 #define LIBVALKEY_MINOR 2
 #define LIBVALKEY_PATCH 0
-/* clang-format off */
-#define LIBVALKEY_SONAME 1.2.1-dev
-/* clang-format on */
+#define LIBVALKEY_SONAME "1.2.1-dev"
 
 /* Connection type can be blocking or non-blocking and is set in the
  * least significant bit of the flags field in valkeyContext. */
