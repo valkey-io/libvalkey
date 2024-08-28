@@ -10,7 +10,7 @@ This document describes using `libvalkey` in standalone (non-cluster) mode, incl
   - [Executing commands](#executing-commands)
   - [Using replies](#using-replies)
   - [Reply types](#reply-types)
-  - [Disconnecting / cleanup](#disconnecting--cleanup)
+  - [Disconnecting/cleanup](#disconnecting-cleanup)
   - [Pipelining](#pipelining)
   - [Errors](#errors)
   - [Thread safety](#thread-safety)
@@ -29,7 +29,7 @@ The synchronous API has a pretty small surface area, with only a few commands to
 
 ### Connecting
 
-There are several convenience functions to connect in various ways (e.g. host and port, Unix socket, etc). See [include/valkey.h](include/valkey.h) for more details.
+There are several convenience functions to connect in various ways (e.g. host and port, Unix socket, etc). See [include/valkey/valkey.h](../include/valkey/valkey.h) for more details.
 
 ```c
 valkeyContext *valkeyConnect(const char *host, int port);
@@ -139,7 +139,7 @@ When a `valkeyReply` is returned, you should test the `valkeyReply->type` field 
 - `VALKEY_REPLY_ATTR` - An attribute reply. As of yet unused by valkey-server.
 - `VALKEY_REPLY_PUSH` - An out of band push reply. This is also array-like in nature.
 
-### Disconnecting / cleanup
+### Disconnecting/cleanup
 
 When libvalkey returns non-null `valkeyReply` struts you are responsible for freeing them with `freeReplyObject`.  In order to disconnect and free the context simply call `valkeyFree`.
 
