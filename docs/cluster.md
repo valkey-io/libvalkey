@@ -19,6 +19,7 @@ It is not intended as a complete reference. For that it's always best to refer t
   - [Disconnecting/cleanup](#disconnecting-cleanup-1)
   - [Events](#events-1)
 - [Miscellaneous](#miscellaneous)
+  - [Cluster node iterator](#cluster-node-iterator)
   - [Extend the list of supported commands](#extend-the-list-of-supported-commands)
   - [Random number generator](#random-number-generator)
 
@@ -326,6 +327,32 @@ Setting the connect and disconnect callbacks can only be done once per context.
 For subsequent calls it will return `VALKEY_ERR`.
 
 ## Miscellaneous
+
+### Cluster node iterator
+
+A `valkeyClusterNodeIterator` can be used to iterate on all known master nodes in a cluster context.
+First it needs to be initiated using `valkeyClusterInitNodeIterator` and then you can repeatedly call `valkeyClusterNodeNext` to get the next node from the iterator.
+
+```c
+valkeyClusterNodeIterator ni;
+valkeyClusterInitNodeIterator(&ni, cc);
+
+valkeyClusterNode *node;
+while ((node = valkeyClusterNodeNext(&ni)) != NULL) {
+   valkeyReply *reply = valkeyClusterCommandToNode(cc, node, "DBSIZE");
+   // Handle reply..
+}
+```
+
+The iterator will handle changes due to slot map updates by restarting the iteration, but on the new set of master nodes.
+There is no bookkeeping for already iterated nodes when a restart is triggered, which means that a node can be iterated over more than once depending on when the slot map update happened and the change of cluster nodes.
+
+Note that when `valkeyClusterCommandToNode` is called, a slot map update can happen if it has been scheduled by the previous command, for example if the previous call to `valkeyClusterCommandToNode` timed out or the node wasn't reachable.
+
+To detect when the slot map has been updated, you can check if the slot map version (`iter.route_version`) is equal to the current cluster context's slot map version (`cc->route_version`).
+If it isn't, it means that the slot map has been updated and the iterator will restart itself at the next call to `valkeyClusterNodeNext`.
+
+Another way to detect that the slot map has been updated is to [register an event callback](#events-per-cluster-context) and look for the event `VALKEYCLUSTER_EVENT_SLOTMAP_UPDATED`.
 
 ### Extend the list of supported commands
 

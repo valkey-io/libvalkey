@@ -70,3 +70,16 @@ Adhere to the existing coding style and make sure to mimic best possible.
 
 When making a change, please use `git clang-format` or [format-files.sh](./scripts/format-files.sh) to format your changes properly.
 This repository is currently using `clang-format` 18.1.3 to format the code, which can be installed using `pip install clang-format==18.1.3` or other preferred method.
+
+## Running cluster tests
+
+Prerequisites:
+
+* Build `libvalkey` using CMake.
+* Perl with [JSON module](https://metacpan.org/pod/JSON). Can be installed using `sudo cpan JSON`.
+* [Docker](https://docs.docker.com/engine/install/)
+
+Some tests needs a Valkey Cluster which can be setup using build targets.
+The clusters will be setup using Docker and it may take a while for them to be ready and accepting requests.
+Run `make start` to start the clusters and then wait a few seconds before running `make test`.
+To stop the running cluster containers run `make stop`.
