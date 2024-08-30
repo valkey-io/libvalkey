@@ -1,6 +1,6 @@
 # Contributing
 
-:tada:Thanks for taking the time to contribute!:tada:
+:tada: Thanks for taking the time to contribute! :tada:
 
 Contributions from the community are welcome. Feel free to open a PR with a bugfix or new feature.
 Note that if you would like to merge a large feature it's probably a good idea to open an issue first rather than spending a lot of time on a PR that may not be accepted.
