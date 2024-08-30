@@ -65,4 +65,4 @@ sudo make install
 
 ## Contributing
 
-Please see the [`CONTRIBUTING.md`](https://github.com/valkey-io/libvalkey/blob/main/CONTRIBUTING.md).
+Please see [`CONTRIBUTING.md`](https://github.com/valkey-io/libvalkey/blob/main/CONTRIBUTING.md).
