@@ -22,6 +22,8 @@ This document describes using `libvalkey` in standalone (non-cluster) mode, incl
 - [Asynchronous API](#asynchronous-api)
   - [Connecting](#connecting-1)
   - [Executing commands](#executing-commands-1)
+  - [Disconnecting/cleanup](#disconnecting-cleanup-1)
+- [SSL/TLS support](#ssl-tls-support)
 
 ## Synchronous API
 
@@ -314,6 +316,11 @@ valkeySetDisconnectCallback(ac, my_disconnect_callback);
 ev_run(EV_DEFAULT_ 0);
 ```
 
+The asynchronous context _should_ hold a connect callback function that is called when the connection attempt completes, either successfully or with an error.
+
+It _can_ also hold a disconnect callback function that is called when the connection is disconnected (either because of an error or per user request).
+The context object is always freed after the disconnect callback fired.
+
 ### Executing commands
 
 Executing commands in an asynchronous context work similarly to the synchronous context, except that you can pass a callback that will be invoked when the reply is received.
@@ -348,5 +355,21 @@ int exec_some_commands(struct my_app_data *data) {
     valkeyAsyncCommand(ac, my_incrby_callback, data, "INCRBY mykey %d", 42);
     valkeyAsyncCommand(ac, my_get_callback, data, "GET %s", "mykey");
 }
-
 ```
+
+### Disconnecting/cleanup
+
+For a graceful disconnect use `valkeyAsyncDisconnect` which will block new commands from being issued.
+The connection is only terminated when all pending commands have been sent, their respective replies have been read, and their respective callbacks have been executed.
+After this, the disconnection callback is called with the status, and the context object is freed.
+
+To terminate the connection forcefully use `valkeyAsyncFree` which also will block new commands from being issued.
+There will be no more data sent on the socket and all pending callbacks will be called with a `NULL` reply.
+After this, the disconnection callback is called with the `VALKEY_OK` status, and the context object is freed.
+
+## SSL/TLS support
+
+SSL/TLS support is not enabled by default and requires an explicit build flag as described in [`README.md`](../README.md#building).
+
+Libvalkey implements SSL/TLS on top of its `valkeyContext` and `valkeyAsyncContext`, so you will need to establish a connection first and then initiate an SSL/TLS handshake.
+See the [examples](../examples) directory for how to create the SSL/TLS context and initiate the handshake.
