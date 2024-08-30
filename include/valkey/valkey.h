@@ -333,9 +333,13 @@ int valkeyReconnect(valkeyContext *c);
 
 valkeyPushFn *valkeySetPushCallback(valkeyContext *c, valkeyPushFn *fn);
 int valkeySetTimeout(valkeyContext *c, const struct timeval tv);
+
+/* Configurations using socket options. Applied directly to the underlying
+ * socket and not automatically applied after a reconnect. */
 int valkeyEnableKeepAlive(valkeyContext *c);
 int valkeyEnableKeepAliveWithInterval(valkeyContext *c, int interval);
 int valkeySetTcpUserTimeout(valkeyContext *c, unsigned int timeout);
+
 void valkeyFree(valkeyContext *c);
 valkeyFD valkeyFreeKeepFd(valkeyContext *c);
 int valkeyBufferRead(valkeyContext *c);
