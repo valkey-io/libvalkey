@@ -147,7 +147,6 @@ int valkeyFormatCommand(char **target, const char *format, ...);
 long long valkeyFormatCommandArgv(char **target, int argc, const char **argv, const size_t *argvlen);
 long long valkeyFormatSdsCommandArgv(sds *target, int argc, const char **argv, const size_t *argvlen);
 void valkeyFreeCommand(char *cmd);
-void valkeyFreeSdsCommand(sds cmd);
 
 enum valkeyConnectionType {
     VALKEY_CONN_TCP,
