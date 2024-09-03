@@ -75,9 +75,9 @@ typedef int(sslInitFn)(valkeyContext *, void *);
 typedef void(valkeyClusterCallbackFn)(struct valkeyClusterAsyncContext *,
                                       void *, void *);
 typedef struct valkeyClusterNode {
-    sds name;
-    sds addr;
-    sds host;
+    char *name;
+    char *addr;
+    char *host;
     uint16_t port;
     uint8_t role;
     uint8_t pad;
