@@ -33,6 +33,7 @@
 
 #include "win32.h"
 
+#include "sds.h"
 #include "valkey.h"
 
 #include <limits.h>
@@ -127,5 +128,7 @@ void valkeyContextRegisterUnixFuncs(void);
 void valkeyContextRegisterUserfdFuncs(void);
 
 void valkeyContextSetFuncs(valkeyContext *c);
+
+long long valkeyFormatSdsCommandArgv(sds *target, int argc, const char **argv, const size_t *argvlen);
 
 #endif /* VALKEY_VK_PRIVATE_H */
