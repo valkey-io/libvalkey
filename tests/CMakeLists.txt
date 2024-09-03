@@ -62,6 +62,7 @@ endif()
 
 # Add non-cluster tests
 add_executable(client_test client_test.c)
+target_include_directories(client_test PRIVATE "${PROJECT_SOURCE_DIR}/src")
 target_link_libraries(client_test valkey)
 if(SSL_LIBRARY)
   target_compile_definitions(client_test PUBLIC VALKEY_TEST_SSL=1)

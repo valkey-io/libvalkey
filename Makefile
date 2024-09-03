@@ -217,7 +217,7 @@ $(OBJ_DIR)/%.o: $(SRC_DIR)/%.c | $(OBJ_DIR)
 	$(CC) -std=c99 -pedantic $(REAL_CFLAGS) -I$(INCLUDE_DIR) -MMD -MP -c $< -o $@
 
 $(OBJ_DIR)/%.o: $(TEST_DIR)/%.c | $(OBJ_DIR)
-	$(CC) -std=c99 -pedantic $(REAL_CFLAGS) -I$(INCLUDE_DIR) -MMD -MP -c $< -o $@
+	$(CC) -std=c99 -pedantic $(REAL_CFLAGS) -I$(INCLUDE_DIR) -I$(SRC_DIR) -MMD -MP -c $< -o $@
 
 $(TEST_DIR)/%: $(OBJ_DIR)/%.o $(STLIBNAME)
 	$(CC) -o $@ $< $(RDMA_STLIB) $(STLIBNAME) $(SSL_STLIB) $(LDFLAGS) $(TEST_LDFLAGS)
