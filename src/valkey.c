@@ -641,10 +641,6 @@ long long valkeyFormatSdsCommandArgv(sds *target, int argc, const char **argv,
     return totlen;
 }
 
-void valkeyFreeSdsCommand(sds cmd) {
-    sdsfree(cmd);
-}
-
 /* Format a command according to the RESP protocol. This function takes the
  * number of arguments, an array with arguments and an array with their
  * lengths. If the latter is set to NULL, strlen will be used to compute the

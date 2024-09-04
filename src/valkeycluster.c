@@ -39,6 +39,7 @@
 #include "alloc.h"
 #include "command.h"
 #include "dict.h"
+#include "sds.h"
 #include "vkutil.h"
 
 #include <assert.h>

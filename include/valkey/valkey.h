@@ -37,14 +37,14 @@
 
 #include <stdarg.h> /* for va_list */
 #ifndef _MSC_VER
-#include <sys/time.h> /* for struct timeval */
+#include <sys/time.h>  /* for struct timeval */
+#include <sys/types.h> /* for ssize_t */
 #else
 #include <basetsd.h>
 struct timeval; /* forward declaration */
 typedef SSIZE_T ssize_t;
 #endif
 #include "alloc.h" /* for allocation wrappers */
-#include "sds.h"   /* for sds */
 
 #include <stdint.h> /* uintXX_t, etc */
 
@@ -145,9 +145,7 @@ void freeReplyObject(void *reply);
 int valkeyvFormatCommand(char **target, const char *format, va_list ap);
 int valkeyFormatCommand(char **target, const char *format, ...);
 long long valkeyFormatCommandArgv(char **target, int argc, const char **argv, const size_t *argvlen);
-long long valkeyFormatSdsCommandArgv(sds *target, int argc, const char **argv, const size_t *argvlen);
 void valkeyFreeCommand(char *cmd);
-void valkeyFreeSdsCommand(sds cmd);
 
 enum valkeyConnectionType {
     VALKEY_CONN_TCP,
