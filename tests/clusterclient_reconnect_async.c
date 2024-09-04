@@ -73,12 +73,9 @@ void sendNextCommand(evutil_socket_t fd, short kind, void *arg) {
         if (command[len - 1] == '\n') // Chop trailing line break
             command[len - 1] = '\0';
 
-        dictIterator di;
-        dictInitIterator(&di, acc->cc->nodes);
-
-        dictEntry *de = dictNext(&di);
-        assert(de);
-        valkeyClusterNode *node = dictGetEntryVal(de);
+        valkeyClusterNodeIterator ni;
+        valkeyClusterInitNodeIterator(&ni, acc->cc);
+        valkeyClusterNode *node = valkeyClusterNodeNext(&ni);
         assert(node);
 
         // coverity[tainted_scalar]
