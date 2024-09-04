@@ -15,8 +15,8 @@ The type `sds` is removed from the public API.
 
 ### Removed API functions
 
-* `valkeyFormatSdsCommandArgv` removed from API. Can be replaced with `valkeyFormatCommandArgv`.
-* `valkeyFreeSdsCommand` removed since the `sds` type is for internal use only.
+* `redisFormatSdsCommandArgv` removed from API. Can be replaced with `valkeyFormatCommandArgv`.
+* `redisFreeSdsCommand` removed since the `sds` type is for internal use only.
 
 ## Migrating from `hiredis-cluster` 0.14.0
 
