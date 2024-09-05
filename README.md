@@ -13,6 +13,7 @@ Libvalkey is the official C client for the [Valkey](https://valkey.io) database.
 - Using the library
   - [Standalone mode](docs/standalone.md)
   - [Cluster mode](docs/cluster.md)
+  - [Migration guide](docs/migration-guide.md)
 
 ## Features
 
