@@ -35,6 +35,9 @@
 extern "C" {
 #endif
 
+/* Forward declarations for structs defined elsewhere. */
+struct valkeyContext;
+
 /* This is the underlying struct for SSL in ssl.h, which is not included to
  * keep build dependencies short here.
  */
@@ -147,13 +150,13 @@ void valkeyFreeSSLContext(valkeySSLContext *valkey_ssl_ctx);
  * previously created using valkeyCreateSSLContext().
  */
 
-int valkeyInitiateSSLWithContext(valkeyContext *c, valkeySSLContext *valkey_ssl_ctx);
+int valkeyInitiateSSLWithContext(struct valkeyContext *c, valkeySSLContext *valkey_ssl_ctx);
 
 /**
  * Initiate SSL/TLS negotiation on a provided OpenSSL SSL object.
  */
 
-int valkeyInitiateSSL(valkeyContext *c, struct ssl_st *ssl);
+int valkeyInitiateSSL(struct valkeyContext *c, struct ssl_st *ssl);
 
 #ifdef __cplusplus
 }
