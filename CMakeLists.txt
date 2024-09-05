@@ -41,6 +41,7 @@ SET(valkey_sources
     src/adlist.c
     src/alloc.c
     src/async.c
+    src/cluster.c
     src/command.c
     src/conn.c
     src/crc16.c
@@ -50,7 +51,6 @@ SET(valkey_sources
     src/sds.c
     src/sockcompat.c
     src/valkey.c
-    src/valkeycluster.c
     src/vkutil.c)
 
 ADD_LIBRARY(valkey ${valkey_sources})
@@ -160,8 +160,8 @@ IF(ENABLE_SSL)
     ENDIF()
     FIND_PACKAGE(OpenSSL REQUIRED)
     SET(valkey_ssl_sources
-        src/ssl.c
-        src/valkeycluster_ssl.c)
+        src/cluster_ssl.c
+        src/ssl.c)
     ADD_LIBRARY(valkey_ssl ${valkey_ssl_sources})
     ADD_LIBRARY(valkey::valkey_ssl ALIAS valkey_ssl)
 
