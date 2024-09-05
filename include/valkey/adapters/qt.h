@@ -23,8 +23,8 @@
  * SUCH DAMAGE.
  */
 
-#ifndef VALKEY_QT_H
-#define VALKEY_QT_H
+#ifndef VALKEY_ADAPTERS_QT_H
+#define VALKEY_ADAPTERS_QT_H
 #include "../async.h"
 
 #include <QSocketNotifier>
@@ -132,4 +132,4 @@ class ValkeyQtAdapter : public QObject {
     QSocketNotifier *m_write;
 };
 
-#endif /* !VALKEY_QT_H */
+#endif /* VALKEY_ADAPTERS_QT_H */

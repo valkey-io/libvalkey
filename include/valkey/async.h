@@ -156,4 +156,4 @@ int valkeyAsyncFormattedCommand(valkeyAsyncContext *ac, valkeyCallbackFn *fn, vo
 }
 #endif
 
-#endif
+#endif /* VALKEY_ASYNC_H */

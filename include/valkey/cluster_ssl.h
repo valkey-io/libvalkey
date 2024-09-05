@@ -26,8 +26,8 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-#ifndef VALKEYCLUSTER_SSL_H
-#define VALKEYCLUSTER_SSL_H
+#ifndef VALKEY_CLUSTER_SSL_H
+#define VALKEY_CLUSTER_SSL_H
 
 #include "cluster.h"
 #include "ssl.h"
@@ -47,4 +47,4 @@ int valkeyClusterSetOptionEnableSSL(valkeyClusterContext *cc,
 }
 #endif
 
-#endif /* VALKEYCLUSTER_SSL_H */
+#endif /* VALKEY_CLUSTER_SSL_H */

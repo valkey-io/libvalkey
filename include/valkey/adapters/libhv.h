@@ -1,5 +1,5 @@
-#ifndef VALKEY_LIBHV_H
-#define VALKEY_LIBHV_H
+#ifndef VALKEY_ADAPTERS_LIBHV_H
+#define VALKEY_ADAPTERS_LIBHV_H
 
 #include "../async.h"
 #include "../valkey.h"
@@ -121,4 +121,4 @@ static int valkeyLibhvAttach(valkeyAsyncContext *ac, hloop_t *loop) {
 
     return VALKEY_OK;
 }
-#endif
+#endif /* VALKEY_ADAPTERS_LIBHV_H */

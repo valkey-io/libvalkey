@@ -1,5 +1,5 @@
-#ifndef VALKEY_VALKEYMODULEAPI_H
-#define VALKEY_VALKEYMODULEAPI_H
+#ifndef VALKEY_ADAPTERS_VALKEYMODULEAPI_H
+#define VALKEY_ADAPTERS_VALKEYMODULEAPI_H
 
 #include "../async.h"
 #include "../valkey.h"
@@ -140,4 +140,4 @@ static inline int valkeyModuleAttach(valkeyAsyncContext *ac, ValkeyModuleCtx *mo
     return VALKEY_OK;
 }
 
-#endif
+#endif /* VALKEY_ADAPTERS_VALKEYMODULEAPI_H */

@@ -125,4 +125,4 @@ int valkeyReaderGetReply(valkeyReader *r, void **reply);
 }
 #endif
 
-#endif
+#endif /* VALKEY_READ_H */

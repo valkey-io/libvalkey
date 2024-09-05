@@ -1,5 +1,5 @@
-#ifndef VALKEY_IVYKIS_H
-#define VALKEY_IVYKIS_H
+#ifndef VALKEY_ADAPTERS_IVYKIS_H
+#define VALKEY_ADAPTERS_IVYKIS_H
 #include "../async.h"
 #include "../valkey.h"
 
@@ -82,4 +82,4 @@ static int valkeyIvykisAttach(valkeyAsyncContext *ac) {
 
     return VALKEY_OK;
 }
-#endif
+#endif /* VALKEY_ADAPTERS_IVYKIS_H */

@@ -1,5 +1,5 @@
-#ifndef VALKEY_GLIB_H
-#define VALKEY_GLIB_H
+#ifndef VALKEY_ADAPTERS_GLIB_H
+#define VALKEY_ADAPTERS_GLIB_H
 
 #include "../async.h"
 #include "../cluster.h"
@@ -168,4 +168,4 @@ static int valkeyClusterGlibAttach(valkeyClusterAsyncContext *acc,
     return VALKEY_OK;
 }
 
-#endif /* VALKEY_GLIB_H */
+#endif /* VALKEY_ADAPTERS_GLIB_H */
