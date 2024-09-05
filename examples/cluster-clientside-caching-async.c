@@ -4,7 +4,7 @@
  * messages are received via the registered push callback.
  * The disconnect callback should also be used as an indication of invalidation.
  */
-#include <valkey/valkeycluster.h>
+#include <valkey/cluster.h>
 
 #include <valkey/adapters/libevent.h>
 

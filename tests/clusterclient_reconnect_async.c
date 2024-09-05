@@ -10,8 +10,8 @@
  */
 
 #include "adapters/libevent.h"
+#include "cluster.h"
 #include "test_utils.h"
-#include "valkeycluster.h"
 
 #include <assert.h>
 #include <stdio.h>

@@ -26,7 +26,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-#include "valkeycluster_ssl.h"
+#include "cluster_ssl.h"
 
 static int valkeyClusterInitiateSSLWithContext(valkeyContext *c,
                                                void *valkey_ssl_ctx) {

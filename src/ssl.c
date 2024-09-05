@@ -55,8 +55,8 @@
 #include "win32.h"
 
 #include "async_private.h"
+#include "ssl.h"
 #include "valkey_private.h"
-#include "valkey_ssl.h"
 
 #include <openssl/err.h>
 #include <openssl/ssl.h>

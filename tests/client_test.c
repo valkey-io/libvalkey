@@ -26,10 +26,10 @@
 #include <math.h>
 #include <signal.h>
 #ifdef VALKEY_TEST_SSL
-#include "valkey_ssl.h"
+#include "ssl.h"
 #endif
 #ifdef VALKEY_TEST_RDMA
-#include "valkey_rdma.h"
+#include "rdma.h"
 #endif
 #ifdef VALKEY_TEST_ASYNC
 #include "adapters/libevent.h"

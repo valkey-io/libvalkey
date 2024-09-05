@@ -31,8 +31,8 @@
 #ifndef VALKEY_LIBEV_H
 #define VALKEY_LIBEV_H
 #include "../async.h"
+#include "../cluster.h"
 #include "../valkey.h"
-#include "../valkeycluster.h"
 
 #include <ev.h>
 #include <stdlib.h>

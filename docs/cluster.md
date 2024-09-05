@@ -44,7 +44,7 @@ To be able to set options before any connection attempt is performed a `valkeyCl
 The context is where the known cluster state and the options are kept, which can be configured using functions like
 `valkeyClusterSetOptionAddNodes` to add one or many cluster node addresses,
 or `valkeyClusterSetOptionUsername` together with `valkeyClusterSetOptionPassword` to configure authentication and so on.
-See [`include/valkey/valkeycluster.h`](../include/valkey/valkeycluster.h) for more details.
+See [`include/valkey/cluster.h`](../include/valkey/cluster.h) for more details.
 
 The function `valkeyClusterConnect2` is provided to connect using the prepared `valkeyClusterContext`.
 

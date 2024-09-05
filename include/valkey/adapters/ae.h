@@ -31,8 +31,8 @@
 #ifndef VALKEY_AE_H
 #define VALKEY_AE_H
 #include "../async.h"
+#include "../cluster.h"
 #include "../valkey.h"
-#include "../valkeycluster.h"
 
 #include <ae.h>
 #include <sys/types.h>

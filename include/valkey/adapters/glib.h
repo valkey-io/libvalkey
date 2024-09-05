@@ -2,8 +2,8 @@
 #define VALKEY_GLIB_H
 
 #include "../async.h"
+#include "../cluster.h"
 #include "../valkey.h"
-#include "../valkeycluster.h"
 
 #include <glib.h>
 

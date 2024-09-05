@@ -2,9 +2,9 @@
 
 #include "win32.h"
 
+#include "cluster.h"
 #include "command.h"
 #include "test_utils.h"
-#include "valkeycluster.h"
 
 #include <assert.h>
 #include <stdio.h>
