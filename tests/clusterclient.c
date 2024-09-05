@@ -14,7 +14,7 @@
  *   2 - Client failed to get initial slotmap from given "HOST:PORT".
  */
 
-#include "valkeycluster.h"
+#include "cluster.h"
 
 #include <stdio.h>
 #include <stdlib.h>

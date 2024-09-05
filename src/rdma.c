@@ -31,10 +31,11 @@
 #ifdef __linux__ /* currently RDMA is only supported on Linux */
 
 #define _GNU_SOURCE
+#include "rdma.h"
+
 #include "async.h"
 #include "valkey.h"
 #include "valkey_private.h"
-#include "valkey_rdma.h"
 #include "vkutil.h"
 
 #include <arpa/inet.h>

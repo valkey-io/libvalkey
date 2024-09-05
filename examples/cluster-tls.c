@@ -1,7 +1,7 @@
+#include <valkey/cluster.h>
+#include <valkey/cluster_ssl.h>
+#include <valkey/ssl.h>
 #include <valkey/valkey.h>
-#include <valkey/valkey_ssl.h>
-#include <valkey/valkeycluster.h>
-#include <valkey/valkeycluster_ssl.h>
 
 #include <stdio.h>
 #include <stdlib.h>

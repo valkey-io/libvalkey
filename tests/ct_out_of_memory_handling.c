@@ -25,8 +25,8 @@
  *   and error of running with increased/decreased `i` until the edge is found.
  */
 #include "adapters/libevent.h"
+#include "cluster.h"
 #include "test_utils.h"
-#include "valkeycluster.h"
 
 #include <assert.h>
 #include <stdbool.h>

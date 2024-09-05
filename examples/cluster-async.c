@@ -1,4 +1,4 @@
-#include <valkey/valkeycluster.h>
+#include <valkey/cluster.h>
 
 #include <valkey/adapters/libevent.h>
 

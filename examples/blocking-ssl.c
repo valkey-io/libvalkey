@@ -1,5 +1,5 @@
+#include <valkey/ssl.h>
 #include <valkey/valkey.h>
-#include <valkey/valkey_ssl.h>
 
 #include <stdio.h>
 #include <stdlib.h>

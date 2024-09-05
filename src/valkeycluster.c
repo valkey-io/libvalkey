@@ -33,10 +33,9 @@
 #define _XOPEN_SOURCE 600
 #include "win32.h"
 
-#include "valkeycluster.h"
-
 #include "adlist.h"
 #include "alloc.h"
+#include "cluster.h"
 #include "command.h"
 #include "dict.h"
 #include "sds.h"

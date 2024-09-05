@@ -31,8 +31,8 @@
 #ifndef VALKEY_LIBEVENT_H
 #define VALKEY_LIBEVENT_H
 #include "../async.h"
+#include "../cluster.h"
 #include "../valkey.h"
-#include "../valkeycluster.h"
 
 #include <event2/event.h>
 
