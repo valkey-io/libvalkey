@@ -28,8 +28,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef VALKEY_AE_H
-#define VALKEY_AE_H
+#ifndef VALKEY_ADAPTERS_AE_H
+#define VALKEY_ADAPTERS_AE_H
 #include "../async.h"
 #include "../cluster.h"
 #include "../valkey.h"
@@ -149,4 +149,4 @@ static int valkeyClusterAeAttach(aeEventLoop *loop,
     acc->attach_fn = valkeyAeAttach_link;
     return VALKEY_OK;
 }
-#endif
+#endif /* VALKEY_ADAPTERS_AE_H */

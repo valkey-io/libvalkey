@@ -1,6 +1,6 @@
 
-#ifndef VALKEY_POLL_H
-#define VALKEY_POLL_H
+#ifndef VALKEY_ADAPTERS_POLL_H
+#define VALKEY_ADAPTERS_POLL_H
 
 #include "../async.h"
 #include "../sockcompat.h"
@@ -194,4 +194,4 @@ static int valkeyPollAttach(valkeyAsyncContext *ac) {
 
     return VALKEY_OK;
 }
-#endif /* VALKEY_POLL_H */
+#endif /* VALKEY_ADAPTERS_POLL_H */

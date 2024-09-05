@@ -31,8 +31,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef VALKEY_H
-#define VALKEY_H
+#ifndef VALKEY_VALKEY_H
+#define VALKEY_VALKEY_H
 #include "read.h"
 
 #include <stdarg.h> /* for va_list */
@@ -373,4 +373,4 @@ void *valkeyCommandArgv(valkeyContext *c, int argc, const char **argv, const siz
 }
 #endif
 
-#endif
+#endif /* VALKEY_VALKEY_H */

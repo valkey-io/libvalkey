@@ -48,4 +48,4 @@ int valkeyCheckConnectDone(valkeyContext *c, int *completed);
 int valkeySetTcpNoDelay(valkeyContext *c);
 int valkeyContextSetTcpUserTimeout(valkeyContext *c, unsigned int timeout);
 
-#endif
+#endif /* VALKEY_NET_H */

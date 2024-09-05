@@ -30,8 +30,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef VALKEYCLUSTER_H
-#define VALKEYCLUSTER_H
+#ifndef VALKEY_CLUSTER_H
+#define VALKEY_CLUSTER_H
 
 #include "async.h"
 #include "dict.h"
@@ -336,4 +336,4 @@ valkeyClusterNode *valkeyClusterGetNodeByKey(valkeyClusterContext *cc,
 }
 #endif
 
-#endif /* VALKEYCLUSTER_H */
+#endif /* VALKEY_CLUSTER_H */

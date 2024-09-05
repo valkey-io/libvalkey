@@ -31,8 +31,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef VALKEY_MACOSX_H
-#define VALKEY_MACOSX_H
+#ifndef VALKEY_ADAPTERS_MACOSX_H
+#define VALKEY_ADAPTERS_MACOSX_H
 
 #include "../async.h"
 #include "../valkey.h"
@@ -142,4 +142,4 @@ static int valkeyMacOSAttach(valkeyAsyncContext *valkeyAsyncCtx, CFRunLoopRef ru
     return VALKEY_OK;
 }
 
-#endif
+#endif /* VALKEY_ADAPTERS_MACOSX_H */
