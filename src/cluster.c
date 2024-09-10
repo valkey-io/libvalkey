@@ -200,23 +200,20 @@ static unsigned int keyHashSlot(char *key, int keylen) {
 
 static void valkeyClusterSetError(valkeyClusterContext *cc, int type,
                                   const char *str) {
-    size_t len;
-
-    if (cc == NULL) {
-        return;
-    }
-
     cc->err = type;
-    if (str != NULL) {
-        len = strlen(str);
+
+    assert(str != NULL);
+    if (str != NULL && str != cc->errstr) {
+        size_t len = strlen(str);
         len = len < (sizeof(cc->errstr) - 1) ? len : (sizeof(cc->errstr) - 1);
         memcpy(cc->errstr, str, len);
         cc->errstr[len] = '\0';
-    } else {
-        /* Only VALKEY_ERR_IO may lack a description! */
-        assert(type == VALKEY_ERR_IO);
-        strerror_r(errno, cc->errstr, sizeof(cc->errstr));
     }
+}
+
+static inline void valkeyClusterClearError(valkeyClusterContext *cc) {
+    cc->err = 0;
+    cc->errstr[0] = '\0';
 }
 
 static int cluster_reply_error_type(valkeyReply *reply) {
@@ -1335,10 +1332,7 @@ int valkeyClusterUpdateSlotmap(valkeyClusterContext *cc) {
 
         ret = cluster_update_route_by_addr(cc, node->host, node->port);
         if (ret == VALKEY_OK) {
-            if (cc->err) {
-                cc->err = 0;
-                memset(cc->errstr, '\0', strlen(cc->errstr));
-            }
+            valkeyClusterClearError(cc);
             return VALKEY_OK;
         }
 
@@ -2122,8 +2116,7 @@ ask_retry:
                     c_updating_route = c;
                 } else if (valkeyClusterUpdateSlotmap(cc) == VALKEY_OK) {
                     /* Synchronous update route successful using new connection. */
-                    cc->err = 0;
-                    cc->errstr[0] = '\0';
+                    valkeyClusterClearError(cc);
                 } else {
                     /* Failed to update route. Specific error already set. */
                     goto error;
@@ -2197,8 +2190,7 @@ done:
          * reply and handle it. */
         if (clusterUpdateRouteHandleReply(cc, c_updating_route) != VALKEY_OK) {
             /* Clear error and update synchronously using another node. */
-            cc->err = 0;
-            cc->errstr[0] = '\0';
+            valkeyClusterClearError(cc);
             if (valkeyClusterUpdateSlotmap(cc) != VALKEY_OK) {
                 /* Clear the reply to indicate failure. */
                 freeReplyObject(reply);
@@ -2266,10 +2258,7 @@ void *valkeyClusterFormattedCommand(valkeyClusterContext *cc, char *cmd,
         return NULL;
     }
 
-    if (cc->err) {
-        cc->err = 0;
-        memset(cc->errstr, '\0', strlen(cc->errstr));
-    }
+    valkeyClusterClearError(cc);
 
     command = command_get();
     if (command == NULL) {
@@ -2355,10 +2344,7 @@ void *valkeyClustervCommandToNode(valkeyClusterContext *cc,
         return NULL;
     }
 
-    if (cc->err) {
-        cc->err = 0;
-        memset(cc->errstr, '\0', sizeof(cc->errstr));
-    }
+    valkeyClusterClearError(cc);
 
     ret = valkeyvAppendCommand(c, format, ap);
 
@@ -2385,8 +2371,7 @@ void *valkeyClustervCommandToNode(valkeyClusterContext *cc,
         /* Handle reply from pipelined CLUSTER SLOTS or CLUSTER NODES. */
         if (clusterUpdateRouteHandleReply(cc, c) != VALKEY_OK) {
             /* Ignore error. Update will be triggered on the next command. */
-            cc->err = 0;
-            cc->errstr[0] = '\0';
+            valkeyClusterClearError(cc);
         }
     }
 
@@ -2655,10 +2640,7 @@ static int valkeyClusterClearAll(valkeyClusterContext *cc) {
         return VALKEY_ERR;
     }
 
-    if (cc->err) {
-        cc->err = 0;
-        memset(cc->errstr, '\0', strlen(cc->errstr));
-    }
+    valkeyClusterClearError(cc);
 
     if (cc->nodes == NULL) {
         return VALKEY_ERR;
@@ -2693,9 +2675,7 @@ int valkeyClusterGetReply(valkeyClusterContext *cc, void **reply) {
     if (cc == NULL || reply == NULL)
         return VALKEY_ERR;
 
-    cc->err = 0;
-    cc->errstr[0] = '\0';
-
+    valkeyClusterClearError(cc);
     *reply = NULL;
 
     if (cc->requests == NULL)
@@ -2793,20 +2773,22 @@ void valkeyClusterReset(valkeyClusterContext *cc) {
 
 static void valkeyClusterAsyncSetError(valkeyClusterAsyncContext *acc, int type,
                                        const char *str) {
-
-    size_t len;
-
+    valkeyClusterSetError(acc->cc, type, str); /* Keep error flags identical. */
     acc->err = type;
-    if (str != NULL) {
-        len = strlen(str);
+
+    assert(str != NULL);
+    if (str != NULL && str != acc->errstr) {
+        size_t len = strlen(str);
         len = len < (sizeof(acc->errstr) - 1) ? len : (sizeof(acc->errstr) - 1);
         memcpy(acc->errstr, str, len);
         acc->errstr[len] = '\0';
-    } else {
-        /* Only VALKEY_ERR_IO may lack a description! */
-        assert(type == VALKEY_ERR_IO);
-        strerror_r(errno, acc->errstr, sizeof(acc->errstr));
     }
+}
+
+static inline void valkeyClusterAsyncClearError(valkeyClusterAsyncContext *acc) {
+    valkeyClusterClearError(acc->cc);
+    acc->err = 0;
+    acc->errstr[0] = '\0';
 }
 
 static valkeyClusterAsyncContext *
@@ -2822,12 +2804,7 @@ valkeyClusterAsyncInitialize(valkeyClusterContext *cc) {
         return NULL;
 
     acc->cc = cc;
-
-    /* We want the error field to be accessible directly instead of requiring
-     * an indirection to the valkeyContext struct. */
-    // TODO: really needed?
-    acc->err = cc->err;
-    memcpy(acc->errstr, cc->errstr, 128);
+    valkeyClusterAsyncSetError(acc, cc->err, cc->errstr);
 
     return acc;
 }
@@ -3299,15 +3276,7 @@ done:
         cad->callback(acc, r, cad->privdata);
     }
 
-    if (cc->err) {
-        cc->err = 0;
-        memset(cc->errstr, '\0', strlen(cc->errstr));
-    }
-
-    if (acc->err) {
-        acc->err = 0;
-        memset(acc->errstr, '\0', strlen(acc->errstr));
-    }
+    valkeyClusterAsyncClearError(acc);
 
     cluster_async_data_free(cad);
 
@@ -3351,15 +3320,7 @@ int valkeyClusterAsyncFormattedCommand(valkeyClusterAsyncContext *acc,
         return VALKEY_ERR;
     }
 
-    if (cc->err) {
-        cc->err = 0;
-        memset(cc->errstr, '\0', strlen(cc->errstr));
-    }
-
-    if (acc->err) {
-        acc->err = 0;
-        memset(acc->errstr, '\0', strlen(acc->errstr));
-    }
+    valkeyClusterAsyncClearError(acc);
 
     command = command_get();
     if (command == NULL) {
@@ -3446,15 +3407,7 @@ int valkeyClusterAsyncFormattedCommandToNode(valkeyClusterAsyncContext *acc,
         return VALKEY_ERR;
     }
 
-    if (cc->err) {
-        cc->err = 0;
-        memset(cc->errstr, '\0', strlen(cc->errstr));
-    }
-
-    if (acc->err) {
-        acc->err = 0;
-        memset(acc->errstr, '\0', strlen(acc->errstr));
-    }
+    valkeyClusterAsyncClearError(acc);
 
     command = command_get();
     if (command == NULL) {
