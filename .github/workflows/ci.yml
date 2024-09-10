@@ -17,24 +17,24 @@ jobs:
         clang-format-version: '18'
 
   ubuntu:
-    name: ${{ matrix.cmake-build-type }}-build [${{ matrix.compiler }}, cmake-${{ matrix.cmake-version }} sanitizer="${{ matrix.sanitizer }}"]
+    name: ${{ matrix.cmake-build-type }} build [${{ matrix.compiler }}, cmake-${{ matrix.cmake-version }} sanitizer="${{ matrix.sanitizer }}"]
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
       matrix:
-        compiler: [gcc-13, clang-18]
+        compiler: [gcc-14, clang-18]
         cmake-version: [3.29]
-        cmake-build-type: [Release, RelWithDebInfo]
+        cmake-build-type: [Release]
         sanitizer: ["", thread, undefined, leak, address]
-        runner: [ubuntu-22.04]
+        runner: [ubuntu-24.04]
         include:
           - compiler: gcc-7
-            cmake-version: 3.11
+            cmake-version: 3.13
             cmake-build-type: Release
             sanitizer: ""
             runner: ubuntu-20.04
           - compiler: clang-12
-            cmake-version: 3.11
+            cmake-version: 3.13
             cmake-build-type: Release
             sanitizer: ""
             runner: ubuntu-20.04
