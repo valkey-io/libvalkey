@@ -1364,7 +1364,6 @@ valkeyClusterContext *valkeyClusterContextInit(void) {
 }
 
 void valkeyClusterFree(valkeyClusterContext *cc) {
-
     if (cc == NULL)
         return;
 
@@ -1373,45 +1372,21 @@ void valkeyClusterFree(valkeyClusterContext *cc) {
                            cc->event_privdata);
     }
 
-    if (cc->connect_timeout) {
-        vk_free(cc->connect_timeout);
-        cc->connect_timeout = NULL;
-    }
-
-    if (cc->command_timeout) {
-        vk_free(cc->command_timeout);
-        cc->command_timeout = NULL;
-    }
-
-    if (cc->table != NULL) {
-        vk_free(cc->table);
-        cc->table = NULL;
-    }
+    vk_free(cc->connect_timeout);
+    vk_free(cc->command_timeout);
+    vk_free(cc->username);
+    vk_free(cc->password);
+    vk_free(cc->table);
 
     if (cc->nodes != NULL) {
-        /* Clear cc->nodes before releasing the dict since the release procedure
-           might access cc->nodes. When a node and its valkey context are freed
-           all pending callbacks are executed. Clearing cc->nodes prevents a pending
-           slotmap update command callback to trigger additional slotmap updates. */
-        dict *nodes = cc->nodes;
-        cc->nodes = NULL;
-        dictRelease(nodes);
+        dictRelease(cc->nodes);
     }
 
     if (cc->requests != NULL) {
         listRelease(cc->requests);
     }
 
-    if (cc->username != NULL) {
-        vk_free(cc->username);
-        cc->username = NULL;
-    }
-
-    if (cc->password != NULL) {
-        vk_free(cc->password);
-        cc->password = NULL;
-    }
-
+    memset(cc, 0xff, sizeof(*cc));
     vk_free(cc);
 }
 
@@ -3673,15 +3648,11 @@ void valkeyClusterAsyncDisconnect(valkeyClusterAsyncContext *acc) {
 }
 
 void valkeyClusterAsyncFree(valkeyClusterAsyncContext *acc) {
-    valkeyClusterContext *cc;
-
-    if (acc == NULL) {
+    if (acc == NULL)
         return;
-    }
 
-    cc = acc->cc;
+    valkeyClusterContext *cc = acc->cc;
     cc->flags |= VALKEYCLUSTER_FLAG_DISCONNECTING;
-
     valkeyClusterFree(cc);
 
     vk_free(acc);
