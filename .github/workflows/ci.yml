@@ -39,6 +39,7 @@ jobs:
             sanitizer: ""
             runner: ubuntu-20.04
     steps:
+    - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
     - name: Prepare
       uses: awalsh128/cache-apt-pkgs-action@a6c3917cc929dd0345bfb2d3feaf9101823370ad # v1.4.2
       with:
@@ -56,14 +57,14 @@ jobs:
       run: |
         git clone --depth 1 --branch 7.2.5 https://github.com/valkey-io/valkey.git
         cd valkey && BUILD_TLS=yes make install
-    - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
-    - name: Create build folder
-      run: cmake -E make_directory build
     - name: Generate makefiles
       env:
         CC: ${{ matrix.compiler }}
-      working-directory: build
-      run: cmake $GITHUB_WORKSPACE -DCMAKE_BUILD_TYPE=$BUILD_TYPE -DENABLE_SSL=ON -DENABLE_IPV6_TESTS=ON -DUSE_SANITIZER=${{ matrix.sanitizer }} ..
+      run: |
+        if [ -n "${{ matrix.sanitizer }}" ]; then
+          export CFLAGS="-fno-omit-frame-pointer -fsanitize=${{ matrix.sanitizer }}"
+        fi
+        cmake -B build -S . -DCMAKE_BUILD_TYPE=${{ matrix.cmake-build-type }} -DENABLE_SSL=ON -DENABLE_IPV6_TESTS=ON
     - name: Build
       working-directory: build
       run: VERBOSE=1 make
