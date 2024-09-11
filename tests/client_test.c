@@ -893,7 +893,7 @@ static void test_reply_reader(void) {
 
     test("Can parse RESP3 doubles in an array: ");
     reader = valkeyReaderCreate();
-    valkeyReaderFeed(reader, "*1\r\n,3.14159265358979323846\r\n", 31);
+    valkeyReaderFeed(reader, "*1\r\n,3.14159265358979323846\r\n", 29);
     ret = valkeyReaderGetReply(reader, &reply);
     test_cond(ret == VALKEY_OK &&
               ((valkeyReply *)reply)->type == VALKEY_REPLY_ARRAY &&
