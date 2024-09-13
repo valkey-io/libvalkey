@@ -1,54 +1,31 @@
-name: "Coverity"
+name: Coverity scan
 on:
+  workflow_dispatch:
   schedule:
-    - cron:  '0 1 * * 0'
+    - cron: '0 10 * * 1' # Mon 10.00 UTC
 
 permissions:
   contents: read
 
 jobs:
-  analyze:
-    name: Analyze
-    if: github.repository == 'Nordix/hiredis-cluster'
+  coverity:
+    if: github.repository == 'valkey-io/libvalkey'
     runs-on: ubuntu-latest
-
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
-      with:
-        fetch-depth: 1
-
-    - name: Download Coverity
-      run: |
-        cd ..
-        wget -q https://scan.coverity.com/download/linux64 --post-data "token=${COVERITY_TOKEN}&project=hiredis-cluster" -O coverity_tool.tgz
-        mkdir coverity
-        tar xzf coverity_tool.tgz --strip 1 -C coverity
-        echo "$(pwd)/coverity/bin" >> $GITHUB_PATH
-      env:
-        COVERITY_TOKEN: ${{ secrets.COVERITY_TOKEN }}
-
-    - name: Prepare
+    - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+    - name: Install dependencies
       uses: awalsh128/cache-apt-pkgs-action@a6c3917cc929dd0345bfb2d3feaf9101823370ad # v1.4.2
       with:
-        packages: libevent-dev cmake
+        packages: libevent-dev
         version: 1.0
-
-    - name: Build with Coverity
+    - name: Prepare
       run: |
         mkdir build; cd build
         cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo -DENABLE_SSL=ON ..
-        cov-build --dir cov-int make
-
-    - name: Submit the result to Coverity
-      run: |
-        tar czvf hiredis_cluster.tgz cov-int
-        curl \
-          --form token=${COVERITY_TOKEN} \
-          --form email=bjorn.a.svensson@est.tech \
-          --form file=@hiredis_cluster.tgz \
-          --form version=${GITHUB_SHA} \
-          https://scan.coverity.com/builds?project=hiredis-cluster
-      working-directory: build
-      env:
-        COVERITY_TOKEN: ${{ secrets.COVERITY_TOKEN }}
+    - name: Build, scan and report
+      uses: vapier/coverity-scan-action@2068473c7bdf8c2fb984a6a40ae76ee7facd7a85 # v1.8.0
+      with:
+        project: libvalkey
+        token: ${{ secrets.COVERITY_TOKEN }}
+        email: bjorn.a.svensson@est.tech
+        working-directory: build
