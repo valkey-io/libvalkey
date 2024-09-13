@@ -16,8 +16,8 @@ jobs:
       with:
         clang-format-version: '18'
 
-  ubuntu:
-    name: ${{ matrix.cmake-build-type }} build [${{ matrix.compiler }}, cmake-${{ matrix.cmake-version }} sanitizer="${{ matrix.sanitizer }}"]
+  ubuntu-cmake:
+    name: Build with CMake [${{ matrix.cmake-build-type }}, ${{ matrix.compiler }}, cmake-${{ matrix.cmake-version }}, sanitizer="${{ matrix.sanitizer }}"]
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
@@ -81,6 +81,36 @@ jobs:
     - name: Teardown clusters
       working-directory: build
       run: make stop
+
+  ubuntu-make:
+    name: Build with make
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+      - name: Prepare
+        uses: awalsh128/cache-apt-pkgs-action@a6c3917cc929dd0345bfb2d3feaf9101823370ad # v1.4.2
+        with:
+          packages: libevent-dev valgrind
+          version: 1.0
+      - name: Install Valkey
+        run: |
+          git clone --depth 1 --branch 7.2.5 https://github.com/valkey-io/valkey.git
+          cd valkey && sudo BUILD_TLS=yes make install
+      - name: Build
+        run: USE_SSL=1 TEST_ASYNC=1 make
+      - name: Run tests
+        working-directory: tests
+        env:
+          SKIPS_AS_FAILS: 1
+          TEST_SSL: 1
+        run: ./test.sh
+      - name: Run tests under valgrind
+        working-directory: tests
+        env:
+          SKIPS_AS_FAILS: 1
+          TEST_SSL: 1
+          TEST_PREFIX: valgrind --error-exitcode=99 --track-origins=yes --leak-check=full
+        run: ./test.sh
 
   install:
     name: Installation tests

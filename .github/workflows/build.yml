@@ -2,44 +2,6 @@ name: Build and test
 on: [push, pull_request]
 
 jobs:
-  ubuntu:
-    name: Ubuntu
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
-
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y valgrind libevent-dev cmake libssl-dev
-
-      # TODO:  Test against Redis and KeyDB in addition to Valkey
-      - name: Install Valkey
-        run: |
-          git clone --depth 1 --branch 7.2.5 https://github.com/valkey-io/valkey.git
-          cd valkey && sudo BUILD_TLS=yes make install
-
-      - name: Build using cmake
-        env:
-          EXTRA_CMAKE_OPTS: -DENABLE_EXAMPLES:BOOL=ON -DENABLE_SSL:BOOL=ON
-        run: mkdir build && cd build && cmake .. && make
-
-      - name: Build using makefile
-        run: USE_SSL=1 TEST_ASYNC=1 make
-
-      - name: Run tests
-        working-directory: tests
-        env:
-          SKIPS_AS_FAILS: 1
-          TEST_SSL: 1
-        run: ./test.sh
-
-      #      - name: Run tests under valgrind
-      #        env:
-      #          SKIPS_AS_FAILS: 1
-      #          TEST_PREFIX: valgrind --error-exitcode=99 --track-origins=yes --leak-check=full
-      #        run: $GITHUB_WORKSPACE/test.sh
-
   almalinux8:
     name: AlmaLinux 8
     runs-on: ubuntu-latest
@@ -50,7 +12,7 @@ jobs:
       - name: Install dependencies
         run: |
           dnf -y install epel-release
-          dnf -y install gcc make cmake3 openssl openssl-devel libevent-devel valgrind procps-ng valkey
+          dnf -y install gcc make cmake3 openssl openssl-devel libevent-devel procps-ng valkey
 
       - name: Build using cmake
         env:
@@ -67,14 +29,6 @@ jobs:
           TEST_SSL: 1
         run: ./test.sh
 
-      - name: Run tests under valgrind
-        working-directory: tests
-        env:
-          SKIPS_AS_FAILS: 1
-          TEST_SSL: 1
-          TEST_PREFIX: valgrind --error-exitcode=99 --track-origins=yes --leak-check=full
-        run: ./test.sh
-
   centos8:
     name: RockyLinux 8
     runs-on: ubuntu-latest
@@ -88,7 +42,7 @@ jobs:
           dnf -y install https://rpms.remirepo.net/enterprise/remi-release-8.rpm
           dnf -y module install redis:remi-6.0
           dnf -y group install "Development Tools"
-          dnf -y install openssl-devel cmake valgrind libevent-devel
+          dnf -y install openssl-devel cmake libevent-devel
 
       - name: Install Valkey
         run: |
@@ -108,14 +62,6 @@ jobs:
         env:
           SKIPS_AS_FAILS: 1
           TEST_SSL: 1
-        run: ./test.sh
-
-      - name: Run tests under valgrind
-        working-directory: tests
-        env:
-          SKIPS_AS_FAILS: 1
-          TEST_SSL: 1
-          TEST_PREFIX: valgrind --error-exitcode=99 --track-origins=yes --leak-check=full
         run: ./test.sh
 
   freebsd:
