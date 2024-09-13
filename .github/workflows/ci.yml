@@ -28,6 +28,11 @@ jobs:
         sanitizer: ["", thread, undefined, leak, address]
         runner: [ubuntu-24.04]
         include:
+          - compiler: clang-18
+            cmake-version: 3.29
+            cmake-build-type: Debug
+            sanitizer: ""
+            runner: ubuntu-24.04
           - compiler: gcc-7
             cmake-version: 3.13
             cmake-build-type: Release
