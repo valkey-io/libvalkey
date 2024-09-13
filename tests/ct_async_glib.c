@@ -41,8 +41,7 @@ int main(int argc, char **argv) {
     GMainContext *context = NULL;
     mainloop = g_main_loop_new(context, FALSE);
 
-    valkeyClusterAsyncContext *acc =
-        valkeyClusterAsyncConnect(CLUSTER_NODE, VALKEYCLUSTER_FLAG_NULL);
+    valkeyClusterAsyncContext *acc = valkeyClusterAsyncConnect(CLUSTER_NODE);
     assert(acc);
     ASSERT_MSG(acc->err == 0, acc->errstr);
 

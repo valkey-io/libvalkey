@@ -50,8 +50,7 @@ int main(int argc, char **argv) {
     (void)argc;
     (void)argv;
     printf("Connecting...\n");
-    valkeyClusterAsyncContext *cc =
-        valkeyClusterAsyncConnect("127.0.0.1:7000", VALKEYCLUSTER_FLAG_NULL);
+    valkeyClusterAsyncContext *cc = valkeyClusterAsyncConnect("127.0.0.1:7000");
     if (!cc) {
         printf("Error: Allocation failure\n");
         exit(-1);

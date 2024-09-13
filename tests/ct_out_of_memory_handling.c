@@ -127,7 +127,7 @@ void test_alloc_failure_handling(void) {
         cc = valkeyClusterContextInit();
         assert(cc);
     }
-    cc->flags |= VALKEYCLUSTER_FLAG_ADD_SLAVE;
+    valkeyClusterSetOptionParseSlaves(cc);
 
     // Add nodes
     {
@@ -173,14 +173,14 @@ void test_alloc_failure_handling(void) {
 
     // Connect
     {
-        for (int i = 0; i < 88; ++i) {
+        for (int i = 0; i < 96; ++i) {
             prepare_allocation_test(cc, i);
             result = valkeyClusterConnect2(cc);
             assert(result == VALKEY_ERR);
             ASSERT_STR_EQ(cc->errstr, "Out of memory");
         }
 
-        prepare_allocation_test(cc, 88);
+        prepare_allocation_test(cc, 96);
         result = valkeyClusterConnect2(cc);
         assert(result == VALKEY_OK);
     }
@@ -500,7 +500,7 @@ void test_alloc_failure_handling_async(void) {
         acc = valkeyClusterAsyncContextInit();
         assert(acc);
     }
-    acc->cc->flags |= VALKEYCLUSTER_FLAG_ADD_SLAVE;
+    valkeyClusterSetOptionParseSlaves(acc->cc);
 
     // Set callbacks
     {
@@ -527,14 +527,14 @@ void test_alloc_failure_handling_async(void) {
 
     // Connect
     {
-        for (int i = 0; i < 86; ++i) {
+        for (int i = 0; i < 94; ++i) {
             prepare_allocation_test(acc->cc, i);
             result = valkeyClusterConnect2(acc->cc);
             assert(result == VALKEY_ERR);
             ASSERT_STR_EQ(acc->cc->errstr, "Out of memory");
         }
 
-        prepare_allocation_test(acc->cc, 86);
+        prepare_allocation_test(acc->cc, 94);
         result = valkeyClusterConnect2(acc->cc);
         assert(result == VALKEY_OK);
     }

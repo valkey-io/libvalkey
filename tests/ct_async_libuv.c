@@ -36,8 +36,7 @@ int main(int argc, char **argv) {
     UNUSED(argc);
     UNUSED(argv);
 
-    valkeyClusterAsyncContext *acc =
-        valkeyClusterAsyncConnect(CLUSTER_NODE, VALKEYCLUSTER_FLAG_NULL);
+    valkeyClusterAsyncContext *acc = valkeyClusterAsyncConnect(CLUSTER_NODE);
     assert(acc);
     ASSERT_MSG(acc->err == 0, acc->errstr);
 

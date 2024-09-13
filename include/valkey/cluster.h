@@ -44,18 +44,6 @@
 #define VALKEY_ROLE_PRIMARY 1
 #define VALKEY_ROLE_REPLICA 2
 
-/* Configuration flags */
-#define VALKEYCLUSTER_FLAG_NULL 0x0
-/* Flag to enable parsing of slave nodes. Currently not used, but the
-   information is added to its master node structure. */
-#define VALKEYCLUSTER_FLAG_ADD_SLAVE 0x1000
-/* Flag to enable routing table updates using the command 'cluster slots'.
- * Default is the 'cluster nodes' command. */
-#define VALKEYCLUSTER_FLAG_ROUTE_USE_SLOTS 0x4000
-/* Flag specific to the async API which means that the user requested a
- * client disconnect or free. */
-#define VALKEYCLUSTER_FLAG_DISCONNECTING 0x8000
-
 /* Events, for valkeyClusterSetEventCallback() */
 #define VALKEYCLUSTER_EVENT_SLOTMAP_UPDATED 1
 #define VALKEYCLUSTER_EVENT_READY 2
@@ -160,10 +148,9 @@ typedef struct valkeyClusterNodeIterator {
  * Synchronous API
  */
 
-valkeyClusterContext *valkeyClusterConnect(const char *addrs, int flags);
+valkeyClusterContext *valkeyClusterConnect(const char *addrs);
 valkeyClusterContext *valkeyClusterConnectWithTimeout(const char *addrs,
-                                                      const struct timeval tv,
-                                                      int flags);
+                                                      const struct timeval tv);
 int valkeyClusterConnect2(valkeyClusterContext *cc);
 
 valkeyClusterContext *valkeyClusterContextInit(void);
@@ -277,8 +264,7 @@ int valkeyClusterAsyncSetDisconnectCallback(valkeyClusterAsyncContext *acc,
                                             valkeyDisconnectCallback *fn);
 
 /* Connect and update slotmap, will block until complete. */
-valkeyClusterAsyncContext *valkeyClusterAsyncConnect(const char *addrs,
-                                                     int flags);
+valkeyClusterAsyncContext *valkeyClusterAsyncConnect(const char *addrs);
 /* Connect and update slotmap asynchronously using configured event engine. */
 int valkeyClusterAsyncConnect2(valkeyClusterAsyncContext *acc);
 void valkeyClusterAsyncDisconnect(valkeyClusterAsyncContext *acc);
