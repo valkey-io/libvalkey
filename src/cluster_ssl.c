@@ -28,11 +28,6 @@
  */
 #include "cluster_ssl.h"
 
-static int valkeyClusterInitiateSSLWithContext(valkeyContext *c,
-                                               void *valkey_ssl_ctx) {
-    return valkeyInitiateSSLWithContext(c, valkey_ssl_ctx);
-}
-
 int valkeyClusterSetOptionEnableSSL(valkeyClusterContext *cc,
                                     valkeySSLContext *ssl) {
     if (cc == NULL || ssl == NULL) {
@@ -40,7 +35,7 @@ int valkeyClusterSetOptionEnableSSL(valkeyClusterContext *cc,
     }
 
     cc->ssl = ssl;
-    cc->ssl_init_fn = &valkeyClusterInitiateSSLWithContext;
+    cc->ssl_init_fn = &valkeyInitiateSSLWithContext;
 
     return VALKEY_OK;
 }
