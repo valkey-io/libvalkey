@@ -144,7 +144,8 @@ static long long usec(void) {
     } while (1)
 
 /* Helper to extract server version information.  Aborts on any failure. */
-#define SERVER_VERSION_FIELD "redis_version:"
+#define VALKEY_VERSION_FIELD "valkey_version:"
+#define REDIS_VERSION_FIELD "redis_version:"
 void get_server_version(valkeyContext *c, int *majorptr, int *minorptr) {
     valkeyReply *reply;
     char *eptr, *s, *e;
@@ -153,10 +154,12 @@ void get_server_version(valkeyContext *c, int *majorptr, int *minorptr) {
     reply = valkeyCommand(c, "INFO");
     if (reply == NULL || c->err || reply->type != VALKEY_REPLY_STRING)
         goto abort;
-    if ((s = strstr(reply->str, SERVER_VERSION_FIELD)) == NULL)
+    if ((s = strstr(reply->str, VALKEY_VERSION_FIELD)) != NULL)
+        s += strlen(VALKEY_VERSION_FIELD);
+    else if ((s = strstr(reply->str, REDIS_VERSION_FIELD)) != NULL)
+        s += strlen(REDIS_VERSION_FIELD);
+    else
         goto abort;
-
-    s += strlen(SERVER_VERSION_FIELD);
 
     /* We need a field terminator and at least 'x.y.z' (5) bytes of data */
     if ((e = strstr(s, "\r\n")) == NULL || (e - s) < 5)
