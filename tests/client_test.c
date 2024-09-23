@@ -1886,14 +1886,14 @@ void subscribe_channel_a_cb(valkeyAsyncContext *ac, void *r, void *privdata) {
                strcmp(reply->element[2]->str, "Hello!") == 0);
         state->checkpoint++;
 
-        /* Unsubscribe to channels, including channel X & Z which we don't subscribe to */
-        valkeyAsyncCommand(ac, unexpected_cb,
-                           (void *)"unsubscribe should not call unexpected_cb()",
-                           "unsubscribe B X A A Z");
         /* Unsubscribe to patterns, none which we subscribe to */
         valkeyAsyncCommand(ac, unexpected_cb,
                            (void *)"punsubscribe should not call unexpected_cb()",
                            "punsubscribe");
+        /* Unsubscribe to channels, including channel X & Z which we don't subscribe to */
+        valkeyAsyncCommand(ac, unexpected_cb,
+                           (void *)"unsubscribe should not call unexpected_cb()",
+                           "unsubscribe B X A A Z");
         /* Send a regular command after unsubscribing, then disconnect */
         state->disconnect = 1;
         valkeyAsyncCommand(ac, integer_cb, state, "LPUSH mylist foo");
