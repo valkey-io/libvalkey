@@ -71,7 +71,7 @@ jobs:
       - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
 
       - name: Build in FreeBSD
-        uses: vmactions/freebsd-vm@575afc54376b74ac2e3488b20e37da73cbd9325d # v1.1.1
+        uses: vmactions/freebsd-vm@d7b8fcc7711aa41ad45e8d9b737cf90f035a7e3d # v1.1.3
         with:
           prepare: pkg install -y gmake cmake
           run: |
