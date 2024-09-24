@@ -15,7 +15,7 @@ syncpid2=$!;
 
 # Start simulated valkey node #1
 timeout 5s ./simulated-valkey.pl -p 7401 --ipv6 -d --sigcont $syncpid1 <<'EOF' &
-# Inital slotmap update
+# Initial slotmap update
 EXPECT CONNECT
 EXPECT ["CLUSTER", "SLOTS"]
 SEND [[0, 16383, ["::1", 7401, "nodeid1"]]]

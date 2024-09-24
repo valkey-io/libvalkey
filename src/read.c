@@ -330,7 +330,7 @@ static int processLineItem(valkeyReader *r) {
                 d = strtod((char *)buf, &eptr);
                 /* RESP3 only allows "inf", "-inf", and finite values, while
                  * strtod() allows other variations on infinity,
-                 * etc. We explicity handle our two allowed infinite cases and NaN
+                 * etc. We explicitly handle our two allowed infinite cases and NaN
                  * above, so strtod() should only result in finite values. */
                 if (buf[0] == '\0' || eptr != &buf[len] || !isfinite(d)) {
                     valkeyReaderSetError(r, VALKEY_ERR_PROTOCOL,
