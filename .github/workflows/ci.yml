@@ -51,7 +51,7 @@ jobs:
         packages: libevent-dev libuv1-dev libev-dev libglib2.0-dev
         version: 1.0
     - name: Setup compiler
-      uses: aminya/setup-cpp@bfbfe9ca0b2c69a076f6513393d61fc478fb54f8 # v0.41.0
+      uses: aminya/setup-cpp@5f4f319fe8905945207f66b0a8e62e64d90ab225 # v0.43.0
       with:
         compiler: ${{ matrix.compiler }}
     - name: Setup CMake
