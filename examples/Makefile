@@ -10,7 +10,7 @@ EXAMPLES=example-blocking example-blocking-push example-async-libevent \
 	 example-cluster-async example-cluster-clientside-caching-async \
 	 example-cluster-simple
 
-ifeq ($(USE_SSL),1)
+ifeq ($(USE_TLS),1)
   EXAMPLES+=example-blocking-tls example-async-libevent-tls \
 	    example-cluster-async-tls example-cluster-tls
   TLS_STLIBNAME=../lib/libvalkey_tls.a

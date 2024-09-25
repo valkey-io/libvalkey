@@ -10,7 +10,7 @@ check_executable() {
 VALKEY_SERVER=${VALKEY_SERVER:-valkey-server}
 VALKEY_PORT=${VALKEY_PORT:-56379}
 VALKEY_TLS_PORT=${VALKEY_TLS_PORT:-56443}
-TEST_SSL=${TEST_SSL:-0}
+TEST_TLS=${TEST_TLS:-0}
 SKIPS_AS_FAILS=${SKIPS_AS_FAILS:-0}
 ENABLE_DEBUG_CMD=
 TLS_TEST_ARGS=
@@ -32,7 +32,7 @@ PID_FILE=${tmpdir}/libvalkey-test-valkey.pid
 SOCK_FILE=${tmpdir}/libvalkey-test-valkey.sock
 CONF_FILE=${tmpdir}/valkey.conf
 
-if [ "$TEST_SSL" = "1" ]; then
+if [ "$TEST_TLS" = "1" ]; then
     TLS_CA_CERT=${tmpdir}/ca.crt
     TLS_CA_KEY=${tmpdir}/ca.key
     TLS_CERT=${tmpdir}/valkey.crt
@@ -90,8 +90,8 @@ bind 127.0.0.1
 EOF
 fi
 
-# if doing ssl, add these
-if [ "$TEST_SSL" = "1" ]; then
+# if doing tls, add these
+if [ "$TEST_TLS" = "1" ]; then
     cat >> ${CONF_FILE} <<EOF
 tls-port ${VALKEY_TLS_PORT}
 tls-ca-cert-file ${TLS_CA_CERT}

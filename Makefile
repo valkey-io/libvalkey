@@ -92,9 +92,9 @@ TLS_DYLIBNAME=$(LIB_DIR)/$(TLS_LIBNAME).$(DYLIBSUFFIX)
 TLS_STLIBNAME=$(LIB_DIR)/$(TLS_LIBNAME).$(STLIBSUFFIX)
 TLS_DYLIB_MAKE_CMD=$(CC) $(OPTIMIZATION) $(PLATFORM_FLAGS) -shared -Wl,-soname,$(TLS_DYLIB_MINOR_NAME)
 
-USE_SSL?=0
+USE_TLS?=0
 
-ifeq ($(USE_SSL),1)
+ifeq ($(USE_TLS),1)
   TLS_SOURCES = $(wildcard $(SRC_DIR)/*tls.c)
   TLS_OBJS = $(patsubst $(SRC_DIR)/%.c,$(OBJ_DIR)/%.o,$(TLS_SOURCES))
 
@@ -152,7 +152,7 @@ ifeq ($(TEST_ASYNC),1)
   export CFLAGS+=-DVALKEY_TEST_ASYNC
 endif
 
-ifeq ($(USE_SSL),1)
+ifeq ($(USE_TLS),1)
   ifndef OPENSSL_PREFIX
     ifeq ($(uname_S),Darwin)
       SEARCH_PATH1=/opt/homebrew/opt/openssl
@@ -237,7 +237,7 @@ pkgconfig: $(PKGCONFNAME) $(TLS_PKGCONF) $(RDMA_PKGCONF)
 -include $(OBJS:.o=.d)
 
 TEST_LDFLAGS = $(TLS_LDFLAGS) $(RDMA_LDFLAGS)
-ifeq ($(USE_SSL),1)
+ifeq ($(USE_TLS),1)
   TEST_LDFLAGS += -pthread
 endif
 ifeq ($(TEST_ASYNC),1)

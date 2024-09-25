@@ -19,7 +19,7 @@ PROJECT(valkey LANGUAGES "C" VERSION "${VERSION}")
 INCLUDE(GNUInstallDirs)
 
 OPTION(BUILD_SHARED_LIBS "Build shared libraries" ON)
-OPTION(ENABLE_SSL "Build valkey_ssl for SSL support" OFF)
+OPTION(ENABLE_TLS "Build valkey_tls for TLS support" OFF)
 OPTION(DISABLE_TESTS "If tests should be compiled or not" OFF)
 OPTION(ENABLE_EXAMPLES "Enable building valkey examples" OFF)
 option(ENABLE_IPV6_TESTS "Enable IPv6 tests requiring special prerequisites" OFF)
@@ -152,7 +152,7 @@ INSTALL(FILES ${CMAKE_CURRENT_BINARY_DIR}/valkey-config.cmake
         DESTINATION ${CMAKE_CONF_INSTALL_DIR})
 
 
-IF(ENABLE_SSL)
+IF(ENABLE_TLS)
     IF (NOT OPENSSL_ROOT_DIR)
         IF (APPLE)
             SET(OPENSSL_ROOT_DIR "/usr/local/opt/openssl")

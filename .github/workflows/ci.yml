@@ -69,7 +69,7 @@ jobs:
         if [ -n "${{ matrix.sanitizer }}" ]; then
           export CFLAGS="-fno-omit-frame-pointer -fsanitize=${{ matrix.sanitizer }}"
         fi
-        cmake -B build -S . -DCMAKE_BUILD_TYPE=${{ matrix.cmake-build-type }} -DENABLE_SSL=ON -DENABLE_IPV6_TESTS=ON
+        cmake -B build -S . -DCMAKE_BUILD_TYPE=${{ matrix.cmake-build-type }} -DENABLE_TLS=ON -DENABLE_IPV6_TESTS=ON
     - name: Build
       working-directory: build
       run: VERBOSE=1 make
@@ -102,18 +102,18 @@ jobs:
           git clone --depth 1 --branch 7.2.5 https://github.com/valkey-io/valkey.git
           cd valkey && sudo BUILD_TLS=yes make install
       - name: Build
-        run: USE_SSL=1 TEST_ASYNC=1 make
+        run: USE_TLS=1 TEST_ASYNC=1 make
       - name: Run tests
         working-directory: tests
         env:
           SKIPS_AS_FAILS: 1
-          TEST_SSL: 1
+          TEST_TLS: 1
         run: ./test.sh
       - name: Run tests under valgrind
         working-directory: tests
         env:
           SKIPS_AS_FAILS: 1
-          TEST_SSL: 1
+          TEST_TLS: 1
           TEST_PREFIX: valgrind --error-exitcode=99 --track-origins=yes --leak-check=full
         run: ./test.sh
 
@@ -129,26 +129,26 @@ jobs:
         version: 1.0
     - name: Install libvalkey using Makefile
       run: |
-        make USE_SSL=1 DESTDIR=${{ github.workspace }}/make-install install
+        make USE_TLS=1 DESTDIR=${{ github.workspace }}/make-install install
     - name: Install libvalkey using CMake
       run: |
         mkdir build && cd build
-        cmake -DDISABLE_TESTS=ON -DENABLE_SSL=ON ..
+        cmake -DDISABLE_TESTS=ON -DENABLE_TLS=ON ..
         make DESTDIR=${{ github.workspace }}/cmake-install install
     - name: Build examples with Makefile using a Makefile-installed libvalkey
       run: |
         make CFLAGS="-I${{ github.workspace }}/make-install/usr/local/include" \
              STLIBNAME="${{ github.workspace }}/make-install/usr/local/lib/libvalkey.a" \
-             USE_SSL=1 -C examples
+             USE_TLS=1 -C examples
     - name: Build examples with Makefile using a CMake-installed libvalkey
       run: |
         make CFLAGS="-I${{ github.workspace }}/cmake-install/usr/local/include" \
              STLIBNAME="${{ github.workspace }}/cmake-install/usr/local/lib/libvalkey.a" \
-             USE_SSL=1 -C examples
+             USE_TLS=1 -C examples
     - name: Build examples with CMake using a CMake-installed libvalkey
       run: |
         cd examples && mkdir build && cd build
-        cmake -DCMAKE_PREFIX_PATH=${{ github.workspace }}/cmake-install/usr/local -DENABLE_SSL=ON ..
+        cmake -DCMAKE_PREFIX_PATH=${{ github.workspace }}/cmake-install/usr/local -DENABLE_TLS=ON ..
         make
 
   macos:
@@ -165,14 +165,14 @@ jobs:
       - name: Build using CMake
         run: |
           mkdir build && cd build
-          cmake .. -G Ninja -DCMAKE_BUILD_TYPE=Release -DENABLE_SSL=ON
+          cmake .. -G Ninja -DCMAKE_BUILD_TYPE=Release -DENABLE_TLS=ON
           ninja -v
       - name: Build using Makefile
-        run: USE_SSL=1 make
+        run: USE_TLS=1 make
       - name: Run tests
         working-directory: tests
         env:
-          TEST_SSL: 1
+          TEST_TLS: 1
         run: ./test.sh
 
   windows:

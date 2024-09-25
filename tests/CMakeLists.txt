@@ -1,6 +1,6 @@
 SET(TEST_WITH_VALKEY_VERSION "7.2.5" CACHE STRING "Valkey version used when running tests.")
 
-if(ENABLE_SSL)
+if(ENABLE_TLS)
   # Generate TLS certs and keys when needed
   set(TLS_CONFIGS ca.crt ca.key ca.txt valkey.crt valkey.key client.crt client.key)
   add_custom_command(
@@ -77,7 +77,7 @@ if(TEST_WITH_REDIS_VERSION)
   set_property(TEST client_test PROPERTY ENVIRONMENT "VALKEY_SERVER=redis-server")
 endif()
 if(TLS_LIBRARY)
-  set_property(TEST client_test PROPERTY ENVIRONMENT "TEST_SSL=1")
+  set_property(TEST client_test PROPERTY ENVIRONMENT "TEST_TLS=1")
 endif()
 if(ENABLE_RDMA)
   target_compile_definitions(client_test PUBLIC VALKEY_TEST_RDMA=1)

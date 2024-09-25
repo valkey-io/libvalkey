@@ -16,17 +16,17 @@ jobs:
 
       - name: Build using cmake
         env:
-          EXTRA_CMAKE_OPTS: -DENABLE_EXAMPLES:BOOL=ON -DENABLE_SSL:BOOL=ON
+          EXTRA_CMAKE_OPTS: -DENABLE_EXAMPLES:BOOL=ON -DENABLE_TLS:BOOL=ON
         run: mkdir build && cd build && cmake3 .. && make
 
       - name: Build using Makefile
-        run: USE_SSL=1 TEST_ASYNC=1 make
+        run: USE_TLS=1 TEST_ASYNC=1 make
 
       - name: Run tests
         working-directory: tests
         env:
           SKIPS_AS_FAILS: 1
-          TEST_SSL: 1
+          TEST_TLS: 1
         run: ./test.sh
 
   centos8:
@@ -51,17 +51,17 @@ jobs:
 
       - name: Build using cmake
         env:
-          EXTRA_CMAKE_OPTS: -DENABLE_EXAMPLES:BOOL=ON -DENABLE_SSL:BOOL=ON
+          EXTRA_CMAKE_OPTS: -DENABLE_EXAMPLES:BOOL=ON -DENABLE_TLS:BOOL=ON
         run: mkdir build && cd build && cmake .. && make
 
       - name: Build using Makefile
-        run: USE_SSL=1 TEST_ASYNC=1 make
+        run: USE_TLS=1 TEST_ASYNC=1 make
 
       - name: Run tests
         working-directory: tests
         env:
           SKIPS_AS_FAILS: 1
-          TEST_SSL: 1
+          TEST_TLS: 1
         run: ./test.sh
 
   freebsd:
