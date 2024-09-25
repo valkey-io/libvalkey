@@ -57,15 +57,15 @@ int main(int argc, char **argv) {
     const char *certKey = argv[5];
     const char *caCert = argc > 5 ? argv[6] : NULL;
 
-    valkeySSLContext *ssl;
-    valkeySSLContextError ssl_error = VALKEY_SSL_CTX_NONE;
+    valkeyTLSContext *tls;
+    valkeyTLSContextError tls_error = VALKEY_TLS_CTX_NONE;
 
     valkeyInitOpenSSL();
 
-    ssl = valkeyCreateSSLContext(caCert, NULL,
-                                 cert, certKey, NULL, &ssl_error);
-    if (!ssl) {
-        printf("Error: %s\n", valkeySSLContextGetError(ssl_error));
+    tls = valkeyCreateTLSContext(caCert, NULL,
+                                 cert, certKey, NULL, &tls_error);
+    if (!tls) {
+        printf("Error: %s\n", valkeyTLSContextGetError(tls_error));
         return 1;
     }
 
@@ -75,8 +75,8 @@ int main(int argc, char **argv) {
         printf("Error: %s\n", c->errstr);
         return 1;
     }
-    if (valkeyInitiateSSLWithContext(&c->c, ssl) != VALKEY_OK) {
-        printf("SSL Error!\n");
+    if (valkeyInitiateTLSWithContext(&c->c, tls) != VALKEY_OK) {
+        printf("TLS Error!\n");
         exit(1);
     }
 
@@ -87,6 +87,6 @@ int main(int argc, char **argv) {
     valkeyAsyncCommand(c, getCallback, (char *)"end-1", "GET key");
     event_base_dispatch(base);
 
-    valkeyFreeSSLContext(ssl);
+    valkeyFreeTLSContext(tls);
     return 0;
 }

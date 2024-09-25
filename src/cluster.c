@@ -1188,7 +1188,7 @@ static int cluster_update_route_by_addr(valkeyClusterContext *cc,
         goto error;
     }
 
-    if (cc->ssl && cc->ssl_init_fn(c, cc->ssl) != VALKEY_OK) {
+    if (cc->tls && cc->tls_init_fn(c, cc->tls) != VALKEY_OK) {
         valkeyClusterSetError(cc, c->err, c->errstr);
         goto error;
     }
@@ -1774,7 +1774,7 @@ valkeyContext *valkeyClusterGetValkeyContext(valkeyClusterContext *cc,
                 cc->on_connect(c, c->err ? VALKEY_ERR : VALKEY_OK);
             }
 
-            if (cc->ssl && cc->ssl_init_fn(c, cc->ssl) != VALKEY_OK) {
+            if (cc->tls && cc->tls_init_fn(c, cc->tls) != VALKEY_OK) {
                 valkeyClusterSetError(cc, c->err, c->errstr);
             }
 
@@ -1809,7 +1809,7 @@ valkeyContext *valkeyClusterGetValkeyContext(valkeyClusterContext *cc,
         return NULL;
     }
 
-    if (cc->ssl && cc->ssl_init_fn(c, cc->ssl) != VALKEY_OK) {
+    if (cc->tls && cc->tls_init_fn(c, cc->tls) != VALKEY_OK) {
         valkeyClusterSetError(cc, c->err, c->errstr);
         valkeyFree(c);
         return NULL;
@@ -2885,8 +2885,8 @@ valkeyClusterGetValkeyAsyncContext(valkeyClusterAsyncContext *acc,
         return NULL;
     }
 
-    if (acc->cc->ssl &&
-        acc->cc->ssl_init_fn(&ac->c, acc->cc->ssl) != VALKEY_OK) {
+    if (acc->cc->tls &&
+        acc->cc->tls_init_fn(&ac->c, acc->cc->tls) != VALKEY_OK) {
         valkeyClusterAsyncSetError(acc, ac->c.err, ac->c.errstr);
         valkeyAsyncFree(ac);
         return NULL;

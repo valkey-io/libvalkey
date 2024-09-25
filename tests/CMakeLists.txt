@@ -1,10 +1,10 @@
 SET(TEST_WITH_VALKEY_VERSION "7.2.5" CACHE STRING "Valkey version used when running tests.")
 
 if(ENABLE_SSL)
-  # Generate SSL certs and keys when needed
-  set(SSL_CONFIGS ca.crt ca.key ca.txt valkey.crt valkey.key client.crt client.key)
+  # Generate TLS certs and keys when needed
+  set(TLS_CONFIGS ca.crt ca.key ca.txt valkey.crt valkey.key client.crt client.key)
   add_custom_command(
-    OUTPUT ${SSL_CONFIGS}
+    OUTPUT ${TLS_CONFIGS}
     COMMAND openssl genrsa -out ca.key 4096
     COMMAND openssl req -x509 -new -nodes -sha256 -key ca.key -days 3650 -subj '/CN=Valkey Test CA' -out ca.crt
     COMMAND openssl genrsa -out valkey.key 2048
@@ -12,7 +12,7 @@ if(ENABLE_SSL)
     COMMAND openssl genrsa -out client.key 2048
     COMMAND openssl req -new -sha256 -key client.key -subj '/CN=Valkey Client Test Cert' | openssl x509 -req -sha256 -CA ca.crt -CAkey ca.key -CAserial ca.txt -CAcreateserial -days 365 -out client.crt
     )
-  add_custom_target(generate_tls_configs DEPENDS ${SSL_CONFIGS})
+  add_custom_target(generate_tls_configs DEPENDS ${TLS_CONFIGS})
   set(TLS_LIBRARY valkey_tls)
 endif()
 
@@ -65,7 +65,7 @@ add_executable(client_test client_test.c)
 target_include_directories(client_test PRIVATE "${PROJECT_SOURCE_DIR}/src")
 target_link_libraries(client_test valkey)
 if(TLS_LIBRARY)
-  target_compile_definitions(client_test PUBLIC VALKEY_TEST_SSL=1)
+  target_compile_definitions(client_test PUBLIC VALKEY_TEST_TLS=1)
   target_link_libraries(client_test ${TLS_LIBRARY})
 endif()
 if(LIBEVENT_LIBRARY)

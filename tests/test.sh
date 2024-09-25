@@ -9,11 +9,11 @@ check_executable() {
 
 VALKEY_SERVER=${VALKEY_SERVER:-valkey-server}
 VALKEY_PORT=${VALKEY_PORT:-56379}
-VALKEY_SSL_PORT=${VALKEY_SSL_PORT:-56443}
+VALKEY_TLS_PORT=${VALKEY_TLS_PORT:-56443}
 TEST_SSL=${TEST_SSL:-0}
 SKIPS_AS_FAILS=${SKIPS_AS_FAILS:-0}
 ENABLE_DEBUG_CMD=
-SSL_TEST_ARGS=
+TLS_TEST_ARGS=
 SKIPS_ARG=${SKIPS_ARG:-}
 VALKEY_DOCKER=${VALKEY_DOCKER:-}
 TEST_RDMA=${TEST_RDMA:-0}
@@ -33,33 +33,33 @@ SOCK_FILE=${tmpdir}/libvalkey-test-valkey.sock
 CONF_FILE=${tmpdir}/valkey.conf
 
 if [ "$TEST_SSL" = "1" ]; then
-    SSL_CA_CERT=${tmpdir}/ca.crt
-    SSL_CA_KEY=${tmpdir}/ca.key
-    SSL_CERT=${tmpdir}/valkey.crt
-    SSL_KEY=${tmpdir}/valkey.key
+    TLS_CA_CERT=${tmpdir}/ca.crt
+    TLS_CA_KEY=${tmpdir}/ca.key
+    TLS_CERT=${tmpdir}/valkey.crt
+    TLS_KEY=${tmpdir}/valkey.key
 
     openssl genrsa -out ${tmpdir}/ca.key 4096
     openssl req \
         -x509 -new -nodes -sha256 \
-        -key ${SSL_CA_KEY} \
+        -key ${TLS_CA_KEY} \
         -days 3650 \
         -subj '/CN=Libvalkey Test CA' \
-        -out ${SSL_CA_CERT}
-    openssl genrsa -out ${SSL_KEY} 2048
+        -out ${TLS_CA_CERT}
+    openssl genrsa -out ${TLS_KEY} 2048
     openssl req \
         -new -sha256 \
-        -key ${SSL_KEY} \
+        -key ${TLS_KEY} \
         -subj '/CN=Libvalkey Test Cert' | \
         openssl x509 \
             -req -sha256 \
-            -CA ${SSL_CA_CERT} \
-            -CAkey ${SSL_CA_KEY} \
+            -CA ${TLS_CA_CERT} \
+            -CAkey ${TLS_CA_KEY} \
             -CAserial ${tmpdir}/ca.txt \
             -CAcreateserial \
             -days 365 \
-            -out ${SSL_CERT}
+            -out ${TLS_CERT}
 
-    SSL_TEST_ARGS="--ssl-host 127.0.0.1 --ssl-port ${VALKEY_SSL_PORT} --ssl-ca-cert ${SSL_CA_CERT} --ssl-cert ${SSL_CERT} --ssl-key ${SSL_KEY}"
+    TLS_TEST_ARGS="--tls-host 127.0.0.1 --tls-port ${VALKEY_TLS_PORT} --tls-ca-cert ${TLS_CA_CERT} --tls-cert ${TLS_CERT} --tls-key ${TLS_KEY}"
 fi
 
 cleanup() {
@@ -93,10 +93,10 @@ fi
 # if doing ssl, add these
 if [ "$TEST_SSL" = "1" ]; then
     cat >> ${CONF_FILE} <<EOF
-tls-port ${VALKEY_SSL_PORT}
-tls-ca-cert-file ${SSL_CA_CERT}
-tls-cert-file ${SSL_CERT}
-tls-key-file ${SSL_KEY}
+tls-port ${VALKEY_TLS_PORT}
+tls-ca-cert-file ${TLS_CA_CERT}
+tls-cert-file ${TLS_CERT}
+tls-key-file ${TLS_KEY}
 EOF
 fi
 
@@ -116,7 +116,7 @@ if [ -n "${VALKEY_DOCKER}" ] ; then
     chmod a+r ${tmpdir}/*
     docker run -d --rm --name valkey-test-server \
         -p ${VALKEY_PORT}:${VALKEY_PORT} \
-        -p ${VALKEY_SSL_PORT}:${VALKEY_SSL_PORT} \
+        -p ${VALKEY_TLS_PORT}:${VALKEY_TLS_PORT} \
         -v ${tmpdir}:${tmpdir} \
         ${VALKEY_DOCKER} \
         ${VALKEY_SERVER} ${CONF_FILE}
@@ -134,4 +134,4 @@ done
 # Treat skips as failures if directed
 [ "$SKIPS_AS_FAILS" = 1 ] && SKIPS_ARG="${SKIPS_ARG} --skips-as-fails"
 
-${TEST_PREFIX:-} ./client_test -h 127.0.0.1 -p ${VALKEY_PORT} -s ${SOCK_FILE} ${SSL_TEST_ARGS} ${SKIPS_ARG} ${RDMA_TEST_ARGS}
+${TEST_PREFIX:-} ./client_test -h 127.0.0.1 -p ${VALKEY_PORT} -s ${SOCK_FILE} ${TLS_TEST_ARGS} ${SKIPS_ARG} ${RDMA_TEST_ARGS}

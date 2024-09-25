@@ -99,7 +99,7 @@ ifeq ($(USE_SSL),1)
   TLS_OBJS = $(patsubst $(SRC_DIR)/%.c,$(OBJ_DIR)/%.o,$(TLS_SOURCES))
 
   # This is required for test.c only
-  CFLAGS+=-DVALKEY_TEST_SSL
+  CFLAGS+=-DVALKEY_TEST_TLS
   TLS_STLIB=$(TLS_STLIBNAME)
   TLS_DYLIB=$(TLS_DYLIBNAME)
   TLS_PKGCONF=$(TLS_PKGCONFNAME)

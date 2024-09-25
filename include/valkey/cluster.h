@@ -68,7 +68,7 @@ extern "C" {
 
 struct hilist;
 struct valkeyClusterAsyncContext;
-struct valkeySSLContext;
+struct valkeyTLSContext;
 
 typedef int(adapterAttachFn)(valkeyAsyncContext *, void *);
 typedef void(valkeyClusterCallbackFn)(struct valkeyClusterAsyncContext *,
@@ -116,8 +116,8 @@ typedef struct valkeyClusterContext {
     int retry_count;       /* Current number of failing attempts */
     int need_update_route; /* Indicator for valkeyClusterReset() (Pipel.) */
 
-    void *ssl; /* Pointer to a valkeySSLContext when using SSL/TLS. */
-    int (*ssl_init_fn)(struct valkeyContext *, struct valkeySSLContext *);
+    void *tls; /* Pointer to a valkeyTLSContext when using TLS. */
+    int (*tls_init_fn)(struct valkeyContext *, struct valkeyTLSContext *);
 
     void (*on_connect)(const struct valkeyContext *c, int status);
     void (*event_callback)(const struct valkeyClusterContext *cc, int event,

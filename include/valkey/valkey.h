@@ -296,7 +296,7 @@ typedef struct valkeyContext {
     void (*free_privdata)(void *);
 
     /* Internal context pointer presently used by libvalkey to manage
-     * SSL connections. */
+     * TLS connections. */
     void *privctx;
 
     /* An optional RESP3 PUSH handler */

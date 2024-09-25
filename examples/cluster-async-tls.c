@@ -55,14 +55,14 @@ int main(int argc, char **argv) {
     UNUSED(argc);
     UNUSED(argv);
 
-    valkeySSLContext *ssl;
-    valkeySSLContextError ssl_error;
+    valkeyTLSContext *tls;
+    valkeyTLSContextError tls_error;
 
     valkeyInitOpenSSL();
-    ssl = valkeyCreateSSLContext("ca.crt", NULL, "client.crt", "client.key",
-                                 NULL, &ssl_error);
-    if (!ssl) {
-        printf("SSL Context error: %s\n", valkeySSLContextGetError(ssl_error));
+    tls = valkeyCreateTLSContext("ca.crt", NULL, "client.crt", "client.key",
+                                 NULL, &tls_error);
+    if (!tls) {
+        printf("TLS Context error: %s\n", valkeyTLSContextGetError(tls_error));
         exit(1);
     }
 
@@ -73,7 +73,7 @@ int main(int argc, char **argv) {
     valkeyClusterSetOptionAddNodes(acc->cc, CLUSTER_NODE_TLS);
     valkeyClusterSetOptionRouteUseSlots(acc->cc);
     valkeyClusterSetOptionParseSlaves(acc->cc);
-    valkeyClusterSetOptionEnableSSL(acc->cc, ssl);
+    valkeyClusterSetOptionEnableTLS(acc->cc, tls);
 
     if (valkeyClusterConnect2(acc->cc) != VALKEY_OK) {
         printf("Error: %s\n", acc->cc->errstr);
@@ -101,7 +101,7 @@ int main(int argc, char **argv) {
 
     printf("Done..\n");
     valkeyClusterAsyncFree(acc);
-    valkeyFreeSSLContext(ssl);
+    valkeyFreeTLSContext(tls);
     event_base_free(base);
     return 0;
 }

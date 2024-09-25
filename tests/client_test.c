@@ -25,7 +25,7 @@
 #include <limits.h>
 #include <math.h>
 #include <signal.h>
-#ifdef VALKEY_TEST_SSL
+#ifdef VALKEY_TEST_TLS
 #include "tls.h"
 #endif
 #ifdef VALKEY_TEST_RDMA
@@ -41,7 +41,7 @@ enum connection_type {
     CONN_TCP,
     CONN_UNIX,
     CONN_FD,
-    CONN_SSL,
+    CONN_TLS,
     CONN_RDMA
 };
 
@@ -64,7 +64,7 @@ struct config {
         const char *ca_cert;
         const char *cert;
         const char *key;
-    } ssl;
+    } tls;
 
     struct {
         const char *host;
@@ -83,8 +83,8 @@ struct pushCounters {
 
 static int insecure_calloc_calls;
 
-#ifdef VALKEY_TEST_SSL
-valkeySSLContext *_ssl_ctx = NULL;
+#ifdef VALKEY_TEST_TLS
+valkeyTLSContext *_tls_ctx = NULL;
 #endif
 
 /* The following lines make up our testing "framework" :) */
@@ -246,11 +246,11 @@ static int disconnect(valkeyContext *c, int keep_fd) {
     return -1;
 }
 
-static void do_ssl_handshake(valkeyContext *c) {
-#ifdef VALKEY_TEST_SSL
-    valkeyInitiateSSLWithContext(c, _ssl_ctx);
+static void do_tls_handshake(valkeyContext *c) {
+#ifdef VALKEY_TEST_TLS
+    valkeyInitiateTLSWithContext(c, _tls_ctx);
     if (c->err) {
-        printf("SSL error: %s\n", c->errstr);
+        printf("TLS error: %s\n", c->errstr);
         valkeyFree(c);
         exit(1);
     }
@@ -264,8 +264,8 @@ static valkeyContext *do_connect(struct config config) {
 
     if (config.type == CONN_TCP) {
         c = valkeyConnect(config.tcp.host, config.tcp.port);
-    } else if (config.type == CONN_SSL) {
-        c = valkeyConnect(config.ssl.host, config.ssl.port);
+    } else if (config.type == CONN_TLS) {
+        c = valkeyConnect(config.tls.host, config.tls.port);
     } else if (config.type == CONN_UNIX) {
         c = valkeyConnectUnix(config.unix_sock.path);
 #ifdef VALKEY_TEST_RDMA
@@ -295,8 +295,8 @@ static valkeyContext *do_connect(struct config config) {
         exit(1);
     }
 
-    if (config.type == CONN_SSL) {
-        do_ssl_handshake(c);
+    if (config.type == CONN_TLS) {
+        do_tls_handshake(c);
     }
 
     return select_database(c);
@@ -305,8 +305,8 @@ static valkeyContext *do_connect(struct config config) {
 static void do_reconnect(valkeyContext *c, struct config config) {
     valkeyReconnect(c);
 
-    if (config.type == CONN_SSL) {
-        do_ssl_handshake(c);
+    if (config.type == CONN_TLS) {
+        do_tls_handshake(c);
     }
 }
 
@@ -1458,7 +1458,7 @@ static void test_invalid_timeout_errors(struct config config) {
     config.connect_timeout.tv_sec = 0;
     config.connect_timeout.tv_usec = 10000001;
 
-    if (config.type == CONN_TCP || config.type == CONN_SSL) {
+    if (config.type == CONN_TCP || config.type == CONN_TLS) {
         c = valkeyConnectWithTimeout(config.tcp.host, config.tcp.port, config.connect_timeout);
     } else if (config.type == CONN_UNIX) {
         c = valkeyConnectUnixWithTimeout(config.unix_sock.path, config.connect_timeout);
@@ -1481,7 +1481,7 @@ static void test_invalid_timeout_errors(struct config config) {
     config.connect_timeout.tv_sec = (((LONG_MAX)-999) / 1000) + 1;
     config.connect_timeout.tv_usec = 0;
 
-    if (config.type == CONN_TCP || config.type == CONN_SSL) {
+    if (config.type == CONN_TCP || config.type == CONN_TLS) {
         c = valkeyConnectWithTimeout(config.tcp.host, config.tcp.port, config.connect_timeout);
     } else if (config.type == CONN_UNIX) {
         c = valkeyConnectUnixWithTimeout(config.unix_sock.path, config.connect_timeout);
@@ -2145,10 +2145,10 @@ static valkeyAsyncContext *do_aconnect(struct config config, astest_no testno) {
         options.type = VALKEY_CONN_TCP;
         options.connect_timeout = &config.connect_timeout;
         VALKEY_OPTIONS_SET_TCP(&options, config.tcp.host, config.tcp.port);
-    } else if (config.type == CONN_SSL) {
+    } else if (config.type == CONN_TLS) {
         options.type = VALKEY_CONN_TCP;
         options.connect_timeout = &config.connect_timeout;
-        VALKEY_OPTIONS_SET_TCP(&options, config.ssl.host, config.ssl.port);
+        VALKEY_OPTIONS_SET_TCP(&options, config.tls.host, config.tls.port);
     } else if (config.type == CONN_UNIX) {
         options.type = VALKEY_CONN_UNIX;
         options.endpoint.unix_socket = config.unix_sock.path;
@@ -2206,7 +2206,7 @@ static void test_async_polling(struct config config) {
     assert(astest.ac == NULL);
     test_cond(astest.disconnect_status == VALKEY_OK);
 
-    if (config.type == CONN_TCP || config.type == CONN_SSL) {
+    if (config.type == CONN_TCP || config.type == CONN_TLS) {
         /* timeout can only be simulated with network */
         test("Async connect timeout: ");
         config.tcp.host = "192.168.254.254"; /* blackhole ip */
@@ -2238,7 +2238,7 @@ static void test_async_polling(struct config config) {
     test_cond(astest.pongs == 1);
 
     /* Test a ping/pong after connection that didn't time out. */
-    if (config.type == CONN_TCP || config.type == CONN_SSL) {
+    if (config.type == CONN_TCP || config.type == CONN_TLS) {
         test("Async PING/PONG after connect timeout: ");
         config.connect_timeout.tv_usec = 10000; /* 10ms  */
         c = do_aconnect(config, ASTEST_PINGPONG_TIMEOUT);
@@ -2312,27 +2312,27 @@ int main(int argc, char **argv) {
             test_inherit_fd = 0;
         } else if (argc >= 1 && !strcmp(argv[0], "--skips-as-fails")) {
             skips_as_fails = 1;
-#ifdef VALKEY_TEST_SSL
-        } else if (argc >= 2 && !strcmp(argv[0], "--ssl-port")) {
+#ifdef VALKEY_TEST_TLS
+        } else if (argc >= 2 && !strcmp(argv[0], "--tls-port")) {
             argv++;
             argc--;
-            cfg.ssl.port = atoi(argv[0]);
-        } else if (argc >= 2 && !strcmp(argv[0], "--ssl-host")) {
+            cfg.tls.port = atoi(argv[0]);
+        } else if (argc >= 2 && !strcmp(argv[0], "--tls-host")) {
             argv++;
             argc--;
-            cfg.ssl.host = argv[0];
-        } else if (argc >= 2 && !strcmp(argv[0], "--ssl-ca-cert")) {
+            cfg.tls.host = argv[0];
+        } else if (argc >= 2 && !strcmp(argv[0], "--tls-ca-cert")) {
             argv++;
             argc--;
-            cfg.ssl.ca_cert = argv[0];
-        } else if (argc >= 2 && !strcmp(argv[0], "--ssl-cert")) {
+            cfg.tls.ca_cert = argv[0];
+        } else if (argc >= 2 && !strcmp(argv[0], "--tls-cert")) {
             argv++;
             argc--;
-            cfg.ssl.cert = argv[0];
-        } else if (argc >= 2 && !strcmp(argv[0], "--ssl-key")) {
+            cfg.tls.cert = argv[0];
+        } else if (argc >= 2 && !strcmp(argv[0], "--tls-key")) {
             argv++;
             argc--;
-            cfg.ssl.key = argv[0];
+            cfg.tls.key = argv[0];
 #endif
 #ifdef VALKEY_TEST_RDMA
         } else if (argc >= 1 && !strcmp(argv[0], "--rdma-addr")) {
@@ -2392,15 +2392,15 @@ int main(int argc, char **argv) {
         test_skipped();
     }
 
-#ifdef VALKEY_TEST_SSL
-    if (cfg.ssl.port && cfg.ssl.host) {
+#ifdef VALKEY_TEST_TLS
+    if (cfg.tls.port && cfg.tls.host) {
 
         valkeyInitOpenSSL();
-        _ssl_ctx = valkeyCreateSSLContext(cfg.ssl.ca_cert, NULL, cfg.ssl.cert, cfg.ssl.key, NULL, NULL);
-        assert(_ssl_ctx != NULL);
+        _tls_ctx = valkeyCreateTLSContext(cfg.tls.ca_cert, NULL, cfg.tls.cert, cfg.tls.key, NULL, NULL);
+        assert(_tls_ctx != NULL);
 
-        printf("\nTesting against SSL connection (%s:%d):\n", cfg.ssl.host, cfg.ssl.port);
-        cfg.type = CONN_SSL;
+        printf("\nTesting against TLS connection (%s:%d):\n", cfg.tls.host, cfg.tls.port);
+        cfg.type = CONN_TLS;
 
         test_blocking_connection(cfg);
         test_blocking_connection_timeouts(cfg);
@@ -2410,8 +2410,8 @@ int main(int argc, char **argv) {
         if (throughput)
             test_throughput(cfg);
 
-        valkeyFreeSSLContext(_ssl_ctx);
-        _ssl_ctx = NULL;
+        valkeyFreeTLSContext(_tls_ctx);
+        _tls_ctx = NULL;
     }
 #endif
 
