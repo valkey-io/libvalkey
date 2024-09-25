@@ -295,7 +295,7 @@ The callbacks are installed using the following functions:
 
 ```c
 status = valkeyClusterAsyncSetConnectCallback(acc, callbackFn);
-status = valkeyClusterAsyncSetDisonnectCallback(acc, callbackFn);
+status = valkeyClusterAsyncSetDisconnectCallback(acc, callbackFn);
 ```
 
 The callback functions should have the following prototype, aliased to `valkeyConnectCallback`:

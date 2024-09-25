@@ -189,7 +189,7 @@ static unsigned int keyHashSlot(char *key, int keylen) {
         if (key[e] == '}')
             break;
 
-    /* No '}' or nothing betweeen {} ? Hash the whole key. */
+    /* No '}' or nothing between {} ? Hash the whole key. */
     if (e == keylen || e == s + 1)
         return crc16(key, keylen) & 0x3FFF;
 
@@ -1949,7 +1949,7 @@ static valkeyClusterNode *getNodeFromRedirectReply(valkeyClusterContext *cc,
         *slotptr = vk_atoi(part[1], sdslen(part[1]));
     }
 
-    /* Find the last occurance of the port separator since
+    /* Find the last occurrence of the port separator since
      * IPv6 addresses can contain ':' */
     if ((p = strrchr(part[2], IP_PORT_SEPARATOR)) == NULL) {
         valkeyClusterSetError(cc, VALKEY_ERR_OTHER,

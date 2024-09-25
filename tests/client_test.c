@@ -219,7 +219,7 @@ static void send_hello(valkeyContext *c, int version) {
     freeReplyObject(reply);
 }
 
-/* Togggle client tracking */
+/* Toggle client tracking */
 static void send_client_tracking(valkeyContext *c, const char *str) {
     valkeyReply *reply;
 
@@ -1846,7 +1846,7 @@ static void test_command_timeout_during_pubsub(struct config config) {
     assert(ac != NULL && ac->err == 0);
     valkeyLibeventAttach(ac, base);
 
-    /* Configure a command timout */
+    /* Configure a command timeout */
     struct timeval command_timeout = {.tv_sec = 2};
     valkeyAsyncSetTimeout(ac, command_timeout);
 

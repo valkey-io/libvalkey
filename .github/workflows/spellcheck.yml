@@ -1,15 +1,28 @@
-name: spellcheck
+name: Spellcheck
 on:
   workflow_dispatch:
   pull_request:
+
+permissions:
+  contents: read
+
 jobs:
-  check-spelling:
+  spellcheck:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
-      - name: Check Spelling
+      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+      - name: Run spellcheck
         uses: rojopolis/spellcheck-github-actions@b83ca7c1b5c285e4f2b43e209a455c74872ec341 # 0.42.0
         with:
           config_path: .github/spellcheck-settings.yml
           task_name: Markdown
+  typos:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+      - name: Install typos
+        uses: taiki-e/install-action@7348990d6a11d92f3e482c9b1bb48cf31ab7f658 # v2.44.7
+        with:
+          tool: typos
+      - name: Run typos
+        run: typos --config=.github/typos.toml
