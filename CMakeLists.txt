@@ -159,70 +159,70 @@ IF(ENABLE_SSL)
         ENDIF()
     ENDIF()
     FIND_PACKAGE(OpenSSL REQUIRED)
-    SET(valkey_ssl_sources
+    SET(valkey_tls_sources
         src/cluster_tls.c
         src/tls.c)
-    ADD_LIBRARY(valkey_ssl ${valkey_ssl_sources})
-    ADD_LIBRARY(valkey::valkey_ssl ALIAS valkey_ssl)
+    ADD_LIBRARY(valkey_tls ${valkey_tls_sources})
+    ADD_LIBRARY(valkey::valkey_tls ALIAS valkey_tls)
 
-    TARGET_INCLUDE_DIRECTORIES(valkey_ssl
+    TARGET_INCLUDE_DIRECTORIES(valkey_tls
         PRIVATE
             $<INSTALL_INTERFACE:include>
             $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/valkey>
     )
 
     IF (APPLE AND BUILD_SHARED_LIBS)
-        SET_PROPERTY(TARGET valkey_ssl PROPERTY LINK_FLAGS "-Wl,-undefined -Wl,dynamic_lookup")
+        SET_PROPERTY(TARGET valkey_tls PROPERTY LINK_FLAGS "-Wl,-undefined -Wl,dynamic_lookup")
     ENDIF()
 
-    SET_TARGET_PROPERTIES(valkey_ssl
+    SET_TARGET_PROPERTIES(valkey_tls
         PROPERTIES
         WINDOWS_EXPORT_ALL_SYMBOLS TRUE
         VERSION "${LIBVALKEY_SONAME}")
     IF(MSVC)
-        SET_TARGET_PROPERTIES(valkey_ssl
+        SET_TARGET_PROPERTIES(valkey_tls
             PROPERTIES COMPILE_FLAGS /Z7)
     ENDIF()
-    TARGET_LINK_LIBRARIES(valkey_ssl PRIVATE OpenSSL::SSL)
+    TARGET_LINK_LIBRARIES(valkey_tls PRIVATE OpenSSL::SSL)
     IF(WIN32)
-        TARGET_LINK_LIBRARIES(valkey_ssl PRIVATE valkey)
+        TARGET_LINK_LIBRARIES(valkey_tls PRIVATE valkey)
     ENDIF()
-    CONFIGURE_FILE(valkey_tls.pc.in valkey_ssl.pc @ONLY)
+    CONFIGURE_FILE(valkey_tls.pc.in valkey_tls.pc @ONLY)
 
-    INSTALL(TARGETS valkey_ssl
-        EXPORT valkey_ssl-targets
+    INSTALL(TARGETS valkey_tls
+        EXPORT valkey_tls-targets
         RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
         LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
         ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
 
     if (MSVC AND BUILD_SHARED_LIBS)
-        INSTALL(FILES $<TARGET_PDB_FILE:valkey_ssl>
+        INSTALL(FILES $<TARGET_PDB_FILE:valkey_tls>
             DESTINATION ${CMAKE_INSTALL_BINDIR}
             CONFIGURATIONS Debug RelWithDebInfo)
     endif()
 
-    INSTALL(FILES ${CMAKE_CURRENT_BINARY_DIR}/valkey_ssl.pc
+    INSTALL(FILES ${CMAKE_CURRENT_BINARY_DIR}/valkey_tls.pc
         DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig)
 
-    export(EXPORT valkey_ssl-targets
-           FILE "${CMAKE_CURRENT_BINARY_DIR}/valkey_ssl-targets.cmake"
+    export(EXPORT valkey_tls-targets
+           FILE "${CMAKE_CURRENT_BINARY_DIR}/valkey_tls-targets.cmake"
            NAMESPACE valkey::)
 
     if(WIN32)
-        SET(CMAKE_CONF_INSTALL_DIR share/valkey_ssl)
+        SET(CMAKE_CONF_INSTALL_DIR share/valkey_tls)
     else()
-        SET(CMAKE_CONF_INSTALL_DIR ${CMAKE_INSTALL_LIBDIR}/cmake/valkey_ssl)
+        SET(CMAKE_CONF_INSTALL_DIR ${CMAKE_INSTALL_LIBDIR}/cmake/valkey_tls)
     endif()
-    configure_package_config_file(valkey_tls-config.cmake.in ${CMAKE_CURRENT_BINARY_DIR}/valkey_ssl-config.cmake
+    configure_package_config_file(valkey_tls-config.cmake.in ${CMAKE_CURRENT_BINARY_DIR}/valkey_tls-config.cmake
                                   INSTALL_DESTINATION ${CMAKE_CONF_INSTALL_DIR}
                                   PATH_VARS INCLUDE_INSTALL_DIR)
 
-    INSTALL(EXPORT valkey_ssl-targets
-        FILE valkey_ssl-targets.cmake
+    INSTALL(EXPORT valkey_tls-targets
+        FILE valkey_tls-targets.cmake
         NAMESPACE valkey::
         DESTINATION ${CMAKE_CONF_INSTALL_DIR})
 
-    INSTALL(FILES ${CMAKE_CURRENT_BINARY_DIR}/valkey_ssl-config.cmake
+    INSTALL(FILES ${CMAKE_CURRENT_BINARY_DIR}/valkey_tls-config.cmake
         DESTINATION ${CMAKE_CONF_INSTALL_DIR})
 ENDIF()
 

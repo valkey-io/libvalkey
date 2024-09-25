@@ -11,10 +11,10 @@ EXAMPLES=example-blocking example-blocking-push example-async-libevent \
 	 example-cluster-simple
 
 ifeq ($(USE_SSL),1)
-  EXAMPLES+=example-blocking-ssl example-async-libevent-ssl \
+  EXAMPLES+=example-blocking-tls example-async-libevent-tls \
 	    example-cluster-async-tls example-cluster-tls
-  SSL_STLIBNAME=../lib/libvalkey_ssl.a
-  SSL_LDFLAGS=-lssl -lcrypto
+  TLS_STLIBNAME=../lib/libvalkey_tls.a
+  TLS_LDFLAGS=-lssl -lcrypto
 endif
 
 .PHONY: all clean
@@ -24,8 +24,8 @@ all: $(EXAMPLES)
 $(STLIBNAME):
 	$(MAKE) -C ../
 
-$(SSL_STLIBNAME):
-	USE_SSL=1 $(MAKE) -C ../
+$(TLS_STLIBNAME):
+	USE_TLS=1 $(MAKE) -C ../
 
 example-blocking: blocking.c $(STLIBNAME)
 	$(CC) -o $@ $(CFLAGS) $< $(STLIBNAME)
@@ -33,14 +33,14 @@ example-blocking: blocking.c $(STLIBNAME)
 example-blocking-push: blocking-push.c $(STLIBNAME)
 	$(CC) -o $@ $(CFLAGS) $< $(STLIBNAME)
 
-example-blocking-ssl: blocking-tls.c $(STLIBNAME) $(TLS_STLIBNAME)
-	$(CC) -o $@ $(CFLAGS) $< $(STLIBNAME) $(SSL_STLIBNAME) $(SSL_LDFLAGS)
+example-blocking-tls: blocking-tls.c $(STLIBNAME) $(TLS_STLIBNAME)
+	$(CC) -o $@ $(CFLAGS) $< $(STLIBNAME) $(TLS_STLIBNAME) $(TLS_LDFLAGS)
 
 example-async-libevent: async-libevent.c $(STLIBNAME)
 	$(CC) -o $@ $(CFLAGS) $< -levent $(STLIBNAME)
 
-example-async-libevent-ssl: async-libevent-tls.c $(STLIBNAME) $(SSL_STLIBNAME)
-	$(CC) -o $@ $(CFLAGS) $< -levent $(STLIBNAME) $(SSL_STLIBNAME) $(SSL_LDFLAGS)
+example-async-libevent-tls: async-libevent-tls.c $(STLIBNAME) $(TLS_STLIBNAME)
+	$(CC) -o $@ $(CFLAGS) $< -levent $(STLIBNAME) $(TLS_STLIBNAME) $(TLS_LDFLAGS)
 
 example-async-libev: async-libev.c $(STLIBNAME)
 	$(CC) -o $@ $(CFLAGS) $< -lev $(STLIBNAME)
@@ -98,8 +98,8 @@ endif
 example-cluster-async: cluster-async.c $(STLIBNAME)
 	$(CC) -o $@ $(CFLAGS) $< -levent $(STLIBNAME)
 
-example-cluster-async-tls: cluster-async-tls.c $(STLIBNAME) $(SSL_STLIBNAME)
-	$(CC) -o $@ $(CFLAGS) $< -levent $(STLIBNAME) $(SSL_STLIBNAME) $(SSL_LDFLAGS)
+example-cluster-async-tls: cluster-async-tls.c $(STLIBNAME) $(TLS_STLIBNAME)
+	$(CC) -o $@ $(CFLAGS) $< -levent $(STLIBNAME) $(TLS_STLIBNAME) $(TLS_LDFLAGS)
 
 example-cluster-clientside-caching-async: cluster-clientside-caching-async.c $(STLIBNAME)
 	$(CC) -o $@ $(CFLAGS) $< -levent $(STLIBNAME)
@@ -107,8 +107,8 @@ example-cluster-clientside-caching-async: cluster-clientside-caching-async.c $(S
 example-cluster-simple: cluster-simple.c $(STLIBNAME)
 	$(CC) -o $@ $(CFLAGS) $< $(STLIBNAME)
 
-example-cluster-tls: cluster-tls.c $(STLIBNAME) $(SSL_STLIBNAME)
-	$(CC) -o $@ $(CFLAGS) $< $(STLIBNAME) $(SSL_STLIBNAME) $(SSL_LDFLAGS)
+example-cluster-tls: cluster-tls.c $(STLIBNAME) $(TLS_STLIBNAME)
+	$(CC) -o $@ $(CFLAGS) $< $(STLIBNAME) $(TLS_STLIBNAME) $(TLS_LDFLAGS)
 
 clean:
 	rm -f example-* *.o

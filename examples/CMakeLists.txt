@@ -5,7 +5,7 @@ if(CMAKE_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR)
   # This CMakeLists.txt is used standalone to build the examples.
   # Find required valkey package to get include paths.
   find_package(valkey REQUIRED)
-  find_package(valkey_ssl QUIET)
+  find_package(valkey_tls QUIET)
 else()
   # This CMakeLists.txt is included, most likely from libvalkey's project
   # CMakeLists.txt. Add path to enable <valkey/x.h> includes.
@@ -37,8 +37,8 @@ if(LIBEVENT)
   target_link_libraries(example-async-libevent valkey::valkey event)
 
   if(ENABLE_SSL)
-    add_executable(example-async-libevent-ssl async-libevent-tls.c)
-    target_link_libraries(example-async-libevent-ssl valkey::valkey valkey::valkey_ssl event)
+    add_executable(example-async-libevent-tls async-libevent-tls.c)
+    target_link_libraries(example-async-libevent-tls valkey::valkey valkey::valkey_tls event)
   endif()
 endif()
 
@@ -67,8 +67,8 @@ if(APPLE)
 endif()
 
 if(ENABLE_SSL)
-  add_executable(example-blocking-ssl blocking-tls.c)
-  target_link_libraries(example-blocking-ssl valkey::valkey valkey::valkey_ssl)
+  add_executable(example-blocking-tls blocking-tls.c)
+  target_link_libraries(example-blocking-tls valkey::valkey valkey::valkey_tls)
 endif()
 
 add_executable(example-blocking blocking.c)
@@ -83,7 +83,7 @@ if(LIBEVENT)
 
   if(ENABLE_SSL)
     add_executable(example-cluster-async-tls cluster-async-tls.c)
-    target_link_libraries(example-cluster-async-tls valkey::valkey valkey::valkey_ssl event)
+    target_link_libraries(example-cluster-async-tls valkey::valkey valkey::valkey_tls event)
   endif()
 
   add_executable(example-cluster-clientside-caching-async cluster-clientside-caching-async.c)
@@ -95,5 +95,5 @@ target_link_libraries(example-cluster-simple valkey::valkey)
 
 if(ENABLE_SSL)
   add_executable(example-cluster-tls cluster-tls.c)
-  target_link_libraries(example-cluster-tls valkey::valkey valkey::valkey_ssl)
+  target_link_libraries(example-cluster-tls valkey::valkey valkey::valkey_tls)
 endif()

@@ -5,9 +5,9 @@ libdir=${exec_prefix}/${install_libdir}
 includedir=${prefix}/include
 pkgincludedir=${includedir}/valkey
 
-Name: valkey_ssl
-Description: SSL Support for valkey.
+Name: valkey_tls
+Description: TLS support for libvalkey.
 Version: @PROJECT_VERSION@
 Requires: valkey
-Libs: -L${libdir} -lvalkey_ssl
+Libs: -L${libdir} -lvalkey_tls
 Libs.private: -lssl -lcrypto
