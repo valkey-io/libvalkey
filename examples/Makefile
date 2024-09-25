@@ -33,13 +33,13 @@ example-blocking: blocking.c $(STLIBNAME)
 example-blocking-push: blocking-push.c $(STLIBNAME)
 	$(CC) -o $@ $(CFLAGS) $< $(STLIBNAME)
 
-example-blocking-ssl: blocking-ssl.c $(STLIBNAME) $(SSL_STLIBNAME)
+example-blocking-ssl: blocking-tls.c $(STLIBNAME) $(TLS_STLIBNAME)
 	$(CC) -o $@ $(CFLAGS) $< $(STLIBNAME) $(SSL_STLIBNAME) $(SSL_LDFLAGS)
 
 example-async-libevent: async-libevent.c $(STLIBNAME)
 	$(CC) -o $@ $(CFLAGS) $< -levent $(STLIBNAME)
 
-example-async-libevent-ssl: async-libevent-ssl.c $(STLIBNAME) $(SSL_STLIBNAME)
+example-async-libevent-ssl: async-libevent-tls.c $(STLIBNAME) $(SSL_STLIBNAME)
 	$(CC) -o $@ $(CFLAGS) $< -levent $(STLIBNAME) $(SSL_STLIBNAME) $(SSL_LDFLAGS)
 
 example-async-libev: async-libev.c $(STLIBNAME)

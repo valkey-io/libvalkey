@@ -37,7 +37,7 @@ if(LIBEVENT)
   target_link_libraries(example-async-libevent valkey::valkey event)
 
   if(ENABLE_SSL)
-    add_executable(example-async-libevent-ssl async-libevent-ssl.c)
+    add_executable(example-async-libevent-ssl async-libevent-tls.c)
     target_link_libraries(example-async-libevent-ssl valkey::valkey valkey::valkey_ssl event)
   endif()
 endif()
@@ -67,7 +67,7 @@ if(APPLE)
 endif()
 
 if(ENABLE_SSL)
-  add_executable(example-blocking-ssl blocking-ssl.c)
+  add_executable(example-blocking-ssl blocking-tls.c)
   target_link_libraries(example-blocking-ssl valkey::valkey valkey::valkey_ssl)
 endif()
 

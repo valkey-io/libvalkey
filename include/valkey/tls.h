@@ -28,8 +28,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef VALKEY_SSL_H
-#define VALKEY_SSL_H
+#ifndef VALKEY_TLS_H
+#define VALKEY_TLS_H
 
 #ifdef __cplusplus
 extern "C" {
@@ -162,4 +162,4 @@ int valkeyInitiateSSL(struct valkeyContext *c, struct ssl_st *ssl);
 }
 #endif
 
-#endif /* VALKEY_SSL_H */
+#endif /* VALKEY_TLS_H */

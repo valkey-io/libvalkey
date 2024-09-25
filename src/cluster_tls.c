@@ -26,7 +26,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-#include "cluster_ssl.h"
+#include "cluster_tls.h"
 
 int valkeyClusterSetOptionEnableSSL(valkeyClusterContext *cc,
                                     valkeySSLContext *ssl) {

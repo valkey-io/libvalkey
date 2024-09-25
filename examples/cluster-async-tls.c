@@ -1,5 +1,5 @@
 #include <valkey/cluster.h>
-#include <valkey/cluster_ssl.h>
+#include <valkey/cluster_tls.h>
 
 #include <valkey/adapters/libevent.h>
 

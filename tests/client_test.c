@@ -26,7 +26,7 @@
 #include <math.h>
 #include <signal.h>
 #ifdef VALKEY_TEST_SSL
-#include "ssl.h"
+#include "tls.h"
 #endif
 #ifdef VALKEY_TEST_RDMA
 #include "rdma.h"

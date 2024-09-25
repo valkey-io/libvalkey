@@ -160,8 +160,8 @@ IF(ENABLE_SSL)
     ENDIF()
     FIND_PACKAGE(OpenSSL REQUIRED)
     SET(valkey_ssl_sources
-        src/cluster_ssl.c
-        src/ssl.c)
+        src/cluster_tls.c
+        src/tls.c)
     ADD_LIBRARY(valkey_ssl ${valkey_ssl_sources})
     ADD_LIBRARY(valkey::valkey_ssl ALIAS valkey_ssl)
 
@@ -187,7 +187,7 @@ IF(ENABLE_SSL)
     IF(WIN32)
         TARGET_LINK_LIBRARIES(valkey_ssl PRIVATE valkey)
     ENDIF()
-    CONFIGURE_FILE(valkey_ssl.pc.in valkey_ssl.pc @ONLY)
+    CONFIGURE_FILE(valkey_tls.pc.in valkey_ssl.pc @ONLY)
 
     INSTALL(TARGETS valkey_ssl
         EXPORT valkey_ssl-targets
@@ -213,7 +213,7 @@ IF(ENABLE_SSL)
     else()
         SET(CMAKE_CONF_INSTALL_DIR ${CMAKE_INSTALL_LIBDIR}/cmake/valkey_ssl)
     endif()
-    configure_package_config_file(valkey_ssl-config.cmake.in ${CMAKE_CURRENT_BINARY_DIR}/valkey_ssl-config.cmake
+    configure_package_config_file(valkey_tls-config.cmake.in ${CMAKE_CURRENT_BINARY_DIR}/valkey_ssl-config.cmake
                                   INSTALL_DESTINATION ${CMAKE_CONF_INSTALL_DIR}
                                   PATH_VARS INCLUDE_INSTALL_DIR)
 

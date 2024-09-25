@@ -1,5 +1,5 @@
 #include <valkey/async.h>
-#include <valkey/ssl.h>
+#include <valkey/tls.h>
 #include <valkey/valkey.h>
 
 #include <valkey/adapters/libevent.h>

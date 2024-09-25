@@ -1,4 +1,4 @@
-#include <valkey/ssl.h>
+#include <valkey/tls.h>
 #include <valkey/valkey.h>
 
 #include <stdio.h>
