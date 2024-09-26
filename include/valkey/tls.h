@@ -28,8 +28,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef VALKEY_SSL_H
-#define VALKEY_SSL_H
+#ifndef VALKEY_TLS_H
+#define VALKEY_TLS_H
 
 #ifdef __cplusplus
 extern "C" {
@@ -38,42 +38,41 @@ extern "C" {
 /* Forward declarations for structs defined elsewhere. */
 struct valkeyContext;
 
-/* This is the underlying struct for SSL in ssl.h, which is not included to
+/* This is the underlying OpenSSL struct which is not included to
  * keep build dependencies short here.
  */
 struct ssl_st;
 
-/* A wrapper around OpenSSL SSL_CTX to allow easy SSL use without directly
+/* A wrapper around OpenSSL SSL_CTX to allow easy TLS use without directly
  * calling OpenSSL.
  */
-typedef struct valkeySSLContext valkeySSLContext;
+typedef struct valkeyTLSContext valkeyTLSContext;
 
 /**
- * Initialization errors that valkeyCreateSSLContext() may return.
+ * Initialization errors that valkeyCreateTLSContext() may return.
  */
-
 typedef enum {
-    VALKEY_SSL_CTX_NONE = 0,                   /* No Error */
-    VALKEY_SSL_CTX_CREATE_FAILED,              /* Failed to create OpenSSL SSL_CTX */
-    VALKEY_SSL_CTX_CERT_KEY_REQUIRED,          /* Client cert and key must both be specified or skipped */
-    VALKEY_SSL_CTX_CA_CERT_LOAD_FAILED,        /* Failed to load CA Certificate or CA Path */
-    VALKEY_SSL_CTX_CLIENT_CERT_LOAD_FAILED,    /* Failed to load client certificate */
-    VALKEY_SSL_CTX_CLIENT_DEFAULT_CERT_FAILED, /* Failed to set client default certificate directory */
-    VALKEY_SSL_CTX_PRIVATE_KEY_LOAD_FAILED,    /* Failed to load private key */
-    VALKEY_SSL_CTX_OS_CERTSTORE_OPEN_FAILED,   /* Failed to open system certificate store */
-    VALKEY_SSL_CTX_OS_CERT_ADD_FAILED          /* Failed to add CA certificates obtained from system to the SSL context */
-} valkeySSLContextError;
+    VALKEY_TLS_CTX_NONE = 0,                   /* No Error */
+    VALKEY_TLS_CTX_CREATE_FAILED,              /* Failed to create OpenSSL SSL_CTX */
+    VALKEY_TLS_CTX_CERT_KEY_REQUIRED,          /* Client cert and key must both be specified or skipped */
+    VALKEY_TLS_CTX_CA_CERT_LOAD_FAILED,        /* Failed to load CA Certificate or CA Path */
+    VALKEY_TLS_CTX_CLIENT_CERT_LOAD_FAILED,    /* Failed to load client certificate */
+    VALKEY_TLS_CTX_CLIENT_DEFAULT_CERT_FAILED, /* Failed to set client default certificate directory */
+    VALKEY_TLS_CTX_PRIVATE_KEY_LOAD_FAILED,    /* Failed to load private key */
+    VALKEY_TLS_CTX_OS_CERTSTORE_OPEN_FAILED,   /* Failed to open system certificate store */
+    VALKEY_TLS_CTX_OS_CERT_ADD_FAILED          /* Failed to add CA certificates obtained from system to the TLS context */
+} valkeyTLSContextError;
 
 /* Constants that mirror OpenSSL's verify modes. By default,
- * VALKEY_SSL_VERIFY_PEER is used with valkeyCreateSSLContext().
+ * VALKEY_TLS_VERIFY_PEER is used with valkeyCreateTLSContext().
  * Some clients disable peer verification if there are no
  * certificates specified.
  */
-#define VALKEY_SSL_VERIFY_NONE 0x00
-#define VALKEY_SSL_VERIFY_PEER 0x01
-#define VALKEY_SSL_VERIFY_FAIL_IF_NO_PEER_CERT 0x02
-#define VALKEY_SSL_VERIFY_CLIENT_ONCE 0x04
-#define VALKEY_SSL_VERIFY_POST_HANDSHAKE 0x08
+#define VALKEY_TLS_VERIFY_NONE 0x00
+#define VALKEY_TLS_VERIFY_PEER 0x01
+#define VALKEY_TLS_VERIFY_FAIL_IF_NO_PEER_CERT 0x02
+#define VALKEY_TLS_VERIFY_CLIENT_ONCE 0x04
+#define VALKEY_TLS_VERIFY_POST_HANDSHAKE 0x08
 
 /* Options to create an OpenSSL context. */
 typedef struct {
@@ -83,13 +82,12 @@ typedef struct {
     const char *private_key_filename;
     const char *server_name;
     int verify_mode;
-} valkeySSLOptions;
+} valkeyTLSOptions;
 
 /**
  * Return the error message corresponding with the specified error code.
  */
-
-const char *valkeySSLContextGetError(valkeySSLContextError error);
+const char *valkeyTLSContextGetError(valkeyTLSContextError error);
 
 /**
  * Helper function to initialize the OpenSSL library.
@@ -102,7 +100,7 @@ int valkeyInitOpenSSL(void);
 
 /**
  * Helper function to initialize an OpenSSL context that can be used
- * to initiate SSL connections.
+ * to initiate TLS connections.
  *
  * cacert_filename is an optional name of a CA certificate/bundle file to load
  * and use for validation.
@@ -120,46 +118,43 @@ int valkeyInitOpenSSL(void);
  * If error is non-null, it will be populated in case the context creation fails
  * (returning a NULL).
  */
-
-valkeySSLContext *valkeyCreateSSLContext(const char *cacert_filename, const char *capath,
+valkeyTLSContext *valkeyCreateTLSContext(const char *cacert_filename, const char *capath,
                                          const char *cert_filename, const char *private_key_filename,
-                                         const char *server_name, valkeySSLContextError *error);
+                                         const char *server_name, valkeyTLSContextError *error);
 
 /**
   * Helper function to initialize an OpenSSL context that can be used
-  * to initiate SSL connections. This is a more extensible version of valkeyCreateSSLContext().
+  * to initiate TLS connections. This is a more extensible version of valkeyCreateTLSContext().
   *
-  * options contains a structure of SSL options to use.
+  * options contains a structure of TLS options to use.
   *
   * If error is non-null, it will be populated in case the context creation fails
   * (returning a NULL).
 */
-valkeySSLContext *valkeyCreateSSLContextWithOptions(valkeySSLOptions *options,
-                                                    valkeySSLContextError *error);
+valkeyTLSContext *valkeyCreateTLSContextWithOptions(valkeyTLSOptions *options,
+                                                    valkeyTLSContextError *error);
 
 /**
  * Free a previously created OpenSSL context.
  */
-void valkeyFreeSSLContext(valkeySSLContext *valkey_ssl_ctx);
+void valkeyFreeTLSContext(valkeyTLSContext *valkey_tls_ctx);
 
 /**
- * Initiate SSL on an existing valkeyContext.
+ * Initiate TLS on an existing valkeyContext.
  *
- * This is similar to valkeyInitiateSSL() but does not require the caller
- * to directly interact with OpenSSL, and instead uses a valkeySSLContext
- * previously created using valkeyCreateSSLContext().
+ * This is similar to valkeyInitiateTLS() but does not require the caller
+ * to directly interact with OpenSSL, and instead uses a valkeyTLSContext
+ * previously created using valkeyCreateTLSContext().
  */
-
-int valkeyInitiateSSLWithContext(struct valkeyContext *c, valkeySSLContext *valkey_ssl_ctx);
+int valkeyInitiateTLSWithContext(struct valkeyContext *c, valkeyTLSContext *valkey_tls_ctx);
 
 /**
- * Initiate SSL/TLS negotiation on a provided OpenSSL SSL object.
+ * Initiate TLS negotiation on a provided OpenSSL SSL object.
  */
-
-int valkeyInitiateSSL(struct valkeyContext *c, struct ssl_st *ssl);
+int valkeyInitiateTLS(struct valkeyContext *c, struct ssl_st *ssl);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* VALKEY_SSL_H */
+#endif /* VALKEY_TLS_H */

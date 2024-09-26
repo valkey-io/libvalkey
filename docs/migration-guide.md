@@ -6,8 +6,10 @@ This guide highlights which APIs that have changed and what you need to do when 
 The general actions needed are:
 
 * Replace the prefix `redis` with `valkey` in API usages.
+* Replace the term `SSL` with `TLS` in API usages for secure communication.
 * Update include paths depending on your previous installation.
   All `libvalkey` headers are now found under `include/valkey/`.
+* Update used build options, e.g. `USE_TLS` replaces `USE_SSL`.
 
 ## Migrating from `hiredis` v1.2.0
 

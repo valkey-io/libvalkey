@@ -26,11 +26,11 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-#ifndef VALKEY_CLUSTER_SSL_H
-#define VALKEY_CLUSTER_SSL_H
+#ifndef VALKEY_CLUSTER_TLS_H
+#define VALKEY_CLUSTER_TLS_H
 
 #include "cluster.h"
-#include "ssl.h"
+#include "tls.h"
 #include "valkey.h"
 
 #ifdef __cplusplus
@@ -38,13 +38,13 @@ extern "C" {
 #endif
 
 /**
- * Configuration option to enable SSL/TLS negotiation on a context.
+ * Configuration option to enable TLS negotiation on a context.
  */
-int valkeyClusterSetOptionEnableSSL(valkeyClusterContext *cc,
-                                    valkeySSLContext *ssl);
+int valkeyClusterSetOptionEnableTLS(valkeyClusterContext *cc,
+                                    valkeyTLSContext *tls);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* VALKEY_CLUSTER_SSL_H */
+#endif /* VALKEY_CLUSTER_TLS_H */

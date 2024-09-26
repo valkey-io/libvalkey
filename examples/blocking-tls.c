@@ -1,4 +1,4 @@
-#include <valkey/ssl.h>
+#include <valkey/tls.h>
 #include <valkey/valkey.h>
 
 #include <stdio.h>
@@ -11,8 +11,8 @@
 
 int main(int argc, char **argv) {
     unsigned int j;
-    valkeySSLContext *ssl;
-    valkeySSLContextError ssl_error = VALKEY_SSL_CTX_NONE;
+    valkeyTLSContext *tls;
+    valkeyTLSContextError tls_error = VALKEY_TLS_CTX_NONE;
     valkeyContext *c;
     valkeyReply *reply;
     if (argc < 4) {
@@ -26,9 +26,9 @@ int main(int argc, char **argv) {
     const char *ca = argc > 4 ? argv[5] : NULL;
 
     valkeyInitOpenSSL();
-    ssl = valkeyCreateSSLContext(ca, NULL, cert, key, NULL, &ssl_error);
-    if (!ssl || ssl_error != VALKEY_SSL_CTX_NONE) {
-        printf("SSL Context error: %s\n", valkeySSLContextGetError(ssl_error));
+    tls = valkeyCreateTLSContext(ca, NULL, cert, key, NULL, &tls_error);
+    if (!tls || tls_error != VALKEY_TLS_CTX_NONE) {
+        printf("TLS Context error: %s\n", valkeyTLSContextGetError(tls_error));
         exit(1);
     }
 
@@ -48,8 +48,8 @@ int main(int argc, char **argv) {
         exit(1);
     }
 
-    if (valkeyInitiateSSLWithContext(c, ssl) != VALKEY_OK) {
-        printf("Couldn't initialize SSL!\n");
+    if (valkeyInitiateTLSWithContext(c, tls) != VALKEY_OK) {
+        printf("Couldn't initialize TLS!\n");
         printf("Error: %s\n", c->errstr);
         valkeyFree(c);
         exit(1);
@@ -106,7 +106,7 @@ int main(int argc, char **argv) {
     /* Disconnects and frees the context */
     valkeyFree(c);
 
-    valkeyFreeSSLContext(ssl);
+    valkeyFreeTLSContext(tls);
 
     return 0;
 }

@@ -1,6 +1,6 @@
 #include <valkey/cluster.h>
-#include <valkey/cluster_ssl.h>
-#include <valkey/ssl.h>
+#include <valkey/cluster_tls.h>
+#include <valkey/tls.h>
 #include <valkey/valkey.h>
 
 #include <stdio.h>
@@ -12,14 +12,14 @@ int main(int argc, char **argv) {
     UNUSED(argc);
     UNUSED(argv);
 
-    valkeySSLContext *ssl;
-    valkeySSLContextError ssl_error;
+    valkeyTLSContext *tls;
+    valkeyTLSContextError tls_error;
 
     valkeyInitOpenSSL();
-    ssl = valkeyCreateSSLContext("ca.crt", NULL, "client.crt", "client.key",
-                                 NULL, &ssl_error);
-    if (!ssl) {
-        printf("SSL Context error: %s\n", valkeySSLContextGetError(ssl_error));
+    tls = valkeyCreateTLSContext("ca.crt", NULL, "client.crt", "client.key",
+                                 NULL, &tls_error);
+    if (!tls) {
+        printf("TLS Context error: %s\n", valkeyTLSContextGetError(tls_error));
         exit(1);
     }
 
@@ -30,7 +30,7 @@ int main(int argc, char **argv) {
     valkeyClusterSetOptionConnectTimeout(cc, timeout);
     valkeyClusterSetOptionRouteUseSlots(cc);
     valkeyClusterSetOptionParseSlaves(cc);
-    valkeyClusterSetOptionEnableSSL(cc, ssl);
+    valkeyClusterSetOptionEnableTLS(cc, tls);
     valkeyClusterConnect2(cc);
     if (!cc) {
         printf("Error: Allocation failure\n");
@@ -58,6 +58,6 @@ int main(int argc, char **argv) {
     freeReplyObject(reply2);
 
     valkeyClusterFree(cc);
-    valkeyFreeSSLContext(ssl);
+    valkeyFreeTLSContext(tls);
     return 0;
 }

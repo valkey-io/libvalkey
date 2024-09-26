@@ -23,7 +23,7 @@ This document describes using `libvalkey` in standalone (non-cluster) mode, incl
   - [Connecting](#connecting-1)
   - [Executing commands](#executing-commands-1)
   - [Disconnecting/cleanup](#disconnecting-cleanup-1)
-- [SSL/TLS support](#ssl-tls-support)
+- [TLS support](#tls-support)
 
 ## Synchronous API
 
@@ -367,9 +367,9 @@ To terminate the connection forcefully use `valkeyAsyncFree` which also will blo
 There will be no more data sent on the socket and all pending callbacks will be called with a `NULL` reply.
 After this, the disconnection callback is called with the `VALKEY_OK` status, and the context object is freed.
 
-## SSL/TLS support
+## TLS support
 
-SSL/TLS support is not enabled by default and requires an explicit build flag as described in [`README.md`](../README.md#building).
+TLS support is not enabled by default and requires an explicit build flag as described in [`README.md`](../README.md#building).
 
-Libvalkey implements SSL/TLS on top of its `valkeyContext` and `valkeyAsyncContext`, so you will need to establish a connection first and then initiate an SSL/TLS handshake.
-See the [examples](../examples) directory for how to create the SSL/TLS context and initiate the handshake.
+Libvalkey implements TLS on top of its `valkeyContext` and `valkeyAsyncContext`, so you will need to establish a connection first and then initiate a TLS handshake.
+See the [examples](../examples) directory for how to create the TLS context and initiate the handshake.

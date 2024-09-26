@@ -26,16 +26,16 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-#include "cluster_ssl.h"
+#include "cluster_tls.h"
 
-int valkeyClusterSetOptionEnableSSL(valkeyClusterContext *cc,
-                                    valkeySSLContext *ssl) {
-    if (cc == NULL || ssl == NULL) {
+int valkeyClusterSetOptionEnableTLS(valkeyClusterContext *cc,
+                                    valkeyTLSContext *tls) {
+    if (cc == NULL || tls == NULL) {
         return VALKEY_ERR;
     }
 
-    cc->ssl = ssl;
-    cc->ssl_init_fn = &valkeyInitiateSSLWithContext;
+    cc->tls = tls;
+    cc->tls_init_fn = &valkeyInitiateTLSWithContext;
 
     return VALKEY_OK;
 }

@@ -55,7 +55,7 @@
 #include "win32.h"
 
 #include "async_private.h"
-#include "ssl.h"
+#include "tls.h"
 #include "valkey_private.h"
 
 #include <openssl/err.h>
@@ -63,16 +63,16 @@
 
 #define OPENSSL_1_1_0 0x10100000L
 
-struct valkeySSLContext {
-    /* Associated OpenSSL SSL_CTX as created by valkeyCreateSSLContext() */
+struct valkeyTLSContext {
+    /* Associated OpenSSL SSL_CTX as created by valkeyCreateTLSContext() */
     SSL_CTX *ssl_ctx;
 
     /* Requested SNI, or NULL */
     char *server_name;
 };
 
-/* The SSL connection context is attached to SSL/TLS connections as a privdata. */
-typedef struct valkeySSL {
+/* The TLS connection context is attached to TLS connections as a privdata. */
+typedef struct valkeyTLS {
     /**
      * OpenSSL SSL object.
      */
@@ -92,10 +92,10 @@ typedef struct valkeySSL {
      * should resume whenever a read takes place, if possible
      */
     int pendingWrite;
-} valkeySSL;
+} valkeyTLS;
 
 /* Forward declaration */
-static valkeyContextFuncs valkeyContextSSLFuncs;
+static valkeyContextFuncs valkeyContextTLSFuncs;
 
 /**
  * OpenSSL global initialization and locking handling callbacks.
@@ -175,33 +175,33 @@ int valkeyInitOpenSSL(void) {
 }
 
 /**
- * valkeySSLContext helper context destruction.
+ * valkeyTLSContext helper context destruction.
  */
 
-const char *valkeySSLContextGetError(valkeySSLContextError error) {
+const char *valkeyTLSContextGetError(valkeyTLSContextError error) {
     switch (error) {
-    case VALKEY_SSL_CTX_NONE:
+    case VALKEY_TLS_CTX_NONE:
         return "No Error";
-    case VALKEY_SSL_CTX_CREATE_FAILED:
+    case VALKEY_TLS_CTX_CREATE_FAILED:
         return "Failed to create OpenSSL SSL_CTX";
-    case VALKEY_SSL_CTX_CERT_KEY_REQUIRED:
+    case VALKEY_TLS_CTX_CERT_KEY_REQUIRED:
         return "Client cert and key must both be specified or skipped";
-    case VALKEY_SSL_CTX_CA_CERT_LOAD_FAILED:
+    case VALKEY_TLS_CTX_CA_CERT_LOAD_FAILED:
         return "Failed to load CA Certificate or CA Path";
-    case VALKEY_SSL_CTX_CLIENT_CERT_LOAD_FAILED:
+    case VALKEY_TLS_CTX_CLIENT_CERT_LOAD_FAILED:
         return "Failed to load client certificate";
-    case VALKEY_SSL_CTX_PRIVATE_KEY_LOAD_FAILED:
+    case VALKEY_TLS_CTX_PRIVATE_KEY_LOAD_FAILED:
         return "Failed to load private key";
-    case VALKEY_SSL_CTX_OS_CERTSTORE_OPEN_FAILED:
+    case VALKEY_TLS_CTX_OS_CERTSTORE_OPEN_FAILED:
         return "Failed to open system certificate store";
-    case VALKEY_SSL_CTX_OS_CERT_ADD_FAILED:
-        return "Failed to add CA certificates obtained from system to the SSL context";
+    case VALKEY_TLS_CTX_OS_CERT_ADD_FAILED:
+        return "Failed to add CA certificates obtained from system to the TLS context";
     default:
         return "Unknown error code";
     }
 }
 
-void valkeyFreeSSLContext(valkeySSLContext *ctx) {
+void valkeyFreeTLSContext(valkeyTLSContext *ctx) {
     if (!ctx)
         return;
 
@@ -219,25 +219,25 @@ void valkeyFreeSSLContext(valkeySSLContext *ctx) {
 }
 
 /**
- * valkeySSLContext helper context initialization.
+ * valkeyTLSContext helper context initialization.
  */
 
-valkeySSLContext *valkeyCreateSSLContext(const char *cacert_filename, const char *capath,
+valkeyTLSContext *valkeyCreateTLSContext(const char *cacert_filename, const char *capath,
                                          const char *cert_filename, const char *private_key_filename,
-                                         const char *server_name, valkeySSLContextError *error) {
-    valkeySSLOptions options = {
+                                         const char *server_name, valkeyTLSContextError *error) {
+    valkeyTLSOptions options = {
         .cacert_filename = cacert_filename,
         .capath = capath,
         .cert_filename = cert_filename,
         .private_key_filename = private_key_filename,
         .server_name = server_name,
-        .verify_mode = VALKEY_SSL_VERIFY_PEER,
+        .verify_mode = VALKEY_TLS_VERIFY_PEER,
     };
 
-    return valkeyCreateSSLContextWithOptions(&options, error);
+    return valkeyCreateTLSContextWithOptions(&options, error);
 }
 
-valkeySSLContext *valkeyCreateSSLContextWithOptions(valkeySSLOptions *options, valkeySSLContextError *error) {
+valkeyTLSContext *valkeyCreateTLSContextWithOptions(valkeyTLSOptions *options, valkeyTLSContextError *error) {
     const char *cacert_filename = options->cacert_filename;
     const char *capath = options->capath;
     const char *cert_filename = options->cert_filename;
@@ -249,7 +249,7 @@ valkeySSLContext *valkeyCreateSSLContextWithOptions(valkeySSLOptions *options, v
     PCCERT_CONTEXT win_ctx = NULL;
 #endif
 
-    valkeySSLContext *ctx = vk_calloc(1, sizeof(valkeySSLContext));
+    valkeyTLSContext *ctx = vk_calloc(1, sizeof(valkeyTLSContext));
     if (ctx == NULL)
         goto error;
 
@@ -263,7 +263,7 @@ valkeySSLContext *valkeyCreateSSLContextWithOptions(valkeySSLOptions *options, v
     ctx->ssl_ctx = SSL_CTX_new(ssl_method);
     if (!ctx->ssl_ctx) {
         if (error)
-            *error = VALKEY_SSL_CTX_CREATE_FAILED;
+            *error = VALKEY_TLS_CTX_CREATE_FAILED;
         goto error;
     }
 
@@ -278,7 +278,7 @@ valkeySSLContext *valkeyCreateSSLContextWithOptions(valkeySSLOptions *options, v
     if ((cert_filename != NULL && private_key_filename == NULL) ||
         (private_key_filename != NULL && cert_filename == NULL)) {
         if (error)
-            *error = VALKEY_SSL_CTX_CERT_KEY_REQUIRED;
+            *error = VALKEY_TLS_CTX_CERT_KEY_REQUIRED;
         goto error;
     }
 
@@ -288,7 +288,7 @@ valkeySSLContext *valkeyCreateSSLContextWithOptions(valkeySSLOptions *options, v
             win_store = CertOpenSystemStore(NULL, "Root");
             if (!win_store) {
                 if (error)
-                    *error = VALKEY_SSL_CTX_OS_CERTSTORE_OPEN_FAILED;
+                    *error = VALKEY_TLS_CTX_OS_CERTSTORE_OPEN_FAILED;
                 goto error;
             }
             X509_STORE *store = SSL_CTX_get_cert_store(ctx->ssl_ctx);
@@ -299,7 +299,7 @@ valkeySSLContext *valkeyCreateSSLContextWithOptions(valkeySSLOptions *options, v
                     if ((1 != X509_STORE_add_cert(store, x509)) ||
                         (1 != SSL_CTX_add_client_CA(ctx->ssl_ctx, x509))) {
                         if (error)
-                            *error = VALKEY_SSL_CTX_OS_CERT_ADD_FAILED;
+                            *error = VALKEY_TLS_CTX_OS_CERT_ADD_FAILED;
                         goto error;
                     }
                     X509_free(x509);
@@ -311,13 +311,13 @@ valkeySSLContext *valkeyCreateSSLContextWithOptions(valkeySSLOptions *options, v
 #endif
             if (!SSL_CTX_load_verify_locations(ctx->ssl_ctx, cacert_filename, capath)) {
             if (error)
-                *error = VALKEY_SSL_CTX_CA_CERT_LOAD_FAILED;
+                *error = VALKEY_TLS_CTX_CA_CERT_LOAD_FAILED;
             goto error;
         }
     } else {
         if (!SSL_CTX_set_default_verify_paths(ctx->ssl_ctx)) {
             if (error)
-                *error = VALKEY_SSL_CTX_CLIENT_DEFAULT_CERT_FAILED;
+                *error = VALKEY_TLS_CTX_CLIENT_DEFAULT_CERT_FAILED;
             goto error;
         }
     }
@@ -325,12 +325,12 @@ valkeySSLContext *valkeyCreateSSLContextWithOptions(valkeySSLOptions *options, v
     if (cert_filename) {
         if (!SSL_CTX_use_certificate_chain_file(ctx->ssl_ctx, cert_filename)) {
             if (error)
-                *error = VALKEY_SSL_CTX_CLIENT_CERT_LOAD_FAILED;
+                *error = VALKEY_TLS_CTX_CLIENT_CERT_LOAD_FAILED;
             goto error;
         }
         if (!SSL_CTX_use_PrivateKey_file(ctx->ssl_ctx, private_key_filename, SSL_FILETYPE_PEM)) {
             if (error)
-                *error = VALKEY_SSL_CTX_PRIVATE_KEY_LOAD_FAILED;
+                *error = VALKEY_TLS_CTX_PRIVATE_KEY_LOAD_FAILED;
             goto error;
         }
     }
@@ -345,21 +345,21 @@ error:
     CertFreeCertificateContext(win_ctx);
     CertCloseStore(win_store, 0);
 #endif
-    valkeyFreeSSLContext(ctx);
+    valkeyFreeTLSContext(ctx);
     return NULL;
 }
 
 /**
- * SSL Connection initialization.
+ * TLS Connection initialization.
  */
 
-static int valkeySSLConnect(valkeyContext *c, SSL *ssl) {
+static int valkeyTLSConnect(valkeyContext *c, SSL *ssl) {
     if (c->privctx) {
         valkeySetError(c, VALKEY_ERR_OTHER, "valkeyContext was already associated");
         return VALKEY_ERR;
     }
 
-    valkeySSL *rssl = vk_calloc(1, sizeof(valkeySSL));
+    valkeyTLS *rssl = vk_calloc(1, sizeof(valkeyTLS));
     if (rssl == NULL) {
         valkeySetError(c, VALKEY_ERR_OOM, "Out of memory");
         return VALKEY_ERR;
@@ -375,7 +375,7 @@ static int valkeySSLConnect(valkeyContext *c, SSL *ssl) {
 
     int rv = SSL_connect(rssl->ssl);
     if (rv == 1) {
-        c->funcs = &valkeyContextSSLFuncs;
+        c->funcs = &valkeyContextTLSFuncs;
         c->privctx = rssl;
         return VALKEY_OK;
     }
@@ -383,7 +383,7 @@ static int valkeySSLConnect(valkeyContext *c, SSL *ssl) {
     rv = SSL_get_error(rssl->ssl, rv);
     if (((c->flags & VALKEY_BLOCK) == 0) &&
         (rv == SSL_ERROR_WANT_READ || rv == SSL_ERROR_WANT_WRITE)) {
-        c->funcs = &valkeyContextSSLFuncs;
+        c->funcs = &valkeyContextTLSFuncs;
         c->privctx = rssl;
         return VALKEY_OK;
     }
@@ -405,43 +405,43 @@ static int valkeySSLConnect(valkeyContext *c, SSL *ssl) {
 }
 
 /**
- * A wrapper around valkeySSLConnect() for users who manage their own context and
- * create their own SSL object.
+ * A wrapper around valkeyTLSConnect() for users who manage their own context and
+ * create their own OpenSSL SSL object.
  */
 
-int valkeyInitiateSSL(valkeyContext *c, SSL *ssl) {
-    return valkeySSLConnect(c, ssl);
+int valkeyInitiateTLS(valkeyContext *c, SSL *ssl) {
+    return valkeyTLSConnect(c, ssl);
 }
 
 /**
- * A wrapper around valkeySSLConnect() for users who use valkeySSLContext and don't
- * manage their own SSL objects.
+ * A wrapper around valkeyTLSConnect() for users who use valkeyTLSContext and don't
+ * manage their own OpenSSL SSL objects.
  */
 
-int valkeyInitiateSSLWithContext(valkeyContext *c, valkeySSLContext *valkey_ssl_ctx) {
-    if (!c || !valkey_ssl_ctx)
+int valkeyInitiateTLSWithContext(valkeyContext *c, valkeyTLSContext *valkey_tls_ctx) {
+    if (!c || !valkey_tls_ctx)
         return VALKEY_ERR;
 
-    /* We want to verify that valkeySSLConnect() won't fail on this, as it will
-     * not own the SSL object in that case and we'll end up leaking.
+    /* We want to verify that valkeyTLSConnect() won't fail on this, as it will
+     * not own the OpenSSL SSL object in that case and we'll end up leaking.
      */
     if (c->privctx)
         return VALKEY_ERR;
 
-    SSL *ssl = SSL_new(valkey_ssl_ctx->ssl_ctx);
+    SSL *ssl = SSL_new(valkey_tls_ctx->ssl_ctx);
     if (!ssl) {
-        valkeySetError(c, VALKEY_ERR_OTHER, "Couldn't create new SSL instance");
+        valkeySetError(c, VALKEY_ERR_OTHER, "Couldn't create new TLS instance");
         goto error;
     }
 
-    if (valkey_ssl_ctx->server_name) {
-        if (!SSL_set_tlsext_host_name(ssl, valkey_ssl_ctx->server_name)) {
+    if (valkey_tls_ctx->server_name) {
+        if (!SSL_set_tlsext_host_name(ssl, valkey_tls_ctx->server_name)) {
             valkeySetError(c, VALKEY_ERR_OTHER, "Failed to set server_name/SNI");
             goto error;
         }
     }
 
-    if (valkeySSLConnect(c, ssl) != VALKEY_OK) {
+    if (valkeyTLSConnect(c, ssl) != VALKEY_OK) {
         goto error;
     }
 
@@ -453,7 +453,7 @@ error:
     return VALKEY_ERR;
 }
 
-static int maybeCheckWant(valkeySSL *rssl, int rv) {
+static int maybeCheckWant(valkeyTLS *rssl, int rv) {
     /**
      * If the error is WANT_READ or WANT_WRITE, the appropriate flags are set
      * and true is returned. False is returned otherwise
@@ -470,11 +470,11 @@ static int maybeCheckWant(valkeySSL *rssl, int rv) {
 }
 
 /**
- * Implementation of valkeyContextFuncs for SSL connections.
+ * Implementation of valkeyContextFuncs for TLS connections.
  */
 
-static void valkeySSLFree(void *privctx) {
-    valkeySSL *rsc = privctx;
+static void valkeyTLSFree(void *privctx) {
+    valkeyTLS *rsc = privctx;
 
     if (!rsc)
         return;
@@ -485,8 +485,8 @@ static void valkeySSLFree(void *privctx) {
     vk_free(rsc);
 }
 
-static ssize_t valkeySSLRead(valkeyContext *c, char *buf, size_t bufcap) {
-    valkeySSL *rssl = c->privctx;
+static ssize_t valkeyTLSRead(valkeyContext *c, char *buf, size_t bufcap) {
+    valkeyTLS *rssl = c->privctx;
 
     int nread = SSL_read(rssl->ssl, buf, bufcap);
     if (nread > 0) {
@@ -527,8 +527,8 @@ static ssize_t valkeySSLRead(valkeyContext *c, char *buf, size_t bufcap) {
     }
 }
 
-static ssize_t valkeySSLWrite(valkeyContext *c) {
-    valkeySSL *rssl = c->privctx;
+static ssize_t valkeyTLSWrite(valkeyContext *c) {
+    valkeyTLS *rssl = c->privctx;
 
     size_t len = rssl->lastLen ? rssl->lastLen : sdslen(c->obuf);
     int rv = SSL_write(rssl->ssl, c->obuf, len);
@@ -549,9 +549,9 @@ static ssize_t valkeySSLWrite(valkeyContext *c) {
     return rv;
 }
 
-static void valkeySSLAsyncRead(valkeyAsyncContext *ac) {
+static void valkeyTLSAsyncRead(valkeyAsyncContext *ac) {
     int rv;
-    valkeySSL *rssl = ac->c.privctx;
+    valkeyTLS *rssl = ac->c.privctx;
     valkeyContext *c = &ac->c;
 
     rssl->wantRead = 0;
@@ -579,9 +579,9 @@ static void valkeySSLAsyncRead(valkeyAsyncContext *ac) {
     }
 }
 
-static void valkeySSLAsyncWrite(valkeyAsyncContext *ac) {
+static void valkeyTLSAsyncWrite(valkeyAsyncContext *ac) {
     int rv, done = 0;
-    valkeySSL *rssl = ac->c.privctx;
+    valkeyTLS *rssl = ac->c.privctx;
     valkeyContext *c = &ac->c;
 
     rssl->pendingWrite = 0;
@@ -609,13 +609,13 @@ static void valkeySSLAsyncWrite(valkeyAsyncContext *ac) {
     _EL_ADD_READ(ac);
 }
 
-static valkeyContextFuncs valkeyContextSSLFuncs = {
+static valkeyContextFuncs valkeyContextTLSFuncs = {
     .connect = valkeyContextConnectTcp,
     .close = valkeyNetClose,
-    .free_privctx = valkeySSLFree,
-    .async_read = valkeySSLAsyncRead,
-    .async_write = valkeySSLAsyncWrite,
-    .read = valkeySSLRead,
-    .write = valkeySSLWrite,
+    .free_privctx = valkeyTLSFree,
+    .async_read = valkeyTLSAsyncRead,
+    .async_write = valkeyTLSAsyncWrite,
+    .read = valkeyTLSRead,
+    .write = valkeyTLSWrite,
     .set_timeout = valkeyTcpSetTimeout,
 };

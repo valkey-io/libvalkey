@@ -156,8 +156,6 @@ enum valkeyConnectionType {
     VALKEY_CONN_MAX
 };
 
-struct valkeySsl;
-
 #define VALKEY_OPT_NONBLOCK 0x01
 #define VALKEY_OPT_REUSEADDR 0x02
 #define VALKEY_OPT_NOAUTOFREE 0x04        /* Don't automatically free the async
@@ -298,7 +296,7 @@ typedef struct valkeyContext {
     void (*free_privdata)(void *);
 
     /* Internal context pointer presently used by libvalkey to manage
-     * SSL connections. */
+     * TLS connections. */
     void *privctx;
 
     /* An optional RESP3 PUSH handler */
