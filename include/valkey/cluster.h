@@ -34,7 +34,6 @@
 #define VALKEY_CLUSTER_H
 
 #include "async.h"
-#include "dict.h"
 #include "valkey.h"
 
 #define UNUSED(x) (void)(x)
@@ -66,6 +65,7 @@
 extern "C" {
 #endif
 
+struct dict;
 struct hilist;
 struct valkeyClusterAsyncContext;
 struct valkeyTLSContext;
@@ -148,11 +148,15 @@ typedef struct valkeyClusterAsyncContext {
 
 } valkeyClusterAsyncContext;
 
+#if UINTPTR_MAX == UINT64_MAX
+#define VALKEY_NODE_ITERATOR_SIZE 56
+#elif defined(__arm__)
+#define VALKEY_NODE_ITERATOR_SIZE 40
+#else
+#define VALKEY_NODE_ITERATOR_SIZE 32
+#endif
 typedef struct valkeyClusterNodeIterator {
-    valkeyClusterContext *cc;
-    uint64_t route_version;
-    int retries_left;
-    dictIterator di;
+    char opaque_data[VALKEY_NODE_ITERATOR_SIZE];
 } valkeyClusterNodeIterator;
 
 /*

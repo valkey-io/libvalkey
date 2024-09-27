@@ -3611,33 +3611,44 @@ void valkeyClusterAsyncFree(valkeyClusterAsyncContext *acc) {
     vk_free(acc);
 }
 
+struct nodeIterator {
+    valkeyClusterContext *cc;
+    uint64_t route_version;
+    int retries_left;
+    dictIterator di;
+};
+/* Make sure VALKEY_NODE_ITERATOR_SIZE is correct. */
+vk_static_assert(sizeof(struct nodeIterator) == VALKEY_NODE_ITERATOR_SIZE);
+
 /* Initiate an iterator for iterating over current cluster nodes */
 void valkeyClusterInitNodeIterator(valkeyClusterNodeIterator *iter,
                                    valkeyClusterContext *cc) {
-    iter->cc = cc;
-    iter->route_version = cc->route_version;
-    dictInitIterator(&iter->di, cc->nodes);
-    iter->retries_left = 1;
+    struct nodeIterator *ni = (struct nodeIterator *)iter;
+    ni->cc = cc;
+    ni->route_version = cc->route_version;
+    dictInitIterator(&ni->di, cc->nodes);
+    ni->retries_left = 1;
 }
 
 /* Get next node from the iterator
  * The iterator will restart if the routing table is updated
  * before all nodes have been iterated. */
 valkeyClusterNode *valkeyClusterNodeNext(valkeyClusterNodeIterator *iter) {
-    if (iter->retries_left <= 0)
+    struct nodeIterator *ni = (struct nodeIterator *)iter;
+    if (ni->retries_left <= 0)
         return NULL;
 
-    if (iter->route_version != iter->cc->route_version) {
+    if (ni->route_version != ni->cc->route_version) {
         // The routing table has changed and current iterator
         // is invalid. The nodes dict has been recreated in
         // the cluster context. We need to re-init the dictIter.
-        dictInitIterator(&iter->di, iter->cc->nodes);
-        iter->route_version = iter->cc->route_version;
-        iter->retries_left--;
+        dictInitIterator(&ni->di, ni->cc->nodes);
+        ni->route_version = ni->cc->route_version;
+        ni->retries_left--;
     }
 
     dictEntry *de;
-    if ((de = dictNext(&iter->di)) != NULL)
+    if ((de = dictNext(&ni->di)) != NULL)
         return dictGetEntryVal(de);
     else
         return NULL;
