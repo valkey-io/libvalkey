@@ -2909,8 +2909,8 @@ valkeyClusterGetValkeyAsyncContext(valkeyClusterAsyncContext *acc,
         }
     }
 
-    if (acc->adapter) {
-        ret = acc->attach_fn(ac, acc->adapter);
+    if (acc->attach_fn) {
+        ret = acc->attach_fn(ac, acc->attach_data);
         if (ret != VALKEY_OK) {
             valkeyClusterAsyncSetError(acc, VALKEY_ERR_OTHER,
                                        "Failed to attach event adapter");
@@ -2975,8 +2975,8 @@ valkeyClusterAsyncContext *valkeyClusterAsyncConnect(const char *addrs,
 }
 
 int valkeyClusterAsyncConnect2(valkeyClusterAsyncContext *acc) {
-    /* An adapter to an async event library is required. */
-    if (acc->adapter == NULL) {
+    /* An attach function for an async event library is required. */
+    if (acc->attach_fn == NULL) {
         return VALKEY_ERR;
     }
     return updateSlotMapAsync(acc, NULL /*any node*/);
