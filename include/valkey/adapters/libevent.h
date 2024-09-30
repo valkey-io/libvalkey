@@ -176,8 +176,8 @@ static int valkeyLibeventAttach(valkeyAsyncContext *ac, struct event_base *base)
     return VALKEY_OK;
 }
 
-VALKEY_UNUSED
-static int valkeyLibeventAttach_link(valkeyAsyncContext *ac, void *base) {
+/* Internal adapter function with correct function signature. */
+static int valkeyLibeventAttachAdapter(valkeyAsyncContext *ac, void *base) {
     return valkeyLibeventAttach(ac, (struct event_base *)base);
 }
 
@@ -188,8 +188,8 @@ static int valkeyClusterLibeventAttach(valkeyClusterAsyncContext *acc,
         return VALKEY_ERR;
     }
 
-    acc->adapter = base;
-    acc->attach_fn = valkeyLibeventAttach_link;
+    acc->attach_fn = valkeyLibeventAttachAdapter;
+    acc->attach_data = base;
     return VALKEY_OK;
 }
 #endif /* VALKEY_ADAPTERS_LIBEVENT_H */

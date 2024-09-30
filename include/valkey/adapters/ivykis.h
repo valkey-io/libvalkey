@@ -1,6 +1,7 @@
 #ifndef VALKEY_ADAPTERS_IVYKIS_H
 #define VALKEY_ADAPTERS_IVYKIS_H
 #include "../async.h"
+#include "../cluster.h"
 #include "../valkey.h"
 
 #include <iv.h>
@@ -82,4 +83,20 @@ static int valkeyIvykisAttach(valkeyAsyncContext *ac) {
 
     return VALKEY_OK;
 }
+
+/* Internal adapter function with correct function signature. */
+static int valkeyClusterIvykisAttachAdapter(valkeyAsyncContext *ac, VALKEY_UNUSED void *) {
+    return valkeyIvykisAttach(ac);
+}
+
+VALKEY_UNUSED
+static int valkeyClusterIvykisAttach(valkeyClusterAsyncContext *acc) {
+    if (acc == NULL) {
+        return VALKEY_ERR;
+    }
+
+    acc->attach_fn = valkeyClusterIvykisAttachAdapter;
+    return VALKEY_OK;
+}
+
 #endif /* VALKEY_ADAPTERS_IVYKIS_H */

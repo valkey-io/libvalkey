@@ -3,6 +3,7 @@
 #define VALKEY_ADAPTERS_POLL_H
 
 #include "../async.h"
+#include "../cluster.h"
 #include "../sockcompat.h"
 
 #include <errno.h>
@@ -194,4 +195,20 @@ static int valkeyPollAttach(valkeyAsyncContext *ac) {
 
     return VALKEY_OK;
 }
+
+/* Internal adapter function with correct function signature. */
+static int valkeyPollAttachAdapter(valkeyAsyncContext *ac, VALKEY_UNUSED void *unused) {
+    return valkeyPollAttach(ac);
+}
+
+VALKEY_UNUSED
+static int valkeyClusterPollAttach(valkeyClusterAsyncContext *acc) {
+    if (acc == NULL) {
+        return VALKEY_ERR;
+    }
+
+    acc->attach_fn = valkeyPollAttachAdapter;
+    return VALKEY_OK;
+}
+
 #endif /* VALKEY_ADAPTERS_POLL_H */

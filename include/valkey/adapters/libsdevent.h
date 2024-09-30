@@ -1,6 +1,7 @@
 #ifndef VALKEY_ADAPTERS_LIBSDEVENT_H
 #define VALKEY_ADAPTERS_LIBSDEVENT_H
 #include "../async.h"
+#include "../cluster.h"
 #include "../valkey.h"
 
 #include <systemd/sd-event.h>
@@ -176,4 +177,22 @@ static int valkeyLibsdeventAttach(valkeyAsyncContext *ac, struct sd_event *event
 
     return VALKEY_OK;
 }
+
+/* Internal adapter function with correct function signature. */
+static int valkeyLibsdeventAttachAdapter(valkeyAsyncContext *ac, void *event) {
+    return valkeyLibsdeventAttach(ac, (struct sd_event *)event);
+}
+
+VALKEY_UNUSED
+static int valkeyClusterLibsdeventAttach(valkeyClusterAsyncContext *acc,
+                                         struct sd_event *event) {
+    if (acc == NULL || event == NULL) {
+        return VALKEY_ERR;
+    }
+
+    acc->attach_fn = valkeyLibsdeventAttachAdapter;
+    acc->attach_data = event;
+    return VALKEY_OK;
+}
+
 #endif /* VALKEY_ADAPTERS_LIBSDEVENT_H */

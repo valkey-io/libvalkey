@@ -35,6 +35,7 @@
 #define VALKEY_ADAPTERS_MACOSX_H
 
 #include "../async.h"
+#include "../cluster.h"
 #include "../valkey.h"
 
 #include <CoreFoundation/CoreFoundation.h>
@@ -139,6 +140,23 @@ static int valkeyMacOSAttach(valkeyAsyncContext *valkeyAsyncCtx, CFRunLoopRef ru
 
     CFRunLoopAddSource(runLoop, valkeyRunLoop->sourceRef, kCFRunLoopDefaultMode);
 
+    return VALKEY_OK;
+}
+
+/* Internal adapter function with correct function signature. */
+static int valkeyMacOSAttachAdapter(valkeyAsyncContext *ac, void *loop) {
+    return valkeyMacOSAttach(ac, (CFRunLoopRef)loop);
+}
+
+VALKEY_UNUSED
+static int valkeyClusterMacOSAttach(valkeyClusterAsyncContext *acc,
+                                    CFRunLoopRef loop) {
+    if (acc == NULL || loop == NULL) {
+        return VALKEY_ERR;
+    }
+
+    acc->attach_fn = valkeyMacOSAttachAdapter;
+    acc->attach_data = loop;
     return VALKEY_OK;
 }
 

@@ -2,6 +2,7 @@
 #define VALKEY_ADAPTERS_LIBHV_H
 
 #include "../async.h"
+#include "../cluster.h"
 #include "../valkey.h"
 
 #include <hv/hloop.h>
@@ -121,4 +122,22 @@ static int valkeyLibhvAttach(valkeyAsyncContext *ac, hloop_t *loop) {
 
     return VALKEY_OK;
 }
+
+/* Internal adapter function with correct function signature. */
+static int valkeyLibhvAttachAdapter(valkeyAsyncContext *ac, void *loop) {
+    return valkeyLibhvAttach(ac, (hloop_t *)loop);
+}
+
+VALKEY_UNUSED
+static int valkeyClusterLibhvAttach(valkeyClusterAsyncContext *acc,
+                                    hloop_t *loop) {
+    if (acc == NULL || loop == NULL) {
+        return VALKEY_ERR;
+    }
+
+    acc->attach_fn = valkeyLibhvAttachAdapter;
+    acc->attach_data = loop;
+    return VALKEY_OK;
+}
+
 #endif /* VALKEY_ADAPTERS_LIBHV_H */
