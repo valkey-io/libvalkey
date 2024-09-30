@@ -46,9 +46,7 @@ int main(int argc, char **argv) {
     assert(acc);
     ASSERT_MSG(acc->err == 0, acc->errstr);
 
-    int status;
-    valkeyClusterGlibAdapter adapter = {.context = context};
-    status = valkeyClusterGlibAttach(acc, &adapter);
+    int status = valkeyClusterGlibAttach(acc, context);
     assert(status == VALKEY_OK);
 
     valkeyClusterAsyncSetConnectCallback(acc, connectCallback);

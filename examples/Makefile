@@ -49,7 +49,7 @@ example-async-libhv: async-libhv.c $(STLIBNAME)
 	$(CC) -o $@ $(CFLAGS) $< -lhv $(STLIBNAME)
 
 example-async-libsdevent: async-libsdevent.c $(STLIBNAME)
-	$(CC) -o $@ $(CFLAGS) $< -lsdevent $(STLIBNAME)
+	$(CC) -o $@ $(CFLAGS) $< -lsystemd $(STLIBNAME)
 
 example-async-glib: async-glib.c $(STLIBNAME)
 	$(CC) -o $@ $(CFLAGS) $< $(shell pkg-config --cflags --libs glib-2.0) $(STLIBNAME)
@@ -69,7 +69,9 @@ example-async-ae:
 	@false
 else
 example-async-ae: async-ae.c $(STLIBNAME)
-	$(CC) -o $@ $(CFLAGS) $(LDFLAGS) -I$(AE_DIR) $< $(AE_DIR)/ae.o $(AE_DIR)/zmalloc.o $(AE_DIR)/../deps/jemalloc/lib/libjemalloc.a -pthread $(STLIBNAME)
+	$(CC) -o $@ $(CFLAGS) $(LDFLAGS) -I$(AE_DIR) $< $(AE_DIR)/ae.o $(AE_DIR)/zmalloc.o \
+	$(AE_DIR)/monotonic.o $(AE_DIR)/anet.o $(AE_DIR)/serverassert.o $(AE_DIR)/../deps/jemalloc/lib/libjemalloc.a \
+	-pthread $(STLIBNAME)
 endif
 
 ifndef LIBUV_DIR

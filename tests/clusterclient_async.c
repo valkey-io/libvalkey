@@ -100,8 +100,8 @@ void replyCallback(valkeyClusterAsyncContext *acc, void *r, void *privdata) {
 
     if (--num_running == 0) {
         /* Schedule a read from stdin and send next command */
-        event_base_once(acc->adapter, -1, EV_TIMEOUT, sendNextCommand, acc,
-                        NULL);
+        struct event_base *base = acc->attach_data;
+        event_base_once(base, -1, EV_TIMEOUT, sendNextCommand, acc, NULL);
     }
 }
 
@@ -125,8 +125,8 @@ void sendNextCommand(evutil_socket_t fd, short kind, void *arg) {
             if (strcmp(cmd, "!sleep") == 0) {
                 ASSERT_MSG(async == 0, "!sleep in !async not supported");
                 struct timeval timeout = {1, 0};
-                event_base_once(acc->adapter, -1, EV_TIMEOUT, sendNextCommand,
-                                acc, &timeout);
+                struct event_base *base = acc->attach_data;
+                event_base_once(base, -1, EV_TIMEOUT, sendNextCommand, acc, &timeout);
                 return;
             }
             if (strcmp(cmd, "!async") == 0) /* Enable async send */
@@ -172,8 +172,8 @@ void sendNextCommand(evutil_socket_t fd, short kind, void *arg) {
                 printf("error: %s\n", acc->errstr);
 
                 /* Schedule a read from stdin and handle next command. */
-                event_base_once(acc->adapter, -1, EV_TIMEOUT, sendNextCommand,
-                                acc, NULL);
+                struct event_base *base = acc->attach_data;
+                event_base_once(base, -1, EV_TIMEOUT, sendNextCommand, acc, NULL);
             }
         }
 
@@ -275,7 +275,7 @@ int main(int argc, char **argv) {
     assert(status == VALKEY_OK);
 
     /* Schedule a read from stdin and send next command */
-    event_base_once(acc->adapter, -1, EV_TIMEOUT, sendNextCommand, acc, NULL);
+    event_base_once(base, -1, EV_TIMEOUT, sendNextCommand, acc, NULL);
 
     event_base_dispatch(base);
 
