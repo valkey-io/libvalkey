@@ -134,19 +134,20 @@ static int valkeyAeAttach(aeEventLoop *loop, valkeyAsyncContext *ac) {
     return VALKEY_OK;
 }
 
-static int valkeyAeAttach_link(valkeyAsyncContext *ac, void *base) {
-    return valkeyAeAttach((aeEventLoop *)base, ac);
+/* Internal adapter function with correct function signature. */
+static int valkeyAeAttachAdapter(valkeyAsyncContext *ac, void *loop) {
+    return valkeyAeAttach((aeEventLoop *)loop, ac);
 }
 
 VALKEY_UNUSED
-static int valkeyClusterAeAttach(aeEventLoop *loop,
-                                 valkeyClusterAsyncContext *acc) {
+static int valkeyClusterAeAttach(valkeyClusterAsyncContext *acc,
+                                 aeEventLoop *loop) {
     if (acc == NULL || loop == NULL) {
         return VALKEY_ERR;
     }
 
-    acc->adapter = loop;
-    acc->attach_fn = valkeyAeAttach_link;
+    acc->attach_fn = valkeyAeAttachAdapter;
+    acc->attach_data = loop;
     return VALKEY_OK;
 }
 #endif /* VALKEY_ADAPTERS_AE_H */

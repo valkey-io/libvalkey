@@ -187,19 +187,20 @@ static int valkeyLibevAttach(EV_P_ valkeyAsyncContext *ac) {
     return VALKEY_OK;
 }
 
-static int valkeyLibevAttach_link(valkeyAsyncContext *ac, void *loop) {
+/* Internal adapter function with correct function signature. */
+static int valkeyLibevAttachAdapter(valkeyAsyncContext *ac, void *loop) {
     return valkeyLibevAttach((struct ev_loop *)loop, ac);
 }
 
 VALKEY_UNUSED
 static int valkeyClusterLibevAttach(valkeyClusterAsyncContext *acc,
                                     struct ev_loop *loop) {
-    if (loop == NULL || acc == NULL) {
+    if (acc == NULL || loop == NULL) {
         return VALKEY_ERR;
     }
 
-    acc->adapter = loop;
-    acc->attach_fn = valkeyLibevAttach_link;
+    acc->attach_fn = valkeyLibevAttachAdapter;
+    acc->attach_data = loop;
     return VALKEY_OK;
 }
 

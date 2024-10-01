@@ -59,7 +59,8 @@ void replyCallback(valkeyClusterAsyncContext *acc, void *r, void *privdata) {
     }
 
     // schedule reading from stdin and sending next command
-    event_base_once(acc->adapter, -1, EV_TIMEOUT, sendNextCommand, acc, NULL);
+    struct event_base *base = acc->attach_data;
+    event_base_once(base, -1, EV_TIMEOUT, sendNextCommand, acc, NULL);
 }
 
 void sendNextCommand(evutil_socket_t fd, short kind, void *arg) {
@@ -109,7 +110,7 @@ int main(int argc, char **argv) {
 
     connectToValkey(acc);
     // schedule reading from stdin and sending next command
-    event_base_once(acc->adapter, -1, EV_TIMEOUT, sendNextCommand, acc, NULL);
+    event_base_once(base, -1, EV_TIMEOUT, sendNextCommand, acc, NULL);
 
     event_base_dispatch(base);
 

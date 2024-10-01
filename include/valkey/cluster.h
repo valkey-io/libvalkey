@@ -70,7 +70,6 @@ struct hilist;
 struct valkeyClusterAsyncContext;
 struct valkeyTLSContext;
 
-typedef int(adapterAttachFn)(valkeyAsyncContext *, void *);
 typedef void(valkeyClusterCallbackFn)(struct valkeyClusterAsyncContext *,
                                       void *, void *);
 typedef struct valkeyClusterNode {
@@ -135,8 +134,9 @@ typedef struct valkeyClusterAsyncContext {
 
     int64_t lastSlotmapUpdateAttempt; /* Timestamp */
 
-    void *adapter;              /* Adapter to the async event library */
-    adapterAttachFn *attach_fn; /* Func ptr for attaching the async library */
+    /* Attach function for an async library. */
+    int (*attach_fn)(valkeyAsyncContext *ac, void *attach_data);
+    void *attach_data;
 
     /* Called when either the connection is terminated due to an error or per
      * user request. The status is set accordingly (VALKEY_OK, VALKEY_ERR). */
