@@ -685,20 +685,18 @@ static dict *parse_cluster_slots(valkeyClusterContext *cc, valkeyReply *reply,
     valkeyClusterNode *master = NULL, *slave;
     uint32_t i, idx;
 
-    if (reply == NULL) {
-        return NULL;
+    if (reply->type != VALKEY_REPLY_ARRAY) {
+        valkeyClusterSetError(cc, VALKEY_ERR_OTHER, "Unexpected reply type");
+        goto error;
+    }
+    if (reply->elements == 0) {
+        valkeyClusterSetError(cc, VALKEY_ERR_OTHER, "No slot information");
+        goto error;
     }
 
     nodes = dictCreate(&clusterNodesDictType, NULL);
     if (nodes == NULL) {
         goto oom;
-    }
-
-    if (reply->type != VALKEY_REPLY_ARRAY || reply->elements <= 0) {
-        valkeyClusterSetError(cc, VALKEY_ERR_OTHER,
-                              "Command(cluster slots) reply error: "
-                              "reply is not an array.");
-        goto error;
     }
 
     for (i = 0; i < reply->elements; i++) {
@@ -879,6 +877,11 @@ static dict *parse_cluster_nodes(valkeyClusterContext *cc, valkeyReply *reply,
     int count_part = 0, count_slot_start_end = 0;
     int k;
     int len;
+
+    if (reply->type != VALKEY_REPLY_STRING) {
+        valkeyClusterSetError(cc, VALKEY_ERR_OTHER, "Unexpected reply type");
+        goto error;
+    }
 
     nodes = dictCreate(&clusterNodesDictType, NULL);
     if (nodes == NULL) {
@@ -1092,14 +1095,9 @@ static int handleClusterSlotsReply(valkeyClusterContext *cc, valkeyContext *c) {
                 "Command (cluster slots) reply error (NULL).");
         }
         return VALKEY_ERR;
-    } else if (reply->type != VALKEY_REPLY_ARRAY) {
-        if (reply->type == VALKEY_REPLY_ERROR) {
-            valkeyClusterSetError(cc, VALKEY_ERR_OTHER, reply->str);
-        } else {
-            valkeyClusterSetError(
-                cc, VALKEY_ERR_OTHER,
-                "Command (cluster slots) reply error: type is not array.");
-        }
+    }
+    if (reply->type == VALKEY_REPLY_ERROR) {
+        valkeyClusterSetError(cc, VALKEY_ERR_OTHER, reply->str);
         freeReplyObject(reply);
         return VALKEY_ERR;
     }
@@ -1124,14 +1122,9 @@ static int handleClusterNodesReply(valkeyClusterContext *cc, valkeyContext *c) {
                                   "(NULL).");
         }
         return VALKEY_ERR;
-    } else if (reply->type != VALKEY_REPLY_STRING) {
-        if (reply->type == VALKEY_REPLY_ERROR) {
-            valkeyClusterSetError(cc, VALKEY_ERR_OTHER, reply->str);
-        } else {
-            valkeyClusterSetError(cc, VALKEY_ERR_OTHER,
-                                  "Command(cluster nodes) reply error: "
-                                  "type is not string.");
-        }
+    }
+    if (reply->type == VALKEY_REPLY_ERROR) {
+        valkeyClusterSetError(cc, VALKEY_ERR_OTHER, reply->str);
         freeReplyObject(reply);
         return VALKEY_ERR;
     }
