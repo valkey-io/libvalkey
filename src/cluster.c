@@ -864,7 +864,7 @@ error:
 /**
  * Parse the "cluster nodes" command reply to nodes dict.
  */
-static dict *parse_cluster_nodes(valkeyClusterContext *cc, char *str, int str_len,
+static dict *parse_cluster_nodes(valkeyClusterContext *cc, valkeyReply *reply,
                                  int flags) {
     int ret;
     dict *nodes = NULL;
@@ -885,8 +885,8 @@ static dict *parse_cluster_nodes(valkeyClusterContext *cc, char *str, int str_le
         goto oom;
     }
 
-    start = str;
-    end = start + str_len;
+    start = reply->str;
+    end = start + reply->len;
 
     line_start = start;
 
@@ -1136,7 +1136,7 @@ static int handleClusterNodesReply(valkeyClusterContext *cc, valkeyContext *c) {
         return VALKEY_ERR;
     }
 
-    dict *nodes = parse_cluster_nodes(cc, reply->str, reply->len, cc->flags);
+    dict *nodes = parse_cluster_nodes(cc, reply, cc->flags);
     freeReplyObject(reply);
     return updateNodesAndSlotmap(cc, nodes);
 }
@@ -3046,7 +3046,7 @@ void clusterNodesReplyCallback(valkeyAsyncContext *ac, void *r,
     }
 
     valkeyClusterContext *cc = acc->cc;
-    dict *nodes = parse_cluster_nodes(cc, reply->str, reply->len, cc->flags);
+    dict *nodes = parse_cluster_nodes(cc, reply, cc->flags);
     if (updateNodesAndSlotmap(cc, nodes) != VALKEY_OK) {
         /* Ignore failures for now */
     }
