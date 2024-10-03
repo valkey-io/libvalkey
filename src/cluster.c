@@ -1080,69 +1080,29 @@ static int clusterUpdateRouteSendCommand(valkeyClusterContext *cc,
     return VALKEY_OK;
 }
 
-/* Receives and handles a CLUSTER SLOTS reply from node with context c. */
-static int handleClusterSlotsReply(valkeyClusterContext *cc, valkeyContext *c) {
-    valkeyReply *reply = NULL;
-    int result = valkeyGetReply(c, (void **)&reply);
-    if (result != VALKEY_OK) {
-        if (c->err == VALKEY_ERR_TIMEOUT) {
-            valkeyClusterSetError(
-                cc, c->err,
-                "Command (cluster slots) reply error (socket timeout)");
-        } else {
-            valkeyClusterSetError(
-                cc, VALKEY_ERR_OTHER,
-                "Command (cluster slots) reply error (NULL).");
-        }
-        return VALKEY_ERR;
-    }
-    if (reply->type == VALKEY_REPLY_ERROR) {
-        valkeyClusterSetError(cc, VALKEY_ERR_OTHER, reply->str);
-        freeReplyObject(reply);
-        return VALKEY_ERR;
-    }
-
-    dict *nodes = parse_cluster_slots(cc, reply, cc->flags);
-    freeReplyObject(reply);
-    return updateNodesAndSlotmap(cc, nodes);
-}
-
-/* Receives and handles a CLUSTER NODES reply from node with context c. */
-static int handleClusterNodesReply(valkeyClusterContext *cc, valkeyContext *c) {
-    valkeyReply *reply = NULL;
-    int result = valkeyGetReply(c, (void **)&reply);
-    if (result != VALKEY_OK) {
-        if (c->err == VALKEY_ERR_TIMEOUT) {
-            valkeyClusterSetError(cc, c->err,
-                                  "Command (cluster nodes) reply error "
-                                  "(socket timeout)");
-        } else {
-            valkeyClusterSetError(cc, VALKEY_ERR_OTHER,
-                                  "Command (cluster nodes) reply error "
-                                  "(NULL).");
-        }
-        return VALKEY_ERR;
-    }
-    if (reply->type == VALKEY_REPLY_ERROR) {
-        valkeyClusterSetError(cc, VALKEY_ERR_OTHER, reply->str);
-        freeReplyObject(reply);
-        return VALKEY_ERR;
-    }
-
-    dict *nodes = parse_cluster_nodes(cc, reply, cc->flags);
-    freeReplyObject(reply);
-    return updateNodesAndSlotmap(cc, nodes);
-}
-
 /* Receives and handles a CLUSTER SLOTS or CLUSTER NODES reply from node with
  * context c. */
 static int clusterUpdateRouteHandleReply(valkeyClusterContext *cc,
                                          valkeyContext *c) {
-    if (cc->flags & VALKEYCLUSTER_FLAG_ROUTE_USE_SLOTS) {
-        return handleClusterSlotsReply(cc, c);
-    } else {
-        return handleClusterNodesReply(cc, c);
+    valkeyReply *reply = NULL;
+    if (valkeyGetReply(c, (void **)&reply) != VALKEY_OK) {
+        valkeyClusterSetError(cc, c->err, c->errstr);
+        return VALKEY_ERR;
     }
+    if (reply->type == VALKEY_REPLY_ERROR) {
+        valkeyClusterSetError(cc, VALKEY_ERR_OTHER, reply->str);
+        freeReplyObject(reply);
+        return VALKEY_ERR;
+    }
+
+    dict *nodes;
+    if (cc->flags & VALKEYCLUSTER_FLAG_ROUTE_USE_SLOTS) {
+        nodes = parse_cluster_slots(cc, reply, cc->flags);
+    } else {
+        nodes = parse_cluster_nodes(cc, reply, cc->flags);
+    }
+    freeReplyObject(reply);
+    return updateNodesAndSlotmap(cc, nodes);
 }
 
 /**
