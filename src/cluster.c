@@ -672,8 +672,7 @@ oom:
 /**
  * Parse the "cluster slots" command reply to nodes dict.
  */
-static dict *parse_cluster_slots(valkeyClusterContext *cc, valkeyReply *reply,
-                                 int flags) {
+static dict *parse_cluster_slots(valkeyClusterContext *cc, valkeyReply *reply) {
     int ret;
     cluster_slot *slot = NULL;
     dict *nodes = NULL;
@@ -817,7 +816,7 @@ static dict *parse_cluster_slots(valkeyClusterContext *cc, valkeyReply *reply,
                     }
 
                     slot = NULL;
-                } else if (flags & VALKEYCLUSTER_FLAG_ADD_SLAVE) {
+                } else if (cc->flags & VALKEYCLUSTER_FLAG_ADD_SLAVE) {
                     slave = node_get_with_slots(cc, elem_ip, elem_port,
                                                 VALKEY_ROLE_SLAVE);
                     if (slave == NULL) {
@@ -862,8 +861,7 @@ error:
 /**
  * Parse the "cluster nodes" command reply to nodes dict.
  */
-static dict *parse_cluster_nodes(valkeyClusterContext *cc, valkeyReply *reply,
-                                 int flags) {
+static dict *parse_cluster_nodes(valkeyClusterContext *cc, valkeyReply *reply) {
     int ret;
     dict *nodes = NULL;
     dict *nodes_name = NULL;
@@ -956,7 +954,7 @@ static dict *parse_cluster_nodes(valkeyClusterContext *cc, valkeyReply *reply,
                     goto oom;
                 }
 
-                if (flags & VALKEYCLUSTER_FLAG_ADD_SLAVE) {
+                if (cc->flags & VALKEYCLUSTER_FLAG_ADD_SLAVE) {
                     ret = cluster_master_slave_mapping_with_name(
                         cc, &nodes_name, master, master->name);
                     if (ret != VALKEY_OK) {
@@ -1008,7 +1006,7 @@ static dict *parse_cluster_nodes(valkeyClusterContext *cc, valkeyReply *reply,
 
             }
             // add slave node
-            else if ((flags & VALKEYCLUSTER_FLAG_ADD_SLAVE) &&
+            else if ((cc->flags & VALKEYCLUSTER_FLAG_ADD_SLAVE) &&
                      (role_len >= 5 && memcmp(role, "slave", 5) == 0)) {
                 slave = node_get_with_nodes(cc, part, count_part,
                                             VALKEY_ROLE_SLAVE);
@@ -1097,9 +1095,9 @@ static int clusterUpdateRouteHandleReply(valkeyClusterContext *cc,
 
     dict *nodes;
     if (cc->flags & VALKEYCLUSTER_FLAG_ROUTE_USE_SLOTS) {
-        nodes = parse_cluster_slots(cc, reply, cc->flags);
+        nodes = parse_cluster_slots(cc, reply);
     } else {
-        nodes = parse_cluster_nodes(cc, reply, cc->flags);
+        nodes = parse_cluster_nodes(cc, reply);
     }
     freeReplyObject(reply);
     return updateNodesAndSlotmap(cc, nodes);
@@ -2978,7 +2976,7 @@ void clusterSlotsReplyCallback(valkeyAsyncContext *ac, void *r,
     }
 
     valkeyClusterContext *cc = acc->cc;
-    dict *nodes = parse_cluster_slots(cc, reply, cc->flags);
+    dict *nodes = parse_cluster_slots(cc, reply);
     if (updateNodesAndSlotmap(cc, nodes) != VALKEY_OK) {
         /* Ignore failures for now */
     }
@@ -2999,7 +2997,7 @@ void clusterNodesReplyCallback(valkeyAsyncContext *ac, void *r,
     }
 
     valkeyClusterContext *cc = acc->cc;
-    dict *nodes = parse_cluster_nodes(cc, reply, cc->flags);
+    dict *nodes = parse_cluster_nodes(cc, reply);
     if (updateNodesAndSlotmap(cc, nodes) != VALKEY_OK) {
         /* Ignore failures for now */
     }
