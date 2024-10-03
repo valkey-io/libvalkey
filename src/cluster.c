@@ -1068,15 +1068,14 @@ static int clusterUpdateRouteSendCommand(valkeyClusterContext *cc,
                            VALKEY_COMMAND_CLUSTER_SLOTS :
                            VALKEY_COMMAND_CLUSTER_NODES);
     if (valkeyAppendCommand(c, cmd) != VALKEY_OK) {
-        const char *msg = (cc->flags & VALKEYCLUSTER_FLAG_ROUTE_USE_SLOTS ?
-                               "Command (cluster slots) send error." :
-                               "Command (cluster nodes) send error.");
-        valkeyClusterSetError(cc, c->err, msg);
+        valkeyClusterSetError(cc, c->err, c->errstr);
         return VALKEY_ERR;
     }
     /* Flush buffer to socket. */
-    if (valkeyBufferWrite(c, NULL) == VALKEY_ERR)
+    if (valkeyBufferWrite(c, NULL) == VALKEY_ERR) {
+        valkeyClusterSetError(cc, c->err, c->errstr);
         return VALKEY_ERR;
+    }
 
     return VALKEY_OK;
 }
