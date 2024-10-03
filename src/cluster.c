@@ -943,16 +943,17 @@ static dict *parse_cluster_nodes(valkeyClusterContext *cc, valkeyReply *reply,
                     freeValkeyClusterNode(master);
                     goto oom;
                 }
-
-                ret = dictAdd(nodes, key, master);
-                if (ret != DICT_OK) {
-                    // Key already exists, but possibly an OOM error
-                    valkeyClusterSetError(
-                        cc, VALKEY_ERR_OTHER,
-                        "The address already exists in the nodes");
+                if (dictFind(nodes, key) != NULL) {
+                    valkeyClusterSetError(cc, VALKEY_ERR_OTHER,
+                                          "Duplicate addresses in cluster nodes response");
                     sdsfree(key);
                     freeValkeyClusterNode(master);
                     goto error;
+                }
+                if (dictAdd(nodes, key, master) != DICT_OK) {
+                    sdsfree(key);
+                    freeValkeyClusterNode(master);
+                    goto oom;
                 }
 
                 if (flags & VALKEYCLUSTER_FLAG_ADD_SLAVE) {
