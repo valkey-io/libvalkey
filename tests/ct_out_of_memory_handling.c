@@ -173,6 +173,7 @@ void test_alloc_failure_handling(void) {
             prepare_allocation_test(cc, i);
             result = valkeyClusterConnect2(cc);
             assert(result == VALKEY_ERR);
+            ASSERT_STR_EQ(cc->errstr, "Out of memory");
         }
 
         prepare_allocation_test(cc, 128);
@@ -521,6 +522,7 @@ void test_alloc_failure_handling_async(void) {
             prepare_allocation_test(acc->cc, i);
             result = valkeyClusterConnect2(acc->cc);
             assert(result == VALKEY_ERR);
+            ASSERT_STR_EQ(acc->cc->errstr, "Out of memory");
         }
 
         prepare_allocation_test(acc->cc, 126);
