@@ -171,14 +171,14 @@ void test_alloc_failure_handling(void) {
 
     // Connect
     {
-        for (int i = 0; i < 148; ++i) {
+        for (int i = 0; i < 91; ++i) {
             prepare_allocation_test(cc, i);
             result = valkeyClusterConnect2(cc);
             assert(result == VALKEY_ERR);
             ASSERT_STR_EQ(cc->errstr, "Out of memory");
         }
 
-        prepare_allocation_test(cc, 148);
+        prepare_allocation_test(cc, 91);
         result = valkeyClusterConnect2(cc);
         assert(result == VALKEY_OK);
     }
@@ -521,14 +521,14 @@ void test_alloc_failure_handling_async(void) {
 
     // Connect
     {
-        for (int i = 0; i < 146; ++i) {
+        for (int i = 0; i < 89; ++i) {
             prepare_allocation_test(acc->cc, i);
             result = valkeyClusterConnect2(acc->cc);
             assert(result == VALKEY_ERR);
             ASSERT_STR_EQ(acc->cc->errstr, "Out of memory");
         }
 
-        prepare_allocation_test(acc->cc, 146);
+        prepare_allocation_test(acc->cc, 89);
         result = valkeyClusterConnect2(acc->cc);
         assert(result == VALKEY_OK);
     }
