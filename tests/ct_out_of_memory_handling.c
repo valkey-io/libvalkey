@@ -24,6 +24,7 @@
  *   Correct `i` can be hard to know, finding the correct number might require trial
  *   and error of running with increased/decreased `i` until the edge is found.
  */
+#define _XOPEN_SOURCE 600 /* For strdup() */
 #include "adapters/libevent.h"
 #include "cluster.h"
 #include "test_utils.h"

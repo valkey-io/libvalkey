@@ -1,3 +1,4 @@
+#define _XOPEN_SOURCE 600 /* Required by libuv (pthread_rwlock_t) */
 #include <valkey/async.h>
 #include <valkey/valkey.h>
 

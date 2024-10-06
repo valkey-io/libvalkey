@@ -1,3 +1,4 @@
+#define _XOPEN_SOURCE 600 /* For strdup() */
 #include "adapters/libevent.h"
 #include "cluster.h"
 #include "test_utils.h"

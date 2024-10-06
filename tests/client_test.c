@@ -1,6 +1,5 @@
-#if !defined(__FreeBSD__)
-#define _POSIX_C_SOURCE 200112L
-#endif
+#include "fmacros.h"
+
 #include "sockcompat.h"
 
 #include <stdio.h>
