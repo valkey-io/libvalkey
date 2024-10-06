@@ -25,8 +25,9 @@ OPTION(ENABLE_EXAMPLES "Enable building valkey examples" OFF)
 option(ENABLE_IPV6_TESTS "Enable IPv6 tests requiring special prerequisites" OFF)
 OPTION(ENABLE_RDMA "Build valkey_rdma for RDMA support" OFF)
 
-# valkey requires C99
+# Libvalkey requires C99 (-std=c99)
 SET(CMAKE_C_STANDARD 99)
+set(CMAKE_C_EXTENSIONS OFF)
 SET(CMAKE_DEBUG_POSTFIX d)
 
 # Set target-common flags

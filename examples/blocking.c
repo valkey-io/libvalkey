@@ -1,3 +1,4 @@
+#define _XOPEN_SOURCE 600 /* For strdup() */
 #include <valkey/valkey.h>
 
 #include <stdio.h>

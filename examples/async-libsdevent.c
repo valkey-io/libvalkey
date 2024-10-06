@@ -1,3 +1,4 @@
+#define _XOPEN_SOURCE 600 /* Required by libsdevent (CLOCK_MONOTONIC) */
 #include <valkey/async.h>
 #include <valkey/valkey.h>
 

@@ -1,3 +1,4 @@
+#define _XOPEN_SOURCE 600 /* Required by libuv (pthread_rwlock_t) */
 #include "adapters/libuv.h"
 #include "cluster.h"
 #include "test_utils.h"

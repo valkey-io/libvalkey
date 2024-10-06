@@ -1,5 +1,6 @@
 /* Some unit tests that don't require Valkey to be running. */
 
+#include "fmacros.h"
 #include "win32.h"
 
 #include "cluster.h"
