@@ -14,12 +14,9 @@
 void test_command_to_single_node(valkeyClusterContext *cc) {
     valkeyReply *reply;
 
-    dictIterator di;
-    dictInitIterator(&di, cc->nodes);
-
-    dictEntry *de = dictNext(&di);
-    assert(de);
-    valkeyClusterNode *node = dictGetEntryVal(de);
+    valkeyClusterNodeIterator ni;
+    valkeyClusterInitNodeIterator(&ni, cc);
+    valkeyClusterNode *node = valkeyClusterNodeNext(&ni);
     assert(node);
 
     reply = valkeyClusterCommandToNode(cc, node, "DBSIZE");
@@ -182,12 +179,9 @@ void test_pipeline_to_single_node(valkeyClusterContext *cc) {
     int status;
     valkeyReply *reply;
 
-    dictIterator di;
-    dictInitIterator(&di, cc->nodes);
-
-    dictEntry *de = dictNext(&di);
-    assert(de);
-    valkeyClusterNode *node = dictGetEntryVal(de);
+    valkeyClusterNodeIterator ni;
+    valkeyClusterInitNodeIterator(&ni, cc);
+    valkeyClusterNode *node = valkeyClusterNodeNext(&ni);
     assert(node);
 
     status = valkeyClusterAppendCommandToNode(cc, node, "DBSIZE");
@@ -336,12 +330,9 @@ void test_async_to_single_node(void) {
     status = valkeyClusterLibeventAttach(acc, base);
     assert(status == VALKEY_OK);
 
-    dictIterator di;
-    dictInitIterator(&di, acc->cc->nodes);
-
-    dictEntry *de = dictNext(&di);
-    assert(de);
-    valkeyClusterNode *node = dictGetEntryVal(de);
+    valkeyClusterNodeIterator ni;
+    valkeyClusterInitNodeIterator(&ni, acc->cc);
+    valkeyClusterNode *node = valkeyClusterNodeNext(&ni);
     assert(node);
 
     ExpectedResult r1 = {.type = VALKEY_REPLY_INTEGER, .disconnect = true};
@@ -372,12 +363,9 @@ void test_async_formatted_to_single_node(void) {
     status = valkeyClusterLibeventAttach(acc, base);
     assert(status == VALKEY_OK);
 
-    dictIterator di;
-    dictInitIterator(&di, acc->cc->nodes);
-
-    dictEntry *de = dictNext(&di);
-    assert(de);
-    valkeyClusterNode *node = dictGetEntryVal(de);
+    valkeyClusterNodeIterator ni;
+    valkeyClusterInitNodeIterator(&ni, acc->cc);
+    valkeyClusterNode *node = valkeyClusterNodeNext(&ni);
     assert(node);
 
     ExpectedResult r1 = {.type = VALKEY_REPLY_INTEGER, .disconnect = true};
@@ -409,12 +397,9 @@ void test_async_command_argv_to_single_node(void) {
     status = valkeyClusterLibeventAttach(acc, base);
     assert(status == VALKEY_OK);
 
-    dictIterator di;
-    dictInitIterator(&di, acc->cc->nodes);
-
-    dictEntry *de = dictNext(&di);
-    assert(de);
-    valkeyClusterNode *node = dictGetEntryVal(de);
+    valkeyClusterNodeIterator ni;
+    valkeyClusterInitNodeIterator(&ni, acc->cc);
+    valkeyClusterNode *node = valkeyClusterNodeNext(&ni);
     assert(node);
 
     ExpectedResult r1 = {.type = VALKEY_REPLY_INTEGER, .disconnect = true};

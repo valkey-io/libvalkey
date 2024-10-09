@@ -122,6 +122,7 @@ int main(int argc, char **argv) {
         if (send_to_all) {
             valkeyClusterNodeIterator ni;
             valkeyClusterInitNodeIterator(&ni, cc);
+            uint64_t route_version = cc->route_version;
 
             valkeyClusterNode *node;
             while ((node = valkeyClusterNodeNext(&ni)) != NULL) {
@@ -133,7 +134,7 @@ int main(int argc, char **argv) {
                     printReply(reply);
                 }
                 freeReplyObject(reply);
-                if (ni.route_version != cc->route_version) {
+                if (route_version != cc->route_version) {
                     /* Updated slotmap resets the iterator. Abort iteration. */
                     break;
                 }

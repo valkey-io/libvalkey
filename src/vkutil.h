@@ -36,6 +36,9 @@
 #include <stdint.h>
 #include <sys/types.h>
 
+/* Static assert macro for C99. */
+#define vk_static_assert(cond) extern char vk_static_assert[sizeof(char[(cond) ? 1 : -1])]
+
 /*
  * Wrapper to workaround well known, safe, implicit type conversion when
  * invoking system calls.
