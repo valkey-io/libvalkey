@@ -849,9 +849,7 @@ oom:
     // passthrough
 
 error:
-    if (nodes != NULL) {
-        dictRelease(nodes);
-    }
+    dictRelease(nodes);
     if (slot != NULL) {
         cluster_slot_destroy(slot);
     }
@@ -1037,9 +1035,7 @@ static dict *parse_cluster_nodes(valkeyClusterContext *cc, valkeyReply *reply) {
         goto error;
     }
 
-    if (nodes_name != NULL) {
-        dictRelease(nodes_name);
-    }
+    dictRelease(nodes_name);
 
     return nodes;
 
@@ -1050,12 +1046,8 @@ oom:
 error:
     sdsfreesplitres(part, count_part);
     sdsfreesplitres(slot_start_end, count_slot_start_end);
-    if (nodes != NULL) {
-        dictRelease(nodes);
-    }
-    if (nodes_name != NULL) {
-        dictRelease(nodes_name);
-    }
+    dictRelease(nodes);
+    dictRelease(nodes_name);
     return NULL;
 }
 
@@ -1233,9 +1225,8 @@ static int updateNodesAndSlotmap(valkeyClusterContext *cc, dict *nodes) {
      * the release procedure might access cc->nodes. */
     dict *oldnodes = cc->nodes;
     cc->nodes = nodes;
-    if (oldnodes != NULL) {
-        dictRelease(oldnodes);
-    }
+    dictRelease(oldnodes);
+
     if (cc->event_callback != NULL) {
         cc->event_callback(cc, VALKEYCLUSTER_EVENT_SLOTMAP_UPDATED,
                            cc->event_privdata);
@@ -1322,10 +1313,7 @@ void valkeyClusterFree(valkeyClusterContext *cc) {
     vk_free(cc->username);
     vk_free(cc->password);
     vk_free(cc->table);
-
-    if (cc->nodes != NULL) {
-        dictRelease(cc->nodes);
-    }
+    dictRelease(cc->nodes);
 
     if (cc->requests != NULL) {
         listRelease(cc->requests);
