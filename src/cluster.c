@@ -333,6 +333,8 @@ static int cluster_slot_ref_node(cluster_slot *slot, valkeyClusterNode *node) {
 }
 
 static void cluster_slot_destroy(cluster_slot *slot) {
+    if (slot == NULL)
+        return;
     slot->start = 0;
     slot->end = 0;
     slot->node = NULL;
@@ -846,9 +848,7 @@ oom:
 
 error:
     dictRelease(nodes);
-    if (slot != NULL) {
-        cluster_slot_destroy(slot);
-    }
+    cluster_slot_destroy(slot);
     return NULL;
 }
 
