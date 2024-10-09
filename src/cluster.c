@@ -271,12 +271,8 @@ static void freeValkeyClusterNode(valkeyClusterNode *node) {
         node->acon->data = NULL;
         valkeyAsyncFree(node->acon);
     }
-    if (node->slots != NULL) {
-        listRelease(node->slots);
-    }
-    if (node->slaves != NULL) {
-        listRelease(node->slaves);
-    }
+    listRelease(node->slots);
+    listRelease(node->slaves);
     vk_free(node);
 }
 
@@ -1314,10 +1310,7 @@ void valkeyClusterFree(valkeyClusterContext *cc) {
     vk_free(cc->password);
     vk_free(cc->table);
     dictRelease(cc->nodes);
-
-    if (cc->requests != NULL) {
-        listRelease(cc->requests);
-    }
+    listRelease(cc->requests);
 
     memset(cc, 0xff, sizeof(*cc));
     vk_free(cc);
@@ -2693,10 +2686,8 @@ void valkeyClusterReset(valkeyClusterContext *cc) {
         } while (reply != NULL);
     }
 
-    if (cc->requests) {
-        listRelease(cc->requests);
-        cc->requests = NULL;
-    }
+    listRelease(cc->requests);
+    cc->requests = NULL;
 
     if (cc->need_update_route) {
         status = valkeyClusterUpdateSlotmap(cc);

@@ -59,6 +59,8 @@ void listRelease(hilist *list) {
     unsigned long len;
     listNode *current, *next;
 
+    if (list == NULL)
+        return;
     current = list->head;
     len = list->len;
     while (len--) {
