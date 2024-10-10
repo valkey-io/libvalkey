@@ -23,17 +23,3 @@ jobs:
         TEST_PREFIX: valgrind --error-exitcode=100
         SKIPS_ARG: --skip-throughput
       run: make check
-
-  build-32-bit:
-    name: Build and test minimal 32 bit linux
-    runs-on: ubuntu-latest
-    steps:
-    - name: Install prerequisites
-      run: sudo apt-get update && sudo apt-get install gcc-multilib
-    - uses: actions/checkout@d632683dd7b4114ad314bca15554477dd762a938 # v4.2.0
-    - name: Run make
-      run: make 32bit
-    - name: Run unittests
-      env:
-        REDIS_DOCKER: redis:alpine
-      run: make check
