@@ -3542,8 +3542,8 @@ void valkeyClusterAsyncFree(valkeyClusterAsyncContext *acc) {
 }
 
 struct nodeIterator {
-    valkeyClusterContext *cc;
     uint64_t route_version;
+    valkeyClusterContext *cc;
     int retries_left;
     dictIterator di;
 };
