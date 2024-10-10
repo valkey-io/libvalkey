@@ -85,6 +85,17 @@ if(ENABLE_RDMA)
   set_property(TEST client_test PROPERTY ENVIRONMENT "TEST_RDMA=1")
 endif()
 
+# Unit tests
+add_executable(ut_parse_cmd ut_parse_cmd.c test_utils.c)
+target_include_directories(ut_parse_cmd PRIVATE "${PROJECT_SOURCE_DIR}/src")
+target_link_libraries(ut_parse_cmd valkey)
+add_test(NAME ut_parse_cmd COMMAND "$<TARGET_FILE:ut_parse_cmd>")
+
+add_executable(ut_slotmap_update ut_slotmap_update.c)
+target_include_directories(ut_slotmap_update PRIVATE "${PROJECT_SOURCE_DIR}/src")
+target_link_libraries(ut_slotmap_update valkey)
+add_test(NAME ut_slotmap_update COMMAND "$<TARGET_FILE:ut_slotmap_update>")
+
 # Add cluster tests if we have libevent
 if (LIBEVENT_LIBRARY)
   add_executable(ct_async ct_async.c)
@@ -117,11 +128,6 @@ if (LIBEVENT_LIBRARY)
   add_executable(ct_specific_nodes ct_specific_nodes.c test_utils.c)
   target_link_libraries(ct_specific_nodes valkey ${TLS_LIBRARY} ${LIBEVENT_LIBRARY})
   add_test(NAME ct_specific_nodes COMMAND "$<TARGET_FILE:ct_specific_nodes>")
-  
-  add_executable(ut_parse_cmd ut_parse_cmd.c test_utils.c)
-  target_include_directories(ut_parse_cmd PRIVATE "${PROJECT_SOURCE_DIR}/src")
-  target_link_libraries(ut_parse_cmd valkey ${TLS_LIBRARY})
-  add_test(NAME ut_parse_cmd COMMAND "$<TARGET_FILE:ut_parse_cmd>")
   
   if(LIBUV_LIBRARY)
     add_executable(ct_async_libuv ct_async_libuv.c)
