@@ -43,12 +43,7 @@ jobs:
           dnf -y install https://rpms.remirepo.net/enterprise/remi-release-8.rpm
           dnf -y module install redis:remi-6.0
           dnf -y group install "Development Tools"
-          dnf -y install openssl-devel cmake libevent-devel
-
-      - name: Install Valkey
-        run: |
-          git clone --depth 1 --branch 7.2.5 https://github.com/valkey-io/valkey.git
-          cd valkey && BUILD_TLS=yes make install
+          dnf -y install openssl-devel cmake libevent-devel valkey
 
       - name: Build using cmake
         env:

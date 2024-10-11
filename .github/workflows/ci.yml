@@ -58,10 +58,14 @@ jobs:
       uses: jwlawson/actions-setup-cmake@802fa1a2c4e212495c05bf94dba2704a92a472be # v2.0.2
       with:
         cmake-version: ${{ matrix.cmake-version }}
-    - name: Install Valkey for non-cluster tests
+    - name: Build and install Valkey for non-cluster tests
+      if: ${{ matrix.runner == 'ubuntu-20.04' }}
       run: |
         git clone --depth 1 --branch 7.2.5 https://github.com/valkey-io/valkey.git
         cd valkey && BUILD_TLS=yes make install
+    - name: Install Valkey for non-cluster tests
+      if: ${{ matrix.runner != 'ubuntu-20.04' }}
+      run: sudo apt install valkey
     - name: Generate makefiles
       env:
         CC: ${{ matrix.compiler }}
@@ -89,7 +93,7 @@ jobs:
 
   ubuntu-make:
     name: Build with make
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@d632683dd7b4114ad314bca15554477dd762a938 # v4.2.0
       - name: Prepare
@@ -98,9 +102,7 @@ jobs:
           packages: libevent-dev valgrind
           version: 1.0
       - name: Install Valkey
-        run: |
-          git clone --depth 1 --branch 7.2.5 https://github.com/valkey-io/valkey.git
-          cd valkey && sudo BUILD_TLS=yes make install
+        run: sudo apt install valkey
       - name: Build
         run: USE_TLS=1 TEST_ASYNC=1 make
       - name: Run tests
@@ -119,7 +121,7 @@ jobs:
 
   ubuntu-32bit:
     name: Build for 32-bit
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@d632683dd7b4114ad314bca15554477dd762a938 # v4.2.0
       - name: Prepare
@@ -128,9 +130,7 @@ jobs:
           packages: gcc-multilib
           version: 1.0
       - name: Install Valkey
-        run: |
-          git clone --depth 1 --branch 7.2.5 https://github.com/valkey-io/valkey.git
-          cd valkey && sudo BUILD_TLS=yes make install
+        run: sudo apt install valkey
       - name: Build
         run: |
           make 32bit
