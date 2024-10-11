@@ -150,8 +150,6 @@ typedef struct valkeyClusterAsyncContext {
 
 #if UINTPTR_MAX == UINT64_MAX
 #define VALKEY_NODE_ITERATOR_SIZE 56
-#elif defined(__arm__)
-#define VALKEY_NODE_ITERATOR_SIZE 40
 #else
 #define VALKEY_NODE_ITERATOR_SIZE 32
 #endif

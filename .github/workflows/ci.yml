@@ -117,6 +117,28 @@ jobs:
           TEST_PREFIX: valgrind --error-exitcode=99 --track-origins=yes --leak-check=full
         run: ./test.sh
 
+  ubuntu-32bit:
+    name: Build for 32-bit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@d632683dd7b4114ad314bca15554477dd762a938 # v4.2.0
+      - name: Prepare
+        uses: awalsh128/cache-apt-pkgs-action@a6c3917cc929dd0345bfb2d3feaf9101823370ad # v1.4.2
+        with:
+          packages: gcc-multilib
+          version: 1.0
+      - name: Install Valkey
+        run: |
+          git clone --depth 1 --branch 7.2.5 https://github.com/valkey-io/valkey.git
+          cd valkey && sudo BUILD_TLS=yes make install
+      - name: Build
+        run: |
+          make 32bit
+      - name: Run tests
+        working-directory: tests
+        run: |
+          ./test.sh
+
   install:
     name: Installation tests
     runs-on: ubuntu-latest

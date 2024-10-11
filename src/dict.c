@@ -253,6 +253,8 @@ static int _dictClear(dict *ht) {
 
 /* Clear & Release the hash table */
 void dictRelease(dict *ht) {
+    if (ht == NULL)
+        return;
     _dictClear(ht);
     vk_free(ht);
 }

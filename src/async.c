@@ -156,10 +156,8 @@ static valkeyAsyncContext *valkeyAsyncInitialize(valkeyContext *c) {
 
     return ac;
 oom:
-    if (channels)
-        dictRelease(channels);
-    if (patterns)
-        dictRelease(patterns);
+    dictRelease(channels);
+    dictRelease(patterns);
     return NULL;
 }
 
