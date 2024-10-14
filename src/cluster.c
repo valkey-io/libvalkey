@@ -628,12 +628,12 @@ static int cluster_master_slave_mapping_with_name(valkeyClusterContext *cc,
             }
 
             if (node_old->slaves != NULL) {
-                node_old->slaves->free = NULL;
                 while (listLength(node_old->slaves) > 0) {
                     lnode = listFirst(node_old->slaves);
                     if (listAddNodeHead(node->slaves, lnode->value) == NULL) {
                         goto oom;
                     }
+                    node_old->slaves->free = NULL;
                     listDelNode(node_old->slaves, lnode);
                 }
                 listRelease(node_old->slaves);
@@ -952,7 +952,6 @@ static dict *parse_cluster_nodes(valkeyClusterContext *cc, valkeyReply *reply) {
                     ret = cluster_master_slave_mapping_with_name(
                         cc, &nodes_name, master, master->name);
                     if (ret != VALKEY_OK) {
-                        freeValkeyClusterNode(master);
                         goto error;
                     }
                 }
@@ -1042,8 +1041,19 @@ oom:
 error:
     sdsfreesplitres(part, count_part);
     sdsfreesplitres(slot_start_end, count_slot_start_end);
+    if (nodes_name != NULL) {
+        /* Only free parsed replicas since the `nodes` dict owns primary nodes. */
+        dictIterator di;
+        dictInitIterator(&di, nodes_name);
+        dictEntry *de;
+        while ((de = dictNext(&di))) {
+            valkeyClusterNode *node = dictGetEntryVal(de);
+            if (node->role == VALKEY_ROLE_SLAVE)
+                freeValkeyClusterNode(node);
+        }
+        dictRelease(nodes_name);
+    }
     dictRelease(nodes);
-    dictRelease(nodes_name);
     return NULL;
 }
 
