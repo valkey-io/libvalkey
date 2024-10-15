@@ -780,8 +780,8 @@ static int move_replica_nodes(dict *replicas, dict *nodes) {
  * the 'replica_master_id' argument is NULL, otherwise replicas are parsed and
  * its master_id is given via 'replica_master_id'. */
 static int parse_cluster_nodes_line(valkeyClusterContext *cc, char *line,
-                                    valkeyClusterNode **parsed_node, char **replica_master_id) {
-    char *p, *id = NULL, *addr = NULL, *flags = NULL, *master_id = NULL,
+                                    valkeyClusterNode **parsed_node, char **parsed_primary_id) {
+    char *p, *id = NULL, *addr = NULL, *flags = NULL, *primary_id = NULL,
              *link_state = NULL, *slots = NULL;
     // clang-format off
     /* Find required fields. */
@@ -792,7 +792,7 @@ static int parse_cluster_nodes_line(valkeyClusterContext *cc, char *line,
             case 0: id = line; break;
             case 1: addr = line; break;
             case 2: flags = line; break;
-            case 3: master_id = line; break;
+            case 3: primary_id = line; break;
             case 7: link_state = line; break;
         }
         line = p + 1; /* Start of next field. */
@@ -829,7 +829,7 @@ static int parse_cluster_nodes_line(valkeyClusterContext *cc, char *line,
     }
 
     /* Only parse replicas when requested. */
-    if (role == VALKEY_ROLE_SLAVE && replica_master_id == NULL) {
+    if (role == VALKEY_ROLE_SLAVE && parsed_primary_id == NULL) {
         *parsed_node = NULL;
         return VALKEY_OK;
     }
@@ -876,7 +876,7 @@ static int parse_cluster_nodes_line(valkeyClusterContext *cc, char *line,
 
     /* No slot parsing needed for replicas, but return master id. */
     if (node->role == VALKEY_ROLE_SLAVE) {
-        *replica_master_id = master_id;
+        *parsed_primary_id = primary_id;
         *parsed_node = node;
         return VALKEY_OK;
     }
@@ -957,9 +957,9 @@ static dict *parse_cluster_nodes(valkeyClusterContext *cc, valkeyReply *reply) {
         line = lines;
         lines = p + 1; /* Start of next line. */
 
-        char *master_id;
+        char *primary_id;
         valkeyClusterNode *node;
-        if (parse_cluster_nodes_line(cc, line, &node, add_replicas ? &master_id : NULL) != VALKEY_OK)
+        if (parse_cluster_nodes_line(cc, line, &node, add_replicas ? &primary_id : NULL) != VALKEY_OK)
             goto error;
         if (node == NULL)
             continue; /* Line skipped. */
@@ -985,7 +985,7 @@ static dict *parse_cluster_nodes(valkeyClusterContext *cc, valkeyReply *reply) {
 
         } else {
             assert(node->role == VALKEY_ROLE_SLAVE);
-            if (store_replica_node(&replicas, master_id, node) != VALKEY_OK) {
+            if (store_replica_node(&replicas, primary_id, node) != VALKEY_OK) {
                 freeValkeyClusterNode(node);
                 goto oom;
             }
