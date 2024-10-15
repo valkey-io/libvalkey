@@ -720,7 +720,8 @@ static int store_replica_node(dict *replicas, char *primary_id, valkeyClusterNod
     return VALKEY_OK;
 }
 
-/* Move parsed replica nodes from the collection to related primary. */
+/* Move parsed replica nodes to its primary node, which holds a list of replica
+ * nodes. The `replicas` dict shall contain nodes with primary_id as key. */
 static int move_replica_nodes(dict *replicas, dict *nodes) {
     if (replicas == NULL)
         return VALKEY_OK;
@@ -770,15 +771,19 @@ static int move_replica_nodes(dict *replicas, dict *nodes) {
     return VALKEY_OK;
 }
 
-/* Parse a node from a single CLUSTER NODES line. Only parse primary nodes if
- * the 'replica_master_id' argument is NULL, otherwise replicas are parsed and
- * its master_id is given via 'replica_master_id'. */
+/* Parse a node from a single CLUSTER NODES line. Returns an allocated
+ * valkeyClusterNode as a pointer in `parsed_node`.
+ * Only parse primary nodes if the `parsed_primary_id` argument is NULL,
+ * otherwise replicas are also parsed and its primary_id is returned by pointer
+ * via 'parsed_primary_id'. */
 static int parse_cluster_nodes_line(valkeyClusterContext *cc, char *line,
                                     valkeyClusterNode **parsed_node, char **parsed_primary_id) {
     char *p, *id = NULL, *addr = NULL, *flags = NULL, *primary_id = NULL,
              *link_state = NULL, *slots = NULL;
+    /* Find required fields and keep a pointer to each field:
+     * <id> <addr> <flags> <primary_id> <ping-sent> <pong-recv> <config-epoch> <link-state> [<slot> ...]
+     */
     // clang-format off
-    /* Find required fields. */
     int i = 0;
     while ((p = strchr(line, ' ')) != NULL) {
         *p = '\0';
@@ -800,7 +805,8 @@ static int parse_cluster_nodes_line(valkeyClusterContext *cc, char *line,
         return VALKEY_ERR;
     }
 
-    /* Parse flags. */
+    /* Parse flags, a comma separated list of following flags:
+     * myself, master, slave, fail?, fail, handshake, noaddr, nofailover, noflags. */
     uint8_t role = VALKEY_ROLE_NULL;
     while (*flags != '\0') {
         if ((p = strchr(flags, ',')) != NULL)
@@ -837,8 +843,8 @@ static int parse_cluster_nodes_line(valkeyClusterContext *cc, char *line,
     if (node->name == NULL)
         goto oom;
 
-    /* Handle address field <ip:port@cport...>
-     * Remove @cport... since addr is used as a dict key which should be <ip>:<port> */
+    /* Parse the address field: <ip:port@cport[,hostname]>
+     * Remove @cport.. to get <ip>:<port> which is our dict key. */
     if ((p = strchr(addr, PORT_CPORT_SEPARATOR)) != NULL) {
         *p = '\0';
     }
