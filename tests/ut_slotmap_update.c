@@ -289,12 +289,12 @@ void test_parse_cluster_nodes_with_multiple_replicas(void) {
     assert(strcmp(node->addr, "127.0.0.1:30004") == 0);
     assert(node->role == VALKEY_ROLE_SLAVE);
     node = listNodeValue(listNext(&li));
-    assert(strcmp(node->name, "824fe116063bc5fcf9f4ffd895bc17aee7731ac3") == 0);
-    assert(strcmp(node->addr, "127.0.0.1:30006") == 0);
-    assert(node->role == VALKEY_ROLE_SLAVE);
-    node = listNodeValue(listNext(&li));
     assert(strcmp(node->name, "6ec23923021cf3ffec47632106199cb7f496ce01") == 0);
     assert(strcmp(node->addr, "127.0.0.1:30005") == 0);
+    assert(node->role == VALKEY_ROLE_SLAVE);
+    node = listNodeValue(listNext(&li));
+    assert(strcmp(node->name, "824fe116063bc5fcf9f4ffd895bc17aee7731ac3") == 0);
+    assert(strcmp(node->addr, "127.0.0.1:30006") == 0);
     assert(node->role == VALKEY_ROLE_SLAVE);
     node = listNodeValue(listNext(&li));
     assert(strcmp(node->name, "67ed2db8d677e59ec4a4cefb06858cf2a1a89fa1") == 0);
