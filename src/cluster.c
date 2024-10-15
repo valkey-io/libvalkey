@@ -691,20 +691,14 @@ error:
 
 /* Store a parsed replica node in given dict using the primary_id as key.
  * Additional replicas for a primary are stored within the first replica. */
-static int store_replica_node(dict **replicas, char *primary_id, valkeyClusterNode *node) {
-    if (*replicas == NULL) {
-        *replicas = dictCreate(&clusterNodesDictType, NULL);
-        if (replicas == NULL)
-            return VALKEY_ERR;
-    }
-
+static int store_replica_node(dict *replicas, char *primary_id, valkeyClusterNode *node) {
     sds key = sdsnew(primary_id);
     if (key == NULL)
         return VALKEY_ERR;
 
-    dictEntry *de = dictFind(*replicas, key);
+    dictEntry *de = dictFind(replicas, key);
     if (de == NULL) {
-        if (dictAdd(*replicas, key, node) != DICT_OK) {
+        if (dictAdd(replicas, key, node) != DICT_OK) {
             sdsfree(key);
             return VALKEY_ERR;
         }
@@ -985,7 +979,13 @@ static dict *parse_cluster_nodes(valkeyClusterContext *cc, valkeyReply *reply) {
 
         } else {
             assert(node->role == VALKEY_ROLE_SLAVE);
-            if (store_replica_node(&replicas, primary_id, node) != VALKEY_OK) {
+            if (replicas == NULL) {
+                if ((replicas = dictCreate(&clusterNodesDictType, NULL)) == NULL) {
+                    freeValkeyClusterNode(node);
+                    goto oom;
+                }
+            }
+            if (store_replica_node(replicas, primary_id, node) != VALKEY_OK) {
                 freeValkeyClusterNode(node);
                 goto oom;
             }
