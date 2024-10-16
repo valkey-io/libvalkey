@@ -95,15 +95,15 @@ int main(int argc, char **argv) {
         exit(1);
     }
     const char *initnode = argv[1];
-
-    valkeyClusterAsyncContext *acc = valkeyClusterAsyncContextInit();
-    assert(acc);
-    valkeyClusterSetOptionAddNodes(acc->cc, initnode);
-    valkeyClusterSetOptionRouteUseSlots(acc->cc);
-
     struct event_base *base = event_base_new();
-    int status = valkeyClusterLibeventAttach(acc, base);
-    assert(status == VALKEY_OK);
+
+    valkeyClusterOptions options = {0};
+    options.initial_nodes = initnode;
+    options.options = VALKEY_OPT_USE_CLUSTER_SLOTS;
+    valkeyClusterOptionsUseLibevent(&options, base);
+
+    valkeyClusterAsyncContext *acc = valkeyClusterAsyncContextInit(&options);
+    assert(acc);
 
     connectToValkey(acc);
     // schedule reading from stdin and sending next command

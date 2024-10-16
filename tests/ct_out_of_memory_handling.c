@@ -447,63 +447,37 @@ void test_alloc_failure_handling_async(void) {
     // Override allocators
     valkeySetAllocators(&ha);
 
-    // Context init
-    valkeyClusterAsyncContext *acc;
-    {
-        for (int i = 0; i < 4; ++i) {
-            successfulAllocations = 0;
-            acc = valkeyClusterAsyncContextInit();
-            assert(acc == NULL);
-        }
-        successfulAllocations = 4;
-        acc = valkeyClusterAsyncContextInit();
-        assert(acc);
-    }
-    valkeyClusterSetOptionParseSlaves(acc->cc);
-
-    // Set callbacks
-    {
-        prepare_allocation_test_async(acc, 0);
-        result = valkeyClusterAsyncSetConnectCallback(acc, connectCallback);
-        assert(result == VALKEY_OK);
-        result = valkeyClusterAsyncSetDisconnectCallback(acc, disconnectCallback);
-        assert(result == VALKEY_OK);
-    }
-
-    // Add nodes
-    {
-        for (int i = 0; i < 9; ++i) {
-            prepare_allocation_test(acc->cc, i);
-            result = valkeyClusterSetOptionAddNodes(acc->cc, CLUSTER_NODE);
-            assert(result == VALKEY_ERR);
-            ASSERT_STR_EQ(acc->cc->errstr, "Out of memory");
-        }
-
-        prepare_allocation_test(acc->cc, 9);
-        result = valkeyClusterSetOptionAddNodes(acc->cc, CLUSTER_NODE);
-        assert(result == VALKEY_OK);
-    }
-
-    // Connect
-    {
-        for (int i = 0; i < 94; ++i) {
-            prepare_allocation_test(acc->cc, i);
-            result = valkeyClusterConnect2(acc->cc);
-            assert(result == VALKEY_ERR);
-            ASSERT_STR_EQ(acc->cc->errstr, "Out of memory");
-        }
-
-        prepare_allocation_test(acc->cc, 94);
-        result = valkeyClusterConnect2(acc->cc);
-        assert(result == VALKEY_OK);
-    }
-
     struct event_base *base = event_base_new();
     assert(base);
 
-    successfulAllocations = 0;
-    result = valkeyClusterLibeventAttach(acc, base);
-    assert(result == VALKEY_OK);
+    valkeyClusterOptions options = {0};
+    options.initial_nodes = CLUSTER_NODE;
+    options.options = VALKEY_OPT_USE_REPLICAS;
+    options.async_connect_cb = connectCallback;
+    options.async_disconnect_cb = disconnectCallback;
+    valkeyClusterOptionsUseLibevent(&options, base);
+
+    // Connect
+    valkeyClusterAsyncContext *acc;
+    {
+        for (int i = 0; i < 13; ++i) {
+            successfulAllocations = i;
+            acc = valkeyClusterAsyncConnectWithOptions(&options);
+            assert(acc == NULL);
+        }
+
+        for (int i = 13; i < 107; ++i) {
+            successfulAllocations = i;
+            acc = valkeyClusterAsyncConnectWithOptions(&options);
+            ASSERT_STR_EQ(acc->errstr, "Out of memory");
+            assert(acc != NULL);
+            valkeyClusterAsyncFree(acc);
+        }
+
+        successfulAllocations = 107;
+        acc = valkeyClusterAsyncConnectWithOptions(&options);
+        assert(acc && acc->err == 0);
+    }
 
     // Async command 1
     ExpectedResult r1 = {.type = VALKEY_REPLY_STATUS, .str = "OK"};

@@ -36,18 +36,19 @@ int main(int argc, char **argv) {
     UNUSED(argc);
     UNUSED(argv);
 
-    valkeyClusterAsyncContext *acc = valkeyClusterAsyncConnect(CLUSTER_NODE);
+    uv_loop_t *loop = uv_default_loop();
+
+    valkeyClusterOptions options = {0};
+    options.initial_nodes = CLUSTER_NODE;
+    options.async_connect_cb = connectCallback;
+    options.async_disconnect_cb = disconnectCallback;
+    valkeyClusterOptionsUseLibuv(&options, loop);
+
+    valkeyClusterAsyncContext *acc = valkeyClusterAsyncConnectWithOptions(&options);
     assert(acc);
     ASSERT_MSG(acc->err == 0, acc->errstr);
 
     int status;
-    uv_loop_t *loop = uv_default_loop();
-    status = valkeyClusterLibuvAttach(acc, loop);
-    assert(status == VALKEY_OK);
-
-    valkeyClusterAsyncSetConnectCallback(acc, connectCallback);
-    valkeyClusterAsyncSetDisconnectCallback(acc, disconnectCallback);
-
     status = valkeyClusterAsyncCommand(acc, setCallback, (char *)"ID",
                                        "SET key value");
     ASSERT_MSG(status == VALKEY_OK, acc->errstr);

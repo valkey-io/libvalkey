@@ -92,20 +92,18 @@ void commandCallback(valkeyClusterAsyncContext *cc, void *r, void *privdata) {
 // nature of an event loop. Therefore, unlike the synchronous API, there is only
 // a single way to send commands.
 void test_async_pipeline(void) {
-    valkeyClusterAsyncContext *acc = valkeyClusterAsyncContextInit();
-    assert(acc);
-    valkeyClusterAsyncSetConnectCallback(acc, connectCallback);
-    valkeyClusterAsyncSetDisconnectCallback(acc, disconnectCallback);
-    valkeyClusterSetOptionAddNodes(acc->cc, CLUSTER_NODE);
+    struct event_base *base = event_base_new();
+
+    valkeyClusterOptions options = {0};
+    options.initial_nodes = CLUSTER_NODE;
+    options.async_connect_cb = connectCallback;
+    options.async_disconnect_cb = disconnectCallback;
+    valkeyClusterOptionsUseLibevent(&options, base);
+
+    valkeyClusterAsyncContext *acc = valkeyClusterAsyncConnectWithOptions(&options);
+    ASSERT_MSG(acc && acc->err == 0, acc ? acc->errstr : "OOM");
 
     int status;
-    status = valkeyClusterConnect2(acc->cc);
-    ASSERT_MSG(status == VALKEY_OK, acc->errstr);
-
-    struct event_base *base = event_base_new();
-    status = valkeyClusterLibeventAttach(acc, base);
-    assert(status == VALKEY_OK);
-
     ExpectedResult r1 = {.type = VALKEY_REPLY_STATUS, .str = "OK"};
     status =
         valkeyClusterAsyncCommand(acc, commandCallback, &r1, "SET foo six");

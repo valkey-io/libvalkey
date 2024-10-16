@@ -2710,24 +2710,6 @@ static inline void valkeyClusterAsyncClearError(valkeyClusterAsyncContext *acc) 
     acc->errstr[0] = '\0';
 }
 
-static valkeyClusterAsyncContext *
-valkeyClusterAsyncInitialize(valkeyClusterContext *cc) {
-    valkeyClusterAsyncContext *acc;
-
-    if (cc == NULL) {
-        return NULL;
-    }
-
-    acc = vk_calloc(1, sizeof(valkeyClusterAsyncContext));
-    if (acc == NULL)
-        return NULL;
-
-    acc->cc = cc;
-    valkeyClusterAsyncSetError(acc, cc->err, cc->errstr);
-
-    return acc;
-}
-
 static cluster_async_data *cluster_async_data_create(void) {
     /* use calloc to guarantee all fields are zeroed */
     return vk_calloc(1, sizeof(cluster_async_data));
@@ -2853,49 +2835,56 @@ valkeyClusterGetValkeyAsyncContext(valkeyClusterAsyncContext *acc,
     return ac;
 }
 
-valkeyClusterAsyncContext *valkeyClusterAsyncContextInit(void) {
+valkeyClusterAsyncContext *valkeyClusterAsyncContextInit(const valkeyClusterOptions *options) {
     valkeyClusterContext *cc;
     valkeyClusterAsyncContext *acc;
 
-    valkeyClusterOptions options = {0};
-    cc = valkeyClusterContextInit(&options);
+    cc = valkeyClusterContextInit(options);
     if (cc == NULL) {
         return NULL;
     }
 
-    acc = valkeyClusterAsyncInitialize(cc);
+    acc = vk_calloc(1, sizeof(valkeyClusterAsyncContext));
     if (acc == NULL) {
         valkeyClusterFree(cc);
         return NULL;
+    }
+    acc->cc = cc;
+    valkeyClusterAsyncSetError(acc, cc->err, cc->errstr);
+
+    if (options->async_connect_cb != NULL) {
+        acc->onConnect = options->async_connect_cb;
+    }
+    if (options->async_disconnect_cb != NULL) {
+        acc->onDisconnect = options->async_disconnect_cb;
+    }
+    if (options->attach_fn != NULL) {
+        acc->attach_fn = options->attach_fn;
+        acc->attach_data = options->attach_data;
     }
 
     return acc;
 }
 
-valkeyClusterAsyncContext *valkeyClusterAsyncConnect(const char *addrs) {
-
-    valkeyClusterContext *cc;
-    valkeyClusterAsyncContext *acc;
-
-    cc = valkeyClusterConnect(addrs);
-    if (cc == NULL) {
-        return NULL;
-    }
-
-    acc = valkeyClusterAsyncInitialize(cc);
+valkeyClusterAsyncContext *valkeyClusterAsyncConnectWithOptions(const valkeyClusterOptions *options) {
+    valkeyClusterAsyncContext *acc = valkeyClusterAsyncContextInit(options);
     if (acc == NULL) {
-        valkeyClusterFree(cc);
         return NULL;
     }
 
+    //TODO: valkeyClusterAsyncConnect(acc);
+    if (valkeyClusterUpdateSlotmap(acc->cc) != VALKEY_OK) {
+        valkeyClusterAsyncSetError(acc, acc->cc->err, acc->cc->errstr);
+    }
     return acc;
 }
 
-int valkeyClusterAsyncConnect2(valkeyClusterAsyncContext *acc) {
+int valkeyClusterAsyncConnect(valkeyClusterAsyncContext *acc) {
     /* An attach function for an async event library is required. */
     if (acc->attach_fn == NULL) {
         return VALKEY_ERR;
     }
+    /* TODO: add options to use: valkeyClusterUpdateSlotmap(acc->cc); */
     return updateSlotMapAsync(acc, NULL /*any node*/);
 }
 

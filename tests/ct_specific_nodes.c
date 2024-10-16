@@ -318,27 +318,25 @@ void commandCallback(valkeyClusterAsyncContext *cc, void *r, void *privdata) {
 }
 
 void test_async_to_single_node(void) {
-    int status;
-
-    valkeyClusterAsyncContext *acc = valkeyClusterAsyncContextInit();
-    assert(acc);
-    valkeyClusterAsyncSetConnectCallback(acc, connectCallback);
-    valkeyClusterAsyncSetDisconnectCallback(acc, disconnectCallback);
-    valkeyClusterSetOptionAddNodes(acc->cc, CLUSTER_NODE);
-    valkeyClusterSetOptionMaxRetry(acc->cc, 1);
-    valkeyClusterSetOptionRouteUseSlots(acc->cc);
-    status = valkeyClusterConnect2(acc->cc);
-    ASSERT_MSG(status == VALKEY_OK, acc->errstr);
-
     struct event_base *base = event_base_new();
-    status = valkeyClusterLibeventAttach(acc, base);
-    assert(status == VALKEY_OK);
+
+    valkeyClusterOptions options = {0};
+    options.initial_nodes = CLUSTER_NODE;
+    options.options = VALKEY_OPT_USE_CLUSTER_SLOTS;
+    options.max_retry = 1;
+    options.async_connect_cb = connectCallback;
+    options.async_disconnect_cb = disconnectCallback;
+    valkeyClusterOptionsUseLibevent(&options, base);
+
+    valkeyClusterAsyncContext *acc = valkeyClusterAsyncConnectWithOptions(&options);
+    ASSERT_MSG(acc && acc->err == 0, acc ? acc->errstr : "OOM");
 
     valkeyClusterNodeIterator ni;
     valkeyClusterInitNodeIterator(&ni, acc->cc);
     valkeyClusterNode *node = valkeyClusterNodeNext(&ni);
     assert(node);
 
+    int status;
     ExpectedResult r1 = {.type = VALKEY_REPLY_INTEGER, .disconnect = true};
     status = valkeyClusterAsyncCommandToNode(acc, node, commandCallback, &r1,
                                              "DBSIZE");
@@ -351,27 +349,25 @@ void test_async_to_single_node(void) {
 }
 
 void test_async_formatted_to_single_node(void) {
-    int status;
-
-    valkeyClusterAsyncContext *acc = valkeyClusterAsyncContextInit();
-    assert(acc);
-    valkeyClusterAsyncSetConnectCallback(acc, connectCallback);
-    valkeyClusterAsyncSetDisconnectCallback(acc, disconnectCallback);
-    valkeyClusterSetOptionAddNodes(acc->cc, CLUSTER_NODE);
-    valkeyClusterSetOptionMaxRetry(acc->cc, 1);
-    valkeyClusterSetOptionRouteUseSlots(acc->cc);
-    status = valkeyClusterConnect2(acc->cc);
-    ASSERT_MSG(status == VALKEY_OK, acc->errstr);
-
     struct event_base *base = event_base_new();
-    status = valkeyClusterLibeventAttach(acc, base);
-    assert(status == VALKEY_OK);
+
+    valkeyClusterOptions options = {0};
+    options.initial_nodes = CLUSTER_NODE;
+    options.options = VALKEY_OPT_USE_CLUSTER_SLOTS;
+    options.max_retry = 1;
+    options.async_connect_cb = connectCallback;
+    options.async_disconnect_cb = disconnectCallback;
+    valkeyClusterOptionsUseLibevent(&options, base);
+
+    valkeyClusterAsyncContext *acc = valkeyClusterAsyncConnectWithOptions(&options);
+    ASSERT_MSG(acc && acc->err == 0, acc ? acc->errstr : "OOM");
 
     valkeyClusterNodeIterator ni;
     valkeyClusterInitNodeIterator(&ni, acc->cc);
     valkeyClusterNode *node = valkeyClusterNodeNext(&ni);
     assert(node);
 
+    int status;
     ExpectedResult r1 = {.type = VALKEY_REPLY_INTEGER, .disconnect = true};
     char command[] = "*1\r\n$6\r\nDBSIZE\r\n";
     status = valkeyClusterAsyncFormattedCommandToNode(
@@ -385,27 +381,25 @@ void test_async_formatted_to_single_node(void) {
 }
 
 void test_async_command_argv_to_single_node(void) {
-    int status;
-
-    valkeyClusterAsyncContext *acc = valkeyClusterAsyncContextInit();
-    assert(acc);
-    valkeyClusterAsyncSetConnectCallback(acc, connectCallback);
-    valkeyClusterAsyncSetDisconnectCallback(acc, disconnectCallback);
-    valkeyClusterSetOptionAddNodes(acc->cc, CLUSTER_NODE);
-    valkeyClusterSetOptionMaxRetry(acc->cc, 1);
-    valkeyClusterSetOptionRouteUseSlots(acc->cc);
-    status = valkeyClusterConnect2(acc->cc);
-    ASSERT_MSG(status == VALKEY_OK, acc->errstr);
-
     struct event_base *base = event_base_new();
-    status = valkeyClusterLibeventAttach(acc, base);
-    assert(status == VALKEY_OK);
+
+    valkeyClusterOptions options = {0};
+    options.initial_nodes = CLUSTER_NODE;
+    options.options = VALKEY_OPT_USE_CLUSTER_SLOTS;
+    options.max_retry = 1;
+    options.async_connect_cb = connectCallback;
+    options.async_disconnect_cb = disconnectCallback;
+    valkeyClusterOptionsUseLibevent(&options, base);
+
+    valkeyClusterAsyncContext *acc = valkeyClusterAsyncConnectWithOptions(&options);
+    ASSERT_MSG(acc && acc->err == 0, acc ? acc->errstr : "OOM");
 
     valkeyClusterNodeIterator ni;
     valkeyClusterInitNodeIterator(&ni, acc->cc);
     valkeyClusterNode *node = valkeyClusterNodeNext(&ni);
     assert(node);
 
+    int status;
     ExpectedResult r1 = {.type = VALKEY_REPLY_INTEGER, .disconnect = true};
     status = valkeyClusterAsyncCommandArgvToNode(
         acc, node, commandCallback, &r1, 1, (const char *[]){"DBSIZE"},
@@ -419,25 +413,23 @@ void test_async_command_argv_to_single_node(void) {
 }
 
 void test_async_to_all_nodes(void) {
-    int status;
-
-    valkeyClusterAsyncContext *acc = valkeyClusterAsyncContextInit();
-    assert(acc);
-    valkeyClusterAsyncSetConnectCallback(acc, connectCallback);
-    valkeyClusterAsyncSetDisconnectCallback(acc, disconnectCallback);
-    valkeyClusterSetOptionAddNodes(acc->cc, CLUSTER_NODE);
-    valkeyClusterSetOptionMaxRetry(acc->cc, 1);
-    valkeyClusterSetOptionRouteUseSlots(acc->cc);
-    status = valkeyClusterConnect2(acc->cc);
-    ASSERT_MSG(status == VALKEY_OK, acc->errstr);
-
     struct event_base *base = event_base_new();
-    status = valkeyClusterLibeventAttach(acc, base);
-    assert(status == VALKEY_OK);
+
+    valkeyClusterOptions options = {0};
+    options.initial_nodes = CLUSTER_NODE;
+    options.options = VALKEY_OPT_USE_CLUSTER_SLOTS;
+    options.max_retry = 1;
+    options.async_connect_cb = connectCallback;
+    options.async_disconnect_cb = disconnectCallback;
+    valkeyClusterOptionsUseLibevent(&options, base);
+
+    valkeyClusterAsyncContext *acc = valkeyClusterAsyncConnectWithOptions(&options);
+    ASSERT_MSG(acc && acc->err == 0, acc ? acc->errstr : "OOM");
 
     valkeyClusterNodeIterator ni;
     valkeyClusterInitNodeIterator(&ni, acc->cc);
 
+    int status;
     ExpectedResult r1 = {.type = VALKEY_REPLY_INTEGER};
 
     valkeyClusterNode *node;
@@ -461,25 +453,23 @@ void test_async_to_all_nodes(void) {
 }
 
 void test_async_transaction(void) {
-    int status;
-
-    valkeyClusterAsyncContext *acc = valkeyClusterAsyncContextInit();
-    assert(acc);
-    valkeyClusterAsyncSetConnectCallback(acc, connectCallback);
-    valkeyClusterAsyncSetDisconnectCallback(acc, disconnectCallback);
-    valkeyClusterSetOptionAddNodes(acc->cc, CLUSTER_NODE);
-    valkeyClusterSetOptionMaxRetry(acc->cc, 1);
-    valkeyClusterSetOptionRouteUseSlots(acc->cc);
-    status = valkeyClusterConnect2(acc->cc);
-    ASSERT_MSG(status == VALKEY_OK, acc->errstr);
-
     struct event_base *base = event_base_new();
-    status = valkeyClusterLibeventAttach(acc, base);
-    assert(status == VALKEY_OK);
+
+    valkeyClusterOptions options = {0};
+    options.initial_nodes = CLUSTER_NODE;
+    options.options = VALKEY_OPT_USE_CLUSTER_SLOTS;
+    options.max_retry = 1;
+    options.async_connect_cb = connectCallback;
+    options.async_disconnect_cb = disconnectCallback;
+    valkeyClusterOptionsUseLibevent(&options, base);
+
+    valkeyClusterAsyncContext *acc = valkeyClusterAsyncConnectWithOptions(&options);
+    ASSERT_MSG(acc && acc->err == 0, acc ? acc->errstr : "OOM");
 
     valkeyClusterNode *node = valkeyClusterGetNodeByKey(acc->cc, (char *)"foo");
     assert(node);
 
+    int status;
     ExpectedResult r1 = {.type = VALKEY_REPLY_STATUS, .str = "OK"};
     status = valkeyClusterAsyncCommandToNode(acc, node, commandCallback, &r1,
                                              "MULTI");

@@ -37,15 +37,3 @@ int valkeyClusterOptionsEnableTLS(valkeyClusterOptions *options,
     options->tls_init_fn = &valkeyInitiateTLSWithContext;
     return VALKEY_OK;
 }
-
-int valkeyClusterSetTLSContext(valkeyClusterContext *cc,
-                               valkeyTLSContext *tls) {
-    if (cc == NULL || tls == NULL) {
-        return VALKEY_ERR;
-    }
-
-    cc->tls = tls;
-    cc->tls_init_fn = &valkeyInitiateTLSWithContext;
-
-    return VALKEY_OK;
-}

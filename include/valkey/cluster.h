@@ -170,10 +170,10 @@ typedef struct {
     void (*connect_callback)(const valkeyContext *c, int status);
 
     /* Asynchronous API callbacks. */
-    int (*attach_fn)(valkeyAsyncContext *ac, void *attach_data);
+    valkeyConnectCallback *async_connect_cb;
+    valkeyDisconnectCallback *async_disconnect_cb;
+    int (*attach_fn)(valkeyAsyncContext *ac, void *attach_data); /* Event engine attach func. */
     void *attach_data;
-    valkeyConnectCallback *onConnect;
-    valkeyDisconnectCallback *onDisconnect;
 
     /* TLS context, enabled using valkeyClusterOptionsEnableTLS. */
     void *tls;
@@ -284,27 +284,26 @@ int valkeyClusterUpdateSlotmap(valkeyClusterContext *cc);
 valkeyContext *valkeyClusterGetValkeyContext(valkeyClusterContext *cc,
                                              valkeyClusterNode *node);
 
-/*
- * Asynchronous API
- */
+/* --- Asynchronous API --- */
 
-valkeyClusterAsyncContext *valkeyClusterAsyncContextInit(void);
+valkeyClusterAsyncContext *valkeyClusterAsyncConnectWithOptions(const valkeyClusterOptions *options);
+void valkeyClusterAsyncDisconnect(valkeyClusterAsyncContext *acc);
 void valkeyClusterAsyncFree(valkeyClusterAsyncContext *acc);
+
+/* Initiate and connect as separate steps. */
+valkeyClusterAsyncContext *valkeyClusterAsyncContextInit(const valkeyClusterOptions *options);
+int valkeyClusterAsyncConnect(valkeyClusterAsyncContext *acc);
 
 int valkeyClusterAsyncSetConnectCallback(valkeyClusterAsyncContext *acc,
                                          valkeyConnectCallback *fn);
 int valkeyClusterAsyncSetDisconnectCallback(valkeyClusterAsyncContext *acc,
                                             valkeyDisconnectCallback *fn);
+/* Callback option configurable after a context initiation, enabling that the
+ * valkeyClusterAsyncContext pointer can be given as privdata in the callback. */
 int valkeyClusterAsyncSetEventCallback(valkeyClusterAsyncContext *acc,
                                        void(fn)(const valkeyClusterContext *cc,
                                                 int event, void *privdata),
                                        void *privdata);
-
-/* Connect and update slotmap, will block until complete. */
-valkeyClusterAsyncContext *valkeyClusterAsyncConnect(const char *addrs);
-/* Connect and update slotmap asynchronously using configured event engine. */
-int valkeyClusterAsyncConnect2(valkeyClusterAsyncContext *acc);
-void valkeyClusterAsyncDisconnect(valkeyClusterAsyncContext *acc);
 
 /* Commands */
 int valkeyClusterAsyncCommand(valkeyClusterAsyncContext *acc,

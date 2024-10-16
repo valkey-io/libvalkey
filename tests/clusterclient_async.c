@@ -247,32 +247,30 @@ int main(int argc, char **argv) {
     }
     const char *initnode = argv[optind];
     struct timeval timeout = {0, 500000};
+    struct event_base *base = event_base_new();
 
-    valkeyClusterAsyncContext *acc = valkeyClusterAsyncContextInit();
-    assert(acc);
-    valkeyClusterSetOptionAddNodes(acc->cc, initnode);
-    valkeyClusterSetOptionTimeout(acc->cc, timeout);
-    valkeyClusterSetOptionConnectTimeout(acc->cc, timeout);
-    valkeyClusterSetOptionMaxRetry(acc->cc, 1);
+    valkeyClusterOptions options = {0};
+    options.initial_nodes = initnode;
+    options.connect_timeout = &timeout;
+    options.command_timeout = &timeout;
+    options.max_retry = 1;
     if (use_cluster_slots) {
-        valkeyClusterSetOptionRouteUseSlots(acc->cc);
+        options.options = VALKEY_OPT_USE_CLUSTER_SLOTS;
     }
     if (show_events) {
-        valkeyClusterAsyncSetEventCallback(acc, eventCallback, NULL);
+        options.event_callback = eventCallback;
     }
     if (show_connection_events) {
-        valkeyClusterAsyncSetConnectCallback(acc, connectCallback);
-        valkeyClusterAsyncSetDisconnectCallback(acc, disconnectCallback);
+        options.async_connect_cb = connectCallback;
+        options.async_disconnect_cb = disconnectCallback;
     }
+    valkeyClusterOptionsUseLibevent(&options, base);
 
-    if (valkeyClusterConnect2(acc->cc) != VALKEY_OK) {
-        printf("Connect error: %s\n", acc->cc->errstr);
+    valkeyClusterAsyncContext *acc = valkeyClusterAsyncConnectWithOptions(&options);
+    if (acc == NULL || acc->err != 0) {
+        printf("Connect error: %s\n", acc ? acc->errstr : "OOM");
         exit(2);
     }
-
-    struct event_base *base = event_base_new();
-    int status = valkeyClusterLibeventAttach(acc, base);
-    assert(status == VALKEY_OK);
 
     /* Schedule a read from stdin and send next command */
     event_base_once(base, -1, EV_TIMEOUT, sendNextCommand, acc, NULL);
