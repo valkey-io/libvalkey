@@ -73,7 +73,7 @@ int main(int argc, char **argv) {
     valkeyClusterSetOptionAddNodes(acc->cc, CLUSTER_NODE_TLS);
     valkeyClusterSetOptionRouteUseSlots(acc->cc);
     valkeyClusterSetOptionParseSlaves(acc->cc);
-    valkeyClusterSetOptionEnableTLS(acc->cc, tls);
+    valkeyClusterSetTLSContext(acc->cc, tls);
 
     if (valkeyClusterConnect2(acc->cc) != VALKEY_OK) {
         printf("Error: %s\n", acc->cc->errstr);

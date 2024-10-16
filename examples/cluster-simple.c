@@ -8,11 +8,12 @@ int main(int argc, char **argv) {
     UNUSED(argv);
     struct timeval timeout = {1, 500000}; // 1.5s
 
-    valkeyClusterContext *cc = valkeyClusterContextInit();
-    valkeyClusterSetOptionAddNodes(cc, "127.0.0.1:7000");
-    valkeyClusterSetOptionConnectTimeout(cc, timeout);
-    valkeyClusterSetOptionRouteUseSlots(cc);
-    valkeyClusterConnect2(cc);
+    valkeyClusterOptions options = {0};
+    options.initial_nodes = "127.0.0.1:7000";
+    options.options = VALKEY_OPT_USE_CLUSTER_SLOTS;
+    options.connect_timeout = &timeout;
+
+    valkeyClusterContext *cc = valkeyClusterConnectWithOptions(&options);
     if (!cc) {
         printf("Error: Allocation failure\n");
         exit(-1);

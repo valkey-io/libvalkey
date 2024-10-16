@@ -44,7 +44,7 @@
 #define VALKEY_ROLE_PRIMARY 1
 #define VALKEY_ROLE_REPLICA 2
 
-/* Events, for valkeyClusterSetEventCallback() */
+/* Events, for valkeyClusterOptionsSetEventCallback() */
 #define VALKEYCLUSTER_EVENT_SLOTMAP_UPDATED 1
 #define VALKEYCLUSTER_EVENT_READY 2
 #define VALKEYCLUSTER_EVENT_FREE_CONTEXT 3
@@ -144,16 +144,67 @@ typedef struct valkeyClusterNodeIterator {
     char opaque_data[VALKEY_NODE_ITERATOR_SIZE];
 } valkeyClusterNodeIterator;
 
-/*
- * Synchronous API
- */
+/* --- Configuration options --- */
 
+/* Enable slotmap updates using the command CLUSTER SLOTS.
+ * Default is the CLUSTER NODES command. */
+#define VALKEY_OPT_USE_CLUSTER_SLOTS 0x1000
+/* Enable parsing of replica nodes. Currently not used, but the
+ * information is added to its primary node structure. */
+#define VALKEY_OPT_USE_REPLICAS 0x2000
+
+typedef struct {
+    const char *initial_nodes;             /* Initial cluster node address(es). */
+    int options;                           /* Bit field of VALKEY_OPT_xxx */
+    const struct timeval *connect_timeout; /* Timeout value for connect, no timeout if NULL. */
+    const struct timeval *command_timeout; /* Timeout value for commands, no timeout if NULL. */
+    const char *username;                  /* Authentication username. */
+    const char *password;                  /* Authentication password. */
+    int max_retry;                         /* Allowed retry attempts. */
+
+    /* Common callbacks. */
+    void (*event_callback)(const struct valkeyClusterContext *cc, int event, void *privdata);
+    void *event_privdata;
+
+    /* Synchronous API callbacks. */
+    void (*connect_callback)(const valkeyContext *c, int status);
+
+    /* Asynchronous API callbacks. */
+    int (*attach_fn)(valkeyAsyncContext *ac, void *attach_data);
+    void *attach_data;
+    valkeyConnectCallback *onConnect;
+    valkeyDisconnectCallback *onDisconnect;
+
+    /* TLS context, enabled using valkeyClusterOptionsEnableTLS. */
+    void *tls;
+    int (*tls_init_fn)(struct valkeyContext *, struct valkeyTLSContext *);
+} valkeyClusterOptions;
+
+/* Helper functions to set options. */
+int valkeyClusterOptionsSetEventCallback(valkeyClusterOptions *options,
+                                         void(fn)(const valkeyClusterContext *cc,
+                                                  int event, void *privdata),
+                                         void *privdata);
+/* A hook for connect and reconnect attempts, e.g. for applying additional
+ * socket options. This is called just after connect, before TLS handshake and
+ * Valkey authentication.
+ *
+ * On successful connection, `status` is set to `VALKEY_OK` and the file
+ * descriptor can be accessed as `c->fd` to apply socket options.
+ *
+ * On failed connection attempt, this callback is called with `status` set to
+ * `VALKEY_ERR`. The `err` field in the `valkeyContext` can be used to find out
+ * the cause of the error. */
+int valkeyClusterOptionsSetConnectCallback(valkeyClusterOptions *options,
+                                           void(fn)(const valkeyContext *c,
+                                                    int status));
+
+/* --- Synchronous API --- */
+
+valkeyClusterContext *valkeyClusterConnectWithOptions(const valkeyClusterOptions *options);
 valkeyClusterContext *valkeyClusterConnect(const char *addrs);
-valkeyClusterContext *valkeyClusterConnectWithTimeout(const char *addrs,
-                                                      const struct timeval tv);
+valkeyClusterContext *valkeyClusterConnectWithTimeout(const char *addrs, const struct timeval tv);
 int valkeyClusterConnect2(valkeyClusterContext *cc);
-
-valkeyClusterContext *valkeyClusterContextInit(void);
 void valkeyClusterFree(valkeyClusterContext *cc);
 
 /* Configuration options */
@@ -166,29 +217,11 @@ int valkeyClusterSetOptionParseSlaves(valkeyClusterContext *cc);
 int valkeyClusterSetOptionRouteUseSlots(valkeyClusterContext *cc);
 int valkeyClusterSetOptionConnectTimeout(valkeyClusterContext *cc,
                                          const struct timeval tv);
-int valkeyClusterSetOptionTimeout(valkeyClusterContext *cc,
-                                  const struct timeval tv);
 int valkeyClusterSetOptionMaxRetry(valkeyClusterContext *cc,
                                    int max_retry_count);
-/* A hook for connect and reconnect attempts, e.g. for applying additional
- * socket options. This is called just after connect, before TLS handshake and
- * Valkey authentication.
- *
- * On successful connection, `status` is set to `VALKEY_OK` and the file
- * descriptor can be accessed as `c->fd` to apply socket options.
- *
- * On failed connection attempt, this callback is called with `status` set to
- * `VALKEY_ERR`. The `err` field in the `valkeyContext` can be used to find out
- * the cause of the error. */
-int valkeyClusterSetConnectCallback(valkeyClusterContext *cc,
-                                    void(fn)(const valkeyContext *c,
-                                             int status));
 
-/* A hook for events. */
-int valkeyClusterSetEventCallback(valkeyClusterContext *cc,
-                                  void(fn)(const valkeyClusterContext *cc,
-                                           int event, void *privdata),
-                                  void *privdata);
+/* Options configurable in runtime. */
+int valkeyClusterSetOptionTimeout(valkeyClusterContext *cc, const struct timeval tv);
 
 /* Blocking
  * The following functions will block for a reply, or return NULL if there was
@@ -262,6 +295,10 @@ int valkeyClusterAsyncSetConnectCallback(valkeyClusterAsyncContext *acc,
                                          valkeyConnectCallback *fn);
 int valkeyClusterAsyncSetDisconnectCallback(valkeyClusterAsyncContext *acc,
                                             valkeyDisconnectCallback *fn);
+int valkeyClusterAsyncSetEventCallback(valkeyClusterAsyncContext *acc,
+                                       void(fn)(const valkeyClusterContext *cc,
+                                                int event, void *privdata),
+                                       void *privdata);
 
 /* Connect and update slotmap, will block until complete. */
 valkeyClusterAsyncContext *valkeyClusterAsyncConnect(const char *addrs);

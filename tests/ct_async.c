@@ -72,7 +72,7 @@ int main(void) {
 
     status = valkeyClusterAsyncSetDisconnectCallback(acc, disconnectCallback);
     assert(status == VALKEY_OK);
-    status = valkeyClusterSetEventCallback(acc->cc, eventCallback, acc);
+    status = valkeyClusterAsyncSetEventCallback(acc, eventCallback, acc);
     assert(status == VALKEY_OK);
     status = valkeyClusterSetOptionAddNodes(acc->cc, CLUSTER_NODE);
     assert(status == VALKEY_OK);

@@ -12,16 +12,13 @@
 
 // Test of two pipelines using sync API
 void test_pipeline(void) {
-    valkeyClusterContext *cc = valkeyClusterContextInit();
-    assert(cc);
+    valkeyClusterOptions options = {0};
+    options.initial_nodes = CLUSTER_NODE;
+
+    valkeyClusterContext *cc = valkeyClusterConnectWithOptions(&options);
+    ASSERT_MSG(cc && cc->err == 0, cc ? cc->errstr : "OOM");
 
     int status;
-    status = valkeyClusterSetOptionAddNodes(cc, CLUSTER_NODE);
-    ASSERT_MSG(status == VALKEY_OK, cc->errstr);
-
-    status = valkeyClusterConnect2(cc);
-    ASSERT_MSG(status == VALKEY_OK, cc->errstr);
-
     status = valkeyClusterAppendCommand(cc, "SET foo one");
     ASSERT_MSG(status == VALKEY_OK, cc->errstr);
     status = valkeyClusterAppendCommand(cc, "SET bar two");

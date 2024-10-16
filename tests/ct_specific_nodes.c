@@ -509,15 +509,13 @@ void test_async_transaction(void) {
 }
 
 int main(void) {
-    int status;
+    valkeyClusterOptions options = {0};
+    options.initial_nodes = CLUSTER_NODE;
+    options.options = VALKEY_OPT_USE_CLUSTER_SLOTS;
+    options.max_retry = 1;
 
-    valkeyClusterContext *cc = valkeyClusterContextInit();
-    assert(cc);
-    valkeyClusterSetOptionAddNodes(cc, CLUSTER_NODE);
-    valkeyClusterSetOptionRouteUseSlots(cc);
-    valkeyClusterSetOptionMaxRetry(cc, 1);
-    status = valkeyClusterConnect2(cc);
-    ASSERT_MSG(status == VALKEY_OK, cc->errstr);
+    valkeyClusterContext *cc = valkeyClusterConnectWithOptions(&options);
+    ASSERT_MSG(cc && cc->err == 0, cc ? cc->errstr : "OOM");
     load_valkey_version(cc);
 
     // Synchronous API

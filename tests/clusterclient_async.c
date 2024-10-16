@@ -258,7 +258,7 @@ int main(int argc, char **argv) {
         valkeyClusterSetOptionRouteUseSlots(acc->cc);
     }
     if (show_events) {
-        valkeyClusterSetEventCallback(acc->cc, eventCallback, NULL);
+        valkeyClusterAsyncSetEventCallback(acc, eventCallback, NULL);
     }
     if (show_connection_events) {
         valkeyClusterAsyncSetConnectCallback(acc, connectCallback);

@@ -123,14 +123,15 @@ char *resp_encode_array(char *p, sds *resp) {
 
 /* Parse a cluster nodes reply from a basic deployment. */
 void test_parse_cluster_nodes(bool parse_replicas) {
-    valkeyClusterContext *cc = valkeyClusterContextInit();
+    valkeyClusterOptions options = {0};
+    if (parse_replicas)
+        options.options |= VALKEY_OPT_USE_REPLICAS;
+
+    valkeyClusterContext *cc = valkeyClusterContextInit(&options);
     valkeyContext *c = valkeyContextInit();
     valkeyClusterNode *node;
     cluster_slot *slot;
     dictIterator di;
-
-    if (parse_replicas)
-        cc->flags |= VALKEY_FLAG_PARSE_REPLICAS;
 
     valkeyReply *reply = create_cluster_nodes_reply(
         "07c37dfeb235213a872192d90877d0cd55635b91 127.0.0.1:30004@31004,hostname4 slave e7d1eecce10fd6bb5eb35b9f99a514335d9ba9ca 0 1426238317239 4 connected\n"
@@ -209,7 +210,8 @@ void test_parse_cluster_nodes(bool parse_replicas) {
 }
 
 void test_parse_cluster_nodes_during_failover(void) {
-    valkeyClusterContext *cc = valkeyClusterContextInit();
+    valkeyClusterOptions options = {0};
+    valkeyClusterContext *cc = valkeyClusterContextInit(&options);
     valkeyContext *c = valkeyContextInit();
     valkeyClusterNode *node;
     cluster_slot *slot;
@@ -274,7 +276,8 @@ void test_parse_cluster_nodes_during_failover(void) {
 
 /* Skip nodes with the `noaddr` flag. */
 void test_parse_cluster_nodes_with_noaddr(void) {
-    valkeyClusterContext *cc = valkeyClusterContextInit();
+    valkeyClusterOptions options = {0};
+    valkeyClusterContext *cc = valkeyClusterContextInit(&options);
     valkeyContext *c = valkeyContextInit();
     valkeyClusterNode *node;
     dictIterator di;
@@ -302,7 +305,8 @@ void test_parse_cluster_nodes_with_noaddr(void) {
 }
 
 void test_parse_cluster_nodes_with_empty_ip(void) {
-    valkeyClusterContext *cc = valkeyClusterContextInit();
+    valkeyClusterOptions options = {0};
+    valkeyClusterContext *cc = valkeyClusterContextInit(&options);
     valkeyClusterNode *node;
     dictIterator di;
 
@@ -337,7 +341,8 @@ void test_parse_cluster_nodes_with_empty_ip(void) {
 
 /* Parse replies with additional importing and migrating information. */
 void test_parse_cluster_nodes_with_special_slot_entries(void) {
-    valkeyClusterContext *cc = valkeyClusterContextInit();
+    valkeyClusterOptions options = {0};
+    valkeyClusterContext *cc = valkeyClusterContextInit(&options);
     valkeyContext *c = valkeyContextInit();
     valkeyClusterNode *node;
     cluster_slot *slot;
@@ -377,14 +382,15 @@ void test_parse_cluster_nodes_with_special_slot_entries(void) {
 
 /* Parse a cluster nodes reply containing a primary with multiple replicas. */
 void test_parse_cluster_nodes_with_multiple_replicas(void) {
-    valkeyClusterContext *cc = valkeyClusterContextInit();
+    valkeyClusterOptions options = {0};
+    options.options |= VALKEY_OPT_USE_REPLICAS;
+
+    valkeyClusterContext *cc = valkeyClusterContextInit(&options);
     valkeyContext *c = valkeyContextInit();
     valkeyClusterNode *node;
     cluster_slot *slot;
     dictIterator di;
     listIter li;
-
-    cc->flags |= VALKEY_FLAG_PARSE_REPLICAS;
 
     valkeyReply *reply = create_cluster_nodes_reply(
         "07c37dfeb235213a872192d90877d0cd55635b91 127.0.0.1:30004@31004,hostname4 slave e7d1eecce10fd6bb5eb35b9f99a514335d9ba9ca 0 1426238317239 4 connected\n"
@@ -442,7 +448,8 @@ void test_parse_cluster_nodes_with_multiple_replicas(void) {
 
 /* Give error when parsing erroneous data. */
 void test_parse_cluster_nodes_with_parse_error(void) {
-    valkeyClusterContext *cc = valkeyClusterContextInit();
+    valkeyClusterOptions options = {0};
+    valkeyClusterContext *cc = valkeyClusterContextInit(&options);
     valkeyContext *c = valkeyContextInit();
     valkeyReply *reply;
     dict *nodes;
@@ -490,7 +497,8 @@ void test_parse_cluster_nodes_with_parse_error(void) {
 /* Redis pre-v4.0 returned node addresses without the clusterbus port,
  * i.e. `ip:port` instead of `ip:port@cport` */
 void test_parse_cluster_nodes_with_legacy_format(void) {
-    valkeyClusterContext *cc = valkeyClusterContextInit();
+    valkeyClusterOptions options = {0};
+    valkeyClusterContext *cc = valkeyClusterContextInit(&options);
     valkeyContext *c = valkeyContextInit();
     valkeyClusterNode *node;
     dictIterator di;
@@ -514,13 +522,14 @@ void test_parse_cluster_nodes_with_legacy_format(void) {
 
 /* Parse a cluster slots reply from a basic deployment. */
 void test_parse_cluster_slots(bool parse_replicas) {
-    valkeyClusterContext *cc = valkeyClusterContextInit();
+    valkeyClusterOptions options = {0};
+    if (parse_replicas)
+        options.options |= VALKEY_OPT_USE_REPLICAS;
+
+    valkeyClusterContext *cc = valkeyClusterContextInit(&options);
     valkeyClusterNode *node;
     cluster_slot *slot;
     dictIterator di;
-
-    if (parse_replicas)
-        cc->flags |= VALKEY_FLAG_PARSE_REPLICAS;
 
     valkeyReply *reply = create_cluster_slots_reply(
         "[[0, 5460, ['127.0.0.1', 30001, 'e7d1eecce10fd6bb5eb35b9f99a514335d9ba9ca', ['hostname', 'localhost']],"
@@ -596,7 +605,8 @@ void test_parse_cluster_slots(bool parse_replicas) {
 }
 
 void test_parse_cluster_slots_with_empty_ip(void) {
-    valkeyClusterContext *cc = valkeyClusterContextInit();
+    valkeyClusterOptions options = {0};
+    valkeyClusterContext *cc = valkeyClusterContextInit(&options);
 
     valkeyReply *reply = create_cluster_slots_reply(
         "[[0, 5460, ['', 6379, 'e7d1eecce10fd6bb5eb35b9f99a514335d9ba9ca']],"
@@ -613,7 +623,8 @@ void test_parse_cluster_slots_with_empty_ip(void) {
 }
 
 void test_parse_cluster_slots_with_null_ip(void) {
-    valkeyClusterContext *cc = valkeyClusterContextInit();
+    valkeyClusterOptions options = {0};
+    valkeyClusterContext *cc = valkeyClusterContextInit(&options);
 
     valkeyReply *reply = create_cluster_slots_reply(
         "[[0, 5460, [null, 6379, 'e7d1eecce10fd6bb5eb35b9f99a514335d9ba9ca']],"
@@ -631,13 +642,14 @@ void test_parse_cluster_slots_with_null_ip(void) {
 
 /* Parse a cluster slots reply containing a primary with multiple replicas. */
 void test_parse_cluster_slots_with_multiple_replicas(void) {
-    valkeyClusterContext *cc = valkeyClusterContextInit();
+    valkeyClusterOptions options = {0};
+    options.options |= VALKEY_OPT_USE_REPLICAS;
+
+    valkeyClusterContext *cc = valkeyClusterContextInit(&options);
     valkeyClusterNode *node;
     cluster_slot *slot;
     dictIterator di;
     listIter li;
-
-    cc->flags |= VALKEY_FLAG_PARSE_REPLICAS;
 
     valkeyReply *reply = create_cluster_slots_reply(
         "[[0, 16383, ['127.0.0.1', 30001, 'e7d1eecce10fd6bb5eb35b9f99a514335d9ba9ca'],"
@@ -688,13 +700,14 @@ void test_parse_cluster_slots_with_multiple_replicas(void) {
 }
 
 void test_parse_cluster_slots_with_noncontiguous_slots(void) {
-    valkeyClusterContext *cc = valkeyClusterContextInit();
+    valkeyClusterOptions options = {0};
+    options.options |= VALKEY_OPT_USE_REPLICAS;
+
+    valkeyClusterContext *cc = valkeyClusterContextInit(&options);
     valkeyClusterNode *node;
     cluster_slot *slot;
     dictIterator di;
     listIter li;
-
-    cc->flags |= VALKEY_FLAG_PARSE_REPLICAS;
 
     valkeyReply *reply = create_cluster_slots_reply(
         "[[0, 0, ['127.0.0.1', 30001, 'e7d1eecce10fd6bb5eb35b9f99a514335d9ba9ca'],"
