@@ -111,41 +111,6 @@ void test_username_ok(void) {
     valkeyClusterFree(cc);
 }
 
-// Test of disabling the use of username after it was enabled.
-void test_username_disabled(void) {
-    if (valkey_version_less_than(6, 0))
-        return;
-
-    valkeyClusterOptions options = {0};
-    options.initial_nodes = CLUSTER_NODE_WITH_PASSWORD;
-    options.username = "missing-user";
-    options.password = CLUSTER_PASSWORD;
-
-    // Connect using 'AUTH <username> <password>' should fail
-    valkeyClusterContext *cc = valkeyClusterConnectWithOptions(&options);
-    assert(cc);
-    assert(cc->err == VALKEY_ERR_OTHER);
-    assert(strncmp(cc->errstr, "WRONGPASS invalid username-password pair",
-                   40) == 0);
-
-    // Disable use of username (2 alternatives)
-    int ret = valkeyClusterSetOptionUsername(cc, NULL);
-    ASSERT_MSG(ret == VALKEY_OK, cc->errstr);
-    ret = valkeyClusterSetOptionUsername(cc, "");
-    ASSERT_MSG(ret == VALKEY_OK, cc->errstr);
-
-    // Connect using 'AUTH <password>' should pass
-    ret = valkeyClusterConnect2(cc);
-    ASSERT_MSG(ret == VALKEY_OK, cc->errstr);
-
-    // Test connection
-    valkeyReply *reply = valkeyClusterCommand(cc, "SET key1 Hello");
-    CHECK_REPLY_OK(cc, reply);
-    freeReplyObject(reply);
-
-    valkeyClusterFree(cc);
-}
-
 // Connect and handle two clusters simultaneously
 void test_multicluster(void) {
     valkeyReply *reply;
@@ -428,23 +393,22 @@ void test_async_username_ok(void) {
     valkeyClusterAsyncContext *acc = valkeyClusterAsyncConnectWithOptions(&options);
     assert(acc);
     assert(acc->err == VALKEY_ERR_OTHER);
-    assert(strncmp(acc->cc->errstr, "WRONGPASS invalid username-password pair",
+    assert(strncmp(acc->errstr, "WRONGPASS invalid username-password pair",
                    40) == 0);
+    valkeyClusterAsyncFree(acc);
 
     // Set correct username
-    int ret = valkeyClusterSetOptionUsername(acc->cc, CLUSTER_USERNAME);
-    ASSERT_MSG(ret == VALKEY_OK, acc->cc->errstr);
+    options.username = CLUSTER_USERNAME;
 
     // Connect using correct username should pass
-    ret = valkeyClusterConnect2(acc->cc); //TODO: handle async so it updates acc->err
-    assert(ret == VALKEY_OK);
-    //    assert(acc->err == 0);
-    assert(acc->cc->err == 0);
+    acc = valkeyClusterAsyncConnectWithOptions(&options);
+    assert(acc);
+    assert(acc->err == 0);
 
     // Test connection
     ExpectedResult r = {
         .type = VALKEY_REPLY_STATUS, .str = "OK", .disconnect = true};
-    ret = valkeyClusterAsyncCommand(acc, commandCallback, &r, "SET key1 Hello");
+    int ret = valkeyClusterAsyncCommand(acc, commandCallback, &r, "SET key1 Hello");
     assert(ret == VALKEY_OK);
 
     event_base_dispatch(base);
@@ -570,7 +534,6 @@ int main(void) {
     test_password_wrong();
     test_password_missing();
     test_username_ok();
-    test_username_disabled();
     test_multicluster();
     test_connect_timeout();
     test_command_timeout();

@@ -207,19 +207,6 @@ valkeyClusterContext *valkeyClusterConnectWithTimeout(const char *addrs, const s
 int valkeyClusterConnect2(valkeyClusterContext *cc);
 void valkeyClusterFree(valkeyClusterContext *cc);
 
-/* Configuration options */
-int valkeyClusterSetOptionAddNodes(valkeyClusterContext *cc, const char *addrs);
-int valkeyClusterSetOptionUsername(valkeyClusterContext *cc,
-                                   const char *username);
-int valkeyClusterSetOptionPassword(valkeyClusterContext *cc,
-                                   const char *password);
-int valkeyClusterSetOptionParseSlaves(valkeyClusterContext *cc);
-int valkeyClusterSetOptionRouteUseSlots(valkeyClusterContext *cc);
-int valkeyClusterSetOptionConnectTimeout(valkeyClusterContext *cc,
-                                         const struct timeval tv);
-int valkeyClusterSetOptionMaxRetry(valkeyClusterContext *cc,
-                                   int max_retry_count);
-
 /* Options configurable in runtime. */
 int valkeyClusterSetOptionTimeout(valkeyClusterContext *cc, const struct timeval tv);
 
@@ -294,10 +281,6 @@ void valkeyClusterAsyncFree(valkeyClusterAsyncContext *acc);
 valkeyClusterAsyncContext *valkeyClusterAsyncContextInit(const valkeyClusterOptions *options);
 int valkeyClusterAsyncConnect(valkeyClusterAsyncContext *acc);
 
-int valkeyClusterAsyncSetConnectCallback(valkeyClusterAsyncContext *acc,
-                                         valkeyConnectCallback *fn);
-int valkeyClusterAsyncSetDisconnectCallback(valkeyClusterAsyncContext *acc,
-                                            valkeyDisconnectCallback *fn);
 /* Callback option configurable after a context initiation, enabling that the
  * valkeyClusterAsyncContext pointer can be given as privdata in the callback. */
 int valkeyClusterAsyncSetEventCallback(valkeyClusterAsyncContext *acc,
