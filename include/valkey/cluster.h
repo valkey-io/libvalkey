@@ -171,7 +171,6 @@ valkeyClusterContext *valkeyClusterContextInit(void);
 void valkeyClusterFree(valkeyClusterContext *cc);
 
 /* Configuration options */
-int valkeyClusterSetOptionAddNode(valkeyClusterContext *cc, const char *addr);
 int valkeyClusterSetOptionAddNodes(valkeyClusterContext *cc, const char *addrs);
 int valkeyClusterSetOptionUsername(valkeyClusterContext *cc,
                                    const char *username);

@@ -30,6 +30,7 @@ The type `sds` is removed from the public API.
 ### Removed API functions
 
 * `redisClusterSetMaxRedirect` removed and replaced with `valkeyClusterSetOptionMaxRetry`.
+* `redisClusterSetOptionAddNode` removed and replaced with `valkeyClusterSetOptionAddNodes`.
 * `redisClusterSetOptionConnectBlock` removed since it was deprecated.
 * `redisClusterSetOptionConnectNonBlock` removed since it was deprecated.
 * `parse_cluster_nodes` removed from API, for internal use only.
