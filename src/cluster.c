@@ -1264,11 +1264,6 @@ int valkeyClusterUpdateSlotmap(valkeyClusterContext *cc) {
         return VALKEY_ERR;
     }
 
-    if (cc->nodes == NULL) {
-        valkeyClusterSetError(cc, VALKEY_ERR_OTHER, "no server address");
-        return VALKEY_ERR;
-    }
-
     dictIterator di;
     dictInitIterator(&di, cc->nodes);
 
@@ -1301,6 +1296,11 @@ valkeyClusterContext *valkeyClusterContextInit(void) {
     if (cc == NULL)
         return NULL;
 
+    cc->nodes = dictCreate(&clusterNodesDictType, NULL);
+    if (cc->nodes == NULL) {
+        valkeyClusterFree(cc);
+        return NULL;
+    }
     cc->max_retry_count = CLUSTER_DEFAULT_MAX_RETRY_COUNT;
     return cc;
 }
@@ -1382,13 +1382,6 @@ static int valkeyClusterSetOptionAddNode(valkeyClusterContext *cc, const char *a
 
     if (cc == NULL) {
         return VALKEY_ERR;
-    }
-
-    if (cc->nodes == NULL) {
-        cc->nodes = dictCreate(&clusterNodesDictType, NULL);
-        if (cc->nodes == NULL) {
-            goto oom;
-        }
     }
 
     sds addr_sds = sdsnew(addr);
@@ -1631,7 +1624,7 @@ int valkeyClusterSetOptionTimeout(valkeyClusterContext *cc,
         memcpy(cc->command_timeout, &tv, sizeof(struct timeval));
 
         /* Set timeout on already connected nodes */
-        if (cc->nodes && dictSize(cc->nodes) > 0) {
+        if (dictSize(cc->nodes) > 0) {
             dictEntry *de;
             valkeyClusterNode *node;
 
@@ -1688,7 +1681,7 @@ int valkeyClusterConnect2(valkeyClusterContext *cc) {
         return VALKEY_ERR;
     }
 
-    if (cc->nodes == NULL || dictSize(cc->nodes) == 0) {
+    if (dictSize(cc->nodes) == 0) {
         valkeyClusterSetError(cc, VALKEY_ERR_OTHER,
                               "server address not configured");
         return VALKEY_ERR;
@@ -2543,7 +2536,7 @@ static int valkeyClusterSendAll(valkeyClusterContext *cc) {
     valkeyContext *c = NULL;
     int wdone = 0;
 
-    if (cc == NULL || cc->nodes == NULL) {
+    if (cc == NULL) {
         return VALKEY_ERR;
     }
 
@@ -2583,10 +2576,6 @@ static int valkeyClusterClearAll(valkeyClusterContext *cc) {
     }
 
     valkeyClusterClearError(cc);
-
-    if (cc->nodes == NULL) {
-        return VALKEY_ERR;
-    }
 
     dictIterator di;
     dictInitIterator(&di, cc->nodes);
@@ -2674,7 +2663,7 @@ void valkeyClusterReset(valkeyClusterContext *cc) {
     int status;
     void *reply;
 
-    if (cc == NULL || cc->nodes == NULL) {
+    if (cc == NULL) {
         return;
     }
 
@@ -3051,11 +3040,6 @@ static int updateSlotMapAsync(valkeyClusterAsyncContext *acc,
     }
 
     if (ac == NULL) {
-        if (acc->cc->nodes == NULL) {
-            valkeyClusterAsyncSetError(acc, VALKEY_ERR_OTHER, "no nodes added");
-            goto error;
-        }
-
         valkeyClusterNode *node = selectNode(acc->cc->nodes);
         if (node == NULL) {
             goto error;
@@ -3519,10 +3503,6 @@ void valkeyClusterAsyncDisconnect(valkeyClusterAsyncContext *acc) {
 
     cc = acc->cc;
     cc->flags |= VALKEYCLUSTER_FLAG_DISCONNECTING;
-
-    if (cc->nodes == NULL) {
-        return;
-    }
 
     dictIterator di;
     dictInitIterator(&di, cc->nodes);

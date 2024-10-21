@@ -117,11 +117,13 @@ void test_alloc_failure_handling(void) {
     // Context init
     valkeyClusterContext *cc;
     {
-        successfulAllocations = 0;
-        cc = valkeyClusterContextInit();
-        assert(cc == NULL);
+        for (int i = 0; i < 2; ++i) {
+            successfulAllocations = i;
+            cc = valkeyClusterContextInit();
+            assert(cc == NULL);
+        }
 
-        successfulAllocations = 1;
+        successfulAllocations = 2;
         cc = valkeyClusterContextInit();
         assert(cc);
     }
@@ -485,12 +487,12 @@ void test_alloc_failure_handling_async(void) {
     // Context init
     valkeyClusterAsyncContext *acc;
     {
-        for (int i = 0; i < 2; ++i) {
+        for (int i = 0; i < 3; ++i) {
             successfulAllocations = 0;
             acc = valkeyClusterAsyncContextInit();
             assert(acc == NULL);
         }
-        successfulAllocations = 2;
+        successfulAllocations = 3;
         acc = valkeyClusterAsyncContextInit();
         assert(acc);
     }
