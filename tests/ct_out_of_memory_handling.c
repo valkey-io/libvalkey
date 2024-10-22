@@ -117,13 +117,13 @@ void test_alloc_failure_handling(void) {
     // Context init
     valkeyClusterContext *cc;
     {
-        for (int i = 0; i < 2; ++i) {
+        for (int i = 0; i < 3; ++i) {
             successfulAllocations = i;
             cc = valkeyClusterContextInit();
             assert(cc == NULL);
         }
 
-        successfulAllocations = 2;
+        successfulAllocations = 3;
         cc = valkeyClusterContextInit();
         assert(cc);
     }
@@ -231,7 +231,7 @@ void test_alloc_failure_handling(void) {
         valkeyReply *reply;
         const char *cmd = "SET foo one";
 
-        for (int i = 0; i < 34; ++i) {
+        for (int i = 0; i < 33; ++i) {
             prepare_allocation_test(cc, i);
             result = valkeyClusterAppendCommand(cc, cmd);
             assert(result == VALKEY_ERR);
@@ -243,7 +243,7 @@ void test_alloc_failure_handling(void) {
         for (int i = 0; i < 4; ++i) {
             // Appended command lost when receiving error from valkey
             // during a GetReply, needs a new append for each test loop
-            prepare_allocation_test(cc, 34);
+            prepare_allocation_test(cc, 33);
             result = valkeyClusterAppendCommand(cc, cmd);
             assert(result == VALKEY_OK);
 
@@ -275,7 +275,7 @@ void test_alloc_failure_handling(void) {
         assert(node);
 
         // OOM failing appends
-        for (int i = 0; i < 35; ++i) {
+        for (int i = 0; i < 34; ++i) {
             prepare_allocation_test(cc, i);
             result = valkeyClusterAppendCommandToNode(cc, node, cmd);
             assert(result == VALKEY_ERR);
@@ -287,7 +287,7 @@ void test_alloc_failure_handling(void) {
         // OOM failing GetResults
         for (int i = 0; i < 4; ++i) {
             // First a successful append
-            prepare_allocation_test(cc, 35);
+            prepare_allocation_test(cc, 34);
             result = valkeyClusterAppendCommandToNode(cc, node, cmd);
             assert(result == VALKEY_OK);
 
@@ -487,12 +487,12 @@ void test_alloc_failure_handling_async(void) {
     // Context init
     valkeyClusterAsyncContext *acc;
     {
-        for (int i = 0; i < 3; ++i) {
+        for (int i = 0; i < 4; ++i) {
             successfulAllocations = 0;
             acc = valkeyClusterAsyncContextInit();
             assert(acc == NULL);
         }
-        successfulAllocations = 3;
+        successfulAllocations = 4;
         acc = valkeyClusterAsyncContextInit();
         assert(acc);
     }

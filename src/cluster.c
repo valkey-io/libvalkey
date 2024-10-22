@@ -1301,6 +1301,13 @@ valkeyClusterContext *valkeyClusterContextInit(void) {
         valkeyClusterFree(cc);
         return NULL;
     }
+    cc->requests = listCreate();
+    if (cc->requests == NULL) {
+        valkeyClusterFree(cc);
+        return NULL;
+    }
+    cc->requests->free = listCommandFree;
+
     cc->max_retry_count = CLUSTER_DEFAULT_MAX_RETRY_COUNT;
     return cc;
 }
@@ -2349,14 +2356,6 @@ int valkeyClusterAppendFormattedCommand(valkeyClusterContext *cc, char *cmd,
                                         int len) {
     struct cmd *command = NULL;
 
-    if (cc->requests == NULL) {
-        cc->requests = listCreate();
-        if (cc->requests == NULL) {
-            goto oom;
-        }
-        cc->requests->free = listCommandFree;
-    }
-
     command = command_get();
     if (command == NULL) {
         goto oom;
@@ -2437,14 +2436,6 @@ int valkeyClustervAppendCommandToNode(valkeyClusterContext *cc,
     struct cmd *command = NULL;
     char *cmd = NULL;
     int len;
-
-    if (cc->requests == NULL) {
-        cc->requests = listCreate();
-        if (cc->requests == NULL)
-            goto oom;
-
-        cc->requests->free = listCommandFree;
-    }
 
     c = valkeyClusterGetValkeyContext(cc, node);
     if (c == NULL) {
@@ -2609,12 +2600,9 @@ int valkeyClusterGetReply(valkeyClusterContext *cc, void **reply) {
     valkeyClusterClearError(cc);
     *reply = NULL;
 
-    if (cc->requests == NULL)
-        return VALKEY_ERR; // No queued requests
-
     list_command = listFirst(cc->requests);
 
-    // no more reply
+    /* No queued requests. */
     if (list_command == NULL) {
         *reply = NULL;
         return VALKEY_OK;
@@ -2685,8 +2673,12 @@ void valkeyClusterReset(valkeyClusterContext *cc) {
         } while (reply != NULL);
     }
 
-    listRelease(cc->requests);
-    cc->requests = NULL;
+    listIter li;
+    listRewind(cc->requests, &li);
+    listNode *ln;
+    while ((ln = listNext(&li))) {
+        listDelNode(cc->requests, ln);
+    }
 
     if (cc->need_update_route) {
         status = valkeyClusterUpdateSlotmap(cc);
