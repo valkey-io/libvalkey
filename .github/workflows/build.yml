@@ -8,7 +8,7 @@ jobs:
     runs-on: ubuntu-latest
     container: almalinux:8
     steps:
-      - uses: actions/checkout@eef61447b9ff4aafe5dcd4e0bbf5d482be7e7871 # v4.2.1
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Install dependencies
         run: |
@@ -35,7 +35,7 @@ jobs:
     runs-on: ubuntu-latest
     container: rockylinux:8
     steps:
-      - uses: actions/checkout@eef61447b9ff4aafe5dcd4e0bbf5d482be7e7871 # v4.2.1
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Install dependencies
         run: |
@@ -64,7 +64,7 @@ jobs:
     runs-on: ubuntu-latest
     name:  FreeBSD
     steps:
-      - uses: actions/checkout@eef61447b9ff4aafe5dcd4e0bbf5d482be7e7871 # v4.2.1
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Build in FreeBSD
         uses: vmactions/freebsd-vm@c96341966a3954a757e6ea41692f7c7b32312a0c # v1.1.4
@@ -94,7 +94,7 @@ jobs:
           - {target: mipsel,   host: mipsel-linux-gnu,        qemu: mipsel,   gccver: 10 }
           - {target: mips64el, host: mips64el-linux-gnuabi64, qemu: mips64el, gccver: 10 }
     steps:
-      - uses: actions/checkout@eef61447b9ff4aafe5dcd4e0bbf5d482be7e7871 # v4.2.1
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - name: Prepare
         uses: awalsh128/cache-apt-pkgs-action@a6c3917cc929dd0345bfb2d3feaf9101823370ad # v1.4.2
         with:
