@@ -765,7 +765,7 @@ static int parse_cluster_nodes_line(valkeyClusterContext *cc, char *line,
     int i = 0;
     while ((p = strchr(line, ' ')) != NULL) {
         *p = '\0';
-        switch (i++){
+        switch (i++) {
             case 0: id = line; break;
             case 1: addr = line; break;
             case 2: flags = line; break;
