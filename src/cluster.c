@@ -145,19 +145,6 @@ dictType clusterNodesDictType = {
     dictClusterNodeDestructor /* val destructor */
 };
 
-/* Referenced cluster node hash table
- * maps node id (437c719f5.....) to a valkeyClusterNode
- * No ownership of valkeyClusterNode memory
- */
-dictType clusterNodesRefDictType = {
-    dictSdsHash,       /* hash function */
-    NULL,              /* key dup */
-    NULL,              /* val dup */
-    dictSdsKeyCompare, /* key compare */
-    dictSdsDestructor, /* key destructor */
-    NULL               /* val destructor */
-};
-
 void listCommandFree(void *command) {
     struct cmd *cmd = command;
     command_destroy(cmd);
