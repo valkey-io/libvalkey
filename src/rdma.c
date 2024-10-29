@@ -483,7 +483,7 @@ static int valkeyRdmaPollCqCm(valkeyContext *c, long timed) {
         valkeySetError(c, VALKEY_ERR_IO, "RDMA: Poll CQ/CM failed");
         return VALKEY_ERR;
     } else if (ret == 0) {
-        valkeySetError(c, VALKEY_ERR_IO, "RDMA: IO timeout");
+        valkeySetError(c, VALKEY_ERR_IO, "Resource temporarily unavailable");
         return VALKEY_ERR;
     }
 
