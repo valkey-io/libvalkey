@@ -830,6 +830,7 @@ static int valkeyRdmaWaitConn(valkeyContext *c, long timeout) {
 static int valkeyContextConnectRdma(valkeyContext *c, const valkeyOptions *options) {
     const struct timeval *timeout = options->connect_timeout;
     const char *addr = options->endpoint.tcp.ip;
+    const char *source_addr = options->endpoint.tcp.source_addr;
     int port = options->endpoint.tcp.port;
     int ret;
     char _port[6]; /* strlen("65535"); */
@@ -852,6 +853,18 @@ static int valkeyContextConnectRdma(valkeyContext *c, const valkeyOptions *optio
 
         c->tcp.host = vk_strdup(addr);
         if (c->tcp.host == NULL) {
+            valkeySetError(c, VALKEY_ERR_OOM, "RDMA: Out of memory");
+            return VALKEY_ERR;
+        }
+    }
+
+    if (source_addr == NULL) {
+        vk_free(c->tcp.source_addr);
+        c->tcp.source_addr = NULL;
+    } else if (c->tcp.source_addr != source_addr) {
+        vk_free(c->tcp.source_addr);
+        c->tcp.source_addr = vk_strdup(source_addr);
+        if (c->tcp.source_addr == NULL) {
             valkeySetError(c, VALKEY_ERR_OOM, "RDMA: Out of memory");
             return VALKEY_ERR;
         }
@@ -894,6 +907,26 @@ static int valkeyContextConnectRdma(valkeyContext *c, const valkeyOptions *optio
     if ((valkeyRdmaSetFdBlocking(c, ctx->cm_channel->fd, 0) != VALKEY_OK)) {
         valkeySetError(c, VALKEY_ERR_OTHER, "RDMA: set cm channel fd non-block failed");
         goto error;
+    }
+
+    if (c->tcp.source_addr) {
+        /* bind local address with a random port if user specify one. */
+        snprintf(_port, sizeof(_port), "%d", 0);
+        hints.ai_flags = RAI_PASSIVE;
+        hints.ai_port_space = RDMA_PS_TCP;
+        if (rdma_getaddrinfo(addr, _port, &hints, &addrinfo)) {
+            valkeySetError(c, VALKEY_ERR_PROTOCOL, "RDMA: failed to getaddrinfo for local side");
+            goto error;
+        }
+
+        if (rdma_bind_addr(ctx->cm_id, addrinfo->ai_src_addr)) {
+            valkeySetError(c, VALKEY_ERR_PROTOCOL, "RDMA: failed to bind local address");
+            goto error;
+        }
+
+        memset(&hints, 0x00, sizeof(hints));
+        rdma_freeaddrinfo(addrinfo);
+        addrinfo = NULL;
     }
 
     /* resolve remote address & port by RDMA style */

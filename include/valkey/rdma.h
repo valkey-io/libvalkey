@@ -50,6 +50,14 @@ extern "C" {
         (opts)->endpoint.tcp.port = port_;        \
     } while (0)
 
+#define VALKEY_OPTIONS_SET_RDMA_WITH_SOURCE_ADDR(opts, ip_, port_, source_addr_) \
+    do {                                                                         \
+        (opts)->type = VALKEY_CONN_RDMA;                                         \
+        (opts)->endpoint.tcp.ip = ip_;                                           \
+        (opts)->endpoint.tcp.port = port_;                                       \
+        (opts)->endpoint.tcp.source_addr = source_addr_;                         \
+    } while (0)
+
 int valkeyInitiateRdma(void);
 
 #ifdef __cplusplus
