@@ -67,6 +67,7 @@ struct config {
 
     struct {
         const char *host;
+        const char *source_addr;
         /* int port; use the same port as TCP */
     } rdma;
 };
@@ -270,7 +271,12 @@ static valkeyContext *do_connect(struct config config) {
 #ifdef VALKEY_TEST_RDMA
     } else if (config.type == CONN_RDMA) {
         valkeyOptions options = {0};
-        VALKEY_OPTIONS_SET_RDMA(&options, config.rdma.host, config.tcp.port);
+        if (config.rdma.source_addr) {
+            VALKEY_OPTIONS_SET_RDMA_WITH_SOURCE_ADDR(&options, config.rdma.host,
+                                                     config.tcp.port, config.rdma.source_addr);
+        } else {
+            VALKEY_OPTIONS_SET_RDMA(&options, config.rdma.host, config.tcp.port);
+        }
         c = valkeyConnectWithOptions(&options);
 #endif
     } else if (config.type == CONN_FD) {
@@ -2338,6 +2344,10 @@ int main(int argc, char **argv) {
             argv++;
             argc--;
             cfg.rdma.host = argv[0];
+        } else if (argc >= 1 && !strcmp(argv[0], "--rdma-source-addr")) {
+            argv++;
+            argc--;
+            cfg.rdma.source_addr = argv[0];
 #endif
         } else {
             fprintf(stderr, "Invalid argument: %s\n", argv[0]);
