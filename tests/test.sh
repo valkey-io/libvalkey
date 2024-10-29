@@ -104,7 +104,6 @@ fi
 if [ "$TEST_RDMA" = "1" ]; then
     cat >> ${CONF_FILE} <<EOF
 loadmodule ${VALKEY_RDMA_MODULE} bind=${VALKEY_RDMA_ADDR} port=${VALKEY_PORT}
-protected-mode no
 EOF
 RDMA_TEST_ARGS="--rdma-addr ${VALKEY_RDMA_ADDR}"
 fi
