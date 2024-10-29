@@ -833,15 +833,11 @@ static int valkeyContextConnectRdma(valkeyContext *c, const valkeyOptions *optio
     int port = options->endpoint.tcp.port;
     int ret;
     char _port[6]; /* strlen("65535"); */
-    struct addrinfo hints, *servinfo, *p;
+    struct rdma_addrinfo hints = {0}, *addrinfo = NULL;
     long timeout_msec = -1;
-    struct rdma_event_channel *cm_channel = NULL;
-    struct rdma_cm_id *cm_id = NULL;
     RdmaContext *ctx = NULL;
-    struct sockaddr_storage saddr;
     long start = vk_msec_now(), timed;
 
-    servinfo = NULL;
     c->connection_type = VALKEY_CONN_RDMA;
     c->tcp.port = port;
     c->flags &= ~VALKEY_CONNECTED;
@@ -876,91 +872,72 @@ static int valkeyContextConnectRdma(valkeyContext *c, const valkeyOptions *optio
         timeout_msec = INT_MAX;
     }
 
-    snprintf(_port, 6, "%d", port);
-    memset(&hints, 0, sizeof(hints));
-    hints.ai_family = AF_INET;
-    hints.ai_socktype = SOCK_STREAM;
-
-    if ((ret = getaddrinfo(c->tcp.host, _port, &hints, &servinfo)) != 0) {
-        hints.ai_family = AF_INET6;
-        if ((ret = getaddrinfo(addr, _port, &hints, &servinfo)) != 0) {
-            valkeySetError(c, VALKEY_ERR_OTHER, gai_strerror(ret));
-            return VALKEY_ERR;
-        }
-    }
-
     ctx = vk_calloc(sizeof(RdmaContext), 1);
     if (!ctx) {
         valkeySetError(c, VALKEY_ERR_OOM, "Out of memory");
-        goto error;
+        return VALKEY_ERR;
     }
 
     c->privctx = ctx;
 
-    cm_channel = rdma_create_event_channel();
-    if (!cm_channel) {
+    ctx->cm_channel = rdma_create_event_channel();
+    if (!ctx->cm_channel) {
         valkeySetError(c, VALKEY_ERR_OTHER, "RDMA: create event channel failed");
         goto error;
     }
 
-    ctx->cm_channel = cm_channel;
-
-    if (rdma_create_id(cm_channel, &cm_id, (void *)ctx, RDMA_PS_TCP)) {
+    if (rdma_create_id(ctx->cm_channel, &ctx->cm_id, (void *)ctx, RDMA_PS_TCP)) {
         valkeySetError(c, VALKEY_ERR_OTHER, "RDMA: create id failed");
-        return VALKEY_ERR;
+        goto error;
     }
-    ctx->cm_id = cm_id;
 
-    if ((valkeyRdmaSetFdBlocking(c, cm_channel->fd, 0) != VALKEY_OK)) {
+    if ((valkeyRdmaSetFdBlocking(c, ctx->cm_channel->fd, 0) != VALKEY_OK)) {
         valkeySetError(c, VALKEY_ERR_OTHER, "RDMA: set cm channel fd non-block failed");
-        goto free_rdma;
+        goto error;
     }
 
-    for (p = servinfo; p != NULL; p = p->ai_next) {
-        if (p->ai_family == PF_INET) {
-            memcpy(&saddr, p->ai_addr, sizeof(struct sockaddr_in));
-            ((struct sockaddr_in *)&saddr)->sin_port = htons(port);
-        } else if (p->ai_family == PF_INET6) {
-            memcpy(&saddr, p->ai_addr, sizeof(struct sockaddr_in6));
-            ((struct sockaddr_in6 *)&saddr)->sin6_port = htons(port);
-        } else {
-            valkeySetError(c, VALKEY_ERR_PROTOCOL, "RDMA: unsupported family");
-            goto free_rdma;
-        }
-
-        /* resolve addr as most 100ms */
-        if (rdma_resolve_addr(cm_id, NULL, (struct sockaddr *)&saddr, 100)) {
-            continue;
-        }
-
-        timed = timeout_msec - (vk_msec_now() - start);
-        if ((valkeyRdmaWaitConn(c, timed) == VALKEY_OK) && (c->flags & VALKEY_CONNECTED)) {
-            ret = VALKEY_OK;
-            goto end;
-        }
+    /* resolve remote address & port by RDMA style */
+    snprintf(_port, sizeof(_port), "%d", port);
+    hints.ai_port_space = RDMA_PS_TCP;
+    if (rdma_getaddrinfo(addr, _port, &hints, &addrinfo)) {
+        valkeySetError(c, VALKEY_ERR_PROTOCOL, "RDMA: failed to getaddrinfo");
+        goto error;
     }
 
-    if ((!c->err) && (p == NULL)) {
-        valkeySetError(c, VALKEY_ERR_OTHER, "RDMA: resolve failed");
+    timed = timeout_msec - (vk_msec_now() - start);
+    if (rdma_resolve_addr(ctx->cm_id, NULL, (struct sockaddr *)addrinfo->ai_dst_addr, timed)) {
+        valkeySetError(c, VALKEY_ERR_OTHER, "RDMA: failed to resolve");
+        goto error;
     }
 
-free_rdma:
-    if (cm_id) {
-        rdma_destroy_id(cm_id);
+    timed = vk_msec_now() - start;
+    if (timed >= timeout_msec) {
+        valkeySetError(c, VALKEY_ERR_TIMEOUT, "RDMA: resolving timeout");
+        goto error;
     }
-    if (cm_channel) {
-        rdma_destroy_event_channel(cm_channel);
+
+    if ((valkeyRdmaWaitConn(c, timeout_msec - timed) == VALKEY_OK) && (c->flags & VALKEY_CONNECTED)) {
+        ret = VALKEY_OK;
+        goto end;
     }
 
 error:
     ret = VALKEY_ERR;
     if (ctx) {
+        if (ctx->cm_id) {
+            rdma_destroy_id(ctx->cm_id);
+        }
+        if (ctx->cm_channel) {
+            rdma_destroy_event_channel(ctx->cm_channel);
+        }
+
         vk_free(ctx);
+        c->privctx = NULL;
     }
 
 end:
-    if (servinfo) {
-        freeaddrinfo(servinfo);
+    if (addrinfo) {
+        rdma_freeaddrinfo(addrinfo);
     }
 
     return ret;
