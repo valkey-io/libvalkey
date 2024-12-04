@@ -452,7 +452,8 @@ void test_alloc_failure_handling_async(void) {
 
     valkeyClusterOptions options = {0};
     options.initial_nodes = CLUSTER_NODE;
-    options.options = VALKEY_OPT_USE_REPLICAS;
+    options.options = VALKEY_OPT_USE_REPLICAS |
+                      VALKEY_OPT_BLOCKING_INITIAL_UPDATE;
     options.async_connect_cb = connectCallback;
     options.async_disconnect_cb = disconnectCallback;
     valkeyClusterOptionsUseLibevent(&options, base);

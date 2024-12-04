@@ -27,16 +27,15 @@ void connectToValkey(valkeyClusterAsyncContext *acc) {
     /* reset context in case of reconnect */
     valkeyClusterAsyncDisconnect(acc);
 
-    int status = valkeyClusterConnect2(acc->cc);
-    if (status == VALKEY_OK) {
+    if (valkeyClusterAsyncConnect(acc) == VALKEY_OK) {
         // cluster mode
-    } else if (acc->cc->err &&
-               strcmp(acc->cc->errstr, VALKEY_ENOCLUSTER) == 0) {
+    } else if (acc->err &&
+               strcmp(acc->errstr, VALKEY_ENOCLUSTER) == 0) {
         printf("[no cluster]\n");
-        acc->cc->err = 0;
-        memset(acc->cc->errstr, '\0', strlen(acc->cc->errstr));
+        acc->err = 0;
+        memset(acc->errstr, '\0', strlen(acc->errstr));
     } else {
-        printf("Connect error: %s\n", acc->cc->errstr);
+        printf("Connect error: %s\n", acc->errstr);
         exit(-1);
     }
 }
@@ -99,7 +98,8 @@ int main(int argc, char **argv) {
 
     valkeyClusterOptions options = {0};
     options.initial_nodes = initnode;
-    options.options = VALKEY_OPT_USE_CLUSTER_SLOTS;
+    options.options = VALKEY_OPT_USE_CLUSTER_SLOTS |
+                      VALKEY_OPT_BLOCKING_INITIAL_UPDATE;
     valkeyClusterOptionsUseLibevent(&options, base);
 
     valkeyClusterAsyncContext *acc = valkeyClusterAsyncContextInit(&options);

@@ -251,11 +251,12 @@ int main(int argc, char **argv) {
 
     valkeyClusterOptions options = {0};
     options.initial_nodes = initnode;
+    options.options = VALKEY_OPT_BLOCKING_INITIAL_UPDATE;
     options.connect_timeout = &timeout;
     options.command_timeout = &timeout;
     options.max_retry = 1;
     if (use_cluster_slots) {
-        options.options = VALKEY_OPT_USE_CLUSTER_SLOTS;
+        options.options |= VALKEY_OPT_USE_CLUSTER_SLOTS;
     }
     if (show_events) {
         options.event_callback = eventCallback;

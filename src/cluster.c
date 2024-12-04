@@ -56,6 +56,7 @@ vk_static_assert(VALKEY_OPT_USE_CLUSTER_SLOTS > VALKEY_OPT_LAST_SA_OPTION);
 #define VALKEY_FLAG_USE_CLUSTER_SLOTS 0x1
 #define VALKEY_FLAG_PARSE_REPLICAS 0x2
 #define VALKEY_FLAG_DISCONNECTING 0x4
+#define VALKEY_FLAG_BLOCKING_INITIAL_UPDATE 0x8
 
 // Cluster errors are offset by 100 to be sufficiently out of range of
 // standard Valkey errors
@@ -1294,6 +1295,9 @@ static valkeyClusterContext *valkeyClusterContextInit(const valkeyClusterOptions
     if (options->options & VALKEY_OPT_USE_REPLICAS) {
         cc->flags |= VALKEY_FLAG_PARSE_REPLICAS;
     }
+    if (options->options & VALKEY_OPT_BLOCKING_INITIAL_UPDATE) {
+        cc->flags |= VALKEY_FLAG_BLOCKING_INITIAL_UPDATE;
+    }
     if (options->max_retry > 0) {
         cc->max_retry_count = options->max_retry;
     } else {
@@ -1649,24 +1653,6 @@ int valkeyClusterSetOptionTimeout(valkeyClusterContext *cc,
     }
 
     return VALKEY_OK;
-}
-
-int valkeyClusterConnect2(valkeyClusterContext *cc) {
-
-    if (cc == NULL) {
-        return VALKEY_ERR;
-    }
-
-    if (dictSize(cc->nodes) == 0) {
-        valkeyClusterSetError(cc, VALKEY_ERR_OTHER,
-                              "server address not configured");
-        return VALKEY_ERR;
-    }
-    /* Clear a previously set shutdown flag since we allow a
-     * reconnection of an async context using this API (legacy). */
-    cc->flags &= ~VALKEY_FLAG_DISCONNECTING;
-
-    return valkeyClusterUpdateSlotmap(cc);
 }
 
 valkeyContext *valkeyClusterGetValkeyContext(valkeyClusterContext *cc,
@@ -2843,10 +2829,7 @@ valkeyClusterAsyncContext *valkeyClusterAsyncConnectWithOptions(const valkeyClus
         return NULL;
     }
 
-    //TODO: valkeyClusterAsyncConnect(acc);
-    if (valkeyClusterUpdateSlotmap(acc->cc) != VALKEY_OK) {
-        valkeyClusterAsyncSetError(acc, acc->cc->err, acc->cc->errstr);
-    }
+    valkeyClusterAsyncConnect(acc);
     return acc;
 }
 
@@ -2855,7 +2838,20 @@ int valkeyClusterAsyncConnect(valkeyClusterAsyncContext *acc) {
     if (acc->attach_fn == NULL) {
         return VALKEY_ERR;
     }
-    /* TODO: add options to use: valkeyClusterUpdateSlotmap(acc->cc); */
+
+    /* Clear a previously set shutdown flag to allow a
+     * reconnection of an async context using this API. */
+    acc->cc->flags &= ~VALKEY_FLAG_DISCONNECTING;
+
+    /* Use blocking initial slotmap update when configured. */
+    if (acc->cc->flags & VALKEY_FLAG_BLOCKING_INITIAL_UPDATE) {
+        if (valkeyClusterUpdateSlotmap(acc->cc) != VALKEY_OK) {
+            valkeyClusterAsyncSetError(acc, acc->cc->err, acc->cc->errstr);
+            return VALKEY_ERR;
+        }
+        return VALKEY_OK;
+    }
+    /* Use non-blocking initial slotmap update. */
     return updateSlotMapAsync(acc, NULL /*any node*/);
 }
 

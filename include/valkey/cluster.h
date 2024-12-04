@@ -152,6 +152,8 @@ typedef struct valkeyClusterNodeIterator {
 /* Enable parsing of replica nodes. Currently not used, but the
  * information is added to its primary node structure. */
 #define VALKEY_OPT_USE_REPLICAS 0x2000
+/* Use a blocking slotmap update after an initial async connect. */
+#define VALKEY_OPT_BLOCKING_INITIAL_UPDATE 0x4000
 
 typedef struct {
     const char *initial_nodes;             /* Initial cluster node address(es). */
@@ -204,7 +206,6 @@ int valkeyClusterOptionsSetConnectCallback(valkeyClusterOptions *options,
 valkeyClusterContext *valkeyClusterConnectWithOptions(const valkeyClusterOptions *options);
 valkeyClusterContext *valkeyClusterConnect(const char *addrs);
 valkeyClusterContext *valkeyClusterConnectWithTimeout(const char *addrs, const struct timeval tv);
-int valkeyClusterConnect2(valkeyClusterContext *cc);
 void valkeyClusterFree(valkeyClusterContext *cc);
 
 /* Options configurable in runtime. */

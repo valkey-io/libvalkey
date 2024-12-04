@@ -297,6 +297,7 @@ void test_async_password_ok(void) {
 
     valkeyClusterOptions options = {0};
     options.initial_nodes = CLUSTER_NODE_WITH_PASSWORD;
+    options.options = VALKEY_OPT_BLOCKING_INITIAL_UPDATE;
     options.password = CLUSTER_PASSWORD;
     options.async_connect_cb = connectCallback;
     options.async_disconnect_cb = disconnectCallback;
@@ -324,6 +325,7 @@ void test_async_password_wrong(void) {
 
     valkeyClusterOptions options = {0};
     options.initial_nodes = CLUSTER_NODE_WITH_PASSWORD;
+    options.options = VALKEY_OPT_BLOCKING_INITIAL_UPDATE;
     options.password = "faultypass";
     valkeyClusterOptionsUseLibevent(&options, base);
 
@@ -353,6 +355,7 @@ void test_async_password_missing(void) {
 
     valkeyClusterOptions options = {0};
     options.initial_nodes = CLUSTER_NODE_WITH_PASSWORD;
+    options.options = VALKEY_OPT_BLOCKING_INITIAL_UPDATE;
     options.async_connect_cb = connectCallback;
     options.async_disconnect_cb = disconnectCallback;
     valkeyClusterOptionsUseLibevent(&options, base);
@@ -383,6 +386,7 @@ void test_async_username_ok(void) {
     // Connect to the cluster using username and password
     valkeyClusterOptions options = {0};
     options.initial_nodes = CLUSTER_NODE_WITH_PASSWORD;
+    options.options = VALKEY_OPT_BLOCKING_INITIAL_UPDATE;
     options.async_connect_cb = connectCallback;
     options.async_disconnect_cb = disconnectCallback;
     options.username = "missing-user";
@@ -423,6 +427,7 @@ void test_async_multicluster(void) {
 
     valkeyClusterOptions options1 = {0};
     options1.initial_nodes = CLUSTER_NODE;
+    options1.options = VALKEY_OPT_BLOCKING_INITIAL_UPDATE;
     options1.async_connect_cb = connectCallback;
     options1.async_disconnect_cb = disconnectCallback;
     valkeyClusterOptionsUseLibevent(&options1, base);
@@ -433,6 +438,7 @@ void test_async_multicluster(void) {
 
     valkeyClusterOptions options2 = {0};
     options2.initial_nodes = CLUSTER_NODE_WITH_PASSWORD;
+    options2.options = VALKEY_OPT_BLOCKING_INITIAL_UPDATE;
     options2.password = CLUSTER_PASSWORD;
     options2.async_connect_cb = connectCallback;
     options2.async_disconnect_cb = disconnectCallback;
@@ -483,6 +489,7 @@ void test_async_connect_timeout(void) {
     valkeyClusterOptions options = {0};
     /* Configure a non-routable IP address and a timeout */
     options.initial_nodes = "192.168.0.0:7000";
+    options.options = VALKEY_OPT_BLOCKING_INITIAL_UPDATE;
     options.connect_timeout = &timeout;
     valkeyClusterOptionsUseLibevent(&options, base);
 
@@ -504,6 +511,7 @@ void test_async_command_timeout(void) {
 
     valkeyClusterOptions options = {0};
     options.initial_nodes = CLUSTER_NODE;
+    options.options = VALKEY_OPT_BLOCKING_INITIAL_UPDATE;
     options.command_timeout = &timeout;
     valkeyClusterOptionsUseLibevent(&options, base);
 
