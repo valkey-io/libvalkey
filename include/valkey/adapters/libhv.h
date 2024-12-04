@@ -140,4 +140,11 @@ static int valkeyClusterLibhvAttach(valkeyClusterAsyncContext *acc,
     return VALKEY_OK;
 }
 
+/* Helper macro to initialize options. */
+#define VALKEY_CLUSTER_OPTIONS_SET_ADAPTER_LIBHV(opts, loop) \
+    do {                                                     \
+        (opts)->attach_fn = valkeyLibhvAttachAdapter;        \
+        (opts)->attach_data = loop;                          \
+    } while (0)
+
 #endif /* VALKEY_ADAPTERS_LIBHV_H */

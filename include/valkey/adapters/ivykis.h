@@ -85,7 +85,7 @@ static int valkeyIvykisAttach(valkeyAsyncContext *ac) {
 }
 
 /* Internal adapter function with correct function signature. */
-static int valkeyClusterIvykisAttachAdapter(valkeyAsyncContext *ac, VALKEY_UNUSED void *) {
+static int valkeyIvykisAttachAdapter(valkeyAsyncContext *ac, VALKEY_UNUSED void *) {
     return valkeyIvykisAttach(ac);
 }
 
@@ -95,8 +95,14 @@ static int valkeyClusterIvykisAttach(valkeyClusterAsyncContext *acc) {
         return VALKEY_ERR;
     }
 
-    acc->attach_fn = valkeyClusterIvykisAttachAdapter;
+    acc->attach_fn = valkeyIvykisAttachAdapter;
     return VALKEY_OK;
 }
+
+/* Helper macro to initialize options. */
+#define VALKEY_CLUSTER_OPTIONS_SET_ADAPTER_IVYKIS(opts) \
+    do {                                                \
+        (opts)->attach_fn = valkeyAeAttachAdapter;      \
+    } while (0)
 
 #endif /* VALKEY_ADAPTERS_IVYKIS_H */

@@ -204,4 +204,11 @@ static int valkeyClusterLibevAttach(valkeyClusterAsyncContext *acc,
     return VALKEY_OK;
 }
 
+/* Helper macro to initialize options. */
+#define VALKEY_CLUSTER_OPTIONS_SET_ADAPTER_LIBEV(opts, loop) \
+    do {                                                     \
+        (opts)->attach_fn = valkeyLibevAttachAdapter;        \
+        (opts)->attach_data = loop;                          \
+    } while (0)
+
 #endif /* VALKEY_ADAPTERS_LIBEV_H */

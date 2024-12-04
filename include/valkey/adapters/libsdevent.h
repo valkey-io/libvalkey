@@ -195,4 +195,11 @@ static int valkeyClusterLibsdeventAttach(valkeyClusterAsyncContext *acc,
     return VALKEY_OK;
 }
 
+/* Helper macro to initialize options. */
+#define VALKEY_CLUSTER_OPTIONS_SET_ADAPTER_LIBSDEVENT(opts, event) \
+    do {                                                           \
+        (opts)->attach_fn = valkeyLibsdeventAttachAdapter;         \
+        (opts)->attach_data = event;                               \
+    } while (0)
+
 #endif /* VALKEY_ADAPTERS_LIBSDEVENT_H */
