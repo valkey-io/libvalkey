@@ -68,34 +68,22 @@ void eventCallback(const valkeyClusterContext *cc, int event, void *privdata) {
 }
 
 int main(void) {
+    struct event_base *base = event_base_new();
 
-    valkeyClusterAsyncContext *acc = valkeyClusterAsyncContextInit();
+    valkeyClusterOptions options = {0};
+    options.initial_nodes = CLUSTER_NODE;
+    options.onConnect = connectCallback;
+    options.onDisconnect = disconnectCallback;
+    VALKEY_CLUSTER_OPTIONS_SET_ADAPTER_LIBEVENT(&options, base);
+
+    valkeyClusterAsyncContext *acc = valkeyClusterAsyncContextInit(&options);
     assert(acc);
 
-    int status;
-    status = valkeyClusterAsyncSetConnectCallback(acc, connectCallback);
-    assert(status == VALKEY_OK);
-    status = valkeyClusterAsyncSetConnectCallback(acc, connectCallback);
-    assert(status == VALKEY_ERR); /* Re-registration not accepted */
-    status = valkeyClusterAsyncSetConnectCallbackNC(acc, connectCallbackNC);
-    assert(status == VALKEY_ERR); /* Re-registration not accepted */
-
-    status = valkeyClusterAsyncSetDisconnectCallback(acc, disconnectCallback);
-    assert(status == VALKEY_OK);
-    status = valkeyClusterSetEventCallback(acc->cc, eventCallback, acc);
-    assert(status == VALKEY_OK);
-    status = valkeyClusterSetOptionAddNodes(acc->cc, CLUSTER_NODE);
+    /* Set an event callback that uses acc as privdata */
+    int status = valkeyClusterSetEventCallback(acc->cc, eventCallback, acc);
     assert(status == VALKEY_OK);
 
-    /* Expect error when connecting without an attached event library. */
-    status = valkeyClusterAsyncConnect2(acc);
-    assert(status == VALKEY_ERR);
-
-    struct event_base *base = event_base_new();
-    status = valkeyClusterLibeventAttach(acc, base);
-    assert(status == VALKEY_OK);
-
-    status = valkeyClusterAsyncConnect2(acc);
+    status = valkeyClusterAsyncConnect(acc);
     assert(status == VALKEY_OK);
 
     event_base_dispatch(base);

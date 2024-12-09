@@ -192,4 +192,12 @@ static int valkeyClusterLibeventAttach(valkeyClusterAsyncContext *acc,
     acc->attach_data = base;
     return VALKEY_OK;
 }
+
+/* Helper macro to initialize options. */
+#define VALKEY_CLUSTER_OPTIONS_SET_ADAPTER_LIBEVENT(opts, event_base) \
+    do {                                                              \
+        (opts)->attach_fn = valkeyLibeventAttachAdapter;              \
+        (opts)->attach_data = event_base;                             \
+    } while (0)
+
 #endif /* VALKEY_ADAPTERS_LIBEVENT_H */

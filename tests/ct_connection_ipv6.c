@@ -10,23 +10,15 @@
 
 // Successful connection an IPv6 cluster
 void test_successful_ipv6_connection(void) {
-
-    valkeyClusterContext *cc = valkeyClusterContextInit();
-    assert(cc);
-
-    int status;
     struct timeval timeout = {0, 500000}; // 0.5s
-    status = valkeyClusterSetOptionConnectTimeout(cc, timeout);
-    ASSERT_MSG(status == VALKEY_OK, cc->errstr);
 
-    status = valkeyClusterSetOptionAddNodes(cc, CLUSTER_NODE_IPV6);
-    ASSERT_MSG(status == VALKEY_OK, cc->errstr);
+    valkeyClusterOptions options = {0};
+    options.initial_nodes = CLUSTER_NODE_IPV6;
+    options.options = VALKEY_OPT_USE_CLUSTER_SLOTS;
+    options.connect_timeout = &timeout;
 
-    status = valkeyClusterSetOptionRouteUseSlots(cc);
-    ASSERT_MSG(status == VALKEY_OK, cc->errstr);
-
-    status = valkeyClusterConnect2(cc);
-    ASSERT_MSG(status == VALKEY_OK, cc->errstr);
+    valkeyClusterContext *cc = valkeyClusterConnectWithOptions(&options);
+    ASSERT_MSG(cc && cc->err == 0, cc ? cc->errstr : "OOM");
 
     valkeyReply *reply;
     reply = (valkeyReply *)valkeyClusterCommand(cc, "SET key_ipv6 value");

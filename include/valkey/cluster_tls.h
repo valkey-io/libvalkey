@@ -43,6 +43,13 @@ extern "C" {
 int valkeyClusterSetOptionEnableTLS(valkeyClusterContext *cc,
                                     valkeyTLSContext *tls);
 
+/* Helper macro to initialize options. */
+#define VALKEY_CLUSTER_OPTIONS_SET_SSL(opts, tls_)           \
+    do {                                                     \
+        (opts)->tls = tls_;                                  \
+        (opts)->tls_init_fn = &valkeyInitiateTLSWithContext; \
+    } while (0)
+
 #ifdef __cplusplus
 }
 #endif

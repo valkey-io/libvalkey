@@ -150,4 +150,12 @@ static int valkeyClusterAeAttach(valkeyClusterAsyncContext *acc,
     acc->attach_data = loop;
     return VALKEY_OK;
 }
+
+/* Helper macro to initialize options. */
+#define VALKEY_CLUSTER_OPTIONS_SET_ADAPTER_AE(opts, loop) \
+    do {                                                  \
+        (opts)->attach_fn = valkeyAeAttachAdapter;        \
+        (opts)->attach_data = loop;                       \
+    } while (0)
+
 #endif /* VALKEY_ADAPTERS_AE_H */

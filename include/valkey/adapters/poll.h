@@ -211,4 +211,10 @@ static int valkeyClusterPollAttach(valkeyClusterAsyncContext *acc) {
     return VALKEY_OK;
 }
 
+/* Helper macro to initialize options. */
+#define VALKEY_CLUSTER_OPTIONS_SET_ADAPTER_POLL(opts) \
+    do {                                              \
+        (opts)->attach_fn = valkeyPollAttachAdapter;  \
+    } while (0)
+
 #endif /* VALKEY_ADAPTERS_POLL_H */

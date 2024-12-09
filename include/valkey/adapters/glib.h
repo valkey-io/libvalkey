@@ -164,4 +164,11 @@ static int valkeyClusterGlibAttach(valkeyClusterAsyncContext *acc,
     return VALKEY_OK;
 }
 
+/* Helper macro to initialize options. */
+#define VALKEY_CLUSTER_OPTIONS_SET_ADAPTER_GLIB(opts, context) \
+    do {                                                       \
+        (opts)->attach_fn = valkeyGlibAttachAdapter;           \
+        (opts)->attach_data = context;                         \
+    } while (0)
+
 #endif /* VALKEY_ADAPTERS_GLIB_H */
