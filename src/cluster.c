@@ -289,7 +289,7 @@ static cluster_slot *cluster_slot_create(valkeyClusterNode *node) {
     slot->node = node;
 
     if (node != NULL) {
-        assert(node->role == VALKEY_ROLE_MASTER);
+        assert(node->role == VALKEY_ROLE_PRIMARY);
         if (node->slots == NULL) {
             node->slots = listCreate();
             if (node->slots == NULL) {
@@ -314,7 +314,7 @@ static int cluster_slot_ref_node(cluster_slot *slot, valkeyClusterNode *node) {
         return VALKEY_ERR;
     }
 
-    if (node->role != VALKEY_ROLE_MASTER) {
+    if (node->role != VALKEY_ROLE_PRIMARY) {
         return VALKEY_ERR;
     }
 
@@ -424,7 +424,7 @@ static valkeyClusterNode *node_get_with_slots(valkeyClusterContext *cc,
         goto oom;
     }
 
-    if (role == VALKEY_ROLE_MASTER) {
+    if (role == VALKEY_ROLE_PRIMARY) {
         node->slots = listCreate();
         if (node->slots == NULL) {
             goto oom;
@@ -630,7 +630,7 @@ static dict *parse_cluster_slots(valkeyClusterContext *cc, valkeyReply *reply) {
                     }
 
                     master = node_get_with_slots(cc, elem_ip, elem_port,
-                                                 VALKEY_ROLE_MASTER);
+                                                 VALKEY_ROLE_PRIMARY);
                     if (master == NULL) {
                         goto error;
                     }
@@ -656,7 +656,7 @@ static dict *parse_cluster_slots(valkeyClusterContext *cc, valkeyReply *reply) {
                     slot = NULL;
                 } else if (cc->flags & VALKEYCLUSTER_FLAG_ADD_SLAVE) {
                     slave = node_get_with_slots(cc, elem_ip, elem_port,
-                                                VALKEY_ROLE_SLAVE);
+                                                VALKEY_ROLE_REPLICA);
                     if (slave == NULL) {
                         goto error;
                     }
@@ -785,29 +785,29 @@ static int parse_cluster_nodes_line(valkeyClusterContext *cc, char *line,
 
     /* Parse flags, a comma separated list of following flags:
      * myself, master, slave, fail?, fail, handshake, noaddr, nofailover, noflags. */
-    uint8_t role = VALKEY_ROLE_NULL;
+    uint8_t role = VALKEY_ROLE_UNKNOWN;
     while (*flags != '\0') {
         if ((p = strchr(flags, ',')) != NULL)
             *p = '\0';
         if (memcmp(flags, "master", 6) == 0) {
-            role = VALKEY_ROLE_MASTER;
+            role = VALKEY_ROLE_PRIMARY;
             break;
         }
         if (memcmp(flags, "slave", 5) == 0) {
-            role = VALKEY_ROLE_SLAVE;
+            role = VALKEY_ROLE_REPLICA;
             break;
         }
         if (p == NULL) /* No more flags. */
             break;
         flags = p + 1; /* Start of next flag. */
     }
-    if (role == VALKEY_ROLE_NULL) {
+    if (role == VALKEY_ROLE_UNKNOWN) {
         valkeyClusterSetError(cc, VALKEY_ERR_OTHER, "Unknown role");
         return VALKEY_ERR;
     }
 
     /* Only parse replicas when requested. */
-    if (role == VALKEY_ROLE_SLAVE && parsed_primary_id == NULL) {
+    if (role == VALKEY_ROLE_REPLICA && parsed_primary_id == NULL) {
         *parsed_node = NULL;
         return VALKEY_OK;
     }
@@ -853,7 +853,7 @@ static int parse_cluster_nodes_line(valkeyClusterContext *cc, char *line,
     node->port = vk_atoi(p, strlen(p));
 
     /* No slot parsing needed for replicas, but return master id. */
-    if (node->role == VALKEY_ROLE_SLAVE) {
+    if (node->role == VALKEY_ROLE_REPLICA) {
         *parsed_primary_id = primary_id;
         *parsed_node = node;
         return VALKEY_OK;
@@ -941,7 +941,7 @@ static dict *parse_cluster_nodes(valkeyClusterContext *cc, valkeyReply *reply) {
             goto error;
         if (node == NULL)
             continue; /* Line skipped. */
-        if (node->role == VALKEY_ROLE_MASTER) {
+        if (node->role == VALKEY_ROLE_PRIMARY) {
             sds key = sdsnew(node->addr);
             if (key == NULL) {
                 freeValkeyClusterNode(node);
@@ -962,7 +962,7 @@ static dict *parse_cluster_nodes(valkeyClusterContext *cc, valkeyReply *reply) {
             slot_ranges_found += listLength(node->slots);
 
         } else {
-            assert(node->role == VALKEY_ROLE_SLAVE);
+            assert(node->role == VALKEY_ROLE_REPLICA);
             if (replicas == NULL) {
                 if ((replicas = dictCreate(&clusterNodeListDictType, NULL)) == NULL) {
                     freeValkeyClusterNode(node);
@@ -1125,7 +1125,7 @@ static int updateNodesAndSlotmap(valkeyClusterContext *cc, dict *nodes) {
     dictEntry *de;
     while ((de = dictNext(&di))) {
         valkeyClusterNode *master = dictGetEntryVal(de);
-        if (master->role != VALKEY_ROLE_MASTER) {
+        if (master->role != VALKEY_ROLE_PRIMARY) {
             valkeyClusterSetError(cc, VALKEY_ERR_OTHER,
                                   "Node role must be master");
             goto error;
@@ -1861,7 +1861,7 @@ static valkeyClusterNode *getNodeFromRedirectReply(valkeyClusterContext *cc,
     if (node == NULL) {
         goto oom;
     }
-    node->role = VALKEY_ROLE_MASTER;
+    node->role = VALKEY_ROLE_PRIMARY;
     node->addr = part[2];
     part[2] = NULL; /* Memory ownership moved */
 

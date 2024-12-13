@@ -27,6 +27,12 @@ The type `sds` is removed from the public API.
 * `ctx_get_by_node` is renamed to `valkeyClusterGetValkeyContext`.
 * `actx_get_by_node` is renamed to `valkeyClusterGetValkeyAsyncContext`.
 
+### Renamed API defines
+
+* `REDIS_ROLE_NULL` is renamed to `VALKEY_ROLE_UNKNOWN`.
+* `REDIS_ROLE_MASTER` is renamed to `VALKEY_ROLE_PRIMARY`.
+* `REDIS_ROLE_SLAVE` is renamed to `VALKEY_ROLE_REPLICA`.
+
 ### Removed API functions
 
 * `redisClusterSetMaxRedirect` removed and replaced with `valkeyClusterSetOptionMaxRetry`.
