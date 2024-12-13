@@ -146,7 +146,7 @@ int main(int argc, char **argv) {
     options.initial_nodes = CLUSTER_NODE;
     options.onConnectNC = connectCallbackNC;
     options.onDisconnect = disconnectCallback;
-    VALKEY_CLUSTER_OPTIONS_SET_ADAPTER_LIBEVENT(&options, base);
+    valkeyClusterSetOptionUseLibevent(&options, base);
 
     valkeyClusterAsyncContext *acc = valkeyClusterAsyncContextInit(&options);
     assert(acc);

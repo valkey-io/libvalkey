@@ -95,7 +95,7 @@ void test_async_pipeline(void) {
     options.options = VALKEY_OPT_BLOCKING_INITIAL_UPDATE;
     options.onConnect = callbackExpectOk;
     options.onDisconnect = callbackExpectOk;
-    VALKEY_CLUSTER_OPTIONS_SET_ADAPTER_LIBEVENT(&options, base);
+    valkeyClusterSetOptionUseLibevent(&options, base);
 
     valkeyClusterAsyncContext *acc = valkeyClusterAsyncConnectWithOptions(&options);
     ASSERT_MSG(acc && acc->err == 0, acc ? acc->errstr : "OOM");

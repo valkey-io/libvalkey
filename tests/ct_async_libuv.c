@@ -43,7 +43,7 @@ int main(int argc, char **argv) {
     options.options = VALKEY_OPT_BLOCKING_INITIAL_UPDATE;
     options.onConnect = connectCallback;
     options.onDisconnect = disconnectCallback;
-    VALKEY_CLUSTER_OPTIONS_SET_ADAPTER_LIBUV(&options, loop);
+    valkeyClusterSetOptionUseLibuv(&options, loop);
 
     valkeyClusterAsyncContext *acc = valkeyClusterAsyncConnectWithOptions(&options);
     assert(acc);

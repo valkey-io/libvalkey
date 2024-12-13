@@ -203,22 +203,15 @@ static int valkeyLibuvAttachAdapter(valkeyAsyncContext *ac, void *loop) {
 }
 
 VALKEY_UNUSED
-static int valkeyClusterLibuvAttach(valkeyClusterAsyncContext *acc,
-                                    uv_loop_t *loop) {
-    if (acc == NULL || loop == NULL) {
+static int valkeyClusterSetOptionUseLibuv(valkeyClusterOptions *options,
+                                          uv_loop_t *loop) {
+    if (options == NULL || loop == NULL) {
         return VALKEY_ERR;
     }
 
-    acc->attach_fn = valkeyLibuvAttachAdapter;
-    acc->attach_data = loop;
+    options->attach_fn = valkeyLibuvAttachAdapter;
+    options->attach_data = loop;
     return VALKEY_OK;
 }
-
-/* Helper macro to initialize options. */
-#define VALKEY_CLUSTER_OPTIONS_SET_ADAPTER_LIBUV(opts, loop) \
-    do {                                                     \
-        (opts)->attach_fn = valkeyLibuvAttachAdapter;        \
-        (opts)->attach_data = loop;                          \
-    } while (0)
 
 #endif /* VALKEY_ADAPTERS_LIBUV_H */

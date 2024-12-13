@@ -55,7 +55,7 @@ int main(int argc, char **argv) {
     options.initial_nodes = "127.0.0.1:7000";
     options.onConnect = connectCallback;
     options.onDisconnect = disconnectCallback;
-    VALKEY_CLUSTER_OPTIONS_SET_ADAPTER_LIBEVENT(&options, base);
+    valkeyClusterSetOptionUseLibevent(&options, base);
 
     printf("Connecting...\n");
     valkeyClusterAsyncContext *acc = valkeyClusterAsyncConnectWithOptions(&options);

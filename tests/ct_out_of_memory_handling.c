@@ -452,7 +452,7 @@ void test_alloc_failure_handling_async(void) {
     options.onDisconnect = callbackExpectOk;
     options.options = VALKEY_OPT_USE_REPLICAS |
                       VALKEY_OPT_BLOCKING_INITIAL_UPDATE;
-    VALKEY_CLUSTER_OPTIONS_SET_ADAPTER_LIBEVENT(&options, base);
+    valkeyClusterSetOptionUseLibevent(&options, base);
 
     // Connect
     valkeyClusterAsyncContext *acc;

@@ -74,7 +74,7 @@ int main(void) {
     options.initial_nodes = CLUSTER_NODE;
     options.onConnect = connectCallback;
     options.onDisconnect = disconnectCallback;
-    VALKEY_CLUSTER_OPTIONS_SET_ADAPTER_LIBEVENT(&options, base);
+    valkeyClusterSetOptionUseLibevent(&options, base);
 
     valkeyClusterAsyncContext *acc = valkeyClusterAsyncContextInit(&options);
     assert(acc);

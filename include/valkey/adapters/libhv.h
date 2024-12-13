@@ -129,22 +129,15 @@ static int valkeyLibhvAttachAdapter(valkeyAsyncContext *ac, void *loop) {
 }
 
 VALKEY_UNUSED
-static int valkeyClusterLibhvAttach(valkeyClusterAsyncContext *acc,
-                                    hloop_t *loop) {
-    if (acc == NULL || loop == NULL) {
+static int valkeyClusterSetOptionUseLibhv(valkeyClusterOptions *options,
+                                          hloop_t *loop) {
+    if (options == NULL || loop == NULL) {
         return VALKEY_ERR;
     }
 
-    acc->attach_fn = valkeyLibhvAttachAdapter;
-    acc->attach_data = loop;
+    options->attach_fn = valkeyLibhvAttachAdapter;
+    options->attach_data = loop;
     return VALKEY_OK;
 }
-
-/* Helper macro to initialize options. */
-#define VALKEY_CLUSTER_OPTIONS_SET_ADAPTER_LIBHV(opts, loop) \
-    do {                                                     \
-        (opts)->attach_fn = valkeyLibhvAttachAdapter;        \
-        (opts)->attach_data = loop;                          \
-    } while (0)
 
 #endif /* VALKEY_ADAPTERS_LIBHV_H */

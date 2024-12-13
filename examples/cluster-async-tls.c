@@ -74,7 +74,7 @@ int main(int argc, char **argv) {
     valkeyClusterSetOptionEnableTLS(&options, tls);
 
     struct event_base *base = event_base_new();
-    VALKEY_CLUSTER_OPTIONS_SET_ADAPTER_LIBEVENT(&options, base);
+    valkeyClusterSetOptionUseLibevent(&options, base);
 
     valkeyClusterAsyncContext *acc = valkeyClusterAsyncConnectWithOptions(&options);
     if (acc == NULL || acc->err != 0) {

@@ -323,7 +323,7 @@ void test_async_to_single_node(void) {
     options.max_retry_count = 1;
     options.onConnect = callbackExpectOk;
     options.onDisconnect = callbackExpectOk;
-    VALKEY_CLUSTER_OPTIONS_SET_ADAPTER_LIBEVENT(&options, base);
+    valkeyClusterSetOptionUseLibevent(&options, base);
 
     valkeyClusterAsyncContext *acc = valkeyClusterAsyncConnectWithOptions(&options);
     ASSERT_MSG(acc && acc->err == 0, acc ? acc->errstr : "OOM");
@@ -354,7 +354,7 @@ void test_async_formatted_to_single_node(void) {
     options.max_retry_count = 1;
     options.onConnect = callbackExpectOk;
     options.onDisconnect = callbackExpectOk;
-    VALKEY_CLUSTER_OPTIONS_SET_ADAPTER_LIBEVENT(&options, base);
+    valkeyClusterSetOptionUseLibevent(&options, base);
 
     valkeyClusterAsyncContext *acc = valkeyClusterAsyncConnectWithOptions(&options);
     ASSERT_MSG(acc && acc->err == 0, acc ? acc->errstr : "OOM");
@@ -386,7 +386,7 @@ void test_async_command_argv_to_single_node(void) {
     options.max_retry_count = 1;
     options.onConnect = callbackExpectOk;
     options.onDisconnect = callbackExpectOk;
-    VALKEY_CLUSTER_OPTIONS_SET_ADAPTER_LIBEVENT(&options, base);
+    valkeyClusterSetOptionUseLibevent(&options, base);
 
     valkeyClusterAsyncContext *acc = valkeyClusterAsyncConnectWithOptions(&options);
     ASSERT_MSG(acc && acc->err == 0, acc ? acc->errstr : "OOM");
@@ -418,7 +418,7 @@ void test_async_to_all_nodes(void) {
     options.max_retry_count = 1;
     options.onConnect = callbackExpectOk;
     options.onDisconnect = callbackExpectOk;
-    VALKEY_CLUSTER_OPTIONS_SET_ADAPTER_LIBEVENT(&options, base);
+    valkeyClusterSetOptionUseLibevent(&options, base);
 
     valkeyClusterAsyncContext *acc = valkeyClusterAsyncConnectWithOptions(&options);
     ASSERT_MSG(acc && acc->err == 0, acc ? acc->errstr : "OOM");
@@ -459,7 +459,7 @@ void test_async_transaction(void) {
     options.max_retry_count = 1;
     options.onConnect = callbackExpectOk;
     options.onDisconnect = callbackExpectOk;
-    VALKEY_CLUSTER_OPTIONS_SET_ADAPTER_LIBEVENT(&options, base);
+    valkeyClusterSetOptionUseLibevent(&options, base);
 
     valkeyClusterAsyncContext *acc = valkeyClusterAsyncConnectWithOptions(&options);
     ASSERT_MSG(acc && acc->err == 0, acc ? acc->errstr : "OOM");

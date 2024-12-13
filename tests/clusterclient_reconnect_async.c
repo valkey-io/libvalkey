@@ -100,7 +100,7 @@ int main(int argc, char **argv) {
     options.initial_nodes = initnode;
     options.options = VALKEY_OPT_USE_CLUSTER_SLOTS |
                       VALKEY_OPT_BLOCKING_INITIAL_UPDATE;
-    VALKEY_CLUSTER_OPTIONS_SET_ADAPTER_LIBEVENT(&options, base);
+    valkeyClusterSetOptionUseLibevent(&options, base);
 
     valkeyClusterAsyncContext *acc = valkeyClusterAsyncContextInit(&options);
     assert(acc);

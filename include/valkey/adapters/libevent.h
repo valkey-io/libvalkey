@@ -182,22 +182,15 @@ static int valkeyLibeventAttachAdapter(valkeyAsyncContext *ac, void *base) {
 }
 
 VALKEY_UNUSED
-static int valkeyClusterLibeventAttach(valkeyClusterAsyncContext *acc,
-                                       struct event_base *base) {
-    if (acc == NULL || base == NULL) {
+static int valkeyClusterSetOptionUseLibevent(valkeyClusterOptions *options,
+                                             struct event_base *base) {
+    if (options == NULL || base == NULL) {
         return VALKEY_ERR;
     }
 
-    acc->attach_fn = valkeyLibeventAttachAdapter;
-    acc->attach_data = base;
+    options->attach_fn = valkeyLibeventAttachAdapter;
+    options->attach_data = base;
     return VALKEY_OK;
 }
-
-/* Helper macro to initialize options. */
-#define VALKEY_CLUSTER_OPTIONS_SET_ADAPTER_LIBEVENT(opts, event_base) \
-    do {                                                              \
-        (opts)->attach_fn = valkeyLibeventAttachAdapter;              \
-        (opts)->attach_data = event_base;                             \
-    } while (0)
 
 #endif /* VALKEY_ADAPTERS_LIBEVENT_H */

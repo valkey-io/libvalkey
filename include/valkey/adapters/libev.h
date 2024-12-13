@@ -193,22 +193,15 @@ static int valkeyLibevAttachAdapter(valkeyAsyncContext *ac, void *loop) {
 }
 
 VALKEY_UNUSED
-static int valkeyClusterLibevAttach(valkeyClusterAsyncContext *acc,
-                                    struct ev_loop *loop) {
-    if (acc == NULL || loop == NULL) {
+static int valkeyClusterSetOptionUseLibev(valkeyClusterOptions *options,
+                                          struct ev_loop *loop) {
+    if (options == NULL || loop == NULL) {
         return VALKEY_ERR;
     }
 
-    acc->attach_fn = valkeyLibevAttachAdapter;
-    acc->attach_data = loop;
+    options->attach_fn = valkeyLibevAttachAdapter;
+    options->attach_data = loop;
     return VALKEY_OK;
 }
-
-/* Helper macro to initialize options. */
-#define VALKEY_CLUSTER_OPTIONS_SET_ADAPTER_LIBEV(opts, loop) \
-    do {                                                     \
-        (opts)->attach_fn = valkeyLibevAttachAdapter;        \
-        (opts)->attach_data = loop;                          \
-    } while (0)
 
 #endif /* VALKEY_ADAPTERS_LIBEV_H */

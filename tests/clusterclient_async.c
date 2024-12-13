@@ -265,7 +265,7 @@ int main(int argc, char **argv) {
         options.onConnect = connectCallback;
         options.onDisconnect = disconnectCallback;
     }
-    VALKEY_CLUSTER_OPTIONS_SET_ADAPTER_LIBEVENT(&options, base);
+    valkeyClusterSetOptionUseLibevent(&options, base);
 
     valkeyClusterAsyncContext *acc = valkeyClusterAsyncConnectWithOptions(&options);
     if (acc == NULL || acc->err != 0) {

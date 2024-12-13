@@ -90,19 +90,13 @@ static int valkeyIvykisAttachAdapter(valkeyAsyncContext *ac, VALKEY_UNUSED void 
 }
 
 VALKEY_UNUSED
-static int valkeyClusterIvykisAttach(valkeyClusterAsyncContext *acc) {
-    if (acc == NULL) {
+static int valkeyClusterSetOptionUseIvykis(valkeyClusterOptions *options) {
+    if (options == NULL) {
         return VALKEY_ERR;
     }
 
-    acc->attach_fn = valkeyIvykisAttachAdapter;
+    options->attach_fn = valkeyIvykisAttachAdapter;
     return VALKEY_OK;
 }
-
-/* Helper macro to initialize options. */
-#define VALKEY_CLUSTER_OPTIONS_SET_ADAPTER_IVYKIS(opts) \
-    do {                                                \
-        (opts)->attach_fn = valkeyAeAttachAdapter;      \
-    } while (0)
 
 #endif /* VALKEY_ADAPTERS_IVYKIS_H */

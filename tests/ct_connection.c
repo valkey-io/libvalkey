@@ -297,7 +297,7 @@ void test_async_password_ok(void) {
     options.password = CLUSTER_PASSWORD;
     options.onConnect = callbackExpectOk;
     options.onDisconnect = callbackExpectOk;
-    VALKEY_CLUSTER_OPTIONS_SET_ADAPTER_LIBEVENT(&options, base);
+    valkeyClusterSetOptionUseLibevent(&options, base);
 
     valkeyClusterAsyncContext *acc = valkeyClusterAsyncConnectWithOptions(&options);
     ASSERT_MSG(acc && acc->err == 0, acc ? acc->errstr : "OOM");
@@ -323,7 +323,7 @@ void test_async_password_wrong(void) {
     options.initial_nodes = CLUSTER_NODE_WITH_PASSWORD;
     options.options = VALKEY_OPT_BLOCKING_INITIAL_UPDATE;
     options.password = "faultypass";
-    VALKEY_CLUSTER_OPTIONS_SET_ADAPTER_LIBEVENT(&options, base);
+    valkeyClusterSetOptionUseLibevent(&options, base);
 
     valkeyClusterAsyncContext *acc = valkeyClusterAsyncConnectWithOptions(&options);
     assert(acc);
@@ -354,7 +354,7 @@ void test_async_password_missing(void) {
     options.options = VALKEY_OPT_BLOCKING_INITIAL_UPDATE;
     options.onConnect = callbackExpectOk;
     options.onDisconnect = callbackExpectOk;
-    VALKEY_CLUSTER_OPTIONS_SET_ADAPTER_LIBEVENT(&options, base);
+    valkeyClusterSetOptionUseLibevent(&options, base);
     // Password not configured
 
     valkeyClusterAsyncContext *acc = valkeyClusterAsyncConnectWithOptions(&options);
@@ -387,7 +387,7 @@ void test_async_username_ok(void) {
     options.onDisconnect = callbackExpectOk;
     options.username = "missing-user";
     options.password = CLUSTER_PASSWORD;
-    VALKEY_CLUSTER_OPTIONS_SET_ADAPTER_LIBEVENT(&options, base);
+    valkeyClusterSetOptionUseLibevent(&options, base);
 
     // Connect using wrong username should fail
     valkeyClusterAsyncContext *acc = valkeyClusterAsyncConnectWithOptions(&options);
@@ -426,7 +426,7 @@ void test_async_multicluster(void) {
     options1.options = VALKEY_OPT_BLOCKING_INITIAL_UPDATE;
     options1.onConnect = callbackExpectOk;
     options1.onDisconnect = callbackExpectOk;
-    VALKEY_CLUSTER_OPTIONS_SET_ADAPTER_LIBEVENT(&options1, base);
+    valkeyClusterSetOptionUseLibevent(&options1, base);
 
     // Connect to first cluster
     valkeyClusterAsyncContext *acc1 = valkeyClusterAsyncConnectWithOptions(&options1);
@@ -438,7 +438,7 @@ void test_async_multicluster(void) {
     options2.password = CLUSTER_PASSWORD;
     options2.onConnect = callbackExpectOk;
     options2.onDisconnect = callbackExpectOk;
-    VALKEY_CLUSTER_OPTIONS_SET_ADAPTER_LIBEVENT(&options2, base);
+    valkeyClusterSetOptionUseLibevent(&options2, base);
 
     // Connect to second cluster
     valkeyClusterAsyncContext *acc2 = valkeyClusterAsyncConnectWithOptions(&options2);
@@ -487,7 +487,7 @@ void test_async_connect_timeout(void) {
     options.initial_nodes = "192.168.0.0:7000";
     options.options = VALKEY_OPT_BLOCKING_INITIAL_UPDATE;
     options.connect_timeout = &timeout;
-    VALKEY_CLUSTER_OPTIONS_SET_ADAPTER_LIBEVENT(&options, base);
+    valkeyClusterSetOptionUseLibevent(&options, base);
 
     valkeyClusterAsyncContext *acc = valkeyClusterAsyncConnectWithOptions(&options);
     assert(acc);
@@ -509,7 +509,7 @@ void test_async_command_timeout(void) {
     options.initial_nodes = CLUSTER_NODE;
     options.options = VALKEY_OPT_BLOCKING_INITIAL_UPDATE;
     options.command_timeout = &timeout;
-    VALKEY_CLUSTER_OPTIONS_SET_ADAPTER_LIBEVENT(&options, base);
+    valkeyClusterSetOptionUseLibevent(&options, base);
 
     valkeyClusterAsyncContext *acc = valkeyClusterAsyncConnectWithOptions(&options);
     ASSERT_MSG(acc && acc->err == 0, acc ? acc->errstr : "OOM");

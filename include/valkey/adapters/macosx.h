@@ -149,22 +149,15 @@ static int valkeyMacOSAttachAdapter(valkeyAsyncContext *ac, void *loop) {
 }
 
 VALKEY_UNUSED
-static int valkeyClusterMacOSAttach(valkeyClusterAsyncContext *acc,
-                                    CFRunLoopRef loop) {
-    if (acc == NULL || loop == NULL) {
+static int valkeyClusterSetOptionUseMacOS(valkeyClusterOptions *options,
+                                          CFRunLoopRef loop) {
+    if (options == NULL || loop == NULL) {
         return VALKEY_ERR;
     }
 
-    acc->attach_fn = valkeyMacOSAttachAdapter;
-    acc->attach_data = loop;
+    options->attach_fn = valkeyMacOSAttachAdapter;
+    options->attach_data = loop;
     return VALKEY_OK;
 }
-
-/* Helper macro to initialize options. */
-#define VALKEY_CLUSTER_OPTIONS_SET_ADAPTER_MACOSX(opts, loop) \
-    do {                                                      \
-        (opts)->attach_fn = valkeyMacOSAttachAdapter;         \
-        (opts)->attach_data = loop;                           \
-    } while (0)
 
 #endif /* VALKEY_ADAPTERS_MACOSX_H */
