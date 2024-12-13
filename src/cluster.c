@@ -519,7 +519,7 @@ static dict *parse_cluster_slots(valkeyClusterContext *cc, valkeyReply *reply) {
     valkeyReply *elem_slots_begin, *elem_slots_end;
     valkeyReply *elem_nodes;
     valkeyReply *elem_ip, *elem_port;
-    valkeyClusterNode *master = NULL, *slave;
+    valkeyClusterNode *primary = NULL, *replica;
     uint32_t i, idx;
 
     if (reply->type != VALKEY_REPLY_ARRAY) {
@@ -599,12 +599,12 @@ static dict *parse_cluster_slots(valkeyClusterContext *cc, valkeyReply *reply) {
                     elem_port->type != VALKEY_REPLY_INTEGER) {
                     valkeyClusterSetError(cc, VALKEY_ERR_OTHER,
                                           "Command(cluster slots) reply error: "
-                                          "master ip or port is not correct.");
+                                          "ip or port is not correct.");
                     goto error;
                 }
 
-                // this is master.
                 if (idx == 2) {
+                    /* Parse a primary node. */
                     sds address = sdsnewlen(elem_ip->str, elem_ip->len);
                     if (address == NULL) {
                         goto oom;
@@ -616,11 +616,10 @@ static dict *parse_cluster_slots(valkeyClusterContext *cc, valkeyReply *reply) {
 
                     den = dictFind(nodes, address);
                     sdsfree(address);
-                    // master already exists, break to the next slots region.
                     if (den != NULL) {
-
-                        master = dictGetEntryVal(den);
-                        ret = cluster_slot_ref_node(slot, master);
+                        /* Skip parsing this primary node since it's already known. */
+                        primary = dictGetEntryVal(den);
+                        ret = cluster_slot_ref_node(slot, primary);
                         if (ret != VALKEY_OK) {
                             goto oom;
                         }
@@ -629,50 +628,50 @@ static dict *parse_cluster_slots(valkeyClusterContext *cc, valkeyReply *reply) {
                         break;
                     }
 
-                    master = node_get_with_slots(cc, elem_ip, elem_port,
-                                                 VALKEY_ROLE_PRIMARY);
-                    if (master == NULL) {
+                    primary = node_get_with_slots(cc, elem_ip, elem_port,
+                                                  VALKEY_ROLE_PRIMARY);
+                    if (primary == NULL) {
                         goto error;
                     }
 
-                    sds key = sdsnewlen(master->addr, sdslen(master->addr));
+                    sds key = sdsnewlen(primary->addr, sdslen(primary->addr));
                     if (key == NULL) {
-                        freeValkeyClusterNode(master);
+                        freeValkeyClusterNode(primary);
                         goto oom;
                     }
 
-                    ret = dictAdd(nodes, key, master);
+                    ret = dictAdd(nodes, key, primary);
                     if (ret != DICT_OK) {
                         sdsfree(key);
-                        freeValkeyClusterNode(master);
+                        freeValkeyClusterNode(primary);
                         goto oom;
                     }
 
-                    ret = cluster_slot_ref_node(slot, master);
+                    ret = cluster_slot_ref_node(slot, primary);
                     if (ret != VALKEY_OK) {
                         goto oom;
                     }
 
                     slot = NULL;
                 } else if (cc->flags & VALKEYCLUSTER_FLAG_ADD_SLAVE) {
-                    slave = node_get_with_slots(cc, elem_ip, elem_port,
-                                                VALKEY_ROLE_REPLICA);
-                    if (slave == NULL) {
+                    replica = node_get_with_slots(cc, elem_ip, elem_port,
+                                                  VALKEY_ROLE_REPLICA);
+                    if (replica == NULL) {
                         goto error;
                     }
 
-                    if (master->replicas == NULL) {
-                        master->replicas = listCreate();
-                        if (master->replicas == NULL) {
-                            freeValkeyClusterNode(slave);
+                    if (primary->replicas == NULL) {
+                        primary->replicas = listCreate();
+                        if (primary->replicas == NULL) {
+                            freeValkeyClusterNode(replica);
                             goto oom;
                         }
 
-                        master->replicas->free = listClusterNodeDestructor;
+                        primary->replicas->free = listClusterNodeDestructor;
                     }
 
-                    if (listAddNodeTail(master->replicas, slave) == NULL) {
-                        freeValkeyClusterNode(slave);
+                    if (listAddNodeTail(primary->replicas, replica) == NULL) {
+                        freeValkeyClusterNode(replica);
                         goto oom;
                     }
                 }
@@ -852,7 +851,7 @@ static int parse_cluster_nodes_line(valkeyClusterContext *cc, char *line,
     p++; // Skip separator character.
     node->port = vk_atoi(p, strlen(p));
 
-    /* No slot parsing needed for replicas, but return master id. */
+    /* No slot parsing needed for replicas, but return primary id. */
     if (node->role == VALKEY_ROLE_REPLICA) {
         *parsed_primary_id = primary_id;
         *parsed_node = node;
@@ -1124,19 +1123,19 @@ static int updateNodesAndSlotmap(valkeyClusterContext *cc, dict *nodes) {
 
     dictEntry *de;
     while ((de = dictNext(&di))) {
-        valkeyClusterNode *master = dictGetEntryVal(de);
-        if (master->role != VALKEY_ROLE_PRIMARY) {
+        valkeyClusterNode *node = dictGetEntryVal(de);
+        if (node->role != VALKEY_ROLE_PRIMARY) {
             valkeyClusterSetError(cc, VALKEY_ERR_OTHER,
-                                  "Node role must be master");
+                                  "Node role must be primary");
             goto error;
         }
 
-        if (master->slots == NULL) {
+        if (node->slots == NULL) {
             continue;
         }
 
         listIter li;
-        listRewind(master->slots, &li);
+        listRewind(node->slots, &li);
 
         listNode *ln;
         while ((ln = listNext(&li))) {
@@ -1152,7 +1151,7 @@ static int updateNodesAndSlotmap(valkeyClusterContext *cc, dict *nodes) {
                                           "Different node holds same slot");
                     goto error;
                 }
-                table[i] = master;
+                table[i] = node;
             }
         }
     }
@@ -1591,19 +1590,19 @@ int valkeyClusterSetOptionTimeout(valkeyClusterContext *cc,
                 }
 
                 if (node->replicas && listLength(node->replicas) > 0) {
-                    valkeyClusterNode *slave;
+                    valkeyClusterNode *replica;
                     listNode *ln;
 
                     listIter li;
                     listRewind(node->replicas, &li);
 
                     while ((ln = listNext(&li)) != NULL) {
-                        slave = listNodeValue(ln);
-                        if (slave->acon) {
-                            valkeyAsyncSetTimeout(slave->acon, tv);
+                        replica = listNodeValue(ln);
+                        if (replica->acon) {
+                            valkeyAsyncSetTimeout(replica->acon, tv);
                         }
-                        if (slave->con && slave->con->err == 0) {
-                            valkeySetTimeout(slave->con, tv);
+                        if (replica->con && replica->con->err == 0) {
+                            valkeySetTimeout(replica->con, tv);
                         }
                     }
                 }
