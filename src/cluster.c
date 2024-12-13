@@ -275,7 +275,7 @@ static void freeValkeyClusterNode(valkeyClusterNode *node) {
         valkeyAsyncFree(node->acon);
     }
     listRelease(node->slots);
-    listRelease(node->slaves);
+    listRelease(node->replicas);
     vk_free(node);
 }
 
@@ -661,17 +661,17 @@ static dict *parse_cluster_slots(valkeyClusterContext *cc, valkeyReply *reply) {
                         goto error;
                     }
 
-                    if (master->slaves == NULL) {
-                        master->slaves = listCreate();
-                        if (master->slaves == NULL) {
+                    if (master->replicas == NULL) {
+                        master->replicas = listCreate();
+                        if (master->replicas == NULL) {
                             freeValkeyClusterNode(slave);
                             goto oom;
                         }
 
-                        master->slaves->free = listClusterNodeDestructor;
+                        master->replicas->free = listClusterNodeDestructor;
                     }
 
-                    if (listAddNodeTail(master->slaves, slave) == NULL) {
+                    if (listAddNodeTail(master->replicas, slave) == NULL) {
                         freeValkeyClusterNode(slave);
                         goto oom;
                     }
@@ -740,9 +740,9 @@ static int store_replica_nodes(dict *nodes, dict *replicas) {
         /* Move replica nodes related to this primary. */
         dictEntry *der = dictFind(replicas, primary->name);
         if (der != NULL) {
-            assert(primary->slaves == NULL);
+            assert(primary->replicas == NULL);
             /* Move replica list from replicas dict to nodes dict. */
-            primary->slaves = dictGetEntryVal(der);
+            primary->replicas = dictGetEntryVal(der);
             dictSetHashVal(replicas, der, NULL);
         }
     }
@@ -1590,12 +1590,12 @@ int valkeyClusterSetOptionTimeout(valkeyClusterContext *cc,
                     valkeySetTimeout(node->con, tv);
                 }
 
-                if (node->slaves && listLength(node->slaves) > 0) {
+                if (node->replicas && listLength(node->replicas) > 0) {
                     valkeyClusterNode *slave;
                     listNode *ln;
 
                     listIter li;
-                    listRewind(node->slaves, &li);
+                    listRewind(node->replicas, &li);
 
                     while ((ln = listNext(&li)) != NULL) {
                         slave = listNodeValue(ln);

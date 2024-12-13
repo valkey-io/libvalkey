@@ -84,13 +84,13 @@ typedef struct valkeyClusterNode {
     valkeyAsyncContext *acon;
     int64_t lastConnectionAttempt; /* Timestamp */
     struct hilist *slots;
-    struct hilist *slaves;
+    struct hilist *replicas;
 } valkeyClusterNode;
 
 typedef struct cluster_slot {
     uint32_t start;
     uint32_t end;
-    valkeyClusterNode *node; /* master that this slot region belong to */
+    valkeyClusterNode *node; /* Owner of slot region. */
 } cluster_slot;
 
 /* Context for accessing a Valkey Cluster */
