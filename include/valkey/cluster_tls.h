@@ -40,7 +40,7 @@ extern "C" {
 /**
  * Configuration option to enable TLS negotiation on a context.
  */
-int valkeyClusterSetOptionEnableTLS(valkeyClusterContext *cc,
+int valkeyClusterSetOptionEnableTLS(valkeyClusterOptions *options,
                                     valkeyTLSContext *tls);
 
 #ifdef __cplusplus

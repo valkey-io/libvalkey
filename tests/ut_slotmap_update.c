@@ -36,13 +36,14 @@ valkeyReply *create_cluster_nodes_reply(const char *bulkstr) {
 
 /* Parse a cluster nodes reply from a basic deployment. */
 void test_parse_cluster_nodes(bool parse_replicas) {
-    valkeyClusterContext *cc = valkeyClusterContextInit();
+    valkeyClusterOptions options = {0};
+    if (parse_replicas)
+        options.options |= VALKEY_OPT_USE_REPLICAS;
+
+    valkeyClusterContext *cc = valkeyClusterContextInit(&options);
     valkeyClusterNode *node;
     cluster_slot *slot;
     dictIterator di;
-
-    if (parse_replicas)
-        cc->flags |= VALKEYCLUSTER_FLAG_ADD_SLAVE;
 
     valkeyReply *reply = create_cluster_nodes_reply(
         "07c37dfeb235213a872192d90877d0cd55635b91 127.0.0.1:30004@31004,hostname4 slave e7d1eecce10fd6bb5eb35b9f99a514335d9ba9ca 0 1426238317239 4 connected\n"
@@ -120,7 +121,8 @@ void test_parse_cluster_nodes(bool parse_replicas) {
 }
 
 void test_parse_cluster_nodes_during_failover(void) {
-    valkeyClusterContext *cc = valkeyClusterContextInit();
+    valkeyClusterOptions options = {0};
+    valkeyClusterContext *cc = valkeyClusterContextInit(&options);
     valkeyClusterNode *node;
     cluster_slot *slot;
     dictIterator di;
@@ -183,7 +185,8 @@ void test_parse_cluster_nodes_during_failover(void) {
 
 /* Skip nodes with no address, i.e with address :0 */
 void test_parse_cluster_nodes_with_noaddr(void) {
-    valkeyClusterContext *cc = valkeyClusterContextInit();
+    valkeyClusterOptions options = {0};
+    valkeyClusterContext *cc = valkeyClusterContextInit(&options);
     valkeyClusterNode *node;
     dictIterator di;
 
@@ -210,7 +213,8 @@ void test_parse_cluster_nodes_with_noaddr(void) {
 
 /* Parse replies with additional importing and migrating information. */
 void test_parse_cluster_nodes_with_special_slot_entries(void) {
-    valkeyClusterContext *cc = valkeyClusterContextInit();
+    valkeyClusterOptions options = {0};
+    valkeyClusterContext *cc = valkeyClusterContextInit(&options);
     valkeyClusterNode *node;
     cluster_slot *slot;
     dictIterator di;
@@ -248,13 +252,14 @@ void test_parse_cluster_nodes_with_special_slot_entries(void) {
 
 /* Parse a cluster nodes reply containing a primary with multiple replicas. */
 void test_parse_cluster_nodes_with_multiple_replicas(void) {
-    valkeyClusterContext *cc = valkeyClusterContextInit();
+    valkeyClusterOptions options = {0};
+    valkeyClusterContext *cc = valkeyClusterContextInit(&options);
     valkeyClusterNode *node;
     cluster_slot *slot;
     dictIterator di;
     listIter li;
 
-    cc->flags |= VALKEYCLUSTER_FLAG_ADD_SLAVE;
+    cc->flags |= VALKEY_FLAG_PARSE_REPLICAS;
 
     valkeyReply *reply = create_cluster_nodes_reply(
         "07c37dfeb235213a872192d90877d0cd55635b91 127.0.0.1:30004@31004,hostname4 slave e7d1eecce10fd6bb5eb35b9f99a514335d9ba9ca 0 1426238317239 4 connected\n"
@@ -311,7 +316,8 @@ void test_parse_cluster_nodes_with_multiple_replicas(void) {
 
 /* Give error when parsing erroneous data. */
 void test_parse_cluster_nodes_with_parse_error(void) {
-    valkeyClusterContext *cc = valkeyClusterContextInit();
+    valkeyClusterOptions options = {0};
+    valkeyClusterContext *cc = valkeyClusterContextInit(&options);
     valkeyReply *reply;
     dict *nodes;
 
@@ -348,7 +354,8 @@ void test_parse_cluster_nodes_with_parse_error(void) {
 /* Redis pre-v4.0 returned node addresses without the clusterbus port,
  * i.e. `ip:port` instead of `ip:port@cport` */
 void test_parse_cluster_nodes_with_legacy_format(void) {
-    valkeyClusterContext *cc = valkeyClusterContextInit();
+    valkeyClusterOptions options = {0};
+    valkeyClusterContext *cc = valkeyClusterContextInit(&options);
     valkeyClusterNode *node;
     dictIterator di;
 

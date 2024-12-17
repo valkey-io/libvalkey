@@ -169,6 +169,7 @@ enum valkeyConnectionType {
 #define VALKEY_OPT_PREFER_IPV4 0x20       /* Prefer IPv4 in DNS lookups. */
 #define VALKEY_OPT_PREFER_IPV6 0x40       /* Prefer IPv6 in DNS lookups. */
 #define VALKEY_OPT_PREFER_IP_UNSPEC (VALKEY_OPT_PREFER_IPV4 | VALKEY_OPT_PREFER_IPV6)
+#define VALKEY_OPT_LAST_SA_OPTION 0x40 /* Last defined standalone option. */
 
 /* In Unix systems a file descriptor is a regular signed int, with -1
  * representing an invalid descriptor. In Windows it is a SOCKET

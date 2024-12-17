@@ -88,18 +88,19 @@ int main(int argc, char **argv) {
 
     struct timeval timeout = {1, 500000}; // 1.5s
 
-    valkeyClusterContext *cc = valkeyClusterContextInit();
-    valkeyClusterSetOptionAddNodes(cc, initnode);
-    valkeyClusterSetOptionConnectTimeout(cc, timeout);
+    valkeyClusterOptions options = {0};
+    options.initial_nodes = initnode;
+    options.connect_timeout = &timeout;
     if (use_cluster_slots) {
-        valkeyClusterSetOptionRouteUseSlots(cc);
+        options.options = VALKEY_OPT_USE_CLUSTER_SLOTS;
     }
     if (show_events) {
-        valkeyClusterSetEventCallback(cc, eventCallback, NULL);
+        options.event_callback = eventCallback;
     }
 
-    if (valkeyClusterConnect2(cc) != VALKEY_OK) {
-        printf("Connect error: %s\n", cc->errstr);
+    valkeyClusterContext *cc = valkeyClusterConnectWithOptions(&options);
+    if (cc == NULL || cc->err) {
+        printf("Connect error: %s\n", cc ? cc->errstr : "OOM");
         exit(2);
     }
 
