@@ -2100,23 +2100,23 @@ static int prepareCommand(valkeyClusterContext *cc, struct cmd *command) {
     return VALKEY_OK;
 }
 
-int valkeyClusterSetConnectCallback(valkeyClusterContext *cc,
-                                    void(fn)(const valkeyContext *c,
-                                             int status)) {
-    if (cc->on_connect == NULL) {
-        cc->on_connect = fn;
+int valkeyClusterSetOptionConnectCallback(valkeyClusterOptions *options,
+                                          void(fn)(const valkeyContext *c,
+                                                   int status)) {
+    if (options->connect_callback == NULL) {
+        options->connect_callback = fn;
         return VALKEY_OK;
     }
     return VALKEY_ERR;
 }
 
-int valkeyClusterSetEventCallback(valkeyClusterContext *cc,
-                                  void(fn)(const valkeyClusterContext *cc,
-                                           int event, void *privdata),
-                                  void *privdata) {
-    if (cc->event_callback == NULL) {
-        cc->event_callback = fn;
-        cc->event_privdata = privdata;
+int valkeyClusterSetOptionEventCallback(valkeyClusterOptions *options,
+                                        void(fn)(const valkeyClusterContext *cc,
+                                                 int event, void *privdata),
+                                        void *privdata) {
+    if (options->event_callback == NULL) {
+        options->event_callback = fn;
+        options->event_privdata = privdata;
         return VALKEY_OK;
     }
     return VALKEY_ERR;

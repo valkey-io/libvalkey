@@ -208,15 +208,15 @@ int valkeyClusterSetOptionTimeout(valkeyClusterContext *cc, const struct timeval
  * On failed connection attempt, this callback is called with `status` set to
  * `VALKEY_ERR`. The `err` field in the `valkeyContext` can be used to find out
  * the cause of the error. */
-int valkeyClusterSetConnectCallback(valkeyClusterContext *cc,
-                                    void(fn)(const valkeyContext *c,
-                                             int status));
+int valkeyClusterSetOptionConnectCallback(valkeyClusterOptions *options,
+                                          void(fn)(const valkeyContext *c,
+                                                   int status));
 
 /* A hook for events. */
-int valkeyClusterSetEventCallback(valkeyClusterContext *cc,
-                                  void(fn)(const valkeyClusterContext *cc,
-                                           int event, void *privdata),
-                                  void *privdata);
+int valkeyClusterSetOptionEventCallback(valkeyClusterOptions *options,
+                                        void(fn)(const valkeyClusterContext *cc,
+                                                 int event, void *privdata),
+                                        void *privdata);
 
 /* Blocking
  * The following functions will block for a reply, or return NULL if there was
