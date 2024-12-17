@@ -180,9 +180,9 @@ typedef struct {
     void *attach_data;
 
     /* Async API callbacks. */
-    valkeyConnectCallback *onConnect;
-    valkeyConnectCallbackNC *onConnectNC;
-    valkeyDisconnectCallback *onDisconnect;
+    valkeyConnectCallback *async_connect_cb;
+    valkeyConnectCallbackNC *async_connect_nc_cb; /* non-const callback */
+    valkeyDisconnectCallback *async_disconnect_cb;
 } valkeyClusterOptions;
 
 /*

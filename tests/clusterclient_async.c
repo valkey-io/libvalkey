@@ -262,8 +262,8 @@ int main(int argc, char **argv) {
         options.event_callback = eventCallback;
     }
     if (show_connection_events) {
-        options.onConnect = connectCallback;
-        options.onDisconnect = disconnectCallback;
+        options.async_connect_cb = connectCallback;
+        options.async_disconnect_cb = disconnectCallback;
     }
     valkeyClusterSetOptionUseLibevent(&options, base);
 

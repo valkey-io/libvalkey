@@ -321,8 +321,8 @@ void test_async_to_single_node(void) {
     options.options = VALKEY_OPT_USE_CLUSTER_SLOTS |
                       VALKEY_OPT_BLOCKING_INITIAL_UPDATE;
     options.max_retry_count = 1;
-    options.onConnect = callbackExpectOk;
-    options.onDisconnect = callbackExpectOk;
+    options.async_connect_cb = callbackExpectOk;
+    options.async_disconnect_cb = callbackExpectOk;
     valkeyClusterSetOptionUseLibevent(&options, base);
 
     valkeyClusterAsyncContext *acc = valkeyClusterAsyncConnectWithOptions(&options);
@@ -352,8 +352,8 @@ void test_async_formatted_to_single_node(void) {
     options.options = VALKEY_OPT_USE_CLUSTER_SLOTS |
                       VALKEY_OPT_BLOCKING_INITIAL_UPDATE;
     options.max_retry_count = 1;
-    options.onConnect = callbackExpectOk;
-    options.onDisconnect = callbackExpectOk;
+    options.async_connect_cb = callbackExpectOk;
+    options.async_disconnect_cb = callbackExpectOk;
     valkeyClusterSetOptionUseLibevent(&options, base);
 
     valkeyClusterAsyncContext *acc = valkeyClusterAsyncConnectWithOptions(&options);
@@ -384,8 +384,8 @@ void test_async_command_argv_to_single_node(void) {
     options.options = VALKEY_OPT_USE_CLUSTER_SLOTS |
                       VALKEY_OPT_BLOCKING_INITIAL_UPDATE;
     options.max_retry_count = 1;
-    options.onConnect = callbackExpectOk;
-    options.onDisconnect = callbackExpectOk;
+    options.async_connect_cb = callbackExpectOk;
+    options.async_disconnect_cb = callbackExpectOk;
     valkeyClusterSetOptionUseLibevent(&options, base);
 
     valkeyClusterAsyncContext *acc = valkeyClusterAsyncConnectWithOptions(&options);
@@ -416,8 +416,8 @@ void test_async_to_all_nodes(void) {
     options.options = VALKEY_OPT_USE_CLUSTER_SLOTS |
                       VALKEY_OPT_BLOCKING_INITIAL_UPDATE;
     options.max_retry_count = 1;
-    options.onConnect = callbackExpectOk;
-    options.onDisconnect = callbackExpectOk;
+    options.async_connect_cb = callbackExpectOk;
+    options.async_disconnect_cb = callbackExpectOk;
     valkeyClusterSetOptionUseLibevent(&options, base);
 
     valkeyClusterAsyncContext *acc = valkeyClusterAsyncConnectWithOptions(&options);
@@ -457,8 +457,8 @@ void test_async_transaction(void) {
     options.options = VALKEY_OPT_USE_CLUSTER_SLOTS |
                       VALKEY_OPT_BLOCKING_INITIAL_UPDATE;
     options.max_retry_count = 1;
-    options.onConnect = callbackExpectOk;
-    options.onDisconnect = callbackExpectOk;
+    options.async_connect_cb = callbackExpectOk;
+    options.async_disconnect_cb = callbackExpectOk;
     valkeyClusterSetOptionUseLibevent(&options, base);
 
     valkeyClusterAsyncContext *acc = valkeyClusterAsyncConnectWithOptions(&options);

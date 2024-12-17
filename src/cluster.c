@@ -2803,14 +2803,14 @@ valkeyClusterAsyncContext *valkeyClusterAsyncContextInit(const valkeyClusterOpti
         return NULL;
     }
 
-    if (options->onConnect != NULL) {
-        acc->onConnect = options->onConnect;
+    if (options->async_connect_cb != NULL) {
+        acc->onConnect = options->async_connect_cb;
     }
-    if (options->onConnectNC != NULL) {
-        acc->onConnectNC = options->onConnectNC;
+    if (options->async_connect_nc_cb != NULL) {
+        acc->onConnectNC = options->async_connect_nc_cb;
     }
-    if (options->onDisconnect != NULL) {
-        acc->onDisconnect = options->onDisconnect;
+    if (options->async_disconnect_cb != NULL) {
+        acc->onDisconnect = options->async_disconnect_cb;
     }
     if (options->attach_fn != NULL) {
         acc->attach_fn = options->attach_fn;
