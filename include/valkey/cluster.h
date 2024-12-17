@@ -168,12 +168,14 @@ typedef struct {
     void *tls;
     int (*tls_init_fn)(struct valkeyContext *, struct valkeyTLSContext *);
 
-    /* Synchronous API callbacks */
-    void (*connect_callback)(const valkeyContext *c,
-                             int status);
+    /* Common callbacks. */
     void (*event_callback)(const struct valkeyClusterContext *cc, int event,
                            void *privdata);
     void *event_privdata;
+
+    /* Synchronous API callbacks */
+    void (*connect_callback)(const valkeyContext *c,
+                             int status);
 
     /* Async API event engine adapter.  */
     int (*attach_fn)(valkeyAsyncContext *ac, void *attach_data);
@@ -195,9 +197,6 @@ valkeyClusterContext *valkeyClusterConnectWithTimeout(const char *addrs,
                                                       const struct timeval tv);
 void valkeyClusterFree(valkeyClusterContext *cc);
 
-/* Options configurable in runtime. */
-int valkeyClusterSetOptionTimeout(valkeyClusterContext *cc, const struct timeval tv);
-
 /* A hook for connect and reconnect attempts, e.g. for applying additional
  * socket options. This is called just after connect, before TLS handshake and
  * Valkey authentication.
@@ -217,6 +216,9 @@ int valkeyClusterSetOptionEventCallback(valkeyClusterOptions *options,
                                         void(fn)(const valkeyClusterContext *cc,
                                                  int event, void *privdata),
                                         void *privdata);
+
+/* Options configurable in runtime. */
+int valkeyClusterSetOptionTimeout(valkeyClusterContext *cc, const struct timeval tv);
 
 /* Blocking
  * The following functions will block for a reply, or return NULL if there was
