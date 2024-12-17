@@ -152,7 +152,7 @@ int main(int argc, char **argv) {
     assert(acc);
 
     int status;
-    status = valkeyClusterSetEventCallback(acc->cc, eventCallback, acc);
+    status = valkeyClusterAsyncSetEventCallback(acc, eventCallback, acc);
     assert(status == VALKEY_OK);
 
     status = valkeyClusterAsyncConnect(acc);

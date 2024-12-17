@@ -80,7 +80,7 @@ int main(void) {
     assert(acc);
 
     /* Set an event callback that uses acc as privdata */
-    int status = valkeyClusterSetEventCallback(acc->cc, eventCallback, acc);
+    int status = valkeyClusterAsyncSetEventCallback(acc, eventCallback, acc);
     assert(status == VALKEY_OK);
 
     status = valkeyClusterAsyncConnect(acc);
