@@ -299,9 +299,9 @@ int valkeyClusterAsyncSetConnectCallbackNC(valkeyClusterAsyncContext *acc,
 int valkeyClusterAsyncSetDisconnectCallback(valkeyClusterAsyncContext *acc,
                                             valkeyDisconnectCallback *fn);
 int valkeyClusterAsyncSetEventCallback(valkeyClusterAsyncContext *acc,
-                                        void(fn)(const valkeyClusterContext *cc,
-                                                 int event, void *privdata),
-                                        void *privdata);
+                                       void(fn)(const valkeyClusterContext *cc,
+                                                int event, void *privdata),
+                                       void *privdata);
 
 /* Commands */
 int valkeyClusterAsyncCommand(valkeyClusterAsyncContext *acc,
