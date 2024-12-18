@@ -23,17 +23,9 @@ void setCallback(valkeyClusterAsyncContext *acc, void *r, void *privdata) {
     ASSERT_MSG(reply != NULL, acc->errstr);
 }
 
-void connectCallback(const valkeyAsyncContext *ac, int status) {
+void connectCallback(valkeyAsyncContext *ac, int status) {
     ASSERT_MSG(status == VALKEY_OK, ac->errstr);
     printf("Connected to %s:%d\n", ac->c.tcp.host, ac->c.tcp.port);
-}
-
-void connectCallbackNC(valkeyAsyncContext *ac, int status) {
-    UNUSED(ac);
-    UNUSED(status);
-    /* The testcase expects a failure during registration of this
-       non-const connect callback and it should never be called. */
-    assert(0);
 }
 
 void disconnectCallback(const valkeyAsyncContext *ac, int status) {
@@ -76,8 +68,6 @@ int main(void) {
     status = valkeyClusterAsyncSetConnectCallback(acc, connectCallback);
     assert(status == VALKEY_OK);
     status = valkeyClusterAsyncSetConnectCallback(acc, connectCallback);
-    assert(status == VALKEY_ERR); /* Re-registration not accepted */
-    status = valkeyClusterAsyncSetConnectCallbackNC(acc, connectCallbackNC);
     assert(status == VALKEY_ERR); /* Re-registration not accepted */
 
     status = valkeyClusterAsyncSetDisconnectCallback(acc, disconnectCallback);

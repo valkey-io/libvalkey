@@ -8,7 +8,7 @@
 static GMainLoop *mainloop;
 
 static void
-connect_cb(const valkeyAsyncContext *ac G_GNUC_UNUSED,
+connect_cb(valkeyAsyncContext *ac G_GNUC_UNUSED,
            int status) {
     if (status != VALKEY_OK) {
         g_printerr("Failed to connect: %s\n", ac->errstr);

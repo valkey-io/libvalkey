@@ -33,7 +33,7 @@ void getCallback(valkeyAsyncContext *c, void *r, void *privdata) {
     valkeyAsyncCommand(c, debugCallback, NULL, "DEBUG SLEEP %f", 1.5);
 }
 
-void connectCallback(const valkeyAsyncContext *c, int status) {
+void connectCallback(valkeyAsyncContext *c, int status) {
     if (status != VALKEY_OK) {
         printf("connect error: %s\n", c->errstr);
         return;
