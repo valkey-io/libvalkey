@@ -298,19 +298,7 @@ status = valkeyClusterAsyncSetConnectCallback(acc, callbackFn);
 status = valkeyClusterAsyncSetDisconnectCallback(acc, callbackFn);
 ```
 
-The callback functions should have the following prototype, aliased to `valkeyConnectCallback`:
-
-```c
-void(const valkeyAsyncContext *ac, int status);
-```
-
-Alternatively, you set a connect callback that will be passed a non-const `valkeyAsyncContext*` on invocation (e.g. to be able to set a push callback on it).
-
-```c
-status = valkeyClusterAsyncSetConnectCallbackNC(acc, nonConstCallbackFn);
-```
-
-The callback function should have the following prototype, aliased to `valkeyConnectCallbackNC`:
+The connect callback function should have the following prototype, aliased to `valkeyConnectCallback`:
 ```c
 void(valkeyAsyncContext *ac, int status);
 ```

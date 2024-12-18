@@ -2784,8 +2784,6 @@ valkeyClusterGetValkeyAsyncContext(valkeyClusterAsyncContext *acc,
 
     if (acc->onConnect) {
         valkeyAsyncSetConnectCallback(ac, acc->onConnect);
-    } else if (acc->onConnectNC) {
-        valkeyAsyncSetConnectCallbackNC(ac, acc->onConnectNC);
     }
 
     if (acc->onDisconnect) {
@@ -2849,18 +2847,7 @@ int valkeyClusterAsyncSetConnectCallback(valkeyClusterAsyncContext *acc,
                                          valkeyConnectCallback *fn) {
     if (acc->onConnect != NULL)
         return VALKEY_ERR;
-    if (acc->onConnectNC != NULL)
-        return VALKEY_ERR;
     acc->onConnect = fn;
-    return VALKEY_OK;
-}
-
-int valkeyClusterAsyncSetConnectCallbackNC(valkeyClusterAsyncContext *acc,
-                                           valkeyConnectCallbackNC *fn) {
-    if (acc->onConnectNC != NULL || acc->onConnect != NULL) {
-        return VALKEY_ERR;
-    }
-    acc->onConnectNC = fn;
     return VALKEY_OK;
 }
 

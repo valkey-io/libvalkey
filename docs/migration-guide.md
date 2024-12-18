@@ -19,6 +19,7 @@ The type `sds` is removed from the public API.
 
 * `redisFormatSdsCommandArgv` removed from API. Can be replaced with `valkeyFormatCommandArgv`.
 * `redisFreeSdsCommand` removed since the `sds` type is for internal use only.
+* `redisAsyncSetConnectCallbackNC` removed and `valkeyAsyncSetConnectCallback` accepts the non-const callback function prototype.
 
 ## Migrating from `hiredis-cluster` 0.14.0
 
@@ -42,6 +43,7 @@ The type `sds` is removed from the public API.
 * `redisClusterSetOptionConnectNonBlock` removed since it was deprecated.
 * `parse_cluster_nodes` removed from API, for internal use only.
 * `parse_cluster_slots` removed from API, for internal use only.
+* `redisClusterAsyncSetConnectCallbackNC` removed  and `valkeyClusterAsyncSetConnectCallback` accepts the non-const callback function prototype.
 
 ### Removed support for splitting multi-key commands per slot
 
