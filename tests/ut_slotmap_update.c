@@ -63,18 +63,18 @@ void test_parse_cluster_nodes(bool parse_replicas) {
     assert(strcmp(node->addr, "127.0.0.1:30001") == 0);
     assert(strcmp(node->host, "127.0.0.1") == 0);
     assert(node->port == 30001);
-    assert(node->role == VALKEY_ROLE_MASTER);
+    assert(node->role == VALKEY_ROLE_PRIMARY);
     assert(listLength(node->slots) == 1); /* 1 slot range */
     slot = listNodeValue(listFirst(node->slots));
     assert(slot->start == 0);
     assert(slot->end == 5460);
     if (parse_replicas) {
-        assert(listLength(node->slaves) == 1);
-        node = listNodeValue(listFirst(node->slaves));
+        assert(listLength(node->replicas) == 1);
+        node = listNodeValue(listFirst(node->replicas));
         assert(strcmp(node->name, "07c37dfeb235213a872192d90877d0cd55635b91") == 0);
-        assert(node->role == VALKEY_ROLE_SLAVE);
+        assert(node->role == VALKEY_ROLE_REPLICA);
     } else {
-        assert(node->slaves == NULL);
+        assert(node->replicas == NULL);
     }
     /* Verify node 2 */
     node = dictGetEntryVal(dictNext(&di));
@@ -82,18 +82,18 @@ void test_parse_cluster_nodes(bool parse_replicas) {
     assert(strcmp(node->addr, "127.0.0.1:30002") == 0);
     assert(strcmp(node->host, "127.0.0.1") == 0);
     assert(node->port == 30002);
-    assert(node->role == VALKEY_ROLE_MASTER);
+    assert(node->role == VALKEY_ROLE_PRIMARY);
     assert(listLength(node->slots) == 1); /* 1 slot range */
     slot = listNodeValue(listFirst(node->slots));
     assert(slot->start == 5461);
     assert(slot->end == 10922);
     if (parse_replicas) {
-        assert(listLength(node->slaves) == 1);
-        node = listNodeValue(listFirst(node->slaves));
+        assert(listLength(node->replicas) == 1);
+        node = listNodeValue(listFirst(node->replicas));
         assert(strcmp(node->name, "6ec23923021cf3ffec47632106199cb7f496ce01") == 0);
-        assert(node->role == VALKEY_ROLE_SLAVE);
+        assert(node->role == VALKEY_ROLE_REPLICA);
     } else {
-        assert(node->slaves == NULL);
+        assert(node->replicas == NULL);
     }
     /* Verify node 3 */
     node = dictGetEntryVal(dictNext(&di));
@@ -101,18 +101,18 @@ void test_parse_cluster_nodes(bool parse_replicas) {
     assert(strcmp(node->addr, "127.0.0.1:30003") == 0);
     assert(strcmp(node->host, "127.0.0.1") == 0);
     assert(node->port == 30003);
-    assert(node->role == VALKEY_ROLE_MASTER);
+    assert(node->role == VALKEY_ROLE_PRIMARY);
     assert(listLength(node->slots) == 1); /* 1 slot range */
     slot = listNodeValue(listFirst(node->slots));
     assert(slot->start == 10923);
     assert(slot->end == 16383);
     if (parse_replicas) {
-        assert(listLength(node->slaves) == 1);
-        node = listNodeValue(listFirst(node->slaves));
+        assert(listLength(node->replicas) == 1);
+        node = listNodeValue(listFirst(node->replicas));
         assert(strcmp(node->name, "824fe116063bc5fcf9f4ffd895bc17aee7731ac3") == 0);
-        assert(node->role == VALKEY_ROLE_SLAVE);
+        assert(node->role == VALKEY_ROLE_REPLICA);
     } else {
-        assert(node->slaves == NULL);
+        assert(node->replicas == NULL);
     }
 
     dictRelease(nodes);
@@ -275,35 +275,35 @@ void test_parse_cluster_nodes_with_multiple_replicas(void) {
     assert(strcmp(node->addr, "127.0.0.1:30001") == 0);
     assert(strcmp(node->host, "127.0.0.1") == 0);
     assert(node->port == 30001);
-    assert(node->role == VALKEY_ROLE_MASTER);
+    assert(node->role == VALKEY_ROLE_PRIMARY);
     assert(listLength(node->slots) == 1); /* 1 slot range */
     slot = listNodeValue(listFirst(node->slots));
     assert(slot->start == 0);
     assert(slot->end == 16383);
 
     /* Verify replicas. */
-    assert(listLength(node->slaves) == 5);
-    listRewind(node->slaves, &li);
+    assert(listLength(node->replicas) == 5);
+    listRewind(node->replicas, &li);
     node = listNodeValue(listNext(&li));
     assert(strcmp(node->name, "07c37dfeb235213a872192d90877d0cd55635b91") == 0);
     assert(strcmp(node->addr, "127.0.0.1:30004") == 0);
-    assert(node->role == VALKEY_ROLE_SLAVE);
+    assert(node->role == VALKEY_ROLE_REPLICA);
     node = listNodeValue(listNext(&li));
     assert(strcmp(node->name, "6ec23923021cf3ffec47632106199cb7f496ce01") == 0);
     assert(strcmp(node->addr, "127.0.0.1:30005") == 0);
-    assert(node->role == VALKEY_ROLE_SLAVE);
+    assert(node->role == VALKEY_ROLE_REPLICA);
     node = listNodeValue(listNext(&li));
     assert(strcmp(node->name, "824fe116063bc5fcf9f4ffd895bc17aee7731ac3") == 0);
     assert(strcmp(node->addr, "127.0.0.1:30006") == 0);
-    assert(node->role == VALKEY_ROLE_SLAVE);
+    assert(node->role == VALKEY_ROLE_REPLICA);
     node = listNodeValue(listNext(&li));
     assert(strcmp(node->name, "67ed2db8d677e59ec4a4cefb06858cf2a1a89fa1") == 0);
     assert(strcmp(node->addr, "127.0.0.1:30002") == 0);
-    assert(node->role == VALKEY_ROLE_SLAVE);
+    assert(node->role == VALKEY_ROLE_REPLICA);
     node = listNodeValue(listNext(&li));
     assert(strcmp(node->name, "292f8b365bb7edb5e285caf0b7e6ddc7265d2f4f") == 0);
     assert(strcmp(node->addr, "127.0.0.1:30003") == 0);
-    assert(node->role == VALKEY_ROLE_SLAVE);
+    assert(node->role == VALKEY_ROLE_REPLICA);
 
     dictRelease(nodes);
     valkeyClusterFree(cc);

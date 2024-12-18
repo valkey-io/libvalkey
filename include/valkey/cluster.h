@@ -40,9 +40,9 @@
 
 #define VALKEYCLUSTER_SLOTS 16384
 
-#define VALKEY_ROLE_NULL 0
-#define VALKEY_ROLE_MASTER 1
-#define VALKEY_ROLE_SLAVE 2
+#define VALKEY_ROLE_UNKNOWN 0
+#define VALKEY_ROLE_PRIMARY 1
+#define VALKEY_ROLE_REPLICA 2
 
 /* Configuration flags */
 #define VALKEYCLUSTER_FLAG_NULL 0x0
@@ -84,13 +84,13 @@ typedef struct valkeyClusterNode {
     valkeyAsyncContext *acon;
     int64_t lastConnectionAttempt; /* Timestamp */
     struct hilist *slots;
-    struct hilist *slaves;
+    struct hilist *replicas;
 } valkeyClusterNode;
 
 typedef struct cluster_slot {
     uint32_t start;
     uint32_t end;
-    valkeyClusterNode *node; /* master that this slot region belong to */
+    valkeyClusterNode *node; /* Owner of slot region. */
 } cluster_slot;
 
 /* Context for accessing a Valkey Cluster */
