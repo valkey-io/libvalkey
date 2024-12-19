@@ -64,8 +64,7 @@ typedef struct valkeyCallbackList {
 
 /* Connection callback prototypes */
 typedef void(valkeyDisconnectCallback)(const struct valkeyAsyncContext *, int status);
-typedef void(valkeyConnectCallback)(const struct valkeyAsyncContext *, int status);
-typedef void(valkeyConnectCallbackNC)(struct valkeyAsyncContext *, int status);
+typedef void(valkeyConnectCallback)(struct valkeyAsyncContext *, int status);
 typedef void(valkeyTimerCallback)(void *timer, void *privdata);
 
 /* Context for an async connection to Valkey */
@@ -101,7 +100,6 @@ typedef struct valkeyAsyncContext {
 
     /* Called when the first write event was received. */
     valkeyConnectCallback *onConnect;
-    valkeyConnectCallbackNC *onConnectNC;
 
     /* Regular command callbacks */
     valkeyCallbackList replies;
@@ -130,7 +128,6 @@ valkeyAsyncContext *valkeyAsyncConnectBindWithReuse(const char *ip, int port,
                                                     const char *source_addr);
 valkeyAsyncContext *valkeyAsyncConnectUnix(const char *path);
 int valkeyAsyncSetConnectCallback(valkeyAsyncContext *ac, valkeyConnectCallback *fn);
-int valkeyAsyncSetConnectCallbackNC(valkeyAsyncContext *ac, valkeyConnectCallbackNC *fn);
 int valkeyAsyncSetDisconnectCallback(valkeyAsyncContext *ac, valkeyDisconnectCallback *fn);
 
 valkeyAsyncPushFn *valkeyAsyncSetPushCallback(valkeyAsyncContext *ac, valkeyAsyncPushFn *fn);

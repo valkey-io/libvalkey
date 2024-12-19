@@ -277,7 +277,11 @@ typedef struct ExpectedResult {
 } ExpectedResult;
 
 // Callback for Valkey connects and disconnects
-void callbackExpectOk(const valkeyAsyncContext *ac, int status) {
+void connectCallback(valkeyAsyncContext *ac, int status) {
+    UNUSED(ac);
+    assert(status == VALKEY_OK);
+}
+void disconnectCallback(const valkeyAsyncContext *ac, int status) {
     UNUSED(ac);
     assert(status == VALKEY_OK);
 }
@@ -318,8 +322,8 @@ void test_async_to_single_node(void) {
 
     valkeyClusterAsyncContext *acc = valkeyClusterAsyncContextInit();
     assert(acc);
-    valkeyClusterAsyncSetConnectCallback(acc, callbackExpectOk);
-    valkeyClusterAsyncSetDisconnectCallback(acc, callbackExpectOk);
+    valkeyClusterAsyncSetConnectCallback(acc, connectCallback);
+    valkeyClusterAsyncSetDisconnectCallback(acc, disconnectCallback);
     valkeyClusterSetOptionAddNodes(acc->cc, CLUSTER_NODE);
     valkeyClusterSetOptionMaxRetry(acc->cc, 1);
     valkeyClusterSetOptionRouteUseSlots(acc->cc);
@@ -351,8 +355,8 @@ void test_async_formatted_to_single_node(void) {
 
     valkeyClusterAsyncContext *acc = valkeyClusterAsyncContextInit();
     assert(acc);
-    valkeyClusterAsyncSetConnectCallback(acc, callbackExpectOk);
-    valkeyClusterAsyncSetDisconnectCallback(acc, callbackExpectOk);
+    valkeyClusterAsyncSetConnectCallback(acc, connectCallback);
+    valkeyClusterAsyncSetDisconnectCallback(acc, disconnectCallback);
     valkeyClusterSetOptionAddNodes(acc->cc, CLUSTER_NODE);
     valkeyClusterSetOptionMaxRetry(acc->cc, 1);
     valkeyClusterSetOptionRouteUseSlots(acc->cc);
@@ -385,8 +389,8 @@ void test_async_command_argv_to_single_node(void) {
 
     valkeyClusterAsyncContext *acc = valkeyClusterAsyncContextInit();
     assert(acc);
-    valkeyClusterAsyncSetConnectCallback(acc, callbackExpectOk);
-    valkeyClusterAsyncSetDisconnectCallback(acc, callbackExpectOk);
+    valkeyClusterAsyncSetConnectCallback(acc, connectCallback);
+    valkeyClusterAsyncSetDisconnectCallback(acc, disconnectCallback);
     valkeyClusterSetOptionAddNodes(acc->cc, CLUSTER_NODE);
     valkeyClusterSetOptionMaxRetry(acc->cc, 1);
     valkeyClusterSetOptionRouteUseSlots(acc->cc);
@@ -419,8 +423,8 @@ void test_async_to_all_nodes(void) {
 
     valkeyClusterAsyncContext *acc = valkeyClusterAsyncContextInit();
     assert(acc);
-    valkeyClusterAsyncSetConnectCallback(acc, callbackExpectOk);
-    valkeyClusterAsyncSetDisconnectCallback(acc, callbackExpectOk);
+    valkeyClusterAsyncSetConnectCallback(acc, connectCallback);
+    valkeyClusterAsyncSetDisconnectCallback(acc, disconnectCallback);
     valkeyClusterSetOptionAddNodes(acc->cc, CLUSTER_NODE);
     valkeyClusterSetOptionMaxRetry(acc->cc, 1);
     valkeyClusterSetOptionRouteUseSlots(acc->cc);
@@ -461,8 +465,8 @@ void test_async_transaction(void) {
 
     valkeyClusterAsyncContext *acc = valkeyClusterAsyncContextInit();
     assert(acc);
-    valkeyClusterAsyncSetConnectCallback(acc, callbackExpectOk);
-    valkeyClusterAsyncSetDisconnectCallback(acc, callbackExpectOk);
+    valkeyClusterAsyncSetConnectCallback(acc, connectCallback);
+    valkeyClusterAsyncSetDisconnectCallback(acc, disconnectCallback);
     valkeyClusterSetOptionAddNodes(acc->cc, CLUSTER_NODE);
     valkeyClusterSetOptionMaxRetry(acc->cc, 1);
     valkeyClusterSetOptionRouteUseSlots(acc->cc);

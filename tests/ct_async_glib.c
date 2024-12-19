@@ -24,7 +24,7 @@ void getCallback(valkeyClusterAsyncContext *acc, void *r, void *privdata) {
     g_main_loop_quit(mainloop);
 }
 
-void connectCallback(const valkeyAsyncContext *ac, int status) {
+void connectCallback(valkeyAsyncContext *ac, int status) {
     ASSERT_MSG(status == VALKEY_OK, ac->errstr);
     printf("Connected to %s:%d\n", ac->c.tcp.host, ac->c.tcp.port);
 }

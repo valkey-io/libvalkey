@@ -144,7 +144,6 @@ typedef struct valkeyClusterAsyncContext {
 
     /* Called when the first write event was received. */
     valkeyConnectCallback *onConnect;
-    valkeyConnectCallbackNC *onConnectNC;
 
 } valkeyClusterAsyncContext;
 
@@ -274,8 +273,6 @@ void valkeyClusterAsyncFree(valkeyClusterAsyncContext *acc);
 
 int valkeyClusterAsyncSetConnectCallback(valkeyClusterAsyncContext *acc,
                                          valkeyConnectCallback *fn);
-int valkeyClusterAsyncSetConnectCallbackNC(valkeyClusterAsyncContext *acc,
-                                           valkeyConnectCallbackNC *fn);
 int valkeyClusterAsyncSetDisconnectCallback(valkeyClusterAsyncContext *acc,
                                             valkeyDisconnectCallback *fn);
 

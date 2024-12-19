@@ -143,7 +143,6 @@ static valkeyAsyncContext *valkeyAsyncInitialize(valkeyContext *c) {
     ac->ev.scheduleTimer = NULL;
 
     ac->onConnect = NULL;
-    ac->onConnectNC = NULL;
     ac->onDisconnect = NULL;
 
     ac->replies.head = NULL;
@@ -230,18 +229,12 @@ valkeyAsyncContext *valkeyAsyncConnectUnix(const char *path) {
     return valkeyAsyncConnectWithOptions(&options);
 }
 
-static int
-valkeyAsyncSetConnectCallbackImpl(valkeyAsyncContext *ac, valkeyConnectCallback *fn,
-                                  valkeyConnectCallbackNC *fn_nc) {
-    /* If either are already set, this is an error */
-    if (ac->onConnect || ac->onConnectNC)
+int valkeyAsyncSetConnectCallback(valkeyAsyncContext *ac, valkeyConnectCallback *fn) {
+    /* If already set, this is an error */
+    if (ac->onConnect)
         return VALKEY_ERR;
 
-    if (fn) {
-        ac->onConnect = fn;
-    } else if (fn_nc) {
-        ac->onConnectNC = fn_nc;
-    }
+    ac->onConnect = fn;
 
     /* The common way to detect an established connection is to wait for
      * the first write event to be fired. This assumes the related event
@@ -249,14 +242,6 @@ valkeyAsyncSetConnectCallbackImpl(valkeyAsyncContext *ac, valkeyConnectCallback 
     _EL_ADD_WRITE(ac);
 
     return VALKEY_OK;
-}
-
-int valkeyAsyncSetConnectCallback(valkeyAsyncContext *ac, valkeyConnectCallback *fn) {
-    return valkeyAsyncSetConnectCallbackImpl(ac, fn, NULL);
-}
-
-int valkeyAsyncSetConnectCallbackNC(valkeyAsyncContext *ac, valkeyConnectCallbackNC *fn) {
-    return valkeyAsyncSetConnectCallbackImpl(ac, NULL, fn);
 }
 
 int valkeyAsyncSetDisconnectCallback(valkeyAsyncContext *ac, valkeyDisconnectCallback *fn) {
@@ -324,24 +309,16 @@ static void valkeyRunPushCallback(valkeyAsyncContext *ac, valkeyReply *reply) {
 }
 
 static void valkeyRunConnectCallback(valkeyAsyncContext *ac, int status) {
-    if (ac->onConnect == NULL && ac->onConnectNC == NULL)
+    if (ac->onConnect == NULL)
         return;
 
     if (!(ac->c.flags & VALKEY_IN_CALLBACK)) {
         ac->c.flags |= VALKEY_IN_CALLBACK;
-        if (ac->onConnect) {
-            ac->onConnect(ac, status);
-        } else {
-            ac->onConnectNC(ac, status);
-        }
+        ac->onConnect(ac, status);
         ac->c.flags &= ~VALKEY_IN_CALLBACK;
     } else {
         /* already in callback */
-        if (ac->onConnect) {
-            ac->onConnect(ac, status);
-        } else {
-            ac->onConnectNC(ac, status);
-        }
+        ac->onConnect(ac, status);
     }
 }
 

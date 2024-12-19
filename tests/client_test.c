@@ -2173,7 +2173,7 @@ static valkeyAsyncContext *do_aconnect(struct config config, astest_no testno) {
     c->data = &astest;
     c->dataCleanup = asCleanup;
     valkeyPollAttach(c);
-    valkeyAsyncSetConnectCallbackNC(c, connectCallback);
+    valkeyAsyncSetConnectCallback(c, connectCallback);
     valkeyAsyncSetDisconnectCallback(c, disconnectCallback);
     return c;
 }

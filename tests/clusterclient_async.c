@@ -207,7 +207,7 @@ void eventCallback(const valkeyClusterContext *cc, int event, void *privdata) {
     printf("Event: %s\n", e);
 }
 
-void connectCallback(const valkeyAsyncContext *ac, int status) {
+void connectCallback(valkeyAsyncContext *ac, int status) {
     const char *s = "";
     if (status != VALKEY_OK)
         s = "failed to ";

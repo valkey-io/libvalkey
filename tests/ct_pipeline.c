@@ -68,7 +68,11 @@ typedef struct ExpectedResult {
 } ExpectedResult;
 
 // Callback for Valkey connects and disconnects
-void callbackExpectOk(const valkeyAsyncContext *ac, int status) {
+void connectCallback(valkeyAsyncContext *ac, int status) {
+    UNUSED(ac);
+    assert(status == VALKEY_OK);
+}
+void disconnectCallback(const valkeyAsyncContext *ac, int status) {
     UNUSED(ac);
     assert(status == VALKEY_OK);
 }
@@ -93,8 +97,8 @@ void commandCallback(valkeyClusterAsyncContext *cc, void *r, void *privdata) {
 void test_async_pipeline(void) {
     valkeyClusterAsyncContext *acc = valkeyClusterAsyncContextInit();
     assert(acc);
-    valkeyClusterAsyncSetConnectCallback(acc, callbackExpectOk);
-    valkeyClusterAsyncSetDisconnectCallback(acc, callbackExpectOk);
+    valkeyClusterAsyncSetConnectCallback(acc, connectCallback);
+    valkeyClusterAsyncSetDisconnectCallback(acc, disconnectCallback);
     valkeyClusterSetOptionAddNodes(acc->cc, CLUSTER_NODE);
 
     int status;

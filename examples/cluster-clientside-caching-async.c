@@ -22,10 +22,9 @@ void getCallback1(valkeyClusterAsyncContext *acc, void *r, void *privdata);
 void getCallback2(valkeyClusterAsyncContext *acc, void *r, void *privdata);
 void modifyKey(const char *key, const char *value);
 
-/* The connect callback enables RESP3 and client tracking.
-   The non-const connect callback is used since we want to
-   set the push callback in the libvalkey context. */
-void connectCallbackNC(valkeyAsyncContext *ac, int status) {
+/* The connect callback enables RESP3 and client tracking,
+ * and sets the push callback in the libvalkey context. */
+void connectCallback(valkeyAsyncContext *ac, int status) {
     assert(status == VALKEY_OK);
     valkeyAsyncSetPushCallback(ac, pushCallback);
     valkeyAsyncCommand(ac, NULL, NULL, "HELLO 3");
@@ -147,7 +146,7 @@ int main(int argc, char **argv) {
     assert(acc);
 
     int status;
-    status = valkeyClusterAsyncSetConnectCallbackNC(acc, connectCallbackNC);
+    status = valkeyClusterAsyncSetConnectCallback(acc, connectCallback);
     assert(status == VALKEY_OK);
     status = valkeyClusterAsyncSetDisconnectCallback(acc, disconnectCallback);
     assert(status == VALKEY_OK);

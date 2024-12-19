@@ -30,7 +30,7 @@ void setCallback(valkeyClusterAsyncContext *cc, void *r, void *privdata) {
     printf("privdata: %s reply: %s\n", (char *)privdata, reply->str);
 }
 
-void connectCallback(const valkeyAsyncContext *ac, int status) {
+void connectCallback(valkeyAsyncContext *ac, int status) {
     if (status != VALKEY_OK) {
         printf("Error: %s\n", ac->errstr);
         return;
