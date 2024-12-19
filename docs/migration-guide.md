@@ -48,7 +48,7 @@ The type `sds` is removed from the public API.
 * `redisClusterSetOptionConnectNonBlock` removed since it was deprecated.
 * `parse_cluster_nodes` removed from API, for internal use only.
 * `parse_cluster_slots` removed from API, for internal use only.
-* `redisClutserAsyncSetConnectCallback` is removed, but can be replaced with `valkeyClusterAsyncSetConnectCallback` which accepts the non-const callback function prototype.
+* `redisClusterAsyncSetConnectCallback` is removed, but can be replaced with `valkeyClusterAsyncSetConnectCallback` which accepts the non-const callback function prototype.
 
 ### Removed support for splitting multi-key commands per slot
 
