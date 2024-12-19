@@ -15,11 +15,15 @@ The general actions needed are:
 
 The type `sds` is removed from the public API.
 
+### Renamed API functions
+
+* `redisAsyncSetConnectCallbackNC` is renamed to `valkeyAsyncSetConnectCallback`.
+
 ### Removed API functions
 
 * `redisFormatSdsCommandArgv` removed from API. Can be replaced with `valkeyFormatCommandArgv`.
 * `redisFreeSdsCommand` removed since the `sds` type is for internal use only.
-* `redisAsyncSetConnectCallbackNC` removed and `valkeyAsyncSetConnectCallback` accepts the non-const callback function prototype.
+* `redisAsyncSetConnectCallback` is removed, but can be replaced with `valkeyAsyncSetConnectCallback` which accepts the non-const callback function prototype.
 
 ## Migrating from `hiredis-cluster` 0.14.0
 
@@ -27,6 +31,7 @@ The type `sds` is removed from the public API.
 
 * `ctx_get_by_node` is renamed to `valkeyClusterGetValkeyContext`.
 * `actx_get_by_node` is renamed to `valkeyClusterGetValkeyAsyncContext`.
+* `redisClusterAsyncSetConnectCallbackNC` is renamed to `valkeyClusterAsyncSetConnectCallback`.
 
 ### Renamed API defines
 
@@ -43,7 +48,7 @@ The type `sds` is removed from the public API.
 * `redisClusterSetOptionConnectNonBlock` removed since it was deprecated.
 * `parse_cluster_nodes` removed from API, for internal use only.
 * `parse_cluster_slots` removed from API, for internal use only.
-* `redisClusterAsyncSetConnectCallbackNC` removed  and `valkeyClusterAsyncSetConnectCallback` accepts the non-const callback function prototype.
+* `redisClutserAsyncSetConnectCallback` is removed, but can be replaced with `valkeyClusterAsyncSetConnectCallback` which accepts the non-const callback function prototype.
 
 ### Removed support for splitting multi-key commands per slot
 
