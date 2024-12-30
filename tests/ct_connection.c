@@ -313,7 +313,11 @@ typedef struct ExpectedResult {
 } ExpectedResult;
 
 // Callback for Valkey connects and disconnects
-void callbackExpectOk(const valkeyAsyncContext *ac, int status) {
+void connectCallback(valkeyAsyncContext *ac, int status) {
+    UNUSED(ac);
+    assert(status == VALKEY_OK);
+}
+void disconnectCallback(const valkeyAsyncContext *ac, int status) {
     UNUSED(ac);
     assert(status == VALKEY_OK);
 }
@@ -345,8 +349,8 @@ void commandCallback(valkeyClusterAsyncContext *cc, void *r, void *privdata) {
 void test_async_password_ok(void) {
     valkeyClusterAsyncContext *acc = valkeyClusterAsyncContextInit();
     assert(acc);
-    valkeyClusterAsyncSetConnectCallback(acc, callbackExpectOk);
-    valkeyClusterAsyncSetDisconnectCallback(acc, callbackExpectOk);
+    valkeyClusterAsyncSetConnectCallback(acc, connectCallback);
+    valkeyClusterAsyncSetDisconnectCallback(acc, disconnectCallback);
     valkeyClusterSetOptionAddNodes(acc->cc, CLUSTER_NODE_WITH_PASSWORD);
     valkeyClusterSetOptionPassword(acc->cc, CLUSTER_PASSWORD);
 
@@ -404,8 +408,8 @@ void test_async_password_wrong(void) {
 void test_async_password_missing(void) {
     valkeyClusterAsyncContext *acc = valkeyClusterAsyncContextInit();
     assert(acc);
-    valkeyClusterAsyncSetConnectCallback(acc, callbackExpectOk);
-    valkeyClusterAsyncSetDisconnectCallback(acc, callbackExpectOk);
+    valkeyClusterAsyncSetConnectCallback(acc, connectCallback);
+    valkeyClusterAsyncSetDisconnectCallback(acc, disconnectCallback);
     valkeyClusterSetOptionAddNodes(acc->cc, CLUSTER_NODE_WITH_PASSWORD);
     // Password not configured
 
@@ -434,8 +438,8 @@ void test_async_username_ok(void) {
     // Connect to the cluster using username and password
     valkeyClusterAsyncContext *acc = valkeyClusterAsyncContextInit();
     assert(acc);
-    valkeyClusterAsyncSetConnectCallback(acc, callbackExpectOk);
-    valkeyClusterAsyncSetDisconnectCallback(acc, callbackExpectOk);
+    valkeyClusterAsyncSetConnectCallback(acc, connectCallback);
+    valkeyClusterAsyncSetDisconnectCallback(acc, disconnectCallback);
     valkeyClusterSetOptionAddNodes(acc->cc, CLUSTER_NODE_WITH_PASSWORD);
     valkeyClusterSetOptionUsername(acc->cc, "missing-user");
     valkeyClusterSetOptionPassword(acc->cc, CLUSTER_PASSWORD);
@@ -478,14 +482,14 @@ void test_async_multicluster(void) {
 
     valkeyClusterAsyncContext *acc1 = valkeyClusterAsyncContextInit();
     assert(acc1);
-    valkeyClusterAsyncSetConnectCallback(acc1, callbackExpectOk);
-    valkeyClusterAsyncSetDisconnectCallback(acc1, callbackExpectOk);
+    valkeyClusterAsyncSetConnectCallback(acc1, connectCallback);
+    valkeyClusterAsyncSetDisconnectCallback(acc1, disconnectCallback);
     valkeyClusterSetOptionAddNodes(acc1->cc, CLUSTER_NODE);
 
     valkeyClusterAsyncContext *acc2 = valkeyClusterAsyncContextInit();
     assert(acc2);
-    valkeyClusterAsyncSetConnectCallback(acc2, callbackExpectOk);
-    valkeyClusterAsyncSetDisconnectCallback(acc2, callbackExpectOk);
+    valkeyClusterAsyncSetConnectCallback(acc2, connectCallback);
+    valkeyClusterAsyncSetDisconnectCallback(acc2, disconnectCallback);
     valkeyClusterSetOptionAddNodes(acc2->cc, CLUSTER_NODE_WITH_PASSWORD);
     valkeyClusterSetOptionPassword(acc2->cc, CLUSTER_PASSWORD);
 

@@ -453,7 +453,11 @@ typedef struct ExpectedResult {
 } ExpectedResult;
 
 // Callback for Valkey connects and disconnects
-void callbackExpectOk(const valkeyAsyncContext *ac, int status) {
+void connectCallback(valkeyAsyncContext *ac, int status) {
+    UNUSED(ac);
+    assert(status == VALKEY_OK);
+}
+void disconnectCallback(const valkeyAsyncContext *ac, int status) {
     UNUSED(ac);
     assert(status == VALKEY_OK);
 }
@@ -501,9 +505,9 @@ void test_alloc_failure_handling_async(void) {
     // Set callbacks
     {
         prepare_allocation_test_async(acc, 0);
-        result = valkeyClusterAsyncSetConnectCallback(acc, callbackExpectOk);
+        result = valkeyClusterAsyncSetConnectCallback(acc, connectCallback);
         assert(result == VALKEY_OK);
-        result = valkeyClusterAsyncSetDisconnectCallback(acc, callbackExpectOk);
+        result = valkeyClusterAsyncSetDisconnectCallback(acc, disconnectCallback);
         assert(result == VALKEY_OK);
     }
 
