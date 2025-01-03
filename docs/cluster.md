@@ -7,6 +7,7 @@ It is not intended as a complete reference. For that it's always best to refer t
 
 - [Synchronous API](#synchronous-api)
   - [Connecting](#connecting)
+  - [Connection options](#connection-options)
   - [Executing commands](#executing-commands)
   - [Executing commands on a specific node](#executing-commands-on-a-specific-node)
   - [Disconnecting/cleanup](#disconnecting-cleanup)
@@ -14,6 +15,7 @@ It is not intended as a complete reference. For that it's always best to refer t
   - [Events](#events)
 - [Asynchronous API](#asynchronous-api)
   - [Connecting](#connecting-1)
+  - [Connection options](#connection-options-1)
   - [Executing commands](#executing-commands-1)
   - [Executing commands on a specific node](#executing-commands-on-a-specific-node-1)
   - [Disconnecting/cleanup](#disconnecting-cleanup-1)
@@ -27,36 +29,56 @@ It is not intended as a complete reference. For that it's always best to refer t
 
 ### Connecting
 
-There are a variety of ways to setup and connect to a cluster.
-The most basic alternative lacks many options, but can be enough for some use cases.
+There are a few alternative ways to setup and connect to a cluster.
+The basic alternatives lacks most options, but can be enough for some use cases.
 
 ```c
-valkeyClusterContext *cc = valkeyClusterConnect("127.0.0.1:6379", VALKEYCLUSTER_FLAG_NULL);
+valkeyClusterContext *valkeyClusterConnect(const char *addrs);
+valkeyClusterContext *valkeyClusterConnectWithTimeout(const char *addrs,
+                                                      const struct timeval tv);
+
+// There is also a convenience struct to specify various options.
+valkeyClusterContext *valkeyClusterConnectWithOptions(const valkeyClusterOptions *options);
+```
+
+When connecting to a cluster, libvalkey will return `NULL` in the event that we can't allocate the context, and set the `err` member if we can allocate the context but there are issues.
+So when connecting it's simple to handle error states.
+
+```c
+valkeyClusterContext *cc = valkeyClusterConnect("127.0.0.1:6379,127.0.0.1:6380");
 if (cc == NULL || cc->err) {
     fprintf(stderr, "Error: %s\n", cc ? cc->errstr : "OOM");
 }
 ```
 
-When connecting to a cluster, libvalkey will return `NULL` in the event that we can't allocate the context, and set the `err` member if we can connect but there are issues.
-So when connecting it's simple to handle error states.
+### Connection options
 
-To be able to set options before any connection attempt is performed a `valkeyClusterContext` can be created using `valkeyClusterContextInit`.
-The context is where the known cluster state and the options are kept, which can be configured using functions like
-`valkeyClusterSetOptionAddNodes` to add one or many cluster node addresses,
-or `valkeyClusterSetOptionUsername` together with `valkeyClusterSetOptionPassword` to configure authentication and so on.
-See [`include/valkey/cluster.h`](../include/valkey/cluster.h) for more details.
-
-The function `valkeyClusterConnect2` is provided to connect using the prepared `valkeyClusterContext`.
+There are a variety of options you can specify when connecting to a cluster, which are delivered via the `valkeyClusterOptions` helper struct.
+This includes information how to connect to the cluster and defining optional callbacks as well as other flags.
+See [include/valkey/cluster.h](../include/valkey/cluster.h) for more details.
 
 ```c
-valkeyClusterContext *cc = valkeyClusterContextInit();
-valkeyClusterSetOptionAddNodes(cc, "127.0.0.1:6379,127.0.0.1:6380");
-int status = valkeyClusterConnect2(cc);
-if (status == VALKEY_ERR) {
-    printf("Error: %s\n", cc->errstr);
-    // handle error
+valkeyClusterOptions opt = {0};
+opt.initial_nodes = "127.0.0.1:6379,127.0.0.1:6380"; // Addresses to initially connect to.
+opt.options = VALKEY_OPT_USE_CLUSTER_SLOTS;          // See available flags below.
+opt.password = "password"                            // Authentication; libvalkey sends the `AUTH` command.
+
+// There are helper functions to set some options.
+valkeyClusterOptionsEnableTLS(&opt, tlsCtx);         // Use TLS and a prepared `valkeyTLSContext` when connecting.
+
+valkeyClusterContext *cc = valkeyClusterConnectWithOptions(&opt);
+if (cc == NULL || cc->err) {
+    fprintf(stderr, "Error: %s\n", cc ? cc->errstr : "OOM");
 }
 ```
+
+There are also several flags you can specify when using the `valkeyClusterOptions` helper struct.
+
+| Flag | Description  |
+| --- | --- |
+| VALKEY\_OPT\_USE\_CLUSTER\_SLOTS | Tells libvalkey to use the command `CLUSTER SLOTS` when updating its slot map (cluster topology).<br>Libvalkey uses `CLUSTER NODES` by default. |
+| VALKEY\_OPT\_USE\_REPLICAS| Tells libvalkey to keep parsed information of replica nodes. |
+| VALKEY\_OPT\_BLOCKING\_INITIAL\_UPDATE | **ASYNC**: Tells libvalkey to perform the initial slot map update in a blocking fashion. The function call will wait for a slot map update before returning so that the returned context is immediately ready to accept commands. |
 
 ### Executing commands
 
@@ -121,6 +143,7 @@ if (valkeyClusterAppendCommand(cc, "SET foo bar") != VALKEY_OK) {
     fprintf(stderr, "Error appending command: %s\n", cc->errstr);
     exit(1);
 }
+
 if (valkeyClusterAppendCommand(cc, "GET foo") != VALKEY_OK) {
     fprintf(stderr, "Error appending command: %s\n", cc->errstr);
     exit(1);
@@ -128,15 +151,15 @@ if (valkeyClusterAppendCommand(cc, "GET foo") != VALKEY_OK) {
 
 valkeyReply *reply;
 if (valkeyClusterGetReply(cc,&reply) != VALKEY_OK) {
-        fprintf(stderr, "Error reading reply %zu: %s\n", i, c->errstr);
-        exit(1);
+    fprintf(stderr, "Error reading reply %zu: %s\n", i, c->errstr);
+    exit(1);
 }
 // Handle the reply for SET here.
 freeReplyObject(reply);
 
 if (valkeyClusterGetReply(cc,&reply) != VALKEY_OK) {
-        fprintf(stderr, "Error reading reply %zu: %s\n", i, c->errstr);
-        exit(1);
+    fprintf(stderr, "Error reading reply %zu: %s\n", i, c->errstr);
+    exit(1);
 }
 // Handle the reply for GET here.
 freeReplyObject(reply);
@@ -149,10 +172,10 @@ freeReplyObject(reply);
 There is a hook to get notified when certain events occur.
 
 ```c
-int valkeyClusterSetEventCallback(valkeyClusterContext *cc,
-                                  void(fn)(const valkeyClusterContext *cc, int event,
-                                           void *privdata),
-                                  void *privdata);
+int valkeyClusterOptionsSetEventCallback(valkeyClusterOptions *options,
+                                         void(fn)(const valkeyClusterContext *cc, int event,
+                                                  void *privdata),
+                                         void *privdata);
 ```
 
 The callback is called with `event` set to one of the following values:
@@ -172,8 +195,8 @@ This is useful for applying socket options or access endpoint information for a 
 The callback is registered using the following function:
 
 ```c
-int valkeyClusterSetConnectCallback(valkeyClusterContext *cc,
-                                    void(fn)(const valkeyContext *c, int status));
+int valkeyClusterOptionsSetConnectCallback(valkeyClusterOptions *options,
+                                           void(fn)(const valkeyContext *c, int status));
 ```
 
 The callback is called just after connect, before TLS handshake and authentication.
@@ -194,18 +217,7 @@ The first alternative is to use the function `valkeyClusterAsyncConnect`, which 
 Any command sent by the user thereafter will create a new non-blocking connection, unless a non-blocking connection already exists to the destination.
 The function returns a pointer to a newly created `valkeyClusterAsyncContext` struct and its `err` field should be checked to make sure the initial slot map update was successful.
 
-```c
-// Insufficient error handling for brevity.
-valkeyClusterAsyncContext *acc = valkeyClusterAsyncConnect("127.0.0.1:6379", VALKEYCLUSTER_FLAG_NULL);
-if (acc->err) {
-    printf("error: %s\n", acc->errstr);
-    exit(1);
-}
 
-// Attach an event engine. In this example we use libevent.
-struct event_base *base = event_base_new();
-valkeyClusterLibeventAttach(acc, base);
-```
 
 The second alternative is to use `valkeyClusterAsyncContextInit` and `valkeyClusterAsyncConnect2` which avoids the initial blocking connect.
 This connection alternative requires an attached event engine when `valkeyClusterAsyncConnect2` is called, but the connect and the initial slot map update is done in a non-blocking fashion.
@@ -214,22 +226,12 @@ This means that commands sent directly after `valkeyClusterAsyncConnect2` may fa
 You may use the [`eventCallback`](#events-per-cluster-context-1) to be notified when the slot map is updated and the client is ready to accept commands.
 A crude example of using the `eventCallback` can be found in [this test case](../tests/ct_async.c).
 
-```c
-// Insufficient error handling for brevity.
-valkeyClusterAsyncContext *acc = valkeyClusterAsyncContextInit();
 
-// Add a cluster node address for the initial connect.
-valkeyClusterSetOptionAddNodes(acc->cc, "127.0.0.1:6379");
 
-// Attach an event engine. In this example we use libevent.
-struct event_base *base = event_base_new();
-valkeyClusterLibeventAttach(acc, base);
 
-if (valkeyClusterAsyncConnect2(acc) != VALKEY_OK) {
-    printf("error: %s\n", acc->errstr);
-    exit(1);
-}
-```
+
+### Connection options
+
 
 ### Executing commands
 
@@ -284,18 +286,19 @@ After this, the disconnection callback is executed with the `VALKEY_OK` status a
 
 #### Events per cluster context
 
-Use [`valkeyClusterSetEventCallback`](#events-per-cluster-context) with `acc->cc` as the context to get notified when certain events occur.
+Use [`valkeyClusterOptionsSetEventCallback`](#events-per-cluster-context) to get notified when certain events occur.
 
 #### Events per connection
 
 Because the connections that will be created are non-blocking, the kernel is not able to instantly return if the specified host and port is able to accept a connection.
 Instead, use a connect callback to be notified when a connection is established or failed.
 Similarly, a disconnect callback can be used to be notified about a disconnected connection (either because of an error or per user request).
-The callbacks are installed using the following functions:
+The callbacks can be enabled using the following options when calling `valkeyClusterAsyncConnectWithOptions`:
 
 ```c
-status = valkeyClusterAsyncSetConnectCallback(acc, callbackFn);
-status = valkeyClusterAsyncSetDisconnectCallback(acc, callbackFn);
+valkeyClusterOptions opt = {0};
+opt.async_connect_cb = callbackFn;
+opt.async_disconnect_cb = callbackFn;
 ```
 
 The connect callback function should have the following prototype, aliased to `valkeyConnectCallback`:
@@ -305,14 +308,15 @@ void(valkeyAsyncContext *ac, int status);
 
 On a connection attempt, the `status` argument is set to `VALKEY_OK` when the connection was successful.
 The file description of the connection socket can be retrieved from a `valkeyAsyncContext` as `ac->c->fd`.
-On a disconnect, the `status` argument is set to `VALKEY_OK` when disconnection was initiated by the user, or `VALKEY_ERR` when the disconnection was caused by an error.
-When it is `VALKEY_ERR`, the `err` field in the context can be accessed to find out the cause of the error.
 
-You don't need to reconnect in the disconnect callback.
-libvalkey will reconnect by itself when the next command is handled.
+The disconnect callback function should have the following prototype, aliased to `valkeyDisconnectCallback`:
+```c
+void(const valkeyAsyncContext *ac, int status);
+```
 
-Setting the connect and disconnect callbacks can only be done once per context.
-For subsequent calls it will return `VALKEY_ERR`.
+On a disconnection the `status` argument is set to `VALKEY_OK` if it was initiated by the user, or to `VALKEY_ERR` when it was caused by an error.
+When caused by an error the `err` field in the context can be accessed to get the error cause.
+You don't need to reconnect in the disconnect callback since libvalkey will reconnect by itself when the next command is handled.
 
 ## Miscellaneous
 
