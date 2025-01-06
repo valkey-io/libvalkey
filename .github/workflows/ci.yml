@@ -216,7 +216,7 @@ jobs:
         working-directory: build
         run: .\tests\client_test.exe
       - name: Install Cygwin Action
-        uses: cygwin/cygwin-install-action@006ad0b0946ca6d0a3ea2d4437677fa767392401 # v4
+        uses: cygwin/cygwin-install-action@5f89bfcf835742910cafaa6a3cd7dc3624d5fef5 # v5
         with:
           packages: make gcc-core
       - name: Build in Cygwin
