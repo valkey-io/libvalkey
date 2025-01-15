@@ -748,11 +748,15 @@ static int store_replica_nodes(dict *nodes, dict *replicas) {
     return VALKEY_OK;
 }
 
-/* Parse a node from a single CLUSTER NODES line. Returns an allocated
- * valkeyClusterNode as a pointer in `parsed_node`.
+/* Parse a node from a single CLUSTER NODES line.
+ * Returns VALKEY_OK and an allocated valkeyClusterNode as a pointer in
+ * `parsed_node`, or VALKEY_ERR when the parsing fails.
  * Only parse primary nodes if the `parsed_primary_id` argument is NULL,
  * otherwise replicas are also parsed and its primary_id is returned by pointer
- * via 'parsed_primary_id'. */
+ * via 'parsed_primary_id'.
+ * The valkeyContext used when sending the CLUSTER NODES command should be
+ * provided in `c` since its destination IP address is used when no IP address
+ * is found in the parsed string. */
 static int parse_cluster_nodes_line(valkeyClusterContext *cc, valkeyContext *c, char *line,
                                     valkeyClusterNode **parsed_node, char **parsed_primary_id) {
     char *p, *id = NULL, *addr = NULL, *flags = NULL, *primary_id = NULL,
