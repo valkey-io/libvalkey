@@ -225,8 +225,8 @@ void test_parse_cluster_nodes_with_empty_ip(void) {
     c->tcp.host = strdup("127.0.0.99");
 
     valkeyReply *reply = create_cluster_nodes_reply(
-        "752d150249c157c7cb312b6b056517bbbecb42d2 :6379@16379 master - 1658754833817 1658754833000 3 disconnected 5461-10922\n"
-        "e839a12fbed631de867016f636d773e644562e72 127.0.0.1:6379@16379 myself,master - 0 1658755601000 1 connected 0-5460\n"
+        "752d150249c157c7cb312b6b056517bbbecb42d2 :6379@16379 myself,master - 0 0 0 connected 5461-10922\n"
+        "e839a12fbed631de867016f636d773e644562e72 127.0.0.1:6379@16379 master - 0 1658755601000 1 connected 0-5460\n"
         "87f785c4a51f58c06e4be55de8c112210a811db9 127.0.0.2:6379@16379 master - 0 1658755602418 3 connected 10923-16383\n");
     dict *nodes = parse_cluster_nodes(cc, c, reply);
     freeReplyObject(reply);
