@@ -788,13 +788,13 @@ static int parse_cluster_nodes_line(valkeyClusterContext *cc, char *line,
     while (*flags != '\0') {
         if ((p = strchr(flags, ',')) != NULL)
             *p = '\0';
-        if (memcmp(flags, "master", 6) == 0) {
+        if (memcmp(flags, "master", 6) == 0)
             role = VALKEY_ROLE_PRIMARY;
-            break;
-        }
-        if (memcmp(flags, "slave", 5) == 0) {
+        else if (memcmp(flags, "slave", 5) == 0)
             role = VALKEY_ROLE_REPLICA;
-            break;
+        else if (memcmp(flags, "noaddr", 6) == 0) {
+            *parsed_node = NULL;
+            return VALKEY_OK; /* Skip nodes with 'noaddr'. */
         }
         if (p == NULL) /* No more flags. */
             break;
@@ -837,12 +837,6 @@ static int parse_cluster_nodes_line(valkeyClusterContext *cc, char *line,
     }
     *p = '\0';
 
-    /* Skip nodes where address starts with ":0", i.e. 'noaddr'. */
-    if (strlen(addr) == 0) {
-        freeValkeyClusterNode(node);
-        *parsed_node = NULL;
-        return VALKEY_OK;
-    }
     node->host = sdsnew(addr);
     if (node->host == NULL)
         goto oom;

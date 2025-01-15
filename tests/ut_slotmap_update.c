@@ -181,7 +181,7 @@ void test_parse_cluster_nodes_during_failover(void) {
     valkeyClusterFree(cc);
 }
 
-/* Skip nodes with no address, i.e with address :0 */
+/* Skip nodes with the `noaddr` flag. */
 void test_parse_cluster_nodes_with_noaddr(void) {
     valkeyClusterContext *cc = valkeyClusterContextInit();
     valkeyClusterNode *node;
@@ -195,7 +195,7 @@ void test_parse_cluster_nodes_with_noaddr(void) {
     freeReplyObject(reply);
 
     assert(nodes);
-    assert(dictSize(nodes) == 2); /* Only 2 masters since ":0" is skipped. */
+    assert(dictSize(nodes) == 2); /* Only 2 primaries since `noaddr` nodes are skipped. */
     dictInitIterator(&di, nodes);
     /* Verify node 1 */
     node = dictGetEntryVal(dictNext(&di));
@@ -359,7 +359,7 @@ void test_parse_cluster_nodes_with_legacy_format(void) {
     freeReplyObject(reply);
 
     assert(nodes);
-    assert(dictSize(nodes) == 1); /* Only 1 master since ":0" is skipped. */
+    assert(dictSize(nodes) == 1); /* Only 1 primary since `noaddr` nodes are skipped. */
     dictInitIterator(&di, nodes);
     node = dictGetEntryVal(dictNext(&di));
     assert(strcmp(node->addr, "127.0.0.0:6379") == 0);
