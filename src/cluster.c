@@ -753,7 +753,7 @@ static int store_replica_nodes(dict *nodes, dict *replicas) {
  * Only parse primary nodes if the `parsed_primary_id` argument is NULL,
  * otherwise replicas are also parsed and its primary_id is returned by pointer
  * via 'parsed_primary_id'. */
-static int parse_cluster_nodes_line(valkeyClusterContext *cc, char *line,
+static int parse_cluster_nodes_line(valkeyClusterContext *cc, valkeyContext *c, char *line,
                                     valkeyClusterNode **parsed_node, char **parsed_primary_id) {
     char *p, *id = NULL, *addr = NULL, *flags = NULL, *primary_id = NULL,
              *link_state = NULL, *slots = NULL;
@@ -825,25 +825,53 @@ static int parse_cluster_nodes_line(valkeyClusterContext *cc, char *line,
     if ((p = strchr(addr, PORT_CPORT_SEPARATOR)) != NULL) {
         *p = '\0';
     }
-    node->addr = sdsnew(addr);
-    if (node->addr == NULL)
-        goto oom;
 
-    /* Get the host part */
+    /* Find the required port separator. */
     if ((p = strrchr(addr, IP_PORT_SEPARATOR)) == NULL) {
         valkeyClusterSetError(cc, VALKEY_ERR_OTHER, "Invalid node address");
         freeValkeyClusterNode(node);
         return VALKEY_ERR;
     }
-    *p = '\0';
 
-    node->host = sdsnew(addr);
-    if (node->host == NULL)
-        goto oom;
+    /* Get the port (skip the found port separator). */
+    int port = vk_atoi(p + 1, strlen(p + 1));
+    if (port < 1 || port > UINT16_MAX) {
+        valkeyClusterSetError(cc, VALKEY_ERR_OTHER, "Invalid port");
+        freeValkeyClusterNode(node);
+        return VALKEY_ERR;
+    }
+    node->port = port;
 
-    /* Get the port. */
-    p++; // Skip separator character.
-    node->port = vk_atoi(p, strlen(p));
+    /* Check that we received an ip/host address, i.e. the field
+     * does not start with the port separator. */
+    if (p != addr) {
+        node->addr = sdsnew(addr);
+        if (node->addr == NULL)
+            goto oom;
+
+        *p = '\0'; /* Cut port separator. */
+
+        node->host = sdsnew(addr);
+        if (node->host == NULL)
+            goto oom;
+
+    } else {
+        /* We received an ip/host that is an empty string. According to the docs
+         * we can treat this as it means the same address we sent this command to. */
+        node->host = sdsnew(c->tcp.host);
+        if (node->host == NULL) {
+            goto oom;
+        }
+        /* Create a new addr field using correct host:port */
+        node->addr = sdsnew(node->host);
+        if (node->addr == NULL) {
+            goto oom;
+        }
+        node->addr = sdscatfmt(node->addr, ":%i", node->port);
+        if (node->addr == NULL) {
+            goto oom;
+        }
+    }
 
     /* No slot parsing needed for replicas, but return primary id. */
     if (node->role == VALKEY_ROLE_REPLICA) {
@@ -905,7 +933,7 @@ oom:
 /**
  * Parse the "cluster nodes" command reply to nodes dict.
  */
-static dict *parse_cluster_nodes(valkeyClusterContext *cc, valkeyReply *reply) {
+static dict *parse_cluster_nodes(valkeyClusterContext *cc, valkeyContext *c, valkeyReply *reply) {
     dict *nodes = NULL;
     int slot_ranges_found = 0;
     int add_replicas = cc->flags & VALKEYCLUSTER_FLAG_ADD_SLAVE;
@@ -930,7 +958,7 @@ static dict *parse_cluster_nodes(valkeyClusterContext *cc, valkeyReply *reply) {
 
         char *primary_id;
         valkeyClusterNode *node;
-        if (parse_cluster_nodes_line(cc, line, &node, add_replicas ? &primary_id : NULL) != VALKEY_OK)
+        if (parse_cluster_nodes_line(cc, c, line, &node, add_replicas ? &primary_id : NULL) != VALKEY_OK)
             goto error;
         if (node == NULL)
             continue; /* Line skipped. */
@@ -1031,7 +1059,7 @@ static int clusterUpdateRouteHandleReply(valkeyClusterContext *cc,
     if (cc->flags & VALKEYCLUSTER_FLAG_ROUTE_USE_SLOTS) {
         nodes = parse_cluster_slots(cc, reply);
     } else {
-        nodes = parse_cluster_nodes(cc, reply);
+        nodes = parse_cluster_nodes(cc, c, reply);
     }
     freeReplyObject(reply);
     return updateNodesAndSlotmap(cc, nodes);
@@ -2890,7 +2918,7 @@ void clusterNodesReplyCallback(valkeyAsyncContext *ac, void *r,
     }
 
     valkeyClusterContext *cc = acc->cc;
-    dict *nodes = parse_cluster_nodes(cc, reply);
+    dict *nodes = parse_cluster_nodes(cc, &ac->c, reply);
     if (updateNodesAndSlotmap(cc, nodes) != VALKEY_OK) {
         /* Ignore failures for now */
     }
