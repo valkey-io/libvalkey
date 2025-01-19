@@ -650,9 +650,9 @@ void test_parse_cluster_slots_with_multiple_replicas(void) {
     dict *nodes = parse_cluster_slots(cc, reply);
     freeReplyObject(reply);
 
-    /* Verify master. */
+    /* Verify primary. */
     assert(nodes);
-    assert(dictSize(nodes) == 1); /* 1 master */
+    assert(dictSize(nodes) == 1); /* 1 primary */
     dictInitIterator(&di, nodes);
     node = dictGetEntryVal(dictNext(&di));
     assert(strcmp(node->addr, "127.0.0.1:30001") == 0);
@@ -687,6 +687,58 @@ void test_parse_cluster_slots_with_multiple_replicas(void) {
     valkeyClusterFree(cc);
 }
 
+void test_parse_cluster_slots_with_noncontiguous_slots(void) {
+    valkeyClusterContext *cc = valkeyClusterContextInit();
+    valkeyClusterNode *node;
+    cluster_slot *slot;
+    dictIterator di;
+    listIter li;
+
+    cc->flags |= VALKEYCLUSTER_FLAG_ADD_SLAVE;
+
+    valkeyReply *reply = create_cluster_slots_reply(
+        "[[0, 0, ['127.0.0.1', 30001, 'e7d1eecce10fd6bb5eb35b9f99a514335d9ba9ca'],"
+        "        ['127.0.0.1', 30004, '07c37dfeb235213a872192d90877d0cd55635b91']],"
+        " [2, 2, ['127.0.0.1', 30001, 'e7d1eecce10fd6bb5eb35b9f99a514335d9ba9ca'],"
+        "        ['127.0.0.1', 30004, '07c37dfeb235213a872192d90877d0cd55635b91']],"
+        " [4, 5460, ['127.0.0.1', 30001, 'e7d1eecce10fd6bb5eb35b9f99a514335d9ba9ca'],"
+        "           ['127.0.0.1', 30004, '07c37dfeb235213a872192d90877d0cd55635b91']]]");
+
+    dict *nodes = parse_cluster_slots(cc, reply);
+    freeReplyObject(reply);
+
+    /* Verify primary. */
+    assert(nodes);
+    assert(dictSize(nodes) == 1); /* 1 primary */
+    dictInitIterator(&di, nodes);
+    node = dictGetEntryVal(dictNext(&di));
+    assert(strcmp(node->addr, "127.0.0.1:30001") == 0);
+    assert(strcmp(node->host, "127.0.0.1") == 0);
+    assert(node->port == 30001);
+    assert(node->role == VALKEY_ROLE_PRIMARY);
+    assert(listLength(node->slots) == 3); /* 3 slot range */
+    listRewind(node->slots, &li);
+    slot = listNodeValue(listNext(&li));
+    assert(slot->start == 0);
+    assert(slot->end == 0);
+    slot = listNodeValue(listNext(&li));
+    assert(slot->start == 2);
+    assert(slot->end == 2);
+    slot = listNodeValue(listNext(&li));
+    assert(slot->start == 4);
+    assert(slot->end == 5460);
+
+    /* Verify replica. */
+    assert(listLength(node->replicas) == 1);
+    listRewind(node->replicas, &li);
+    node = listNodeValue(listNext(&li));
+    assert(strcmp(node->addr, "127.0.0.1:30004") == 0);
+    assert(node->role == VALKEY_ROLE_REPLICA);
+
+    dictRelease(nodes);
+    valkeyClusterFree(cc);
+}
+
 int main(void) {
     test_parse_cluster_nodes(false /* replicas not parsed */);
     test_parse_cluster_nodes(true /* replicas parsed */);
@@ -703,5 +755,6 @@ int main(void) {
     test_parse_cluster_slots_with_empty_ip();
     test_parse_cluster_slots_with_null_ip();
     test_parse_cluster_slots_with_multiple_replicas();
+    test_parse_cluster_slots_with_noncontiguous_slots();
     return 0;
 }
