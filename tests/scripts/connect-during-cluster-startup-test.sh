@@ -51,7 +51,7 @@ SET foo bar1
 # Wait to avoid slotmap update throttling.
 !sleep
 
-# A command will fail direcly, but a slotmap update is scheduled.
+# A command will fail directly, but a slotmap update is scheduled.
 SET foo bar2
 
 # Allow slotmap update to finish.
