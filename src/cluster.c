@@ -2888,7 +2888,8 @@ void clusterSlotsReplyCallback(valkeyAsyncContext *ac, void *r,
     valkeyClusterContext *cc = acc->cc;
     dict *nodes = parse_cluster_slots(cc, &ac->c, reply);
     if (updateNodesAndSlotmap(cc, nodes) != VALKEY_OK) {
-        /* Ignore failures for now */
+        /* Retry using available nodes */
+        updateSlotMapAsync(acc, NULL);
     }
 }
 
@@ -2908,7 +2909,8 @@ void clusterNodesReplyCallback(valkeyAsyncContext *ac, void *r,
     valkeyClusterContext *cc = acc->cc;
     dict *nodes = parse_cluster_nodes(cc, &ac->c, reply);
     if (updateNodesAndSlotmap(cc, nodes) != VALKEY_OK) {
-        /* Ignore failures for now */
+        /* Retry using available nodes */
+        updateSlotMapAsync(acc, NULL);
     }
 }
 
