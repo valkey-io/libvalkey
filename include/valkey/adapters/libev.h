@@ -193,14 +193,14 @@ static int valkeyLibevAttachAdapter(valkeyAsyncContext *ac, void *loop) {
 }
 
 VALKEY_UNUSED
-static int valkeyClusterLibevAttach(valkeyClusterAsyncContext *acc,
-                                    struct ev_loop *loop) {
-    if (acc == NULL || loop == NULL) {
+static int valkeyClusterOptionsUseLibev(valkeyClusterOptions *options,
+                                        struct ev_loop *loop) {
+    if (options == NULL || loop == NULL) {
         return VALKEY_ERR;
     }
 
-    acc->attach_fn = valkeyLibevAttachAdapter;
-    acc->attach_data = loop;
+    options->attach_fn = valkeyLibevAttachAdapter;
+    options->attach_data = loop;
     return VALKEY_OK;
 }
 

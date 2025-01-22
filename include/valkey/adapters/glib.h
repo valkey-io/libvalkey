@@ -153,14 +153,14 @@ static int valkeyGlibAttachAdapter(valkeyAsyncContext *ac, void *context) {
 }
 
 VALKEY_UNUSED
-static int valkeyClusterGlibAttach(valkeyClusterAsyncContext *acc,
-                                   GMainContext *context) {
-    if (acc == NULL) { // A NULL context is accepted.
+static int valkeyClusterOptionsUseGlib(valkeyClusterOptions *options,
+                                       GMainContext *context) {
+    if (options == NULL) { // A NULL context is accepted.
         return VALKEY_ERR;
     }
 
-    acc->attach_fn = valkeyGlibAttachAdapter;
-    acc->attach_data = context;
+    options->attach_fn = valkeyGlibAttachAdapter;
+    options->attach_data = context;
     return VALKEY_OK;
 }
 

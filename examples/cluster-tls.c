@@ -25,13 +25,13 @@ int main(int argc, char **argv) {
 
     struct timeval timeout = {1, 500000}; // 1.5s
 
-    valkeyClusterContext *cc = valkeyClusterContextInit();
-    valkeyClusterSetOptionAddNodes(cc, CLUSTER_NODE_TLS);
-    valkeyClusterSetOptionConnectTimeout(cc, timeout);
-    valkeyClusterSetOptionRouteUseSlots(cc);
-    valkeyClusterSetOptionParseSlaves(cc);
-    valkeyClusterSetOptionEnableTLS(cc, tls);
-    valkeyClusterConnect2(cc);
+    valkeyClusterOptions options = {0};
+    options.initial_nodes = CLUSTER_NODE_TLS;
+    options.options = VALKEY_OPT_USE_CLUSTER_SLOTS;
+    options.connect_timeout = &timeout;
+    valkeyClusterOptionsEnableTLS(&options, tls);
+
+    valkeyClusterContext *cc = valkeyClusterConnectWithOptions(&options);
     if (!cc) {
         printf("Error: Allocation failure\n");
         exit(-1);

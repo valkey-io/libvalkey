@@ -203,14 +203,15 @@ static int valkeyLibuvAttachAdapter(valkeyAsyncContext *ac, void *loop) {
 }
 
 VALKEY_UNUSED
-static int valkeyClusterLibuvAttach(valkeyClusterAsyncContext *acc,
-                                    uv_loop_t *loop) {
-    if (acc == NULL || loop == NULL) {
+static int valkeyClusterOptionsUseLibuv(valkeyClusterOptions *options,
+                                        uv_loop_t *loop) {
+    if (options == NULL || loop == NULL) {
         return VALKEY_ERR;
     }
 
-    acc->attach_fn = valkeyLibuvAttachAdapter;
-    acc->attach_data = loop;
+    options->attach_fn = valkeyLibuvAttachAdapter;
+    options->attach_data = loop;
     return VALKEY_OK;
 }
+
 #endif /* VALKEY_ADAPTERS_LIBUV_H */

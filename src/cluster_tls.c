@@ -28,14 +28,12 @@
  */
 #include "cluster_tls.h"
 
-int valkeyClusterSetOptionEnableTLS(valkeyClusterContext *cc,
-                                    valkeyTLSContext *tls) {
-    if (cc == NULL || tls == NULL) {
+int valkeyClusterOptionsEnableTLS(valkeyClusterOptions *options,
+                                  valkeyTLSContext *tls) {
+    if (options == NULL || tls == NULL) {
         return VALKEY_ERR;
     }
-
-    cc->tls = tls;
-    cc->tls_init_fn = &valkeyInitiateTLSWithContext;
-
+    options->tls = tls;
+    options->tls_init_fn = &valkeyInitiateTLSWithContext;
     return VALKEY_OK;
 }
