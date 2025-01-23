@@ -64,6 +64,7 @@ wait $syncpid1 $syncpid2;
 # Run client
 timeout 3s "$clientprog" --events 127.0.0.1:7403 > "$testname.out" <<'EOF'
 GET foo
+!sleep
 GET foo
 EOF
 clientexit=$?
