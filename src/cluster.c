@@ -1821,50 +1821,96 @@ static int valkeyClusterGetReplyFromNode(valkeyClusterContext *cc,
 }
 
 /* Parses a MOVED or ASK error reply and returns the destination node. The slot
- * is returned by pointer, if provided. */
+ * is returned by pointer, if provided. When the parsed endpoint/IP is an empty
+ * string the address from which the reply was sent from is used instead, as
+ * described in the Valkey Cluster Specification. This address is provided via
+ * the valkeyContext given in 'c'. */
 static valkeyClusterNode *getNodeFromRedirectReply(valkeyClusterContext *cc,
+                                                   valkeyContext *c,
                                                    valkeyReply *reply,
                                                    int *slotptr) {
     valkeyClusterNode *node = NULL;
-    sds *part = NULL;
-    int part_len = 0;
-    char *p;
+    sds key = NULL;
+    sds endpoint = NULL;
+    char *str = reply->str;
 
     /* Expecting ["ASK" | "MOVED", "<slot>", "<endpoint>:<port>"] */
-    part = sdssplitlen(reply->str, reply->len, " ", 1, &part_len);
-    if (part == NULL) {
-        goto oom;
+    char *p, *slot = NULL, *addr = NULL;
+    int field = 0;
+    while (*str != '\0') {
+        // clang-format off
+        if ((p = strchr(str, ' ')) != NULL)
+            *p = '\0';
+        switch (field++) {
+            // Skip field 0, i.e. ASK/MOVED
+            case 1: slot = str; break;
+            case 2: addr = str; break;
+        }
+        if (p == NULL) break; /* No more fields. */
+        str = p + 1; /* Start of next field. */
+        // clang-format on
     }
-    if (part_len != 3) {
-        valkeyClusterSetError(cc, VALKEY_ERR_OTHER, "failed to parse redirect");
-        goto done;
+
+    /* Make sure all expected fields are found. */
+    if (addr == NULL) {
+        valkeyClusterSetError(cc, VALKEY_ERR_OTHER, "Failed to parse redirect");
+        return NULL;
+    }
+    /* Find the last occurrence of the port separator since
+     * IPv6 addresses can contain ':' */
+    if ((p = strrchr(addr, IP_PORT_SEPARATOR)) == NULL) {
+        valkeyClusterSetError(cc, VALKEY_ERR_OTHER, "Invalid address in redirect");
+        return NULL;
+    }
+    /* Get the port (skip the found port separator). */
+    int port = vk_atoi(p + 1, strlen(p + 1));
+    if (port < 1 || port > UINT16_MAX) {
+        valkeyClusterSetError(cc, VALKEY_ERR_OTHER, "Invalid port in redirect");
+        return NULL;
+    }
+
+    /* Check that we received an ip/host address, i.e. the field
+     * does not start with the port separator. */
+    if (p != addr) {
+        key = sdsnew(addr);
+        if (key == NULL) {
+            goto oom;
+        }
+        *p = '\0'; /* Cut port separator and port. */
+
+        endpoint = sdsnew(addr);
+        if (endpoint == NULL) {
+            goto oom;
+        }
+    } else {
+        /* We received an ip/host that is an empty string. According to the docs
+         * we can treat this as it means the same address we received the reply from. */
+        endpoint = sdsnew(c->tcp.host);
+        if (endpoint == NULL) {
+            goto oom;
+        }
+
+        key = sdsdup(endpoint);
+        if (key == NULL) {
+            goto oom;
+        }
+        key = sdscatfmt(key, ":%i", port);
+        if (key == NULL) {
+            goto oom;
+        }
     }
 
     /* Parse slot if requested. */
     if (slotptr != NULL) {
-        *slotptr = vk_atoi(part[1], sdslen(part[1]));
+        *slotptr = vk_atoi(slot, strlen(slot));
     }
 
-    /* Find the last occurrence of the port separator since
-     * IPv6 addresses can contain ':' */
-    if ((p = strrchr(part[2], IP_PORT_SEPARATOR)) == NULL) {
-        valkeyClusterSetError(cc, VALKEY_ERR_OTHER,
-                              "port separator missing in redirect");
-        goto done;
-    }
-    // p includes separator
-
-    /* Empty endpoint not supported yet */
-    if (p - part[2] == 0) {
-        valkeyClusterSetError(cc, VALKEY_ERR_OTHER,
-                              "endpoint missing in redirect");
-        goto done;
-    }
-
-    dictEntry *de = dictFind(cc->nodes, part[2]);
+    /* Get the node if already known. */
+    dictEntry *de = dictFind(cc->nodes, key);
     if (de != NULL) {
-        node = de->val;
-        goto done;
+        sdsfree(key);
+        sdsfree(endpoint);
+        return de->val;
     }
 
     /* Add this node since it was unknown */
@@ -1873,39 +1919,26 @@ static valkeyClusterNode *getNodeFromRedirectReply(valkeyClusterContext *cc,
         goto oom;
     }
     node->role = VALKEY_ROLE_PRIMARY;
-    node->addr = part[2];
-    part[2] = NULL; /* Memory ownership moved */
-
-    node->host = sdsnewlen(node->addr, p - node->addr);
-    if (node->host == NULL) {
-        goto oom;
-    }
-    p++; // remove found separator character
-    node->port = vk_atoi(p, strlen(p));
-
-    sds key = sdsnewlen(node->addr, sdslen(node->addr));
-    if (key == NULL) {
+    node->host = endpoint;
+    node->port = port;
+    node->addr = sdsdup(key);
+    if (node->addr == NULL) {
         goto oom;
     }
 
     if (dictAdd(cc->nodes, key, node) != DICT_OK) {
-        sdsfree(key);
         goto oom;
     }
-
-done:
-    sdsfreesplitres(part, part_len);
     return node;
 
 oom:
     valkeyClusterSetError(cc, VALKEY_ERR_OOM, "Out of memory");
-    sdsfreesplitres(part, part_len);
+    sdsfree(key);
+    sdsfree(endpoint);
     if (node != NULL) {
         sdsfree(node->addr);
-        sdsfree(node->host);
         vk_free(node);
     }
-
     return NULL;
 }
 
@@ -1991,7 +2024,7 @@ ask_retry:
         int slot = -1;
         switch (error_type) {
         case CLUSTER_ERR_MOVED:
-            node = getNodeFromRedirectReply(cc, reply, &slot);
+            node = getNodeFromRedirectReply(cc, c, reply, &slot);
             freeReplyObject(reply);
             reply = NULL;
 
@@ -2031,7 +2064,7 @@ ask_retry:
 
             break;
         case CLUSTER_ERR_ASK:
-            node = getNodeFromRedirectReply(cc, reply, NULL);
+            node = getNodeFromRedirectReply(cc, c, reply, NULL);
             if (node == NULL) {
                 goto error;
             }
@@ -3079,7 +3112,7 @@ static void valkeyClusterAsyncCallback(valkeyAsyncContext *ac, void *r,
             /* Initiate slot mapping update using the node that sent MOVED. */
             throttledUpdateSlotMapAsync(acc, ac);
 
-            node = getNodeFromRedirectReply(cc, reply, &slot);
+            node = getNodeFromRedirectReply(cc, &ac->c, reply, &slot);
             if (node == NULL) {
                 valkeyClusterAsyncSetError(acc, cc->err, cc->errstr);
                 goto done;
@@ -3092,7 +3125,7 @@ static void valkeyClusterAsyncCallback(valkeyAsyncContext *ac, void *r,
 
             break;
         case CLUSTER_ERR_ASK:
-            node = getNodeFromRedirectReply(cc, reply, NULL);
+            node = getNodeFromRedirectReply(cc, &ac->c, reply, NULL);
             if (node == NULL) {
                 valkeyClusterAsyncSetError(acc, cc->err, cc->errstr);
                 goto done;
