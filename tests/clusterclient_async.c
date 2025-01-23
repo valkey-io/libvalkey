@@ -56,6 +56,8 @@ char cmd_history[HISTORY_DEPTH][CMD_SIZE];
 int num_running = 0;
 int resend_failed_cmd = 0;
 int send_to_all = 0;
+int show_events = 0;
+int async_initial_update = 0;
 
 void sendNextCommand(evutil_socket_t, short, void *);
 
@@ -100,8 +102,9 @@ void replyCallback(valkeyClusterAsyncContext *acc, void *r, void *privdata) {
 
     if (--num_running == 0) {
         /* Schedule a read from stdin and send next command */
+        struct timeval timeout = {0, 10};
         struct event_base *base = acc->attach_data;
-        event_base_once(base, -1, EV_TIMEOUT, sendNextCommand, acc, NULL);
+        event_base_once(base, -1, EV_TIMEOUT, sendNextCommand, acc, &timeout);
     }
 }
 
@@ -172,8 +175,9 @@ void sendNextCommand(evutil_socket_t fd, short kind, void *arg) {
                 printf("error: %s\n", acc->errstr);
 
                 /* Schedule a read from stdin and handle next command. */
+                struct timeval timeout = {0, 10};
                 struct event_base *base = acc->attach_data;
-                event_base_once(base, -1, EV_TIMEOUT, sendNextCommand, acc, NULL);
+                event_base_once(base, -1, EV_TIMEOUT, sendNextCommand, acc, &timeout);
             }
         }
 
@@ -189,7 +193,17 @@ void sendNextCommand(evutil_socket_t fd, short kind, void *arg) {
 
 void eventCallback(const valkeyClusterContext *cc, int event, void *privdata) {
     (void)cc;
-    (void)privdata;
+    if (event == VALKEYCLUSTER_EVENT_READY) {
+        /* Schedule a read from stdin and send next command. */
+        valkeyClusterAsyncContext *acc = (valkeyClusterAsyncContext *)privdata;
+        struct timeval timeout = {0, 10};
+        struct event_base *base = acc->attach_data;
+        event_base_once(base, -1, EV_TIMEOUT, sendNextCommand, acc, &timeout);
+    }
+
+    if (!show_events)
+        return;
+
     const char *e = NULL;
     switch (event) {
     case VALKEYCLUSTER_EVENT_SLOTMAP_UPDATED:
@@ -224,7 +238,6 @@ void disconnectCallback(const valkeyAsyncContext *ac, int status) {
 
 int main(int argc, char **argv) {
     int use_cluster_slots = 1; // Get topology via CLUSTER SLOTS
-    int show_events = 0;
     int show_connection_events = 0;
 
     int optind;
@@ -235,6 +248,8 @@ int main(int argc, char **argv) {
             show_events = 1;
         } else if (strcmp(argv[optind], "--connection-events") == 0) {
             show_connection_events = 1;
+        } else if (strcmp(argv[optind], "--async-initial-update") == 0) {
+            async_initial_update = 1;
         } else {
             fprintf(stderr, "Unknown argument: '%s'\n", argv[optind]);
         }
@@ -254,28 +269,30 @@ int main(int argc, char **argv) {
     valkeyClusterSetOptionTimeout(acc->cc, timeout);
     valkeyClusterSetOptionConnectTimeout(acc->cc, timeout);
     valkeyClusterSetOptionMaxRetry(acc->cc, 1);
+    valkeyClusterSetEventCallback(acc->cc, eventCallback, acc);
     if (use_cluster_slots) {
         valkeyClusterSetOptionRouteUseSlots(acc->cc);
-    }
-    if (show_events) {
-        valkeyClusterSetEventCallback(acc->cc, eventCallback, NULL);
     }
     if (show_connection_events) {
         valkeyClusterAsyncSetConnectCallback(acc, connectCallback);
         valkeyClusterAsyncSetDisconnectCallback(acc, disconnectCallback);
     }
 
-    if (valkeyClusterConnect2(acc->cc) != VALKEY_OK) {
-        printf("Connect error: %s\n", acc->cc->errstr);
-        exit(2);
-    }
-
     struct event_base *base = event_base_new();
     int status = valkeyClusterLibeventAttach(acc, base);
     assert(status == VALKEY_OK);
 
-    /* Schedule a read from stdin and send next command */
-    event_base_once(base, -1, EV_TIMEOUT, sendNextCommand, acc, NULL);
+    if (async_initial_update) {
+        if (valkeyClusterAsyncConnect2(acc) != VALKEY_OK) {
+            printf("Connect error: %s\n", acc->errstr);
+            exit(2);
+        }
+    } else {
+        if (valkeyClusterConnect2(acc->cc) != VALKEY_OK) {
+            printf("Connect error: %s\n", acc->cc->errstr);
+            exit(2);
+        }
+    }
 
     event_base_dispatch(base);
 
