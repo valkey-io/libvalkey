@@ -91,6 +91,7 @@ expected="Event: slotmap-updated
 Event: ready
 Event: slotmap-updated
 bar
+Event: slotmap-updated
 bar
 Event: free-context"
 
