@@ -135,9 +135,9 @@ When a `valkeyReply` is returned, you should test the `valkeyReply->type` field 
 - `VALKEY_REPLY_BIGNUM` - As of yet unused, but the string would be in `reply->str`.
 - `VALKEY_REPLY_STRING` - A string reply which will be in `reply->str`.
 - `VALKEY_REPLY_VERB` - A verbatim string reply which will be in `reply->str` and who's type will be in `reply->vtype`.
-- `VALKEY_REPLY_ARRAY` - An array reply where each element is in `reply->element` with the number of elements in `reply->element`.
-- `VALKEY_REPLY_MAP` - A map reply, which structurally looks just like `VALKEY_REPLY_ARRAY` only is meant to represent keys and values. As with an array reply you can access the elements with `reply->element` and `reply->element`.
-- `VALKEY_REPLY_SET` - Another array-like reply representing a set (e.g. a reply from `SMEMBERS`). Access via `reply->elemeent` and `reply->element`.
+- `VALKEY_REPLY_ARRAY` - An array reply where each element is in `reply->element` with the number of elements in `reply->elements`.
+- `VALKEY_REPLY_MAP` - A map reply, which structurally looks just like `VALKEY_REPLY_ARRAY` only is meant to represent keys and values. As with an array reply you can access the elements with `reply->element` and `reply->elements`.
+- `VALKEY_REPLY_SET` - Another array-like reply representing a set (e.g. a reply from `SMEMBERS`). Access via `reply->element` and `reply->elements`.
 - `VALKEY_REPLY_ATTR` - An attribute reply. As of yet unused by valkey-server.
 - `VALKEY_REPLY_PUSH` - An out of band push reply. This is also array-like in nature.
 
