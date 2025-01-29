@@ -36,12 +36,15 @@ The basic alternatives lacks most options, but can be enough for some use cases.
 valkeyClusterContext *valkeyClusterConnect(const char *addrs);
 valkeyClusterContext *valkeyClusterConnectWithTimeout(const char *addrs,
                                                       const struct timeval tv);
+```
 
-// There is also a convenience struct to specify various options.
+There is also a convenience struct to specify various options.
+
+```c
 valkeyClusterContext *valkeyClusterConnectWithOptions(const valkeyClusterOptions *options);
 ```
 
-When connecting to a cluster, libvalkey will return `NULL` in the event that we can't allocate the context, and set the `err` member if we can allocate the context but there are issues.
+When connecting to a cluster, `NULL` is returned when the context can't be allocated, or `err` and `errstr` are set in the returned allocated context when there are issues.
 So when connecting it's simple to handle error states.
 
 ```c
@@ -53,8 +56,8 @@ if (cc == NULL || cc->err) {
 
 ### Connection options
 
-There are a variety of options you can specify when connecting to a cluster, which are delivered via the `valkeyClusterOptions` helper struct.
-This includes information how to connect to the cluster and defining optional callbacks as well as other flags.
+There are a variety of options you can specify using the `valkeyClusterOptions` struct when connecting to a cluster.
+This includes information about how to connect to the cluster and defining optional callbacks and other options.
 See [include/valkey/cluster.h](../include/valkey/cluster.h) for more details.
 
 ```c
@@ -72,7 +75,7 @@ if (cc == NULL || cc->err) {
 }
 ```
 
-There are also several flags you can specify when using the `valkeyClusterOptions` helper struct.
+There are also several flags you can specify in `valkeyClusterOptions.flags`. It's a bitwise OR of the following flags:
 
 | Flag | Description  |
 | --- | --- |
