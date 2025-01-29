@@ -175,6 +175,17 @@ typedef struct {
     void *event_privdata;
 
     /* Synchronous API callbacks. */
+
+    /* A hook for connect and reconnect attempts, e.g. for applying additional
+     * socket options. This is called just after connect, before TLS handshake and
+     * Valkey authentication.
+     *
+     * On successful connection, `status` is set to `VALKEY_OK` and the file
+     * descriptor can be accessed as `c->fd` to apply socket options.
+     *
+     * On failed connection attempt, this callback is called with `status` set to
+     * `VALKEY_ERR`. The `err` field in the `valkeyContext` can be used to find out
+     * the cause of the error. */
     void (*connect_callback)(const valkeyContext *c, int status);
 
     /* Asynchronous API callbacks. */
@@ -187,20 +198,6 @@ typedef struct {
     void *tls;
     int (*tls_init_fn)(struct valkeyContext *, struct valkeyTLSContext *);
 } valkeyClusterOptions;
-
-/* A hook for connect and reconnect attempts, e.g. for applying additional
- * socket options. This is called just after connect, before TLS handshake and
- * Valkey authentication.
- *
- * On successful connection, `status` is set to `VALKEY_OK` and the file
- * descriptor can be accessed as `c->fd` to apply socket options.
- *
- * On failed connection attempt, this callback is called with `status` set to
- * `VALKEY_ERR`. The `err` field in the `valkeyContext` can be used to find out
- * the cause of the error. */
-int valkeyClusterOptionsSetConnectCallback(valkeyClusterOptions *options,
-                                           void(fn)(const valkeyContext *c,
-                                                    int status));
 
 /* --- Synchronous API --- */
 

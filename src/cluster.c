@@ -2110,16 +2110,6 @@ static int prepareCommand(valkeyClusterContext *cc, struct cmd *command) {
     return VALKEY_OK;
 }
 
-int valkeyClusterOptionsSetConnectCallback(valkeyClusterOptions *options,
-                                           void(fn)(const valkeyContext *c,
-                                                    int status)) {
-    if (options->connect_callback == NULL) {
-        options->connect_callback = fn;
-        return VALKEY_OK;
-    }
-    return VALKEY_ERR;
-}
-
 void *valkeyClusterFormattedCommand(valkeyClusterContext *cc, char *cmd,
                                     int len) {
     valkeyReply *reply = NULL;

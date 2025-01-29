@@ -200,11 +200,17 @@ The callback is called with `event` set to one of the following values:
 
 There is a hook to get notified about connect and reconnect attempts.
 This is useful for applying socket options or access endpoint information for a connection to a particular node.
-The callback is registered using the following function:
+The callback is registered using an option:
 
 ```c
-int valkeyClusterOptionsSetConnectCallback(valkeyClusterOptions *options,
-                                           void(fn)(const valkeyContext *c, int status));
+void connect_callback(const valkeyContext *c, int status) {
+   // Perform desired action
+}
+
+valkeyClusterOptions opt = {0};
+opt.connect_callback = connect_callback;
+// Set additional options...
+valkeyClusterContext *cc = valkeyClusterConnectWithOptions(&opt);
 ```
 
 The callback is called just after connect, before TLS handshake and authentication.
