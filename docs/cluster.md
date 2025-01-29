@@ -66,8 +66,9 @@ opt.initial_nodes = "127.0.0.1:6379,127.0.0.1:6380"; // Addresses to initially c
 opt.options = VALKEY_OPT_USE_CLUSTER_NODES;          // See available flags below.
 opt.password = "password"                            // Authentication; libvalkey sends the `AUTH` command.
 
-// There are helper functions to set some options.
-valkeyClusterOptionsEnableTLS(&opt, tlsCtx);         // Use TLS and a prepared `valkeyTLSContext` when connecting.
+// Enable TLS using a prepared `valkeyTLSContext` when connecting.
+options.tls = tlsCtx;
+options.tls_init_fn = &valkeyInitiateTLSWithContext;
 
 valkeyClusterContext *cc = valkeyClusterConnectWithOptions(&opt);
 if (cc == NULL || cc->err) {

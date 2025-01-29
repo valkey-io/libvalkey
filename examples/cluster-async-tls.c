@@ -1,5 +1,5 @@
 #include <valkey/cluster.h>
-#include <valkey/cluster_tls.h>
+#include <valkey/tls.h>
 
 #include <valkey/adapters/libevent.h>
 
@@ -72,7 +72,8 @@ int main(int argc, char **argv) {
     options.initial_nodes = CLUSTER_NODE_TLS;
     options.async_connect_cb = connectCallback;
     options.async_disconnect_cb = disconnectCallback;
-    valkeyClusterOptionsEnableTLS(&options, tls);
+    options.tls = tls;
+    options.tls_init_fn = &valkeyInitiateTLSWithContext;
     valkeyClusterOptionsUseLibevent(&options, base);
 
     valkeyClusterAsyncContext *acc = valkeyClusterAsyncConnectWithOptions(&options);

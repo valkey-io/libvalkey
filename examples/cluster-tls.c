@@ -1,7 +1,5 @@
 #include <valkey/cluster.h>
-#include <valkey/cluster_tls.h>
 #include <valkey/tls.h>
-#include <valkey/valkey.h>
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -28,7 +26,8 @@ int main(int argc, char **argv) {
     valkeyClusterOptions options = {0};
     options.initial_nodes = CLUSTER_NODE_TLS;
     options.connect_timeout = &timeout;
-    valkeyClusterOptionsEnableTLS(&options, tls);
+    options.tls = tls;
+    options.tls_init_fn = &valkeyInitiateTLSWithContext;
 
     valkeyClusterContext *cc = valkeyClusterConnectWithOptions(&options);
     if (!cc) {

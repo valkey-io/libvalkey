@@ -194,7 +194,7 @@ typedef struct {
     int (*attach_fn)(valkeyAsyncContext *ac, void *attach_data); /* Event engine attach func. */
     void *attach_data;
 
-    /* TLS context, enabled using valkeyClusterOptionsEnableTLS. */
+    /* TLS context, initiated using valkeyCreateTLSContext. */
     void *tls;
     int (*tls_init_fn)(struct valkeyContext *, struct valkeyTLSContext *);
 } valkeyClusterOptions;
