@@ -527,6 +527,7 @@ void test_parse_cluster_slots(bool parse_replicas) {
         options.options |= VALKEY_OPT_USE_REPLICAS;
 
     valkeyClusterContext *cc = valkeyClusterContextInit(&options);
+    valkeyContext *c = valkeyContextInit();
     valkeyClusterNode *node;
     cluster_slot *slot;
     dictIterator di;
@@ -539,7 +540,7 @@ void test_parse_cluster_slots(bool parse_replicas) {
         " [10923, 16383, ['127.0.0.1', 30003, '292f8b365bb7edb5e285caf0b7e6ddc7265d2f4f', ['hostname', 'localhost']]"
         "                ['127.0.0.1', 30006, '824fe116063bc5fcf9f4ffd895bc17aee7731ac3', ['hostname', 'localhost']]]]");
 
-    dict *nodes = parse_cluster_slots(cc, reply);
+    dict *nodes = parse_cluster_slots(cc, c, reply);
     freeReplyObject(reply);
 
     assert(nodes);
@@ -601,42 +602,79 @@ void test_parse_cluster_slots(bool parse_replicas) {
     }
 
     dictRelease(nodes);
+    valkeyFree(c);
     valkeyClusterFree(cc);
 }
 
 void test_parse_cluster_slots_with_empty_ip(void) {
     valkeyClusterOptions options = {0};
     valkeyClusterContext *cc = valkeyClusterContextInit(&options);
+    valkeyClusterNode *node;
+    dictIterator di;
+
+    /* Set the IP from which the response is received from. */
+    valkeyContext *c = valkeyContextInit();
+    c->tcp.host = strdup("127.0.0.99");
 
     valkeyReply *reply = create_cluster_slots_reply(
         "[[0, 5460, ['', 6379, 'e7d1eecce10fd6bb5eb35b9f99a514335d9ba9ca']],"
         " [5461, 10922, ['127.0.0.1', 6379, '67ed2db8d677e59ec4a4cefb06858cf2a1a89fa1']],"
-        " [10923, 16383, ['127.0.0.1', 6379, '292f8b365bb7edb5e285caf0b7e6ddc7265d2f4f']]]");
+        " [10923, 16383, ['127.0.0.2', 6379, '292f8b365bb7edb5e285caf0b7e6ddc7265d2f4f']]]");
 
-    dict *nodes = parse_cluster_slots(cc, reply);
+    dict *nodes = parse_cluster_slots(cc, c, reply);
     freeReplyObject(reply);
 
-    assert(nodes == NULL);
-    assert(cc->err == VALKEY_ERR_OTHER);
+    assert(nodes);
+    assert(dictSize(nodes) == 3);
+    dictInitIterator(&di, nodes);
+    /* Verify node 1 */
+    node = dictGetEntryVal(dictNext(&di));
+    assert(strcmp(node->addr, "127.0.0.1:6379") == 0);
+    /* Verify node 2 */
+    node = dictGetEntryVal(dictNext(&di));
+    assert(strcmp(node->addr, "127.0.0.2:6379") == 0);
+    /* Verify node 3 */
+    node = dictGetEntryVal(dictNext(&di));
+    assert(strcmp(node->addr, "127.0.0.99:6379") == 0); /* Uses the IP from which the response was received from. */
 
+    dictRelease(nodes);
+    valkeyFree(c);
     valkeyClusterFree(cc);
 }
 
 void test_parse_cluster_slots_with_null_ip(void) {
     valkeyClusterOptions options = {0};
     valkeyClusterContext *cc = valkeyClusterContextInit(&options);
+    valkeyClusterNode *node;
+    dictIterator di;
+
+    /* Set the IP from which the response is received from. */
+    valkeyContext *c = valkeyContextInit();
+    c->tcp.host = strdup("127.0.0.99");
 
     valkeyReply *reply = create_cluster_slots_reply(
         "[[0, 5460, [null, 6379, 'e7d1eecce10fd6bb5eb35b9f99a514335d9ba9ca']],"
         " [5461, 10922, ['127.0.0.1', 6379, '67ed2db8d677e59ec4a4cefb06858cf2a1a89fa1']],"
-        " [10923, 16383, ['127.0.0.1', 6379, '292f8b365bb7edb5e285caf0b7e6ddc7265d2f4f']]]");
+        " [10923, 16383, ['127.0.0.2', 6379, '292f8b365bb7edb5e285caf0b7e6ddc7265d2f4f']]]");
 
-    dict *nodes = parse_cluster_slots(cc, reply);
+    dict *nodes = parse_cluster_slots(cc, c, reply);
     freeReplyObject(reply);
 
-    assert(nodes == NULL);
-    assert(cc->err == VALKEY_ERR_OTHER);
+    assert(nodes);
+    assert(dictSize(nodes) == 3);
+    dictInitIterator(&di, nodes);
+    /* Verify node 1 */
+    node = dictGetEntryVal(dictNext(&di));
+    assert(strcmp(node->addr, "127.0.0.1:6379") == 0);
+    /* Verify node 2 */
+    node = dictGetEntryVal(dictNext(&di));
+    assert(strcmp(node->addr, "127.0.0.2:6379") == 0);
+    /* Verify node 3 */
+    node = dictGetEntryVal(dictNext(&di));
+    assert(strcmp(node->addr, "127.0.0.99:6379") == 0); /* Uses the IP from which the response was received from. */
 
+    dictRelease(nodes);
+    valkeyFree(c);
     valkeyClusterFree(cc);
 }
 
@@ -646,6 +684,7 @@ void test_parse_cluster_slots_with_multiple_replicas(void) {
     options.options |= VALKEY_OPT_USE_REPLICAS;
 
     valkeyClusterContext *cc = valkeyClusterContextInit(&options);
+    valkeyContext *c = valkeyContextInit();
     valkeyClusterNode *node;
     cluster_slot *slot;
     dictIterator di;
@@ -659,7 +698,7 @@ void test_parse_cluster_slots_with_multiple_replicas(void) {
         "            ['127.0.0.1', 30002, '6ec23923021cf3ffec47632106199cb7f496ce01'],"
         "            ['127.0.0.1', 30003, '824fe116063bc5fcf9f4ffd895bc17aee7731ac3']]]");
 
-    dict *nodes = parse_cluster_slots(cc, reply);
+    dict *nodes = parse_cluster_slots(cc, c, reply);
     freeReplyObject(reply);
 
     /* Verify primary. */
@@ -696,6 +735,7 @@ void test_parse_cluster_slots_with_multiple_replicas(void) {
     assert(node->role == VALKEY_ROLE_REPLICA);
 
     dictRelease(nodes);
+    valkeyFree(c);
     valkeyClusterFree(cc);
 }
 
@@ -704,6 +744,7 @@ void test_parse_cluster_slots_with_noncontiguous_slots(void) {
     options.options |= VALKEY_OPT_USE_REPLICAS;
 
     valkeyClusterContext *cc = valkeyClusterContextInit(&options);
+    valkeyContext *c = valkeyContextInit();
     valkeyClusterNode *node;
     cluster_slot *slot;
     dictIterator di;
@@ -717,7 +758,7 @@ void test_parse_cluster_slots_with_noncontiguous_slots(void) {
         " [4, 5460, ['127.0.0.1', 30001, 'e7d1eecce10fd6bb5eb35b9f99a514335d9ba9ca'],"
         "           ['127.0.0.1', 30004, '07c37dfeb235213a872192d90877d0cd55635b91']]]");
 
-    dict *nodes = parse_cluster_slots(cc, reply);
+    dict *nodes = parse_cluster_slots(cc, c, reply);
     freeReplyObject(reply);
 
     /* Verify primary. */
@@ -749,6 +790,7 @@ void test_parse_cluster_slots_with_noncontiguous_slots(void) {
     assert(node->role == VALKEY_ROLE_REPLICA);
 
     dictRelease(nodes);
+    valkeyFree(c);
     valkeyClusterFree(cc);
 }
 
