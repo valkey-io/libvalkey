@@ -10,7 +10,6 @@ int main(int argc, char **argv) {
 
     valkeyClusterOptions options = {0};
     options.initial_nodes = "127.0.0.1:7000";
-    options.options = VALKEY_OPT_USE_CLUSTER_SLOTS;
     options.connect_timeout = &timeout;
 
     valkeyClusterContext *cc = valkeyClusterConnectWithOptions(&options);

@@ -237,13 +237,13 @@ void disconnectCallback(const valkeyAsyncContext *ac, int status) {
 }
 
 int main(int argc, char **argv) {
-    int use_cluster_slots = 1; // Get topology via CLUSTER SLOTS
+    int use_cluster_nodes = 0;
     int show_connection_events = 0;
 
     int optind;
     for (optind = 1; optind < argc && argv[optind][0] == '-'; optind++) {
         if (strcmp(argv[optind], "--use-cluster-nodes") == 0) {
-            use_cluster_slots = 0; // Use the default CLUSTER NODES instead
+            use_cluster_nodes = 1;
         } else if (strcmp(argv[optind], "--events") == 0) {
             show_events = 1;
         } else if (strcmp(argv[optind], "--connection-events") == 0) {
@@ -272,8 +272,8 @@ int main(int argc, char **argv) {
     if (!async_initial_update) {
         options.options = VALKEY_OPT_BLOCKING_INITIAL_UPDATE;
     }
-    if (use_cluster_slots) {
-        options.options |= VALKEY_OPT_USE_CLUSTER_SLOTS;
+    if (use_cluster_nodes) {
+        options.options |= VALKEY_OPT_USE_CLUSTER_NODES;
     }
     if (show_connection_events) {
         options.async_connect_cb = connectCallback;

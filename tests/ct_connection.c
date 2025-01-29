@@ -36,7 +36,7 @@ void test_password_ok(void) {
 
     valkeyClusterContext *cc = valkeyClusterConnectWithOptions(&options);
     ASSERT_MSG(cc && cc->err == 0, cc ? cc->errstr : "OOM");
-    assert(connect_success_counter == 1); // for CLUSTER NODES
+    assert(connect_success_counter == 1); // for CLUSTER SLOTS
     load_valkey_version(cc);
     assert(connect_success_counter == 2); // for checking valkey version
 

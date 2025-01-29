@@ -50,10 +50,10 @@
 #include <string.h>
 
 /* Make sure standalone and cluster options don't overlap. */
-vk_static_assert(VALKEY_OPT_USE_CLUSTER_SLOTS > VALKEY_OPT_LAST_SA_OPTION);
+vk_static_assert(VALKEY_OPT_USE_CLUSTER_NODES > VALKEY_OPT_LAST_SA_OPTION);
 
 /* Internal option flags. */
-#define VALKEY_FLAG_USE_CLUSTER_SLOTS 0x1
+#define VALKEY_FLAG_USE_CLUSTER_NODES 0x1
 #define VALKEY_FLAG_PARSE_REPLICAS 0x2
 #define VALKEY_FLAG_DISCONNECTING 0x4
 #define VALKEY_FLAG_BLOCKING_INITIAL_UPDATE 0x8
@@ -1027,9 +1027,9 @@ error:
 /* Sends CLUSTER SLOTS or CLUSTER NODES to the node with context c. */
 static int clusterUpdateRouteSendCommand(valkeyClusterContext *cc,
                                          valkeyContext *c) {
-    const char *cmd = (cc->flags & VALKEY_FLAG_USE_CLUSTER_SLOTS ?
-                           VALKEY_COMMAND_CLUSTER_SLOTS :
-                           VALKEY_COMMAND_CLUSTER_NODES);
+    const char *cmd = (cc->flags & VALKEY_FLAG_USE_CLUSTER_NODES ?
+                           VALKEY_COMMAND_CLUSTER_NODES :
+                           VALKEY_COMMAND_CLUSTER_SLOTS);
     if (valkeyAppendCommand(c, cmd) != VALKEY_OK) {
         valkeyClusterSetError(cc, c->err, c->errstr);
         return VALKEY_ERR;
@@ -1059,10 +1059,10 @@ static int clusterUpdateRouteHandleReply(valkeyClusterContext *cc,
     }
 
     dict *nodes;
-    if (cc->flags & VALKEY_FLAG_USE_CLUSTER_SLOTS) {
-        nodes = parse_cluster_slots(cc, c, reply);
-    } else {
+    if (cc->flags & VALKEY_FLAG_USE_CLUSTER_NODES) {
         nodes = parse_cluster_nodes(cc, c, reply);
+    } else {
+        nodes = parse_cluster_slots(cc, c, reply);
     }
     freeReplyObject(reply);
     return updateNodesAndSlotmap(cc, nodes);
@@ -1275,8 +1275,8 @@ static valkeyClusterContext *valkeyClusterContextInit(const valkeyClusterOptions
     }
     cc->requests->free = listCommandFree;
 
-    if (options->options & VALKEY_OPT_USE_CLUSTER_SLOTS) {
-        cc->flags |= VALKEY_FLAG_USE_CLUSTER_SLOTS;
+    if (options->options & VALKEY_OPT_USE_CLUSTER_NODES) {
+        cc->flags |= VALKEY_FLAG_USE_CLUSTER_NODES;
     }
     if (options->options & VALKEY_OPT_USE_REPLICAS) {
         cc->flags |= VALKEY_FLAG_PARSE_REPLICAS;
@@ -2967,12 +2967,12 @@ static int updateSlotMapAsync(valkeyClusterAsyncContext *acc,
 
     /* Send a command depending of config */
     int status;
-    if (acc->cc->flags & VALKEY_FLAG_USE_CLUSTER_SLOTS) {
-        status = valkeyAsyncCommand(ac, clusterSlotsReplyCallback, acc,
-                                    VALKEY_COMMAND_CLUSTER_SLOTS);
-    } else {
+    if (acc->cc->flags & VALKEY_FLAG_USE_CLUSTER_NODES) {
         status = valkeyAsyncCommand(ac, clusterNodesReplyCallback, acc,
                                     VALKEY_COMMAND_CLUSTER_NODES);
+    } else {
+        status = valkeyAsyncCommand(ac, clusterSlotsReplyCallback, acc,
+                                    VALKEY_COMMAND_CLUSTER_SLOTS);
     }
 
     if (status == VALKEY_OK) {

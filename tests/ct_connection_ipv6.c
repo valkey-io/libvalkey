@@ -14,7 +14,6 @@ void test_successful_ipv6_connection(void) {
 
     valkeyClusterOptions options = {0};
     options.initial_nodes = CLUSTER_NODE_IPV6;
-    options.options = VALKEY_OPT_USE_CLUSTER_SLOTS;
     options.connect_timeout = &timeout;
 
     valkeyClusterContext *cc = valkeyClusterConnectWithOptions(&options);

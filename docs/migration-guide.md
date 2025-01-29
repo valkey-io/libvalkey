@@ -27,6 +27,9 @@ The type `sds` is removed from the public API.
 
 ## Migrating from `hiredis-cluster` 0.14.0
 
+The command used to update the internal slot map is changed to `CLUSTER SLOTS`.
+`CLUSTER NODES` can be re-enabled through options, see `VALKEY_OPT_USE_CLUSTER_NODES`.
+
 ### Renamed API functions
 
 * `ctx_get_by_node` is renamed to `valkeyClusterGetValkeyContext`.

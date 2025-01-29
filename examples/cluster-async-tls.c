@@ -70,7 +70,6 @@ int main(int argc, char **argv) {
 
     valkeyClusterOptions options = {0};
     options.initial_nodes = CLUSTER_NODE_TLS;
-    options.options = VALKEY_OPT_USE_CLUSTER_SLOTS;
     options.async_connect_cb = connectCallback;
     options.async_disconnect_cb = disconnectCallback;
     valkeyClusterOptionsEnableTLS(&options, tls);

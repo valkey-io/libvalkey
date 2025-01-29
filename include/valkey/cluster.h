@@ -146,9 +146,9 @@ typedef struct valkeyClusterNodeIterator {
 
 /* --- Configuration options --- */
 
-/* Enable slotmap updates using the command CLUSTER SLOTS.
- * Default is the CLUSTER NODES command. */
-#define VALKEY_OPT_USE_CLUSTER_SLOTS 0x1000
+/* Enable slotmap updates using the command CLUSTER NODES.
+ * Default is the CLUSTER SLOTS command. */
+#define VALKEY_OPT_USE_CLUSTER_NODES 0x1000
 /* Enable parsing of replica nodes. Currently not used, but the
  * information is added to its primary node structure. */
 #define VALKEY_OPT_USE_REPLICAS 0x2000

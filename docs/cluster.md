@@ -60,7 +60,7 @@ See [include/valkey/cluster.h](../include/valkey/cluster.h) for more details.
 ```c
 valkeyClusterOptions opt = {0};
 opt.initial_nodes = "127.0.0.1:6379,127.0.0.1:6380"; // Addresses to initially connect to.
-opt.options = VALKEY_OPT_USE_CLUSTER_SLOTS;          // See available flags below.
+opt.options = VALKEY_OPT_USE_CLUSTER_NODES;          // See available flags below.
 opt.password = "password"                            // Authentication; libvalkey sends the `AUTH` command.
 
 // There are helper functions to set some options.
@@ -76,7 +76,7 @@ There are also several flags you can specify when using the `valkeyClusterOption
 
 | Flag | Description  |
 | --- | --- |
-| VALKEY\_OPT\_USE\_CLUSTER\_SLOTS | Tells libvalkey to use the command `CLUSTER SLOTS` when updating its slot map (cluster topology).<br>Libvalkey uses `CLUSTER NODES` by default. |
+| VALKEY\_OPT\_USE\_CLUSTER\_NODES | Tells libvalkey to use the command `CLUSTER NODES` when updating its slot map (cluster topology).<br>Libvalkey uses `CLUSTER SLOTS` by default. |
 | VALKEY\_OPT\_USE\_REPLICAS| Tells libvalkey to keep parsed information of replica nodes. |
 | VALKEY\_OPT\_BLOCKING\_INITIAL\_UPDATE | **ASYNC**: Tells libvalkey to perform the initial slot map update in a blocking fashion. The function call will wait for a slot map update before returning so that the returned context is immediately ready to accept commands. |
 
