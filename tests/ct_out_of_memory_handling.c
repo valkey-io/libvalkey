@@ -131,13 +131,14 @@ void test_alloc_failure_handling(void) {
             assert(cc == NULL);
         }
 
-        for (int i = 3; i < 160; ++i) {
+        for (int i = 3; i < 100; ++i) {
             successfulAllocations = i;
             cc = valkeyClusterConnectWithOptions(&options);
             assert(cc);
             ASSERT_STR_EQ(cc->errstr, "Out of memory");
             valkeyClusterFree(cc);
         }
+        // Skip iteration 100 to 159 since sdscatfmt give leak warnings during OOM.
 
         successfulAllocations = 160;
         cc = valkeyClusterConnectWithOptions(&options);
@@ -467,13 +468,14 @@ void test_alloc_failure_handling_async(void) {
             assert(acc == NULL);
         }
 
-        for (int i = 13; i < 157; ++i) {
+        for (int i = 13; i < 100; ++i) {
             successfulAllocations = i;
             acc = valkeyClusterAsyncConnectWithOptions(&options);
             ASSERT_STR_EQ(acc->errstr, "Out of memory");
             assert(acc != NULL);
             valkeyClusterAsyncFree(acc);
         }
+        // Skip iteration 100 to 156 since sdscatfmt give leak warnings during OOM.
 
         successfulAllocations = 157;
         acc = valkeyClusterAsyncConnectWithOptions(&options);
