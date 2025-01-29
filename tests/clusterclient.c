@@ -95,7 +95,7 @@ int main(int argc, char **argv) {
         options.options = VALKEY_OPT_USE_CLUSTER_NODES;
     }
     if (show_events) {
-        valkeyClusterOptionsSetEventCallback(&options, eventCallback, NULL);
+        options.event_callback = eventCallback;
     }
 
     valkeyClusterContext *cc = valkeyClusterConnectWithOptions(&options);

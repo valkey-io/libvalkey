@@ -44,7 +44,7 @@
 #define VALKEY_ROLE_PRIMARY 1
 #define VALKEY_ROLE_REPLICA 2
 
-/* Events, for valkeyClusterOptionsSetEventCallback() */
+/* Events, for event_callback in valkeyClusterOptions. */
 #define VALKEYCLUSTER_EVENT_SLOTMAP_UPDATED 1
 #define VALKEYCLUSTER_EVENT_READY 2
 #define VALKEYCLUSTER_EVENT_FREE_CONTEXT 3
@@ -165,6 +165,12 @@ typedef struct {
     int max_retry;                         /* Allowed retry attempts. */
 
     /* Common callbacks. */
+
+    /* A hook to get notified when certain events occur. The `event` is set to
+     * VALKEYCLUSTER_EVENT_SLOTMAP_UPDATED when the slot mapping has been updated;
+     * VALKEYCLUSTER_EVENT_READY when the slot mapping has been fetched for the first
+     * time and the client is ready to accept commands;
+     * VALKEYCLUSTER_EVENT_FREE_CONTEXT when the cluster context is being freed. */
     void (*event_callback)(const struct valkeyClusterContext *cc, int event, void *privdata);
     void *event_privdata;
 
@@ -182,11 +188,6 @@ typedef struct {
     int (*tls_init_fn)(struct valkeyContext *, struct valkeyTLSContext *);
 } valkeyClusterOptions;
 
-/* Helper functions to set options. */
-int valkeyClusterOptionsSetEventCallback(valkeyClusterOptions *options,
-                                         void(fn)(const valkeyClusterContext *cc,
-                                                  int event, void *privdata),
-                                         void *privdata);
 /* A hook for connect and reconnect attempts, e.g. for applying additional
  * socket options. This is called just after connect, before TLS handshake and
  * Valkey authentication.

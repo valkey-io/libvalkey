@@ -2120,18 +2120,6 @@ int valkeyClusterOptionsSetConnectCallback(valkeyClusterOptions *options,
     return VALKEY_ERR;
 }
 
-int valkeyClusterOptionsSetEventCallback(valkeyClusterOptions *options,
-                                         void(fn)(const valkeyClusterContext *cc,
-                                                  int event, void *privdata),
-                                         void *privdata) {
-    if (options->event_callback == NULL) {
-        options->event_callback = fn;
-        options->event_privdata = privdata;
-        return VALKEY_OK;
-    }
-    return VALKEY_ERR;
-}
-
 void *valkeyClusterFormattedCommand(valkeyClusterContext *cc, char *cmd,
                                     int len) {
     valkeyReply *reply = NULL;

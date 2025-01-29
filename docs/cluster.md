@@ -172,10 +172,18 @@ freeReplyObject(reply);
 There is a hook to get notified when certain events occur.
 
 ```c
-int valkeyClusterOptionsSetEventCallback(valkeyClusterOptions *options,
-                                         void(fn)(const valkeyClusterContext *cc, int event,
-                                                  void *privdata),
-                                         void *privdata);
+/* Function to be called when events occur. */
+void callbackFn(const valkeyClusterContext *cc, int event, void *privdata) {
+    switch (event) {
+       // Handle event
+    }
+}
+
+valkeyClusterOptions opt = {0};
+opt.event_callback = callbackFn;
+opt.event_privdata = my_privdata; // User defined data can be provided to the callback.
+// Set additional options...
+valkeyClusterContext *cc = valkeyClusterConnectWithOptions(&opt);
 ```
 
 The callback is called with `event` set to one of the following values:
@@ -183,7 +191,7 @@ The callback is called with `event` set to one of the following values:
 * `VALKEYCLUSTER_EVENT_SLOTMAP_UPDATED` when the slot mapping has been updated;
 * `VALKEYCLUSTER_EVENT_READY` when the slot mapping has been fetched for the first
   time and the client is ready to accept commands, useful when initiating the
-  client with `valkeyClusterAsyncConnect2()` where a client is not immediately
+  client with `valkeyClusterAsyncConnect()` where a client is not immediately
   ready after a successful call;
 * `VALKEYCLUSTER_EVENT_FREE_CONTEXT` when the cluster context is being freed, so
   that the user can free the event `privdata`.
@@ -286,7 +294,8 @@ After this, the disconnection callback is executed with the `VALKEY_OK` status a
 
 #### Events per cluster context
 
-Use [`valkeyClusterOptionsSetEventCallback`](#events-per-cluster-context) to get notified when certain events occur.
+Use [`event_callback` in `valkeyClusterOptions`](#events-per-cluster-context) to get notified when certain events occur.
+Alternatively `valkeyClusterAsyncSetEventCallback` can be used when the `valkeyClusterAsyncContext` is required to be provided in `privdata`.
 
 #### Events per connection
 
