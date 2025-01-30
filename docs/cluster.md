@@ -62,10 +62,11 @@ This includes information about how to connect to the cluster and defining optio
 See [include/valkey/cluster.h](../include/valkey/cluster.h) for more details.
 
 ```c
-valkeyClusterOptions opt = {0};
-opt.initial_nodes = "127.0.0.1:6379,127.0.0.1:6380"; // Addresses to initially connect to.
-opt.options = VALKEY_OPT_USE_CLUSTER_NODES;          // See available flags below.
-opt.password = "password"                            // Authentication; libvalkey sends the `AUTH` command.
+valkeyClusterOptions opt = {
+   .initial_nodes = "127.0.0.1:6379,127.0.0.1:6380"; // Addresses to initially connect to.
+   .options = VALKEY_OPT_USE_CLUSTER_NODES;          // See available option flags below.
+   .password = "password";                           // Authenticate connections using the `AUTH` command.
+};
 
 valkeyClusterContext *cc = valkeyClusterConnectWithOptions(&opt);
 if (cc == NULL || cc->err) {
@@ -73,7 +74,7 @@ if (cc == NULL || cc->err) {
 }
 ```
 
-There are also several flags you can specify in `valkeyClusterOptions.flags`. It's a bitwise OR of the following flags:
+There are also several flags you can specify in `valkeyClusterOptions.options`. It's a bitwise OR of the following flags:
 
 | Flag | Description  |
 | --- | --- |
@@ -115,7 +116,7 @@ When there is a need to send commands to a specific node, the following low-leve
 valkeyReply *reply = valkeyClusterCommandToNode(cc, node, "DBSIZE");
 ```
 
-This function handles `printf`-like arguments similar to `valkeyClusterCommand()`, but will only attempt to send the command to the given node and will not perform redirects or retries.
+This function handles `printf`-like arguments similar to `valkeyClusterCommand`, but will only attempt to send the command to the given node and will not perform redirects or retries.
 
 If the command times out or the connection to the node fails, a slot map update is scheduled to be performed when the next command is sent.
 `valkeyClusterCommandToNode` also performs a slot map update if it has previously been scheduled.
@@ -174,16 +175,16 @@ There is a hook to get notified when certain events occur.
 
 ```c
 /* Function to be called when events occur. */
-void callbackFn(const valkeyClusterContext *cc, int event, void *privdata) {
+void event_cb(const valkeyClusterContext *cc, int event, void *privdata) {
     switch (event) {
        // Handle event
     }
 }
 
-valkeyClusterOptions opt = {0};
-opt.event_callback = callbackFn;
-opt.event_privdata = my_privdata; // User defined data can be provided to the callback.
-// Set additional options...
+valkeyClusterOptions opt = {
+   .event_callback = event_cb;
+   .event_privdata = my_privdata; // User defined data can be provided to the callback.
+};
 valkeyClusterContext *cc = valkeyClusterConnectWithOptions(&opt);
 ```
 
@@ -192,7 +193,7 @@ The callback is called with `event` set to one of the following values:
 * `VALKEYCLUSTER_EVENT_SLOTMAP_UPDATED` when the slot mapping has been updated;
 * `VALKEYCLUSTER_EVENT_READY` when the slot mapping has been fetched for the first
   time and the client is ready to accept commands, useful when initiating the
-  client with `valkeyClusterAsyncConnect()` where a client is not immediately
+  client with `valkeyClusterAsyncConnect` where a client is not immediately
   ready after a successful call;
 * `VALKEYCLUSTER_EVENT_FREE_CONTEXT` when the cluster context is being freed, so
   that the user can free the event `privdata`.
@@ -201,16 +202,16 @@ The callback is called with `event` set to one of the following values:
 
 There is a hook to get notified about connect and reconnect attempts.
 This is useful for applying socket options or access endpoint information for a connection to a particular node.
-The callback is registered using an option:
+The callback is registered using an option.
 
 ```c
-void connect_callback(const valkeyContext *c, int status) {
+void connect_cb(const valkeyContext *c, int status) {
    // Perform desired action
 }
 
-valkeyClusterOptions opt = {0};
-opt.connect_callback = connect_callback;
-// Set additional options...
+valkeyClusterOptions opt = {
+   .connect_callback = connect_cb;
+};
 valkeyClusterContext *cc = valkeyClusterConnectWithOptions(&opt);
 ```
 
