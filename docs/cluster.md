@@ -21,6 +21,7 @@ It is not intended as a complete reference. For that it's always best to refer t
   - [Disconnecting/cleanup](#disconnecting-cleanup-1)
   - [Events](#events-1)
 - [Miscellaneous](#miscellaneous)
+  - [TLS support](#tls-support)
   - [Cluster node iterator](#cluster-node-iterator)
   - [Extend the list of supported commands](#extend-the-list-of-supported-commands)
   - [Random number generator](#random-number-generator)
@@ -65,10 +66,6 @@ valkeyClusterOptions opt = {0};
 opt.initial_nodes = "127.0.0.1:6379,127.0.0.1:6380"; // Addresses to initially connect to.
 opt.options = VALKEY_OPT_USE_CLUSTER_NODES;          // See available flags below.
 opt.password = "password"                            // Authentication; libvalkey sends the `AUTH` command.
-
-// Enable TLS using a prepared `valkeyTLSContext` when connecting.
-opt.tls = tlsCtx;
-opt.tls_init_fn = &valkeyInitiateTLSWithContext;
 
 valkeyClusterContext *cc = valkeyClusterConnectWithOptions(&opt);
 if (cc == NULL || cc->err) {
@@ -338,6 +335,31 @@ When caused by an error the `err` field in the context can be accessed to get th
 You don't need to reconnect in the disconnect callback since libvalkey will reconnect by itself when the next command is handled.
 
 ## Miscellaneous
+
+### TLS support
+
+TLS support is not enabled by default and requires an explicit build flag as described in [`README.md`](../README.md#building).
+
+When support is enabled, TLS can be enabled on a cluster context using a prepared `valkeyTLSContext` and the options `valkeyClusterOptions.tls` and `valkeyClusterOptions.tls_init_fn`.
+
+```c
+// Initialize the OpenSSL library.
+valkeyInitOpenSSL();
+
+// Initialize a valkeyTLSContext, which holds an OpenSSL context.
+valkeyTLSContext *tls = valkeyCreateTLSContext("ca.crt", NULL, "client.crt",
+                                               "client.key", NULL, NULL);
+// Set options to enable TLS on context.
+valkeyClusterOptions opt = {
+   .tls = tls;
+   .tls_init_fn = &valkeyInitiateTLSWithContext;
+};
+
+valkeyClusterContext *cc = valkeyClusterConnectWithOptions(&opt);
+if (cc == NULL || cc->err) {
+    fprintf(stderr, "Error: %s\n", cc ? cc->errstr : "OOM");
+}
+```
 
 ### Cluster node iterator
 
