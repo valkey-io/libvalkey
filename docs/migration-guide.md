@@ -27,14 +27,17 @@ The type `sds` is removed from the public API.
 
 ## Migrating from `hiredis-cluster` 0.14.0
 
-The command used to update the internal slot map is changed to `CLUSTER SLOTS`.
-`CLUSTER NODES` can be re-enabled through options, see `VALKEY_OPT_USE_CLUSTER_NODES`.
+* The cluster client initiation procedure is changed and `valkeyClusterOptions`
+  should be used to specify options when creating a context.
+  The `examples` directory in this repo contains some common client initiations
+  that might be helpful.
+* The command used to update the internal slot map is changed to `CLUSTER SLOTS`.
+  `CLUSTER NODES` can be re-enabled through options using `VALKEY_OPT_USE_CLUSTER_NODES`.
 
 ### Renamed API functions
 
 * `ctx_get_by_node` is renamed to `valkeyClusterGetValkeyContext`.
 * `actx_get_by_node` is renamed to `valkeyClusterGetValkeyAsyncContext`.
-* `redisClusterAsyncSetConnectCallbackNC` is renamed to `valkeyClusterAsyncSetConnectCallback`.
 
 ### Renamed API defines
 
@@ -44,14 +47,32 @@ The command used to update the internal slot map is changed to `CLUSTER SLOTS`.
 
 ### Removed API functions
 
-* `redisClusterSetMaxRedirect` removed and replaced with `valkeyClusterSetOptionMaxRetry`.
-* `redisClusterSetOptionAddNode` removed and replaced with `valkeyClusterSetOptionAddNodes`.
-  (Note the "s" in the end of the function name.)
+* `redisClusterConnect2` removed, use `valkeyClusterConnectWithOptions`.
+* `redisClusterContextInit` removed, use `valkeyClusterConnectWithOptions`.
+* `redisClusterSetConnectCallback` removed, use `valkeyClusterOptions.connect_callback`.
+* `redisClusterSetEventCallback` removed, use `valkeyClusterOptions.event_callback`.
+* `redisClusterSetMaxRedirect` removed, use `valkeyClusterOptions.max_retry`.
+* `redisClusterSetOptionAddNode` removed, use `valkeyClusterOptions.initial_nodes`.
+* `redisClusterSetOptionAddNodes` removed, use `valkeyClusterOptions.initial_nodes`.
 * `redisClusterSetOptionConnectBlock` removed since it was deprecated.
 * `redisClusterSetOptionConnectNonBlock` removed since it was deprecated.
+* `redisClusterSetOptionConnectTimeout` removed, use `valkeyClusterOptions.connect_timeout`.
+* `redisClusterSetOptionMaxRetry` removed, use `valkeyClusterOptions.max_retry`.
+* `redisClusterSetOptionParseSlaves` removed, use `valkeyClusterOptions.flags` and `VALKEY_OPT_USE_REPLICAS`.
+* `redisClusterSetOptionPassword` removed, use `valkeyClusterOptions.password`.
+* `redisClusterSetOptionRouteUseSlots` removed, the use of `CLUSTER SLOTS` is enabled by default.
+* `redisClusterSetOptionUsername` removed, use `valkeyClusterOptions.username`.
+* `redisClusterAsyncSetConnectCallback` removed, but `valkeyClusterOptions.async_connect_cb` can be used which accepts a non-const callback function prototype.
+* `redisClusterAsyncSetConnectCallbackNC` removed, use `valkeyClusterOptions.async_connect_cb`.
+* `redisClusterAsyncSetDisconnectCallback` removed, use `valkeyClusterOptions.async_disconnect_cb`.
 * `parse_cluster_nodes` removed from API, for internal use only.
 * `parse_cluster_slots` removed from API, for internal use only.
-* `redisClusterAsyncSetConnectCallback` is removed, but can be replaced with `valkeyClusterAsyncSetConnectCallback` which accepts the non-const callback function prototype.
+
+### Removed API defines
+
+* `HIRCLUSTER_FLAG_NULL` removed.
+* `HIRCLUSTER_FLAG_ADD_SLAVE` removed, flag can be replaced with an option, see `VALKEY_OPT_USE_REPLICAS`.
+* `HIRCLUSTER_FLAG_ROUTE_USE_SLOTS` removed, the use of `CLUSTER SLOTS` is enabled by default.
 
 ### Removed support for splitting multi-key commands per slot
 
