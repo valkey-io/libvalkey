@@ -276,8 +276,8 @@ int main(int argc, char **argv) {
         options.options |= VALKEY_OPT_USE_CLUSTER_NODES;
     }
     if (show_connection_events) {
-        options.async_connect_cb = connectCallback;
-        options.async_disconnect_cb = disconnectCallback;
+        options.async_connect_callback = connectCallback;
+        options.async_disconnect_callback = disconnectCallback;
     }
     valkeyClusterOptionsUseLibevent(&options, base);
 

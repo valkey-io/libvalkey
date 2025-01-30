@@ -44,8 +44,8 @@ int main(int argc, char **argv) {
     valkeyClusterOptions options = {0};
     options.initial_nodes = CLUSTER_NODE;
     options.options = VALKEY_OPT_BLOCKING_INITIAL_UPDATE;
-    options.async_connect_cb = connectCallback;
-    options.async_disconnect_cb = disconnectCallback;
+    options.async_connect_callback = connectCallback;
+    options.async_disconnect_callback = disconnectCallback;
     valkeyClusterOptionsUseGlib(&options, context);
 
     valkeyClusterAsyncContext *acc = valkeyClusterAsyncConnectWithOptions(&options);

@@ -62,9 +62,9 @@ The type `sds` is removed from the public API.
 * `redisClusterSetOptionPassword` removed, use `valkeyClusterOptions.password`.
 * `redisClusterSetOptionRouteUseSlots` removed, the use of `CLUSTER SLOTS` is enabled by default.
 * `redisClusterSetOptionUsername` removed, use `valkeyClusterOptions.username`.
-* `redisClusterAsyncSetConnectCallback` removed, but `valkeyClusterOptions.async_connect_cb` can be used which accepts a non-const callback function prototype.
-* `redisClusterAsyncSetConnectCallbackNC` removed, use `valkeyClusterOptions.async_connect_cb`.
-* `redisClusterAsyncSetDisconnectCallback` removed, use `valkeyClusterOptions.async_disconnect_cb`.
+* `redisClusterAsyncSetConnectCallback` removed, but `valkeyClusterOptions.async_connect_callback` can be used which accepts a non-const callback function prototype.
+* `redisClusterAsyncSetConnectCallbackNC` removed, use `valkeyClusterOptions.async_connect_callback`.
+* `redisClusterAsyncSetDisconnectCallback` removed, use `valkeyClusterOptions.async_disconnect_callback`.
 * `parse_cluster_nodes` removed from API, for internal use only.
 * `parse_cluster_slots` removed from API, for internal use only.
 

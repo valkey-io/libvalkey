@@ -53,8 +53,8 @@ int main(int argc, char **argv) {
 
     valkeyClusterOptions options = {0};
     options.initial_nodes = "127.0.0.1:7000";
-    options.async_connect_cb = connectCallback;
-    options.async_disconnect_cb = disconnectCallback;
+    options.async_connect_callback = connectCallback;
+    options.async_disconnect_callback = disconnectCallback;
     valkeyClusterOptionsUseLibevent(&options, base);
 
     printf("Connecting...\n");

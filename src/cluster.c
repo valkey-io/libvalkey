@@ -2773,11 +2773,11 @@ valkeyClusterAsyncContext *valkeyClusterAsyncContextInit(const valkeyClusterOpti
     acc->cc = cc;
     valkeyClusterAsyncSetError(acc, cc->err, cc->errstr);
 
-    if (options->async_connect_cb != NULL) {
-        acc->onConnect = options->async_connect_cb;
+    if (options->async_connect_callback != NULL) {
+        acc->onConnect = options->async_connect_callback;
     }
-    if (options->async_disconnect_cb != NULL) {
-        acc->onDisconnect = options->async_disconnect_cb;
+    if (options->async_disconnect_callback != NULL) {
+        acc->onDisconnect = options->async_disconnect_callback;
     }
     if (options->attach_fn != NULL) {
         acc->attach_fn = options->attach_fn;

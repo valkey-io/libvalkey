@@ -143,8 +143,8 @@ int main(int argc, char **argv) {
 
     valkeyClusterOptions options = {0};
     options.initial_nodes = CLUSTER_NODE;
-    options.async_connect_cb = connectCallback;
-    options.async_disconnect_cb = disconnectCallback;
+    options.async_connect_callback = connectCallback;
+    options.async_disconnect_callback = disconnectCallback;
     valkeyClusterOptionsUseLibevent(&options, base);
 
     valkeyClusterAsyncContext *acc = valkeyClusterAsyncContextInit(&options);

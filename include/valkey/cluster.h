@@ -189,9 +189,22 @@ typedef struct {
     void (*connect_callback)(const valkeyContext *c, int status);
 
     /* Asynchronous API callbacks. */
-    valkeyConnectCallback *async_connect_cb;
-    valkeyDisconnectCallback *async_disconnect_cb;
-    int (*attach_fn)(valkeyAsyncContext *ac, void *attach_data); /* Event engine attach func. */
+
+    /* A hook for asynchronous connect or reconnect attempts.
+     *
+     * On successful connection, `status` is set to `VALKEY_OK`.
+     * On failed connection attempt, this callback is called with `status` set to
+     * `VALKEY_ERR`. The `err` field in the `valkeyAsyncContext` can be used to
+     * find out the cause of the error. */
+    void (*async_connect_callback)(struct valkeyAsyncContext *, int status);
+
+    /* A hook for asynchronous disconnections.
+     * Called when either a connection is terminated due to an error or per
+     * user request. The status is set accordingly (VALKEY_OK, VALKEY_ERR). */
+    void (*async_disconnect_callback)(const struct valkeyAsyncContext *, int status);
+
+    /* Event engine attach function, initiated using a engine specific helper. */
+    int (*attach_fn)(valkeyAsyncContext *ac, void *attach_data);
     void *attach_data;
 
     /* TLS context, initiated using valkeyCreateTLSContext. */

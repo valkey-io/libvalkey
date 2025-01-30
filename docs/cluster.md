@@ -316,8 +316,8 @@ The callbacks can be enabled using the following options when calling `valkeyClu
 
 ```c
 valkeyClusterOptions opt = {0};
-opt.async_connect_cb = callbackFn;
-opt.async_disconnect_cb = callbackFn;
+opt.async_connect_callback = callbackFn;
+opt.async_disconnect_callback = callbackFn;
 ```
 
 The connect callback function should have the following prototype, aliased to `valkeyConnectCallback`:
