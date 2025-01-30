@@ -31,7 +31,7 @@ The type `sds` is removed from the public API.
   should be used to specify options when creating a context.
   The `examples` directory in this repository contains some common client
   initiation examples that might be helpful.
-* The command used to update the internal slot map is changed to `CLUSTER SLOTS`.
+* The default command to update the internal slot map is changed to `CLUSTER SLOTS`.
   `CLUSTER NODES` can be re-enabled through options using `VALKEY_OPT_USE_CLUSTER_NODES`.
 
 ### Renamed API functions

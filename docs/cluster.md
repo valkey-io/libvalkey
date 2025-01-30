@@ -67,8 +67,8 @@ opt.options = VALKEY_OPT_USE_CLUSTER_NODES;          // See available flags belo
 opt.password = "password"                            // Authentication; libvalkey sends the `AUTH` command.
 
 // Enable TLS using a prepared `valkeyTLSContext` when connecting.
-options.tls = tlsCtx;
-options.tls_init_fn = &valkeyInitiateTLSWithContext;
+opt.tls = tlsCtx;
+opt.tls_init_fn = &valkeyInitiateTLSWithContext;
 
 valkeyClusterContext *cc = valkeyClusterConnectWithOptions(&opt);
 if (cc == NULL || cc->err) {
@@ -80,9 +80,9 @@ There are also several flags you can specify in `valkeyClusterOptions.flags`. It
 
 | Flag | Description  |
 | --- | --- |
-| VALKEY\_OPT\_USE\_CLUSTER\_NODES | Tells libvalkey to use the command `CLUSTER NODES` when updating its slot map (cluster topology).<br>Libvalkey uses `CLUSTER SLOTS` by default. |
-| VALKEY\_OPT\_USE\_REPLICAS| Tells libvalkey to keep parsed information of replica nodes. |
-| VALKEY\_OPT\_BLOCKING\_INITIAL\_UPDATE | **ASYNC**: Tells libvalkey to perform the initial slot map update in a blocking fashion. The function call will wait for a slot map update before returning so that the returned context is immediately ready to accept commands. |
+| `VALKEY_OPT_USE_CLUSTER_NODES` | Tells libvalkey to use the command `CLUSTER NODES` when updating its slot map (cluster topology).<br>Libvalkey uses `CLUSTER SLOTS` by default. |
+| `VALKEY_OPT_USE_REPLICAS` | Tells libvalkey to keep parsed information of replica nodes. |
+| `VALKEY_OPT_BLOCKING_INITIAL_UPDATE` | **ASYNC**: Tells libvalkey to perform the initial slot map update in a blocking fashion. The function call will wait for a slot map update before returning so that the returned context is immediately ready to accept commands. |
 
 ### Executing commands
 
