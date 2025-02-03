@@ -30,8 +30,8 @@ The type `sds` is removed from the public API.
 * The cluster client initiation procedure is changed and `valkeyClusterOptions`
   should be used to specify options when creating a context.
   See documentation for configuration examples when using the
-  [Synchronous API](cluster.md#connection-options) or the
-  [Asynchronous API](cluster.md#connecting-1).
+  [Synchronous API](cluster.md#synchronous-api) or the
+  [Asynchronous API](cluster.md#asynchronous-api).
   The [examples](../examples/) directory also contains some common client
   initiation examples that might be helpful.
 * The default command to update the internal slot map is changed to `CLUSTER SLOTS`.
