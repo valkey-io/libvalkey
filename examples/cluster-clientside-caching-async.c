@@ -126,11 +126,8 @@ void disconnectCallback(const valkeyAsyncContext *ac, int status) {
 /* Helper to modify keys using a separate client. */
 void modifyKey(const char *key, const char *value) {
     printf("Modify key: '%s'\n", key);
-    valkeyClusterContext *cc = valkeyClusterContextInit();
-    int status = valkeyClusterSetOptionAddNodes(cc, CLUSTER_NODE);
-    assert(status == VALKEY_OK);
-    status = valkeyClusterConnect2(cc);
-    assert(status == VALKEY_OK);
+    valkeyClusterContext *cc = valkeyClusterConnect(CLUSTER_NODE);
+    assert(cc);
 
     valkeyReply *reply = valkeyClusterCommand(cc, "SET %s %s", key, value);
     assert(reply != NULL);
@@ -142,24 +139,22 @@ void modifyKey(const char *key, const char *value) {
 int main(int argc, char **argv) {
     (void)argc;
     (void)argv;
-    valkeyClusterAsyncContext *acc = valkeyClusterAsyncContextInit();
+    struct event_base *base = event_base_new();
+
+    valkeyClusterOptions options = {0};
+    options.initial_nodes = CLUSTER_NODE;
+    options.async_connect_callback = connectCallback;
+    options.async_disconnect_callback = disconnectCallback;
+    valkeyClusterOptionsUseLibevent(&options, base);
+
+    valkeyClusterAsyncContext *acc = valkeyClusterAsyncContextInit(&options);
     assert(acc);
 
     int status;
-    status = valkeyClusterAsyncSetConnectCallback(acc, connectCallback);
-    assert(status == VALKEY_OK);
-    status = valkeyClusterAsyncSetDisconnectCallback(acc, disconnectCallback);
-    assert(status == VALKEY_OK);
-    status = valkeyClusterSetEventCallback(acc->cc, eventCallback, acc);
-    assert(status == VALKEY_OK);
-    status = valkeyClusterSetOptionAddNodes(acc->cc, CLUSTER_NODE);
+    status = valkeyClusterAsyncSetEventCallback(acc, eventCallback, acc);
     assert(status == VALKEY_OK);
 
-    struct event_base *base = event_base_new();
-    status = valkeyClusterLibeventAttach(acc, base);
-    assert(status == VALKEY_OK);
-
-    status = valkeyClusterAsyncConnect2(acc);
+    status = valkeyClusterAsyncConnect(acc);
     assert(status == VALKEY_OK);
 
     event_base_dispatch(base);

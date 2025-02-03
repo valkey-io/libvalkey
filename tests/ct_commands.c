@@ -462,15 +462,12 @@ void test_multi(valkeyClusterContext *cc) {
 int main(void) {
     struct timeval timeout = {0, 500000};
 
-    valkeyClusterContext *cc = valkeyClusterContextInit();
-    assert(cc);
+    valkeyClusterOptions options = {0};
+    options.initial_nodes = CLUSTER_NODE;
+    options.connect_timeout = &timeout;
 
-    valkeyClusterSetOptionAddNodes(cc, CLUSTER_NODE);
-    valkeyClusterSetOptionConnectTimeout(cc, timeout);
-
-    int status;
-    status = valkeyClusterConnect2(cc);
-    ASSERT_MSG(status == VALKEY_OK, cc->errstr);
+    valkeyClusterContext *cc = valkeyClusterConnectWithOptions(&options);
+    ASSERT_MSG(cc && cc->err == 0, cc ? cc->errstr : "OOM");
     load_valkey_version(cc);
 
     test_bitfield(cc);

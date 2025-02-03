@@ -41,17 +41,18 @@ int main(int argc, char **argv) {
     GMainContext *context = NULL;
     mainloop = g_main_loop_new(context, FALSE);
 
-    valkeyClusterAsyncContext *acc =
-        valkeyClusterAsyncConnect(CLUSTER_NODE, VALKEYCLUSTER_FLAG_NULL);
+    valkeyClusterOptions options = {0};
+    options.initial_nodes = CLUSTER_NODE;
+    options.options = VALKEY_OPT_BLOCKING_INITIAL_UPDATE;
+    options.async_connect_callback = connectCallback;
+    options.async_disconnect_callback = disconnectCallback;
+    valkeyClusterOptionsUseGlib(&options, context);
+
+    valkeyClusterAsyncContext *acc = valkeyClusterAsyncConnectWithOptions(&options);
     assert(acc);
     ASSERT_MSG(acc->err == 0, acc->errstr);
 
-    int status = valkeyClusterGlibAttach(acc, context);
-    assert(status == VALKEY_OK);
-
-    valkeyClusterAsyncSetConnectCallback(acc, connectCallback);
-    valkeyClusterAsyncSetDisconnectCallback(acc, disconnectCallback);
-
+    int status;
     status = valkeyClusterAsyncCommand(acc, setCallback, (char *)"id", "SET key value");
     ASSERT_MSG(status == VALKEY_OK, acc->errstr);
 

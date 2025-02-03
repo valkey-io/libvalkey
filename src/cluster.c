@@ -49,6 +49,15 @@
 #include <stdlib.h>
 #include <string.h>
 
+/* Make sure standalone and cluster options don't overlap. */
+vk_static_assert(VALKEY_OPT_USE_CLUSTER_NODES > VALKEY_OPT_LAST_SA_OPTION);
+
+/* Internal option flags. */
+#define VALKEY_FLAG_USE_CLUSTER_NODES 0x1
+#define VALKEY_FLAG_PARSE_REPLICAS 0x2
+#define VALKEY_FLAG_DISCONNECTING 0x4
+#define VALKEY_FLAG_BLOCKING_INITIAL_UPDATE 0x8
+
 // Cluster errors are offset by 100 to be sufficiently out of range of
 // standard Valkey errors
 #define VALKEY_ERR_CLUSTER_TOO_MANY_RETRIES 100
@@ -101,6 +110,10 @@ static void cluster_slot_destroy(cluster_slot *slot);
 static int updateNodesAndSlotmap(valkeyClusterContext *cc, dict *nodes);
 static int updateSlotMapAsync(valkeyClusterAsyncContext *acc,
                               valkeyAsyncContext *ac);
+static int valkeyClusterSetOptionAddNodes(valkeyClusterContext *cc, const char *addrs);
+static int valkeyClusterSetOptionConnectTimeout(valkeyClusterContext *cc, const struct timeval tv);
+static int valkeyClusterSetOptionPassword(valkeyClusterContext *cc, const char *password);
+static int valkeyClusterSetOptionUsername(valkeyClusterContext *cc, const char *username);
 
 void listClusterNodeDestructor(void *val) { freeValkeyClusterNode(val); }
 
@@ -639,7 +652,7 @@ static dict *parse_cluster_slots(valkeyClusterContext *cc, valkeyContext *c,
                     }
 
                     slot = NULL;
-                } else if (cc->flags & VALKEYCLUSTER_FLAG_ADD_SLAVE) {
+                } else if (cc->flags & VALKEY_FLAG_PARSE_REPLICAS) {
                     replica = node_get_with_slots(cc, host, port,
                                                   VALKEY_ROLE_REPLICA);
                     if (replica == NULL) {
@@ -926,7 +939,7 @@ oom:
 static dict *parse_cluster_nodes(valkeyClusterContext *cc, valkeyContext *c, valkeyReply *reply) {
     dict *nodes = NULL;
     int slot_ranges_found = 0;
-    int add_replicas = cc->flags & VALKEYCLUSTER_FLAG_ADD_SLAVE;
+    int add_replicas = cc->flags & VALKEY_FLAG_PARSE_REPLICAS;
     dict *replicas = NULL;
 
     if (reply->type != VALKEY_REPLY_STRING) {
@@ -1014,9 +1027,9 @@ error:
 /* Sends CLUSTER SLOTS or CLUSTER NODES to the node with context c. */
 static int clusterUpdateRouteSendCommand(valkeyClusterContext *cc,
                                          valkeyContext *c) {
-    const char *cmd = (cc->flags & VALKEYCLUSTER_FLAG_ROUTE_USE_SLOTS ?
-                           VALKEY_COMMAND_CLUSTER_SLOTS :
-                           VALKEY_COMMAND_CLUSTER_NODES);
+    const char *cmd = (cc->flags & VALKEY_FLAG_USE_CLUSTER_NODES ?
+                           VALKEY_COMMAND_CLUSTER_NODES :
+                           VALKEY_COMMAND_CLUSTER_SLOTS);
     if (valkeyAppendCommand(c, cmd) != VALKEY_OK) {
         valkeyClusterSetError(cc, c->err, c->errstr);
         return VALKEY_ERR;
@@ -1046,10 +1059,10 @@ static int clusterUpdateRouteHandleReply(valkeyClusterContext *cc,
     }
 
     dict *nodes;
-    if (cc->flags & VALKEYCLUSTER_FLAG_ROUTE_USE_SLOTS) {
-        nodes = parse_cluster_slots(cc, c, reply);
-    } else {
+    if (cc->flags & VALKEY_FLAG_USE_CLUSTER_NODES) {
         nodes = parse_cluster_nodes(cc, c, reply);
+    } else {
+        nodes = parse_cluster_slots(cc, c, reply);
     }
     freeReplyObject(reply);
     return updateNodesAndSlotmap(cc, nodes);
@@ -1243,7 +1256,7 @@ int valkeyClusterUpdateSlotmap(valkeyClusterContext *cc) {
     return VALKEY_ERR;
 }
 
-valkeyClusterContext *valkeyClusterContextInit(void) {
+static valkeyClusterContext *valkeyClusterContextInit(const valkeyClusterOptions *options) {
     valkeyClusterContext *cc;
 
     cc = vk_calloc(1, sizeof(valkeyClusterContext));
@@ -1262,7 +1275,52 @@ valkeyClusterContext *valkeyClusterContextInit(void) {
     }
     cc->requests->free = listCommandFree;
 
-    cc->max_retry_count = CLUSTER_DEFAULT_MAX_RETRY_COUNT;
+    if (options->options & VALKEY_OPT_USE_CLUSTER_NODES) {
+        cc->flags |= VALKEY_FLAG_USE_CLUSTER_NODES;
+    }
+    if (options->options & VALKEY_OPT_USE_REPLICAS) {
+        cc->flags |= VALKEY_FLAG_PARSE_REPLICAS;
+    }
+    if (options->options & VALKEY_OPT_BLOCKING_INITIAL_UPDATE) {
+        cc->flags |= VALKEY_FLAG_BLOCKING_INITIAL_UPDATE;
+    }
+    if (options->max_retry > 0) {
+        cc->max_retry_count = options->max_retry;
+    } else {
+        cc->max_retry_count = CLUSTER_DEFAULT_MAX_RETRY_COUNT;
+    }
+    if (options->initial_nodes != NULL &&
+        valkeyClusterSetOptionAddNodes(cc, options->initial_nodes) != VALKEY_OK) {
+        return cc; /* err and errstr already set. */
+    }
+    if (options->connect_timeout != NULL &&
+        valkeyClusterSetOptionConnectTimeout(cc, *options->connect_timeout) != VALKEY_OK) {
+        return cc; /* err and errstr already set. */
+    }
+    if (options->command_timeout != NULL &&
+        valkeyClusterSetOptionTimeout(cc, *options->command_timeout) != VALKEY_OK) {
+        return cc; /* err and errstr already set. */
+    }
+    if (options->username != NULL &&
+        valkeyClusterSetOptionUsername(cc, options->username) != VALKEY_OK) {
+        return cc; /* err and errstr already set. */
+    }
+    if (options->password != NULL &&
+        valkeyClusterSetOptionPassword(cc, options->password) != VALKEY_OK) {
+        return cc; /* err and errstr already set. */
+    }
+    if (options->connect_callback) {
+        cc->on_connect = options->connect_callback;
+    }
+    if (options->event_callback) {
+        cc->event_callback = options->event_callback;
+        cc->event_privdata = options->event_privdata;
+    }
+    if (options->tls) {
+        cc->tls = options->tls;
+        cc->tls_init_fn = options->tls_init_fn;
+    }
+
     return cc;
 }
 
@@ -1287,52 +1345,32 @@ void valkeyClusterFree(valkeyClusterContext *cc) {
     vk_free(cc);
 }
 
-static valkeyClusterContext *
-valkeyClusterConnectInternal(valkeyClusterContext *cc, const char *addrs) {
-    if (valkeyClusterSetOptionAddNodes(cc, addrs) != VALKEY_OK) {
-        return cc;
+valkeyClusterContext *valkeyClusterConnectWithOptions(const valkeyClusterOptions *options) {
+    valkeyClusterContext *cc = valkeyClusterContextInit(options);
+    if (cc == NULL) {
+        return NULL;
     }
-    valkeyClusterUpdateSlotmap(cc);
+    /* Only connect if options are ok. */
+    if (cc->err == 0) {
+        valkeyClusterUpdateSlotmap(cc);
+    }
     return cc;
 }
 
-valkeyClusterContext *valkeyClusterConnect(const char *addrs, int flags) {
-    valkeyClusterContext *cc;
+valkeyClusterContext *valkeyClusterConnect(const char *addrs) {
+    valkeyClusterOptions options = {0};
+    options.initial_nodes = addrs;
 
-    cc = valkeyClusterContextInit();
-
-    if (cc == NULL) {
-        return NULL;
-    }
-
-    cc->flags = flags;
-
-    return valkeyClusterConnectInternal(cc, addrs);
+    return valkeyClusterConnectWithOptions(&options);
 }
 
 valkeyClusterContext *valkeyClusterConnectWithTimeout(const char *addrs,
-                                                      const struct timeval tv,
-                                                      int flags) {
-    valkeyClusterContext *cc;
+                                                      const struct timeval tv) {
+    valkeyClusterOptions options = {0};
+    options.initial_nodes = addrs;
+    options.connect_timeout = &tv;
 
-    cc = valkeyClusterContextInit();
-
-    if (cc == NULL) {
-        return NULL;
-    }
-
-    cc->flags = flags;
-
-    if (cc->connect_timeout == NULL) {
-        cc->connect_timeout = vk_malloc(sizeof(struct timeval));
-        if (cc->connect_timeout == NULL) {
-            return NULL;
-        }
-    }
-
-    memcpy(cc->connect_timeout, &tv, sizeof(struct timeval));
-
-    return valkeyClusterConnectInternal(cc, addrs);
+    return valkeyClusterConnectWithOptions(&options);
 }
 
 static int valkeyClusterSetOptionAddNode(valkeyClusterContext *cc, const char *addr) {
@@ -1428,8 +1466,8 @@ error:
     return VALKEY_ERR;
 }
 
-int valkeyClusterSetOptionAddNodes(valkeyClusterContext *cc,
-                                   const char *addrs) {
+static int valkeyClusterSetOptionAddNodes(valkeyClusterContext *cc,
+                                          const char *addrs) {
     int ret;
     sds *address = NULL;
     int address_count = 0;
@@ -1473,8 +1511,8 @@ int valkeyClusterSetOptionAddNodes(valkeyClusterContext *cc,
  * Disabled by default. Can be disabled again by providing an
  * empty string or a null pointer.
  */
-int valkeyClusterSetOptionUsername(valkeyClusterContext *cc,
-                                   const char *username) {
+static int valkeyClusterSetOptionUsername(valkeyClusterContext *cc,
+                                          const char *username) {
     if (cc == NULL) {
         return VALKEY_ERR;
     }
@@ -1499,8 +1537,8 @@ int valkeyClusterSetOptionUsername(valkeyClusterContext *cc,
  * Configure a password used when connecting to password-protected
  * Valkey instances. (See Valkey AUTH command)
  */
-int valkeyClusterSetOptionPassword(valkeyClusterContext *cc,
-                                   const char *password) {
+static int valkeyClusterSetOptionPassword(valkeyClusterContext *cc,
+                                          const char *password) {
 
     if (cc == NULL) {
         return VALKEY_ERR;
@@ -1522,30 +1560,8 @@ int valkeyClusterSetOptionPassword(valkeyClusterContext *cc,
     return VALKEY_OK;
 }
 
-int valkeyClusterSetOptionParseSlaves(valkeyClusterContext *cc) {
-
-    if (cc == NULL) {
-        return VALKEY_ERR;
-    }
-
-    cc->flags |= VALKEYCLUSTER_FLAG_ADD_SLAVE;
-
-    return VALKEY_OK;
-}
-
-int valkeyClusterSetOptionRouteUseSlots(valkeyClusterContext *cc) {
-
-    if (cc == NULL) {
-        return VALKEY_ERR;
-    }
-
-    cc->flags |= VALKEYCLUSTER_FLAG_ROUTE_USE_SLOTS;
-
-    return VALKEY_OK;
-}
-
-int valkeyClusterSetOptionConnectTimeout(valkeyClusterContext *cc,
-                                         const struct timeval tv) {
+static int valkeyClusterSetOptionConnectTimeout(valkeyClusterContext *cc,
+                                                const struct timeval tv) {
 
     if (cc == NULL) {
         return VALKEY_ERR;
@@ -1623,35 +1639,6 @@ int valkeyClusterSetOptionTimeout(valkeyClusterContext *cc,
     }
 
     return VALKEY_OK;
-}
-
-int valkeyClusterSetOptionMaxRetry(valkeyClusterContext *cc,
-                                   int max_retry_count) {
-    if (cc == NULL || max_retry_count <= 0) {
-        return VALKEY_ERR;
-    }
-
-    cc->max_retry_count = max_retry_count;
-
-    return VALKEY_OK;
-}
-
-int valkeyClusterConnect2(valkeyClusterContext *cc) {
-
-    if (cc == NULL) {
-        return VALKEY_ERR;
-    }
-
-    if (dictSize(cc->nodes) == 0) {
-        valkeyClusterSetError(cc, VALKEY_ERR_OTHER,
-                              "server address not configured");
-        return VALKEY_ERR;
-    }
-    /* Clear a previously set shutdown flag since we allow a
-     * reconnection of an async context using this API (legacy). */
-    cc->flags &= ~VALKEYCLUSTER_FLAG_DISCONNECTING;
-
-    return valkeyClusterUpdateSlotmap(cc);
 }
 
 valkeyContext *valkeyClusterGetValkeyContext(valkeyClusterContext *cc,
@@ -2154,28 +2141,6 @@ static int prepareCommand(valkeyClusterContext *cc, struct cmd *command) {
     }
     command->slot_num = keyHashSlot(command->key.start, command->key.len);
     return VALKEY_OK;
-}
-
-int valkeyClusterSetConnectCallback(valkeyClusterContext *cc,
-                                    void(fn)(const valkeyContext *c,
-                                             int status)) {
-    if (cc->on_connect == NULL) {
-        cc->on_connect = fn;
-        return VALKEY_OK;
-    }
-    return VALKEY_ERR;
-}
-
-int valkeyClusterSetEventCallback(valkeyClusterContext *cc,
-                                  void(fn)(const valkeyClusterContext *cc,
-                                           int event, void *privdata),
-                                  void *privdata) {
-    if (cc->event_callback == NULL) {
-        cc->event_callback = fn;
-        cc->event_privdata = privdata;
-        return VALKEY_OK;
-    }
-    return VALKEY_ERR;
 }
 
 void *valkeyClusterFormattedCommand(valkeyClusterContext *cc, char *cmd,
@@ -2699,24 +2664,6 @@ static inline void valkeyClusterAsyncClearError(valkeyClusterAsyncContext *acc) 
     acc->errstr[0] = '\0';
 }
 
-static valkeyClusterAsyncContext *
-valkeyClusterAsyncInitialize(valkeyClusterContext *cc) {
-    valkeyClusterAsyncContext *acc;
-
-    if (cc == NULL) {
-        return NULL;
-    }
-
-    acc = vk_calloc(1, sizeof(valkeyClusterAsyncContext));
-    if (acc == NULL)
-        return NULL;
-
-    acc->cc = cc;
-    valkeyClusterAsyncSetError(acc, cc->err, cc->errstr);
-
-    return acc;
-}
-
 static cluster_async_data *cluster_async_data_create(void) {
     /* use calloc to guarantee all fields are zeroed */
     return vk_calloc(1, sizeof(cluster_async_data));
@@ -2842,64 +2789,76 @@ valkeyClusterGetValkeyAsyncContext(valkeyClusterAsyncContext *acc,
     return ac;
 }
 
-valkeyClusterAsyncContext *valkeyClusterAsyncContextInit(void) {
+valkeyClusterAsyncContext *valkeyClusterAsyncContextInit(const valkeyClusterOptions *options) {
     valkeyClusterContext *cc;
     valkeyClusterAsyncContext *acc;
 
-    cc = valkeyClusterContextInit();
+    cc = valkeyClusterContextInit(options);
     if (cc == NULL) {
         return NULL;
     }
 
-    acc = valkeyClusterAsyncInitialize(cc);
+    acc = vk_calloc(1, sizeof(valkeyClusterAsyncContext));
     if (acc == NULL) {
         valkeyClusterFree(cc);
         return NULL;
+    }
+    acc->cc = cc;
+    valkeyClusterAsyncSetError(acc, cc->err, cc->errstr);
+
+    if (options->async_connect_callback != NULL) {
+        acc->onConnect = options->async_connect_callback;
+    }
+    if (options->async_disconnect_callback != NULL) {
+        acc->onDisconnect = options->async_disconnect_callback;
+    }
+    if (options->attach_fn != NULL) {
+        acc->attach_fn = options->attach_fn;
+        acc->attach_data = options->attach_data;
     }
 
     return acc;
 }
 
-valkeyClusterAsyncContext *valkeyClusterAsyncConnect(const char *addrs,
-                                                     int flags) {
-
-    valkeyClusterContext *cc;
-    valkeyClusterAsyncContext *acc;
-
-    cc = valkeyClusterConnect(addrs, flags);
-    if (cc == NULL) {
-        return NULL;
-    }
-
-    acc = valkeyClusterAsyncInitialize(cc);
+valkeyClusterAsyncContext *valkeyClusterAsyncConnectWithOptions(const valkeyClusterOptions *options) {
+    valkeyClusterAsyncContext *acc = valkeyClusterAsyncContextInit(options);
     if (acc == NULL) {
-        valkeyClusterFree(cc);
         return NULL;
     }
 
+    valkeyClusterAsyncConnect(acc);
     return acc;
 }
 
-int valkeyClusterAsyncConnect2(valkeyClusterAsyncContext *acc) {
+int valkeyClusterAsyncConnect(valkeyClusterAsyncContext *acc) {
     /* An attach function for an async event library is required. */
     if (acc->attach_fn == NULL) {
         return VALKEY_ERR;
     }
+
+    /* Clear a previously set shutdown flag to allow a
+     * reconnection of an async context using this API. */
+    acc->cc->flags &= ~VALKEY_FLAG_DISCONNECTING;
+
+    /* Use blocking initial slotmap update when configured. */
+    if (acc->cc->flags & VALKEY_FLAG_BLOCKING_INITIAL_UPDATE) {
+        if (valkeyClusterUpdateSlotmap(acc->cc) != VALKEY_OK) {
+            valkeyClusterAsyncSetError(acc, acc->cc->err, acc->cc->errstr);
+            return VALKEY_ERR;
+        }
+        return VALKEY_OK;
+    }
+    /* Use non-blocking initial slotmap update. */
     return updateSlotMapAsync(acc, NULL /*any node*/);
 }
 
-int valkeyClusterAsyncSetConnectCallback(valkeyClusterAsyncContext *acc,
-                                         valkeyConnectCallback *fn) {
-    if (acc->onConnect != NULL)
-        return VALKEY_ERR;
-    acc->onConnect = fn;
-    return VALKEY_OK;
-}
-
-int valkeyClusterAsyncSetDisconnectCallback(valkeyClusterAsyncContext *acc,
-                                            valkeyDisconnectCallback *fn) {
-    if (acc->onDisconnect == NULL) {
-        acc->onDisconnect = fn;
+int valkeyClusterAsyncSetEventCallback(valkeyClusterAsyncContext *acc,
+                                       void(fn)(const valkeyClusterContext *cc,
+                                                int event, void *privdata),
+                                       void *privdata) {
+    if (acc->cc->event_callback == NULL) {
+        acc->cc->event_callback = fn;
+        acc->cc->event_privdata = privdata;
         return VALKEY_OK;
     }
     return VALKEY_ERR;
@@ -3000,7 +2959,7 @@ static int updateSlotMapAsync(valkeyClusterAsyncContext *acc,
         /* Don't allow concurrent slot map updates. */
         return VALKEY_ERR;
     }
-    if (acc->cc->flags & VALKEYCLUSTER_FLAG_DISCONNECTING) {
+    if (acc->cc->flags & VALKEY_FLAG_DISCONNECTING) {
         /* No slot map updates during a cluster client disconnect. */
         return VALKEY_ERR;
     }
@@ -3019,12 +2978,12 @@ static int updateSlotMapAsync(valkeyClusterAsyncContext *acc,
 
     /* Send a command depending of config */
     int status;
-    if (acc->cc->flags & VALKEYCLUSTER_FLAG_ROUTE_USE_SLOTS) {
-        status = valkeyAsyncCommand(ac, clusterSlotsReplyCallback, acc,
-                                    VALKEY_COMMAND_CLUSTER_SLOTS);
-    } else {
+    if (acc->cc->flags & VALKEY_FLAG_USE_CLUSTER_NODES) {
         status = valkeyAsyncCommand(ac, clusterNodesReplyCallback, acc,
                                     VALKEY_COMMAND_CLUSTER_NODES);
+    } else {
+        status = valkeyAsyncCommand(ac, clusterSlotsReplyCallback, acc,
+                                    VALKEY_COMMAND_CLUSTER_SLOTS);
     }
 
     if (status == VALKEY_OK) {
@@ -3092,7 +3051,7 @@ static void valkeyClusterAsyncCallback(valkeyAsyncContext *ac, void *r,
     }
 
     /* Skip retry handling when not expected, or during a client disconnect. */
-    if (cad->retry_count == NO_RETRY || cc->flags & VALKEYCLUSTER_FLAG_DISCONNECTING)
+    if (cad->retry_count == NO_RETRY || cc->flags & VALKEY_FLAG_DISCONNECTING)
         goto done;
 
     error_type = cluster_reply_error_type(reply);
@@ -3205,7 +3164,7 @@ int valkeyClusterAsyncFormattedCommand(valkeyClusterAsyncContext *acc,
     cc = acc->cc;
 
     /* Don't accept new commands when the client is about to disconnect. */
-    if (cc->flags & VALKEYCLUSTER_FLAG_DISCONNECTING) {
+    if (cc->flags & VALKEY_FLAG_DISCONNECTING) {
         valkeyClusterAsyncSetError(acc, VALKEY_ERR_OTHER, "disconnecting");
         return VALKEY_ERR;
     }
@@ -3286,7 +3245,7 @@ int valkeyClusterAsyncFormattedCommandToNode(valkeyClusterAsyncContext *acc,
     struct cmd *command = NULL;
 
     /* Don't accept new commands when the client is about to disconnect. */
-    if (cc->flags & VALKEYCLUSTER_FLAG_DISCONNECTING) {
+    if (cc->flags & VALKEY_FLAG_DISCONNECTING) {
         valkeyClusterAsyncSetError(acc, VALKEY_ERR_OTHER, "disconnecting");
         return VALKEY_ERR;
     }
@@ -3468,7 +3427,7 @@ void valkeyClusterAsyncDisconnect(valkeyClusterAsyncContext *acc) {
     }
 
     cc = acc->cc;
-    cc->flags |= VALKEYCLUSTER_FLAG_DISCONNECTING;
+    cc->flags |= VALKEY_FLAG_DISCONNECTING;
 
     dictIterator di;
     dictInitIterator(&di, cc->nodes);
@@ -3491,7 +3450,7 @@ void valkeyClusterAsyncFree(valkeyClusterAsyncContext *acc) {
         return;
 
     valkeyClusterContext *cc = acc->cc;
-    cc->flags |= VALKEYCLUSTER_FLAG_DISCONNECTING;
+    cc->flags |= VALKEY_FLAG_DISCONNECTING;
     valkeyClusterFree(cc);
 
     vk_free(acc);

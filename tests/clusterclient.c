@@ -63,7 +63,7 @@ void eventCallback(const valkeyClusterContext *cc, int event, void *privdata) {
 
 int main(int argc, char **argv) {
     int show_events = 0;
-    int use_cluster_slots = 1;
+    int use_cluster_nodes = 0;
     int send_to_all = 0;
 
     int argindex;
@@ -72,7 +72,7 @@ int main(int argc, char **argv) {
         if (strcmp(argv[argindex], "--events") == 0) {
             show_events = 1;
         } else if (strcmp(argv[argindex], "--use-cluster-nodes") == 0) {
-            use_cluster_slots = 0;
+            use_cluster_nodes = 1;
         } else {
             fprintf(stderr, "Unknown argument: '%s'\n", argv[argindex]);
             exit(1);
@@ -88,18 +88,19 @@ int main(int argc, char **argv) {
 
     struct timeval timeout = {1, 500000}; // 1.5s
 
-    valkeyClusterContext *cc = valkeyClusterContextInit();
-    valkeyClusterSetOptionAddNodes(cc, initnode);
-    valkeyClusterSetOptionConnectTimeout(cc, timeout);
-    if (use_cluster_slots) {
-        valkeyClusterSetOptionRouteUseSlots(cc);
+    valkeyClusterOptions options = {0};
+    options.initial_nodes = initnode;
+    options.connect_timeout = &timeout;
+    if (use_cluster_nodes) {
+        options.options = VALKEY_OPT_USE_CLUSTER_NODES;
     }
     if (show_events) {
-        valkeyClusterSetEventCallback(cc, eventCallback, NULL);
+        options.event_callback = eventCallback;
     }
 
-    if (valkeyClusterConnect2(cc) != VALKEY_OK) {
-        printf("Connect error: %s\n", cc->errstr);
+    valkeyClusterContext *cc = valkeyClusterConnectWithOptions(&options);
+    if (cc == NULL || cc->err) {
+        printf("Connect error: %s\n", cc ? cc->errstr : "OOM");
         exit(2);
     }
 
