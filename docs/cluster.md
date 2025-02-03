@@ -245,12 +245,12 @@ valkeyClusterOptionsUseLibev(&options, EV_DEFAULT);
 valkeyClusterAsyncContext *acc = valkeyClusterAsyncConnectWithOptions(&options);
 ```
 
-Since an initial slotmap update is performed asynchronously any command sent directly after `valkeyClusterAsyncConnectWithOptions` may fail
+Since an initial slot map update is performed asynchronously any command sent directly after `valkeyClusterAsyncConnectWithOptions` may fail
 because the initial slot map has not yet been retrieved and the client doesn't know which cluster node to send the command to.
 You may use the [`eventCallback`](#events-per-cluster-context-1) to be notified when the slot map is updated and the client is ready to accept commands.
 A crude example of using the `eventCallback` can be found in [this test case](../tests/ct_async.c).
 
-Another option is to enable blocking initial slotmap updates using the option `VALKEY_OPT_BLOCKING_INITIAL_UPDATE`.
+Another option is to enable blocking initial slot map updates using the option `VALKEY_OPT_BLOCKING_INITIAL_UPDATE`.
 When enabled `valkeyClusterAsyncConnectWithOptions` will initially connect to the cluster in a blocking fashion and wait for the slot map before returning.
 Any command sent by the user thereafter will create a new non-blocking connection, unless a non-blocking connection already exists to the destination.
 The function returns a pointer to a newly created `valkeyClusterAsyncContext` struct and its `err` field should be checked to make sure the initial slot map update was successful.
@@ -279,7 +279,7 @@ valkeyClusterAsyncConnect(acc)
 
 There are a variety of options you can specify using the `valkeyClusterOptions` struct when connecting to a cluster.
 
-One async API specific option is `VALKEY_OPT_BLOCKING_INITIAL_UPDATE` which enables the initial slot map update to be performed in a blocking fashion.
+One asynchronous API specific option is `VALKEY_OPT_BLOCKING_INITIAL_UPDATE` which enables the initial slot map update to be performed in a blocking fashion.
 The connect function will wait for a slot map update before returning so that the returned context is immediately ready to accept commands.
 
 See previous [Connection options](#connection-options) section for common options.
@@ -341,7 +341,7 @@ Use [`event_callback` in `valkeyClusterOptions`](#events-per-cluster-context) to
 
 When the callback function requires the current `valkeyClusterAsyncContext` it can be provided in the `privdata`.
 In this case initiate the context using `valkeyClusterAsyncContextInit`, set the callback and `privdata` using `valkeyClusterAsyncSetEventCallback`,
-and initate connection attempts using `valkeyClusterAsyncConnect` as described under the [Connecting](#connecting-1) section.
+and initiate connection attempts using `valkeyClusterAsyncConnect` as described under the [Connecting](#connecting-1) section.
 
 #### Events per connection
 
