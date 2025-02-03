@@ -225,29 +225,64 @@ The `err` field in the `valkeyContext` can be used to find out the cause of the 
 
 ## Asynchronous API
 
+The asynchronous API supports a wide range of event libraries and uses [adapters](../include/valkey/adapters/) to attach to a specific event library.
+Each adapter provide a convenience function that configures which event loop instance the created context will be attached to.
+
 ### Connecting
 
-There are two alternative ways to initiate a cluster client, which also determines how the client behaves during the initial connect.
+To asynchronously connect to a cluster a `valkeyClusterOptions` should first be initiated with initial nodes and more,
+but it's also important to configure which event library to use before calling `valkeyClusterAsyncConnectWithOptions`.
 
-The first alternative is to use the function `valkeyClusterAsyncConnect`, which initially connects to the cluster in a blocking fashion and waits for the slot map before returning.
-Any command sent by the user thereafter will create a new non-blocking connection, unless a non-blocking connection already exists to the destination.
-The function returns a pointer to a newly created `valkeyClusterAsyncContext` struct and its `err` field should be checked to make sure the initial slot map update was successful.
+```c
+valkeyClusterOptions options = {
+   .initial_nodes = "127.0.0.1:7000";
+};
 
+// Use convenience function to set which event library to use.
+valkeyClusterOptionsUseLibev(&options, EV_DEFAULT);
 
+// Initiate the context and start connecting to the initial nodes.
+valkeyClusterAsyncContext *acc = valkeyClusterAsyncConnectWithOptions(&options);
+```
 
-The second alternative is to use `valkeyClusterAsyncContextInit` and `valkeyClusterAsyncConnect2` which avoids the initial blocking connect.
-This connection alternative requires an attached event engine when `valkeyClusterAsyncConnect2` is called, but the connect and the initial slot map update is done in a non-blocking fashion.
-
-This means that commands sent directly after `valkeyClusterAsyncConnect2` may fail because the initial slot map has not yet been retrieved and the client doesn't know which cluster node to send the command to.
+Since an initial slotmap update is performed asynchronously any command sent directly after `valkeyClusterAsyncConnectWithOptions` may fail
+because the initial slot map has not yet been retrieved and the client doesn't know which cluster node to send the command to.
 You may use the [`eventCallback`](#events-per-cluster-context-1) to be notified when the slot map is updated and the client is ready to accept commands.
 A crude example of using the `eventCallback` can be found in [this test case](../tests/ct_async.c).
 
+Another option is to enable blocking initial slotmap updates using the option `VALKEY_OPT_BLOCKING_INITIAL_UPDATE`.
+When enabled `valkeyClusterAsyncConnectWithOptions` will initially connect to the cluster in a blocking fashion and wait for the slot map before returning.
+Any command sent by the user thereafter will create a new non-blocking connection, unless a non-blocking connection already exists to the destination.
+The function returns a pointer to a newly created `valkeyClusterAsyncContext` struct and its `err` field should be checked to make sure the initial slot map update was successful.
 
+There is also a separate API to perform the context initiation and initial connect in separate steps.
+This is useful when there is a need to provide an event callback with the current `valkeyClusterAsyncContext`.
+The context is first initiated using `valkeyClusterAsyncContextInit` and then `valkeyClusterAsyncConnect` will initiate connection attempts.
 
+```c
+valkeyClusterOptions options = {
+   .initial_nodes = "127.0.0.1:7000";
+};
+valkeyClusterOptionsUseLibev(&options, EV_DEFAULT);
 
+// Initiate the context.
+valkeyClusterAsyncContext *acc = valkeyClusterAsyncContextInit(&options);
+
+// Set the event callback using the context as privdata.
+valkeyClusterAsyncSetEventCallback(acc, eventCallback, acc);
+
+// Start connecting to the initial nodes.
+valkeyClusterAsyncConnect(acc)
+```
 
 ### Connection options
 
+There are a variety of options you can specify using the `valkeyClusterOptions` struct when connecting to a cluster.
+
+One async API specific option is `VALKEY_OPT_BLOCKING_INITIAL_UPDATE` which enables the initial slot map update to be performed in a blocking fashion.
+The connect function will wait for a slot map update before returning so that the returned context is immediately ready to accept commands.
+
+See previous [Connection options](#connection-options) section for common options.
 
 ### Executing commands
 
@@ -303,7 +338,10 @@ After this, the disconnection callback is executed with the `VALKEY_OK` status a
 #### Events per cluster context
 
 Use [`event_callback` in `valkeyClusterOptions`](#events-per-cluster-context) to get notified when certain events occur.
-Alternatively `valkeyClusterAsyncSetEventCallback` can be used when the `valkeyClusterAsyncContext` is required to be provided in `privdata`.
+
+When the callback function requires the current `valkeyClusterAsyncContext` it can be provided in the `privdata`.
+In this case initiate the context using `valkeyClusterAsyncContextInit`, set the callback and `privdata` using `valkeyClusterAsyncSetEventCallback`,
+and initate connection attempts using `valkeyClusterAsyncConnect` as described under the [Connecting](#connecting-1) section.
 
 #### Events per connection
 
@@ -313,9 +351,10 @@ Similarly, a disconnect callback can be used to be notified about a disconnected
 The callbacks can be enabled using the following options when calling `valkeyClusterAsyncConnectWithOptions`:
 
 ```c
-valkeyClusterOptions opt = {0};
-opt.async_connect_callback = callbackFn;
-opt.async_disconnect_callback = callbackFn;
+valkeyClusterOptions opt = {
+   .async_connect_callback = connect_cb;
+   .async_disconnect_callback = disconnect_cb;
+}
 ```
 
 The connect callback function should have the following prototype, aliased to `valkeyConnectCallback`:
