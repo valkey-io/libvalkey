@@ -202,12 +202,12 @@ static int valkeyPollAttachAdapter(valkeyAsyncContext *ac, VALKEY_UNUSED void *u
 }
 
 VALKEY_UNUSED
-static int valkeyClusterPollAttach(valkeyClusterAsyncContext *acc) {
-    if (acc == NULL) {
+static int valkeyClusterOptionsUsePoll(valkeyClusterOptions *options) {
+    if (options == NULL) {
         return VALKEY_ERR;
     }
 
-    acc->attach_fn = valkeyPollAttachAdapter;
+    options->attach_fn = valkeyPollAttachAdapter;
     return VALKEY_OK;
 }
 

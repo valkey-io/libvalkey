@@ -17,6 +17,7 @@ Autoloading
 backend
 backends
 behaviour
+bitwise
 boolean
 bugfix
 CAS

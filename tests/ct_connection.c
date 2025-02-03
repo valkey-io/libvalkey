@@ -29,16 +29,14 @@ void reset_counters(void) {
 // Connecting to a password protected cluster and
 // providing a correct password.
 void test_password_ok(void) {
-    valkeyClusterContext *cc = valkeyClusterContextInit();
-    assert(cc);
-    valkeyClusterSetOptionAddNodes(cc, CLUSTER_NODE_WITH_PASSWORD);
-    valkeyClusterSetOptionPassword(cc, CLUSTER_PASSWORD);
-    valkeyClusterSetConnectCallback(cc, connect_callback);
+    valkeyClusterOptions options = {0};
+    options.initial_nodes = CLUSTER_NODE_WITH_PASSWORD;
+    options.password = CLUSTER_PASSWORD;
+    options.connect_callback = connect_callback;
 
-    int status;
-    status = valkeyClusterConnect2(cc);
-    ASSERT_MSG(status == VALKEY_OK, cc->errstr);
-    assert(connect_success_counter == 1); // for CLUSTER NODES
+    valkeyClusterContext *cc = valkeyClusterConnectWithOptions(&options);
+    ASSERT_MSG(cc && cc->err == 0, cc ? cc->errstr : "OOM");
+    assert(connect_success_counter == 1); // for CLUSTER SLOTS
     load_valkey_version(cc);
     assert(connect_success_counter == 2); // for checking valkey version
 
@@ -58,14 +56,12 @@ void test_password_ok(void) {
 // Connecting to a password protected cluster and
 // providing wrong password.
 void test_password_wrong(void) {
-    valkeyClusterContext *cc = valkeyClusterContextInit();
-    assert(cc);
-    valkeyClusterSetOptionAddNodes(cc, CLUSTER_NODE_WITH_PASSWORD);
-    valkeyClusterSetOptionPassword(cc, "faultypass");
+    valkeyClusterOptions options = {0};
+    options.initial_nodes = CLUSTER_NODE_WITH_PASSWORD;
+    options.password = "faultypass";
 
-    int status;
-    status = valkeyClusterConnect2(cc);
-    assert(status == VALKEY_ERR);
+    valkeyClusterContext *cc = valkeyClusterConnectWithOptions(&options);
+    assert(cc);
 
     assert(cc->err == VALKEY_ERR_OTHER);
     if (valkey_version_less_than(6, 0))
@@ -79,14 +75,12 @@ void test_password_wrong(void) {
 // Connecting to a password protected cluster and
 // not providing any password.
 void test_password_missing(void) {
-    valkeyClusterContext *cc = valkeyClusterContextInit();
-    assert(cc);
-    valkeyClusterSetOptionAddNodes(cc, CLUSTER_NODE_WITH_PASSWORD);
+    valkeyClusterOptions options = {0};
+    options.initial_nodes = CLUSTER_NODE_WITH_PASSWORD;
+    // No password set.
 
-    // A password is not configured..
-    int status;
-    status = valkeyClusterConnect2(cc);
-    assert(status == VALKEY_ERR);
+    valkeyClusterContext *cc = valkeyClusterConnectWithOptions(&options);
+    assert(cc);
 
     assert(cc->err == VALKEY_ERR_OTHER);
     assert(strncmp(cc->errstr, "NOAUTH", 6) == 0);
@@ -101,50 +95,13 @@ void test_username_ok(void) {
         return;
 
     // Connect to the cluster using username and password
-    valkeyClusterContext *cc = valkeyClusterContextInit();
-    assert(cc);
-    valkeyClusterSetOptionAddNodes(cc, CLUSTER_NODE_WITH_PASSWORD);
-    valkeyClusterSetOptionUsername(cc, CLUSTER_USERNAME);
-    valkeyClusterSetOptionPassword(cc, CLUSTER_PASSWORD);
+    valkeyClusterOptions options = {0};
+    options.initial_nodes = CLUSTER_NODE_WITH_PASSWORD;
+    options.username = CLUSTER_USERNAME;
+    options.password = CLUSTER_PASSWORD;
 
-    int ret = valkeyClusterConnect2(cc);
-    ASSERT_MSG(ret == VALKEY_OK, cc->errstr);
-
-    // Test connection
-    valkeyReply *reply = valkeyClusterCommand(cc, "SET key1 Hello");
-    CHECK_REPLY_OK(cc, reply);
-    freeReplyObject(reply);
-
-    valkeyClusterFree(cc);
-}
-
-// Test of disabling the use of username after it was enabled.
-void test_username_disabled(void) {
-    if (valkey_version_less_than(6, 0))
-        return;
-
-    valkeyClusterContext *cc = valkeyClusterContextInit();
-    assert(cc);
-    valkeyClusterSetOptionAddNodes(cc, CLUSTER_NODE_WITH_PASSWORD);
-    valkeyClusterSetOptionUsername(cc, "missing-user");
-    valkeyClusterSetOptionPassword(cc, CLUSTER_PASSWORD);
-
-    // Connect using 'AUTH <username> <password>' should fail
-    int ret = valkeyClusterConnect2(cc);
-    assert(ret == VALKEY_ERR);
-    assert(cc->err == VALKEY_ERR_OTHER);
-    assert(strncmp(cc->errstr, "WRONGPASS invalid username-password pair",
-                   40) == 0);
-
-    // Disable use of username (2 alternatives)
-    ret = valkeyClusterSetOptionUsername(cc, NULL);
-    ASSERT_MSG(ret == VALKEY_OK, cc->errstr);
-    ret = valkeyClusterSetOptionUsername(cc, "");
-    ASSERT_MSG(ret == VALKEY_OK, cc->errstr);
-
-    // Connect using 'AUTH <password>' should pass
-    ret = valkeyClusterConnect2(cc);
-    ASSERT_MSG(ret == VALKEY_OK, cc->errstr);
+    valkeyClusterContext *cc = valkeyClusterConnectWithOptions(&options);
+    ASSERT_MSG(cc && cc->err == 0, cc ? cc->errstr : "OOM");
 
     // Test connection
     valkeyReply *reply = valkeyClusterCommand(cc, "SET key1 Hello");
@@ -156,23 +113,20 @@ void test_username_disabled(void) {
 
 // Connect and handle two clusters simultaneously
 void test_multicluster(void) {
-    int ret;
     valkeyReply *reply;
 
     // Connect to first cluster
-    valkeyClusterContext *cc1 = valkeyClusterContextInit();
+    valkeyClusterContext *cc1 = valkeyClusterConnect(CLUSTER_NODE);
     assert(cc1);
-    valkeyClusterSetOptionAddNodes(cc1, CLUSTER_NODE);
-    ret = valkeyClusterConnect2(cc1);
-    ASSERT_MSG(ret == VALKEY_OK, cc1->errstr);
+    ASSERT_MSG(cc1->err == 0, cc1->errstr);
 
     // Connect to second cluster
-    valkeyClusterContext *cc2 = valkeyClusterContextInit();
+    valkeyClusterOptions options = {0};
+    options.initial_nodes = CLUSTER_NODE_WITH_PASSWORD;
+    options.password = CLUSTER_PASSWORD;
+    valkeyClusterContext *cc2 = valkeyClusterConnectWithOptions(&options);
     assert(cc2);
-    valkeyClusterSetOptionAddNodes(cc2, CLUSTER_NODE_WITH_PASSWORD);
-    valkeyClusterSetOptionPassword(cc2, CLUSTER_PASSWORD);
-    ret = valkeyClusterConnect2(cc2);
-    ASSERT_MSG(ret == VALKEY_OK, cc2->errstr);
+    ASSERT_MSG(cc2->err == 0, cc2->errstr);
 
     // Set keys differently in clusters
     reply = valkeyClusterCommand(cc1, "SET key Hello1");
@@ -207,16 +161,14 @@ void test_multicluster(void) {
 void test_connect_timeout(void) {
     struct timeval timeout = {0, 200000};
 
-    valkeyClusterContext *cc = valkeyClusterContextInit();
-    assert(cc);
-
     /* Configure a non-routable IP address and a timeout */
-    valkeyClusterSetOptionAddNodes(cc, "192.168.0.0:7000");
-    valkeyClusterSetOptionConnectTimeout(cc, timeout);
-    valkeyClusterSetConnectCallback(cc, connect_callback);
+    valkeyClusterOptions options = {0};
+    options.initial_nodes = "192.168.0.0:7000";
+    options.connect_timeout = &timeout;
+    options.connect_callback = connect_callback;
 
-    int status = valkeyClusterConnect2(cc);
-    assert(status == VALKEY_ERR);
+    valkeyClusterContext *cc = valkeyClusterConnectWithOptions(&options);
+    assert(cc);
     assert(cc->err == VALKEY_ERR_IO);
     assert(strcmp(cc->errstr, "Connection timed out") == 0);
     assert(connect_success_counter == 0);
@@ -230,13 +182,12 @@ void test_connect_timeout(void) {
 void test_command_timeout(void) {
     struct timeval timeout = {0, 10000};
 
-    valkeyClusterContext *cc = valkeyClusterContextInit();
-    assert(cc);
-    valkeyClusterSetOptionAddNodes(cc, CLUSTER_NODE);
-    valkeyClusterSetOptionTimeout(cc, timeout);
+    valkeyClusterOptions options = {0};
+    options.initial_nodes = CLUSTER_NODE;
+    options.command_timeout = &timeout;
 
-    int status = valkeyClusterConnect2(cc);
-    ASSERT_MSG(status == VALKEY_OK, cc->errstr);
+    valkeyClusterContext *cc = valkeyClusterConnectWithOptions(&options);
+    ASSERT_MSG(cc && cc->err == 0, cc ? cc->errstr : "OOM");
 
     valkeyClusterNodeIterator ni;
     valkeyClusterInitNodeIterator(&ni, cc);
@@ -263,14 +214,8 @@ void test_command_timeout(void) {
 
 /* Connect and configure a command timeout while connected. */
 void test_command_timeout_set_while_connected(void) {
-    struct timeval timeout = {0, 10000};
-
-    valkeyClusterContext *cc = valkeyClusterContextInit();
-    assert(cc);
-    valkeyClusterSetOptionAddNodes(cc, CLUSTER_NODE);
-
-    int status = valkeyClusterConnect2(cc);
-    ASSERT_MSG(status == VALKEY_OK, cc->errstr);
+    valkeyClusterContext *cc = valkeyClusterConnect(CLUSTER_NODE);
+    ASSERT_MSG(cc && cc->err == 0, cc ? cc->errstr : "OOM");
 
     valkeyClusterNodeIterator ni;
     valkeyClusterInitNodeIterator(&ni, cc);
@@ -283,6 +228,7 @@ void test_command_timeout_set_while_connected(void) {
     freeReplyObject(reply);
 
     /* Set command timeout while connected */
+    struct timeval timeout = {0, 10000};
     valkeyClusterSetOptionTimeout(cc, timeout);
 
     reply = valkeyClusterCommandToNode(cc, node, "DEBUG SLEEP 0.2");
@@ -347,26 +293,23 @@ void commandCallback(valkeyClusterAsyncContext *cc, void *r, void *privdata) {
 // Connecting to a password protected cluster using
 // the async API, providing correct password.
 void test_async_password_ok(void) {
-    valkeyClusterAsyncContext *acc = valkeyClusterAsyncContextInit();
-    assert(acc);
-    valkeyClusterAsyncSetConnectCallback(acc, connectCallback);
-    valkeyClusterAsyncSetDisconnectCallback(acc, disconnectCallback);
-    valkeyClusterSetOptionAddNodes(acc->cc, CLUSTER_NODE_WITH_PASSWORD);
-    valkeyClusterSetOptionPassword(acc->cc, CLUSTER_PASSWORD);
-
     struct event_base *base = event_base_new();
-    valkeyClusterLibeventAttach(acc, base);
 
-    int ret;
-    ret = valkeyClusterConnect2(acc->cc);
-    assert(ret == VALKEY_OK);
-    assert(acc->err == 0);
-    assert(acc->cc->err == 0);
+    valkeyClusterOptions options = {0};
+    options.initial_nodes = CLUSTER_NODE_WITH_PASSWORD;
+    options.options = VALKEY_OPT_BLOCKING_INITIAL_UPDATE;
+    options.password = CLUSTER_PASSWORD;
+    options.async_connect_callback = connectCallback;
+    options.async_disconnect_callback = disconnectCallback;
+    valkeyClusterOptionsUseLibevent(&options, base);
+
+    valkeyClusterAsyncContext *acc = valkeyClusterAsyncConnectWithOptions(&options);
+    ASSERT_MSG(acc && acc->err == 0, acc ? acc->errstr : "OOM");
 
     // Test connection
     ExpectedResult r = {
         .type = VALKEY_REPLY_STATUS, .str = "OK", .disconnect = true};
-    ret = valkeyClusterAsyncCommand(acc, commandCallback, &r, "SET key1 Hello");
+    int ret = valkeyClusterAsyncCommand(acc, commandCallback, &r, "SET key1 Hello");
     assert(ret == VALKEY_OK);
 
     event_base_dispatch(base);
@@ -378,16 +321,17 @@ void test_async_password_ok(void) {
 /* Connect to a password protected cluster using the wrong password.
    An eventloop is not attached since it is not needed is this case. */
 void test_async_password_wrong(void) {
-    valkeyClusterAsyncContext *acc = valkeyClusterAsyncContextInit();
-    assert(acc);
-    valkeyClusterSetOptionAddNodes(acc->cc, CLUSTER_NODE_WITH_PASSWORD);
-    valkeyClusterSetOptionPassword(acc->cc, "faultypass");
+    struct event_base *base = event_base_new();
 
-    int ret;
-    ret = valkeyClusterConnect2(acc->cc);
-    assert(ret == VALKEY_ERR);
-    assert(acc->err == VALKEY_OK); // TODO: This must be wrong!
-    assert(acc->cc->err == VALKEY_ERR_OTHER);
+    valkeyClusterOptions options = {0};
+    options.initial_nodes = CLUSTER_NODE_WITH_PASSWORD;
+    options.options = VALKEY_OPT_BLOCKING_INITIAL_UPDATE;
+    options.password = "faultypass";
+    valkeyClusterOptionsUseLibevent(&options, base);
+
+    valkeyClusterAsyncContext *acc = valkeyClusterAsyncConnectWithOptions(&options);
+    assert(acc);
+    assert(acc->err == VALKEY_ERR_OTHER);
     if (valkey_version_less_than(6, 0))
         assert(strcmp(acc->cc->errstr, "ERR invalid password") == 0);
     else
@@ -395,79 +339,80 @@ void test_async_password_wrong(void) {
 
     // No connection
     ExpectedResult r;
-    ret = valkeyClusterAsyncCommand(acc, commandCallback, &r, "SET key1 Hello");
+    int ret = valkeyClusterAsyncCommand(acc, commandCallback, &r, "SET key1 Hello");
     assert(ret == VALKEY_ERR);
     assert(acc->err == VALKEY_ERR_OTHER);
     assert(strcmp(acc->errstr, "slotmap not available") == 0);
 
     valkeyClusterAsyncFree(acc);
+    event_base_free(base);
 }
 
 /* Connect to a password protected cluster without providing a password.
    An eventloop is not attached since it is not needed is this case. */
 void test_async_password_missing(void) {
-    valkeyClusterAsyncContext *acc = valkeyClusterAsyncContextInit();
-    assert(acc);
-    valkeyClusterAsyncSetConnectCallback(acc, connectCallback);
-    valkeyClusterAsyncSetDisconnectCallback(acc, disconnectCallback);
-    valkeyClusterSetOptionAddNodes(acc->cc, CLUSTER_NODE_WITH_PASSWORD);
+    struct event_base *base = event_base_new();
+
+    valkeyClusterOptions options = {0};
+    options.initial_nodes = CLUSTER_NODE_WITH_PASSWORD;
+    options.options = VALKEY_OPT_BLOCKING_INITIAL_UPDATE;
+    options.async_connect_callback = connectCallback;
+    options.async_disconnect_callback = disconnectCallback;
+    valkeyClusterOptionsUseLibevent(&options, base);
     // Password not configured
 
-    int ret;
-    ret = valkeyClusterConnect2(acc->cc);
-    assert(ret == VALKEY_ERR);
-    assert(acc->err == VALKEY_OK); // TODO: This must be wrong!
-    assert(acc->cc->err == VALKEY_ERR_OTHER);
+    valkeyClusterAsyncContext *acc = valkeyClusterAsyncConnectWithOptions(&options);
+    assert(acc);
+    assert(acc->err == VALKEY_ERR_OTHER);
     assert(strncmp(acc->cc->errstr, "NOAUTH", 6) == 0);
 
     // No connection
     ExpectedResult r;
-    ret = valkeyClusterAsyncCommand(acc, commandCallback, &r, "SET key1 Hello");
+    int ret = valkeyClusterAsyncCommand(acc, commandCallback, &r, "SET key1 Hello");
     assert(ret == VALKEY_ERR);
     assert(acc->err == VALKEY_ERR_OTHER);
     assert(strcmp(acc->errstr, "slotmap not available") == 0);
 
     valkeyClusterAsyncFree(acc);
+    event_base_free(base);
 }
 
 // Connect to a cluster and authenticate using username and password
 void test_async_username_ok(void) {
     if (valkey_version_less_than(6, 0))
         return;
+    struct event_base *base = event_base_new();
 
     // Connect to the cluster using username and password
-    valkeyClusterAsyncContext *acc = valkeyClusterAsyncContextInit();
-    assert(acc);
-    valkeyClusterAsyncSetConnectCallback(acc, connectCallback);
-    valkeyClusterAsyncSetDisconnectCallback(acc, disconnectCallback);
-    valkeyClusterSetOptionAddNodes(acc->cc, CLUSTER_NODE_WITH_PASSWORD);
-    valkeyClusterSetOptionUsername(acc->cc, "missing-user");
-    valkeyClusterSetOptionPassword(acc->cc, CLUSTER_PASSWORD);
-
-    struct event_base *base = event_base_new();
-    valkeyClusterLibeventAttach(acc, base);
+    valkeyClusterOptions options = {0};
+    options.initial_nodes = CLUSTER_NODE_WITH_PASSWORD;
+    options.options = VALKEY_OPT_BLOCKING_INITIAL_UPDATE;
+    options.async_connect_callback = connectCallback;
+    options.async_disconnect_callback = disconnectCallback;
+    options.username = "missing-user";
+    options.password = CLUSTER_PASSWORD;
+    valkeyClusterOptionsUseLibevent(&options, base);
 
     // Connect using wrong username should fail
-    int ret = valkeyClusterConnect2(acc->cc);
-    assert(ret == VALKEY_ERR);
-    assert(acc->cc->err == VALKEY_ERR_OTHER);
-    assert(strncmp(acc->cc->errstr, "WRONGPASS invalid username-password pair",
+    valkeyClusterAsyncContext *acc = valkeyClusterAsyncConnectWithOptions(&options);
+    assert(acc);
+    assert(acc->err == VALKEY_ERR_OTHER);
+    assert(strncmp(acc->errstr, "WRONGPASS invalid username-password pair",
                    40) == 0);
+    valkeyClusterAsyncFree(acc);
 
     // Set correct username
-    ret = valkeyClusterSetOptionUsername(acc->cc, CLUSTER_USERNAME);
-    ASSERT_MSG(ret == VALKEY_OK, acc->cc->errstr);
+    options.username = CLUSTER_USERNAME;
 
     // Connect using correct username should pass
-    ret = valkeyClusterConnect2(acc->cc);
-    assert(ret == VALKEY_OK);
+    acc = valkeyClusterAsyncConnectWithOptions(&options);
+    assert(acc);
     assert(acc->err == 0);
-    assert(acc->cc->err == 0);
 
     // Test connection
     ExpectedResult r = {
         .type = VALKEY_REPLY_STATUS, .str = "OK", .disconnect = true};
-    ret = valkeyClusterAsyncCommand(acc, commandCallback, &r, "SET key1 Hello");
+    int ret = valkeyClusterAsyncCommand(acc, commandCallback, &r, "SET key1 Hello");
     assert(ret == VALKEY_OK);
 
     event_base_dispatch(base);
@@ -478,40 +423,34 @@ void test_async_username_ok(void) {
 
 // Connect and handle two clusters simultaneously using the async API
 void test_async_multicluster(void) {
-    int ret;
-
-    valkeyClusterAsyncContext *acc1 = valkeyClusterAsyncContextInit();
-    assert(acc1);
-    valkeyClusterAsyncSetConnectCallback(acc1, connectCallback);
-    valkeyClusterAsyncSetDisconnectCallback(acc1, disconnectCallback);
-    valkeyClusterSetOptionAddNodes(acc1->cc, CLUSTER_NODE);
-
-    valkeyClusterAsyncContext *acc2 = valkeyClusterAsyncContextInit();
-    assert(acc2);
-    valkeyClusterAsyncSetConnectCallback(acc2, connectCallback);
-    valkeyClusterAsyncSetDisconnectCallback(acc2, disconnectCallback);
-    valkeyClusterSetOptionAddNodes(acc2->cc, CLUSTER_NODE_WITH_PASSWORD);
-    valkeyClusterSetOptionPassword(acc2->cc, CLUSTER_PASSWORD);
-
     struct event_base *base = event_base_new();
-    valkeyClusterLibeventAttach(acc1, base);
-    valkeyClusterLibeventAttach(acc2, base);
+
+    valkeyClusterOptions options1 = {0};
+    options1.initial_nodes = CLUSTER_NODE;
+    options1.options = VALKEY_OPT_BLOCKING_INITIAL_UPDATE;
+    options1.async_connect_callback = connectCallback;
+    options1.async_disconnect_callback = disconnectCallback;
+    valkeyClusterOptionsUseLibevent(&options1, base);
 
     // Connect to first cluster
-    ret = valkeyClusterConnect2(acc1->cc);
-    assert(ret == VALKEY_OK);
-    assert(acc1->err == 0);
-    assert(acc1->cc->err == 0);
+    valkeyClusterAsyncContext *acc1 = valkeyClusterAsyncConnectWithOptions(&options1);
+    ASSERT_MSG(acc1 && acc1->err == 0, acc1 ? acc1->errstr : "OOM");
+
+    valkeyClusterOptions options2 = {0};
+    options2.initial_nodes = CLUSTER_NODE_WITH_PASSWORD;
+    options2.options = VALKEY_OPT_BLOCKING_INITIAL_UPDATE;
+    options2.password = CLUSTER_PASSWORD;
+    options2.async_connect_callback = connectCallback;
+    options2.async_disconnect_callback = disconnectCallback;
+    valkeyClusterOptionsUseLibevent(&options2, base);
 
     // Connect to second cluster
-    ret = valkeyClusterConnect2(acc2->cc);
-    assert(ret == VALKEY_OK);
-    assert(acc2->err == 0);
-    assert(acc2->cc->err == 0);
+    valkeyClusterAsyncContext *acc2 = valkeyClusterAsyncConnectWithOptions(&options2);
+    ASSERT_MSG(acc2 && acc2->err == 0, acc2 ? acc2->errstr : "OOM");
 
     // Set keys differently in clusters
     ExpectedResult r1 = {.type = VALKEY_REPLY_STATUS, .str = "OK"};
-    ret = valkeyClusterAsyncCommand(acc1, commandCallback, &r1, "SET key A");
+    int ret = valkeyClusterAsyncCommand(acc1, commandCallback, &r1, "SET key A");
     assert(ret == VALKEY_OK);
 
     ExpectedResult r2 = {.type = VALKEY_REPLY_STATUS, .str = "OK"};
@@ -544,22 +483,20 @@ void test_async_multicluster(void) {
 
 /* Connect to a non-routable address which results in a connection timeout. */
 void test_async_connect_timeout(void) {
+    struct event_base *base = event_base_new();
     struct timeval timeout = {0, 200000};
 
-    valkeyClusterAsyncContext *acc = valkeyClusterAsyncContextInit();
-    assert(acc);
-
+    valkeyClusterOptions options = {0};
     /* Configure a non-routable IP address and a timeout */
-    valkeyClusterSetOptionAddNodes(acc->cc, "192.168.0.0:7000");
-    valkeyClusterSetOptionConnectTimeout(acc->cc, timeout);
+    options.initial_nodes = "192.168.0.0:7000";
+    options.options = VALKEY_OPT_BLOCKING_INITIAL_UPDATE;
+    options.connect_timeout = &timeout;
+    valkeyClusterOptionsUseLibevent(&options, base);
 
-    struct event_base *base = event_base_new();
-    valkeyClusterLibeventAttach(acc, base);
-
-    int status = valkeyClusterConnect2(acc->cc);
-    assert(status == VALKEY_ERR);
-    assert(acc->cc->err == VALKEY_ERR_IO);
-    assert(strcmp(acc->cc->errstr, "Connection timed out") == 0);
+    valkeyClusterAsyncContext *acc = valkeyClusterAsyncConnectWithOptions(&options);
+    assert(acc);
+    assert(acc->err == VALKEY_ERR_IO);
+    assert(strcmp(acc->errstr, "Connection timed out") == 0);
 
     event_base_dispatch(base);
 
@@ -569,19 +506,17 @@ void test_async_connect_timeout(void) {
 
 /* Connect using a pre-configured command timeout */
 void test_async_command_timeout(void) {
+    struct event_base *base = event_base_new();
     struct timeval timeout = {0, 10000};
 
-    valkeyClusterAsyncContext *acc = valkeyClusterAsyncContextInit();
-    assert(acc);
-    valkeyClusterSetOptionAddNodes(acc->cc, CLUSTER_NODE);
-    valkeyClusterSetOptionTimeout(acc->cc, timeout);
+    valkeyClusterOptions options = {0};
+    options.initial_nodes = CLUSTER_NODE;
+    options.options = VALKEY_OPT_BLOCKING_INITIAL_UPDATE;
+    options.command_timeout = &timeout;
+    valkeyClusterOptionsUseLibevent(&options, base);
 
-    struct event_base *base = event_base_new();
-    valkeyClusterLibeventAttach(acc, base);
-
-    int status = valkeyClusterConnect2(acc->cc);
-    assert(status == VALKEY_OK);
-    assert(acc->cc->err == 0);
+    valkeyClusterAsyncContext *acc = valkeyClusterAsyncConnectWithOptions(&options);
+    ASSERT_MSG(acc && acc->err == 0, acc ? acc->errstr : "OOM");
 
     valkeyClusterNodeIterator ni;
     valkeyClusterInitNodeIterator(&ni, acc->cc);
@@ -591,8 +526,8 @@ void test_async_command_timeout(void) {
     /* Simulate a command timeout and expect a timeout error */
     ExpectedResult r = {
         .noreply = true, .errstr = "Timeout", .disconnect = true};
-    status = valkeyClusterAsyncCommandToNode(acc, node, commandCallback, &r,
-                                             "DEBUG SLEEP 0.2");
+    int status = valkeyClusterAsyncCommandToNode(acc, node, commandCallback, &r,
+                                                 "DEBUG SLEEP 0.2");
     assert(status == VALKEY_OK);
 
     event_base_dispatch(base);
@@ -607,7 +542,6 @@ int main(void) {
     test_password_wrong();
     test_password_missing();
     test_username_ok();
-    test_username_disabled();
     test_multicluster();
     test_connect_timeout();
     test_command_timeout();

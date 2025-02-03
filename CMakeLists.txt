@@ -161,7 +161,6 @@ IF(ENABLE_TLS)
     ENDIF()
     FIND_PACKAGE(OpenSSL REQUIRED)
     SET(valkey_tls_sources
-        src/cluster_tls.c
         src/tls.c)
     ADD_LIBRARY(valkey_tls ${valkey_tls_sources})
     ADD_LIBRARY(valkey::valkey_tls ALIAS valkey_tls)

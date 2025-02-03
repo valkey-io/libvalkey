@@ -140,14 +140,15 @@ static int valkeyAeAttachAdapter(valkeyAsyncContext *ac, void *loop) {
 }
 
 VALKEY_UNUSED
-static int valkeyClusterAeAttach(valkeyClusterAsyncContext *acc,
-                                 aeEventLoop *loop) {
-    if (acc == NULL || loop == NULL) {
+static int valkeyClusterOptionsUseAe(valkeyClusterOptions *options,
+                                     aeEventLoop *loop) {
+    if (options == NULL || loop == NULL) {
         return VALKEY_ERR;
     }
 
-    acc->attach_fn = valkeyAeAttachAdapter;
-    acc->attach_data = loop;
+    options->attach_fn = valkeyAeAttachAdapter;
+    options->attach_data = loop;
     return VALKEY_OK;
 }
+
 #endif /* VALKEY_ADAPTERS_AE_H */

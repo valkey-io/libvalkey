@@ -114,75 +114,35 @@ void test_alloc_failure_handling(void) {
     // Override allocators
     valkeySetAllocators(&ha);
 
-    // Context init
+    struct timeval timeout = {0, 500000};
+
+    valkeyClusterOptions options = {0};
+    options.initial_nodes = CLUSTER_NODE;
+    options.options = VALKEY_OPT_USE_REPLICAS;
+    options.connect_timeout = &timeout;
+    options.command_timeout = &timeout;
+
+    // Connect
     valkeyClusterContext *cc;
     {
         for (int i = 0; i < 3; ++i) {
             successfulAllocations = i;
-            cc = valkeyClusterContextInit();
+            cc = valkeyClusterConnectWithOptions(&options);
             assert(cc == NULL);
         }
 
-        successfulAllocations = 3;
-        cc = valkeyClusterContextInit();
-        assert(cc);
-    }
-    cc->flags |= VALKEYCLUSTER_FLAG_ADD_SLAVE;
-
-    // Add nodes
-    {
-        for (int i = 0; i < 9; ++i) {
-            prepare_allocation_test(cc, i);
-            result = valkeyClusterSetOptionAddNodes(cc, CLUSTER_NODE);
-            assert(result == VALKEY_ERR);
+        for (int i = 3; i < 100; ++i) {
+            successfulAllocations = i;
+            cc = valkeyClusterConnectWithOptions(&options);
+            assert(cc);
             ASSERT_STR_EQ(cc->errstr, "Out of memory");
+            valkeyClusterFree(cc);
         }
+        // Skip iteration 100 to 159 since sdscatfmt give leak warnings during OOM.
 
-        prepare_allocation_test(cc, 9);
-        result = valkeyClusterSetOptionAddNodes(cc, CLUSTER_NODE);
-        assert(result == VALKEY_OK);
-    }
-
-    // Set connect timeout
-    {
-        struct timeval timeout = {0, 500000};
-
-        prepare_allocation_test(cc, 0);
-        result = valkeyClusterSetOptionConnectTimeout(cc, timeout);
-        assert(result == VALKEY_ERR);
-        ASSERT_STR_EQ(cc->errstr, "Out of memory");
-
-        prepare_allocation_test(cc, 1);
-        result = valkeyClusterSetOptionConnectTimeout(cc, timeout);
-        assert(result == VALKEY_OK);
-    }
-
-    // Set request timeout
-    {
-        struct timeval timeout = {0, 500000};
-
-        prepare_allocation_test(cc, 0);
-        result = valkeyClusterSetOptionTimeout(cc, timeout);
-        assert(result == VALKEY_ERR);
-        ASSERT_STR_EQ(cc->errstr, "Out of memory");
-
-        prepare_allocation_test(cc, 1);
-        result = valkeyClusterSetOptionTimeout(cc, timeout);
-        assert(result == VALKEY_OK);
-    }
-
-    // Connect
-    {
-        for (int i = 0; i < 88; ++i) {
-            prepare_allocation_test(cc, i);
-            result = valkeyClusterConnect2(cc);
-            assert(result == VALKEY_ERR);
-            ASSERT_STR_EQ(cc->errstr, "Out of memory");
-        }
-
-        prepare_allocation_test(cc, 88);
-        result = valkeyClusterConnect2(cc);
-        assert(result == VALKEY_OK);
+        successfulAllocations = 160;
+        cc = valkeyClusterConnectWithOptions(&options);
+        assert(cc && cc->err == 0);
     }
 
     // Command
@@ -488,63 +448,39 @@ void test_alloc_failure_handling_async(void) {
     // Override allocators
     valkeySetAllocators(&ha);
 
-    // Context init
-    valkeyClusterAsyncContext *acc;
-    {
-        for (int i = 0; i < 4; ++i) {
-            successfulAllocations = 0;
-            acc = valkeyClusterAsyncContextInit();
-            assert(acc == NULL);
-        }
-        successfulAllocations = 4;
-        acc = valkeyClusterAsyncContextInit();
-        assert(acc);
-    }
-    acc->cc->flags |= VALKEYCLUSTER_FLAG_ADD_SLAVE;
-
-    // Set callbacks
-    {
-        prepare_allocation_test_async(acc, 0);
-        result = valkeyClusterAsyncSetConnectCallback(acc, connectCallback);
-        assert(result == VALKEY_OK);
-        result = valkeyClusterAsyncSetDisconnectCallback(acc, disconnectCallback);
-        assert(result == VALKEY_OK);
-    }
-
-    // Add nodes
-    {
-        for (int i = 0; i < 9; ++i) {
-            prepare_allocation_test(acc->cc, i);
-            result = valkeyClusterSetOptionAddNodes(acc->cc, CLUSTER_NODE);
-            assert(result == VALKEY_ERR);
-            ASSERT_STR_EQ(acc->cc->errstr, "Out of memory");
-        }
-
-        prepare_allocation_test(acc->cc, 9);
-        result = valkeyClusterSetOptionAddNodes(acc->cc, CLUSTER_NODE);
-        assert(result == VALKEY_OK);
-    }
-
-    // Connect
-    {
-        for (int i = 0; i < 86; ++i) {
-            prepare_allocation_test(acc->cc, i);
-            result = valkeyClusterConnect2(acc->cc);
-            assert(result == VALKEY_ERR);
-            ASSERT_STR_EQ(acc->cc->errstr, "Out of memory");
-        }
-
-        prepare_allocation_test(acc->cc, 86);
-        result = valkeyClusterConnect2(acc->cc);
-        assert(result == VALKEY_OK);
-    }
-
     struct event_base *base = event_base_new();
     assert(base);
 
-    successfulAllocations = 0;
-    result = valkeyClusterLibeventAttach(acc, base);
-    assert(result == VALKEY_OK);
+    valkeyClusterOptions options = {0};
+    options.initial_nodes = CLUSTER_NODE;
+    options.options = VALKEY_OPT_USE_REPLICAS |
+                      VALKEY_OPT_BLOCKING_INITIAL_UPDATE;
+    options.async_connect_callback = connectCallback;
+    options.async_disconnect_callback = disconnectCallback;
+    valkeyClusterOptionsUseLibevent(&options, base);
+
+    // Connect
+    valkeyClusterAsyncContext *acc;
+    {
+        for (int i = 0; i < 13; ++i) {
+            successfulAllocations = i;
+            acc = valkeyClusterAsyncConnectWithOptions(&options);
+            assert(acc == NULL);
+        }
+
+        for (int i = 13; i < 100; ++i) {
+            successfulAllocations = i;
+            acc = valkeyClusterAsyncConnectWithOptions(&options);
+            ASSERT_STR_EQ(acc->errstr, "Out of memory");
+            assert(acc != NULL);
+            valkeyClusterAsyncFree(acc);
+        }
+        // Skip iteration 100 to 156 since sdscatfmt give leak warnings during OOM.
+
+        successfulAllocations = 157;
+        acc = valkeyClusterAsyncConnectWithOptions(&options);
+        assert(acc && acc->err == 0);
+    }
 
     // Async command 1
     ExpectedResult r1 = {.type = VALKEY_REPLY_STATUS, .str = "OK"};

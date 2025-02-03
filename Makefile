@@ -15,8 +15,8 @@ INCLUDE_DIR = include/valkey
 TEST_SRCS = $(TEST_DIR)/client_test.c $(TEST_DIR)/ut_parse_cmd.c $(TEST_DIR)/ut_slotmap_update.c
 TEST_BINS = $(patsubst $(TEST_DIR)/%.c,$(TEST_DIR)/%,$(TEST_SRCS))
 
-SOURCES = $(filter-out $(wildcard $(SRC_DIR)/*tls.c) $(SRC_DIR)/rdma.c, $(wildcard $(SRC_DIR)/*.c))
-HEADERS = $(filter-out $(wildcard $(INCLUDE_DIR)/*tls.h) $(INCLUDE_DIR)/rdma.h, $(wildcard $(INCLUDE_DIR)/*.h))
+SOURCES = $(filter-out $(SRC_DIR)/tls.c $(SRC_DIR)/rdma.c, $(wildcard $(SRC_DIR)/*.c))
+HEADERS = $(filter-out $(INCLUDE_DIR)/tls.h $(INCLUDE_DIR)/rdma.h, $(wildcard $(INCLUDE_DIR)/*.h))
 
 OBJS = $(patsubst $(SRC_DIR)/%.c,$(OBJ_DIR)/%.o,$(SOURCES))
 
@@ -95,7 +95,7 @@ TLS_DYLIB_MAKE_CMD=$(CC) $(OPTIMIZATION) $(PLATFORM_FLAGS) -shared -Wl,-soname,$
 USE_TLS?=0
 
 ifeq ($(USE_TLS),1)
-  TLS_SOURCES = $(wildcard $(SRC_DIR)/*tls.c)
+  TLS_SOURCES = $(SRC_DIR)/tls.c
   TLS_OBJS = $(patsubst $(SRC_DIR)/%.c,$(OBJ_DIR)/%.o,$(TLS_SOURCES))
 
   # This is required for test.c only
@@ -293,7 +293,6 @@ install: $(DYLIBNAME) $(STLIBNAME) $(PKGCONFNAME) $(TLS_INSTALL)
 install-tls: $(TLS_DYLIBNAME) $(TLS_STLIBNAME) $(TLS_PKGCONFNAME)
 	mkdir -p $(INSTALL_INCLUDE_PATH) $(INSTALL_LIBRARY_PATH)
 	$(INSTALL) $(INCLUDE_DIR)/tls.h $(INSTALL_INCLUDE_PATH)
-	$(INSTALL) $(INCLUDE_DIR)/cluster_tls.h $(INSTALL_INCLUDE_PATH)
 	$(INSTALL) $(TLS_DYLIBNAME) $(INSTALL_LIBRARY_PATH)/$(TLS_DYLIB_MINOR_NAME)
 	ln -sf $(TLS_DYLIB_MINOR_NAME) $(INSTALL_LIBRARY_PATH)/$(TLS_ROOT_DYLIB_NAME)
 	ln -sf $(TLS_DYLIB_MINOR_NAME) $(INSTALL_LIBRARY_PATH)/$(TLS_DYLIB_MAJOR_NAME)

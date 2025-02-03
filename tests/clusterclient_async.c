@@ -237,13 +237,13 @@ void disconnectCallback(const valkeyAsyncContext *ac, int status) {
 }
 
 int main(int argc, char **argv) {
-    int use_cluster_slots = 1; // Get topology via CLUSTER SLOTS
+    int use_cluster_nodes = 0;
     int show_connection_events = 0;
 
     int optind;
     for (optind = 1; optind < argc && argv[optind][0] == '-'; optind++) {
         if (strcmp(argv[optind], "--use-cluster-nodes") == 0) {
-            use_cluster_slots = 0; // Use the default CLUSTER NODES instead
+            use_cluster_nodes = 1;
         } else if (strcmp(argv[optind], "--events") == 0) {
             show_events = 1;
         } else if (strcmp(argv[optind], "--connection-events") == 0) {
@@ -262,36 +262,34 @@ int main(int argc, char **argv) {
     }
     const char *initnode = argv[optind];
     struct timeval timeout = {0, 500000};
+    struct event_base *base = event_base_new();
 
-    valkeyClusterAsyncContext *acc = valkeyClusterAsyncContextInit();
-    assert(acc);
-    valkeyClusterSetOptionAddNodes(acc->cc, initnode);
-    valkeyClusterSetOptionTimeout(acc->cc, timeout);
-    valkeyClusterSetOptionConnectTimeout(acc->cc, timeout);
-    valkeyClusterSetOptionMaxRetry(acc->cc, 1);
-    valkeyClusterSetEventCallback(acc->cc, eventCallback, acc);
-    if (use_cluster_slots) {
-        valkeyClusterSetOptionRouteUseSlots(acc->cc);
+    valkeyClusterOptions options = {0};
+    options.initial_nodes = initnode;
+    options.connect_timeout = &timeout;
+    options.command_timeout = &timeout;
+    options.max_retry = 1;
+    if (!async_initial_update) {
+        options.options = VALKEY_OPT_BLOCKING_INITIAL_UPDATE;
+    }
+    if (use_cluster_nodes) {
+        options.options |= VALKEY_OPT_USE_CLUSTER_NODES;
     }
     if (show_connection_events) {
-        valkeyClusterAsyncSetConnectCallback(acc, connectCallback);
-        valkeyClusterAsyncSetDisconnectCallback(acc, disconnectCallback);
+        options.async_connect_callback = connectCallback;
+        options.async_disconnect_callback = disconnectCallback;
     }
+    valkeyClusterOptionsUseLibevent(&options, base);
 
-    struct event_base *base = event_base_new();
-    int status = valkeyClusterLibeventAttach(acc, base);
-    assert(status == VALKEY_OK);
-
-    if (async_initial_update) {
-        if (valkeyClusterAsyncConnect2(acc) != VALKEY_OK) {
-            printf("Connect error: %s\n", acc->errstr);
-            exit(2);
-        }
-    } else {
-        if (valkeyClusterConnect2(acc->cc) != VALKEY_OK) {
-            printf("Connect error: %s\n", acc->cc->errstr);
-            exit(2);
-        }
+    valkeyClusterAsyncContext *acc = valkeyClusterAsyncContextInit(&options);
+    if (acc == NULL || acc->err != 0) {
+        printf("Initiation failure: %s\n", acc ? acc->errstr : "OOM");
+        exit(2);
+    }
+    valkeyClusterAsyncSetEventCallback(acc, eventCallback, acc);
+    if (valkeyClusterAsyncConnect(acc) != VALKEY_OK) {
+        printf("Connect error: %s\n", acc->errstr);
+        exit(2);
     }
 
     event_base_dispatch(base);
