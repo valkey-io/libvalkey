@@ -12,16 +12,13 @@
 
 // Test of two pipelines using sync API
 void test_pipeline(void) {
-    valkeyClusterContext *cc = valkeyClusterContextInit();
-    assert(cc);
+    valkeyClusterOptions options = {0};
+    options.initial_nodes = CLUSTER_NODE;
+
+    valkeyClusterContext *cc = valkeyClusterConnectWithOptions(&options);
+    ASSERT_MSG(cc && cc->err == 0, cc ? cc->errstr : "OOM");
 
     int status;
-    status = valkeyClusterSetOptionAddNodes(cc, CLUSTER_NODE);
-    ASSERT_MSG(status == VALKEY_OK, cc->errstr);
-
-    status = valkeyClusterConnect2(cc);
-    ASSERT_MSG(status == VALKEY_OK, cc->errstr);
-
     status = valkeyClusterAppendCommand(cc, "SET foo one");
     ASSERT_MSG(status == VALKEY_OK, cc->errstr);
     status = valkeyClusterAppendCommand(cc, "SET bar two");
@@ -95,20 +92,19 @@ void commandCallback(valkeyClusterAsyncContext *cc, void *r, void *privdata) {
 // nature of an event loop. Therefore, unlike the synchronous API, there is only
 // a single way to send commands.
 void test_async_pipeline(void) {
-    valkeyClusterAsyncContext *acc = valkeyClusterAsyncContextInit();
-    assert(acc);
-    valkeyClusterAsyncSetConnectCallback(acc, connectCallback);
-    valkeyClusterAsyncSetDisconnectCallback(acc, disconnectCallback);
-    valkeyClusterSetOptionAddNodes(acc->cc, CLUSTER_NODE);
+    struct event_base *base = event_base_new();
+
+    valkeyClusterOptions options = {0};
+    options.initial_nodes = CLUSTER_NODE;
+    options.options = VALKEY_OPT_BLOCKING_INITIAL_UPDATE;
+    options.async_connect_callback = connectCallback;
+    options.async_disconnect_callback = disconnectCallback;
+    valkeyClusterOptionsUseLibevent(&options, base);
+
+    valkeyClusterAsyncContext *acc = valkeyClusterAsyncConnectWithOptions(&options);
+    ASSERT_MSG(acc && acc->err == 0, acc ? acc->errstr : "OOM");
 
     int status;
-    status = valkeyClusterConnect2(acc->cc);
-    ASSERT_MSG(status == VALKEY_OK, acc->errstr);
-
-    struct event_base *base = event_base_new();
-    status = valkeyClusterLibeventAttach(acc, base);
-    assert(status == VALKEY_OK);
-
     ExpectedResult r1 = {.type = VALKEY_REPLY_STATUS, .str = "OK"};
     status =
         valkeyClusterAsyncCommand(acc, commandCallback, &r1, "SET foo six");
