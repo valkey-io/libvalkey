@@ -277,7 +277,7 @@ valkeyClusterAsyncConnect(acc)
 
 ### Connection options
 
-There are a variety of options you can specify using the `valkeyClusterOptions` struct when connecting to a cluster.
+There is a variety of options you can specify using the `valkeyClusterOptions` struct when connecting to a cluster.
 
 One asynchronous API specific option is `VALKEY_OPT_BLOCKING_INITIAL_UPDATE` which enables the initial slot map update to be performed in a blocking fashion.
 The connect function will wait for a slot map update before returning so that the returned context is immediately ready to accept commands.
