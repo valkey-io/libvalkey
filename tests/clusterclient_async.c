@@ -156,7 +156,7 @@ void sendNextCommand(evutil_socket_t fd, short kind, void *arg) {
 
         if (send_to_all) {
             valkeyClusterNodeIterator ni;
-            valkeyClusterInitNodeIterator(&ni, acc->cc);
+            valkeyClusterInitNodeIterator(&ni, &acc->cc);
 
             valkeyClusterNode *node;
             while ((node = valkeyClusterNodeNext(&ni)) != NULL) {
@@ -193,9 +193,12 @@ void sendNextCommand(evutil_socket_t fd, short kind, void *arg) {
 
 void eventCallback(const valkeyClusterContext *cc, int event, void *privdata) {
     (void)cc;
+    (void)privdata;
     if (event == VALKEYCLUSTER_EVENT_READY) {
-        /* Schedule a read from stdin and send next command. */
-        valkeyClusterAsyncContext *acc = (valkeyClusterAsyncContext *)privdata;
+        /* Schedule a read from stdin and send next command.
+         * Get the async context by a simple cast since the
+         * valkeyClusterAsyncContext is a reallocated valkeyClusterContext. */
+        valkeyClusterAsyncContext *acc = (valkeyClusterAsyncContext *)cc;
         struct timeval timeout = {0, 10};
         struct event_base *base = acc->attach_data;
         event_base_once(base, -1, EV_TIMEOUT, sendNextCommand, acc, &timeout);
@@ -268,6 +271,7 @@ int main(int argc, char **argv) {
     options.initial_nodes = initnode;
     options.connect_timeout = &timeout;
     options.command_timeout = &timeout;
+    options.event_callback = eventCallback;
     options.max_retry = 1;
     if (!async_initial_update) {
         options.options = VALKEY_OPT_BLOCKING_INITIAL_UPDATE;
@@ -281,14 +285,9 @@ int main(int argc, char **argv) {
     }
     valkeyClusterOptionsUseLibevent(&options, base);
 
-    valkeyClusterAsyncContext *acc = valkeyClusterAsyncContextInit(&options);
+    valkeyClusterAsyncContext *acc = valkeyClusterAsyncConnectWithOptions(&options);
     if (acc == NULL || acc->err != 0) {
-        printf("Initiation failure: %s\n", acc ? acc->errstr : "OOM");
-        exit(2);
-    }
-    valkeyClusterAsyncSetEventCallback(acc, eventCallback, acc);
-    if (valkeyClusterAsyncConnect(acc) != VALKEY_OK) {
-        printf("Connect error: %s\n", acc->errstr);
+        printf("Connect error: %s\n", acc ? acc->errstr : "OOM");
         exit(2);
     }
 

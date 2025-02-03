@@ -115,10 +115,13 @@ typedef struct valkeyClusterContext {
 
 /* Context for accessing a Valkey Cluster asynchronously */
 typedef struct valkeyClusterAsyncContext {
-    valkeyClusterContext *cc;
+    /* Hold the regular context, so it can be realloc'ed. */
+    valkeyClusterContext cc;
 
-    int err;          /* Error flags, 0 when there is no error */
-    char errstr[128]; /* String representation of error when applicable */
+    int err;      /* Error flag, 0 when there is no error,
+                   * a copy of cc->err for convenience. */
+    char *errstr; /* String representation of error when applicable,
+                   * always pointing to cc->errstr[] */
 
     int64_t lastSlotmapUpdateAttempt; /* Timestamp */
 
@@ -288,17 +291,6 @@ valkeyContext *valkeyClusterGetValkeyContext(valkeyClusterContext *cc,
 valkeyClusterAsyncContext *valkeyClusterAsyncConnectWithOptions(const valkeyClusterOptions *options);
 void valkeyClusterAsyncDisconnect(valkeyClusterAsyncContext *acc);
 void valkeyClusterAsyncFree(valkeyClusterAsyncContext *acc);
-
-/* Initiate and connect as separate steps. */
-valkeyClusterAsyncContext *valkeyClusterAsyncContextInit(const valkeyClusterOptions *options);
-int valkeyClusterAsyncConnect(valkeyClusterAsyncContext *acc);
-
-/* Callback option configurable after a context initiation, enabling that the
- * valkeyClusterAsyncContext pointer can be given as privdata in the callback. */
-int valkeyClusterAsyncSetEventCallback(valkeyClusterAsyncContext *acc,
-                                       void(fn)(const valkeyClusterContext *cc,
-                                                int event, void *privdata),
-                                       void *privdata);
 
 /* Commands */
 int valkeyClusterAsyncCommand(valkeyClusterAsyncContext *acc,

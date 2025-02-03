@@ -36,6 +36,8 @@ The type `sds` is removed from the public API.
   initiation examples that might be helpful.
 * The default command to update the internal slot map is changed to `CLUSTER SLOTS`.
   `CLUSTER NODES` can be re-enabled through options using `VALKEY_OPT_USE_CLUSTER_NODES`.
+* A `valkeyClusterAsyncContext` now embeds a `valkeyClusterContext` instead of
+  holding a pointer to it. Replace any use of `acc->cc` with `&acc->cc` or similar.
 
 ### Renamed API functions
 
