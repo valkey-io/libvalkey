@@ -41,7 +41,8 @@
 
 #include "alloc.h"
 #include "read.h"
-#include "sds.h"
+
+#include <sds.h>
 
 #include <assert.h>
 #include <ctype.h>

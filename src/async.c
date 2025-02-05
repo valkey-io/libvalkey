@@ -42,10 +42,11 @@
 
 #include "async.h"
 #include "async_private.h"
-#include "dict.h"
 #include "net.h"
-#include "sds.h"
 #include "valkey_private.h"
+
+#include <dict.h>
+#include <sds.h>
 
 #include <assert.h>
 #include <ctype.h>

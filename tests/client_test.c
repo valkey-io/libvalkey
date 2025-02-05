@@ -16,9 +16,10 @@
 #endif
 #include "adapters/poll.h"
 #include "async.h"
-#include "sds.h"
 #include "valkey.h"
 #include "valkey_private.h"
+
+#include <sds.h>
 
 #include <assert.h>
 #include <errno.h>
