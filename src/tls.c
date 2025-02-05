@@ -166,8 +166,8 @@ static int initOpensslLocks(void) {
 #endif /* VALKEY_USE_CRYPTO_LOCKS */
 
 int valkeyInitOpenSSL(void) {
-    SSL_library_init();
 #ifdef VALKEY_USE_CRYPTO_LOCKS
+    SSL_library_init();
     initOpensslLocks();
 #endif
 
