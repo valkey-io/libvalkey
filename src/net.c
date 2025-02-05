@@ -38,9 +38,10 @@
 #include "net.h"
 
 #include "async.h"
-#include "sds.h"
 #include "sockcompat.h"
 #include "valkey_private.h"
+
+#include <sds.h>
 
 #include <errno.h>
 #include <fcntl.h>
