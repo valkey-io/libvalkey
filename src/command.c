@@ -45,8 +45,9 @@
 
 #include "alloc.h"
 #include "command.h"
-#include "sds.h"
 #include "vkutil.h"
+
+#include <sds.h>
 
 #include <stdio.h>
 #include <string.h>
