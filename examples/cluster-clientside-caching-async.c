@@ -152,7 +152,10 @@ int main(int argc, char **argv) {
     valkeyClusterOptionsUseLibevent(&options, base);
 
     valkeyClusterAsyncContext *acc = valkeyClusterAsyncConnectWithOptions(&options);
-    assert(acc);
+    if (acc == NULL || acc->err != 0) {
+        printf("Connect error: %s\n", acc ? acc->errstr : "OOM");
+        exit(2);
+    }
 
     event_base_dispatch(base);
 

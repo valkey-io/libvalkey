@@ -2798,8 +2798,9 @@ valkeyClusterAsyncContext *valkeyClusterAsyncConnectWithOptions(const valkeyClus
 }
 
 static int valkeyClusterAsyncConnect(valkeyClusterAsyncContext *acc) {
-    /* An attach function for an async event library is required. */
     if (acc->attach_fn == NULL) {
+        valkeyClusterAsyncSetError(acc, VALKEY_ERR_OTHER,
+                                   "No event library configured");
         return VALKEY_ERR;
     }
 

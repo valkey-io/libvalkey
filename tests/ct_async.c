@@ -73,7 +73,7 @@ int main(void) {
     valkeyClusterOptionsUseLibevent(&options, base);
 
     valkeyClusterAsyncContext *acc = valkeyClusterAsyncConnectWithOptions(&options);
-    assert(acc);
+    assert(acc && acc->err == 0);
 
     event_base_dispatch(base);
 
