@@ -2803,10 +2803,6 @@ static int valkeyClusterAsyncConnect(valkeyClusterAsyncContext *acc) {
         return VALKEY_ERR;
     }
 
-    /* Clear a previously set shutdown flag to allow a
-     * reconnection of an async context using this API. */
-    acc->cc.flags &= ~VALKEY_FLAG_DISCONNECTING;
-
     /* Use blocking initial slotmap update when configured. */
     if (acc->cc.flags & VALKEY_FLAG_BLOCKING_INITIAL_UPDATE) {
         if (valkeyClusterUpdateSlotmap(&acc->cc) != VALKEY_OK) {
