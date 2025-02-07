@@ -320,8 +320,8 @@ After this, the disconnection callback is executed with the `VALKEY_OK` status a
 
 Use [`event_callback` in `valkeyClusterOptions`](#events-per-cluster-context) to get notified when certain events occur.
 
-When the callback function requires the current `valkeyClusterAsyncContext` typecast the given `valkeyClusterContext` to a `valkeyClusterAsyncContext`.
-A `valkeyClusterAsyncContext` struct begins with the embedded `valkeyClusterContext` so these structs share memory address.
+When the callback function requires the current `valkeyClusterAsyncContext`, it can typecast the given `valkeyClusterContext` to a `valkeyClusterAsyncContext`.
+The `valkeyClusterAsyncContext` struct is an extension of the `valkeyClusterContext` struct.
 
 ```c
 void eventCallback(const valkeyClusterContext *cc, int event, void *privdata) {
