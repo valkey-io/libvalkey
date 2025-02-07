@@ -2799,18 +2799,6 @@ static int valkeyClusterAsyncConnect(valkeyClusterAsyncContext *acc) {
     return updateSlotMapAsync(acc, NULL /*any node*/);
 }
 
-int valkeyClusterAsyncSetEventCallback(valkeyClusterAsyncContext *acc,
-                                       void(fn)(const valkeyClusterContext *cc,
-                                                int event, void *privdata),
-                                       void *privdata) {
-    if (acc->cc.event_callback == NULL) {
-        acc->cc.event_callback = fn;
-        acc->cc.event_privdata = privdata;
-        return VALKEY_OK;
-    }
-    return VALKEY_ERR;
-}
-
 /* Reply callback function for CLUSTER SLOTS */
 void clusterSlotsReplyCallback(valkeyAsyncContext *ac, void *r,
                                void *privdata) {
