@@ -63,10 +63,13 @@ The type `sds` is removed from the public API.
 * `redisClusterSetOptionConnectNonBlock` removed since it was deprecated.
 * `redisClusterSetOptionConnectTimeout` removed, use `valkeyClusterOptions.connect_timeout`.
 * `redisClusterSetOptionMaxRetry` removed, use `valkeyClusterOptions.max_retry`.
-* `redisClusterSetOptionParseSlaves` removed, use `valkeyClusterOptions.flags` and `VALKEY_OPT_USE_REPLICAS`.
+* `redisClusterSetOptionParseSlaves` removed, use `valkeyClusterOptions.options` and `VALKEY_OPT_USE_REPLICAS`.
 * `redisClusterSetOptionPassword` removed, use `valkeyClusterOptions.password`.
-* `redisClusterSetOptionRouteUseSlots` removed, the use of `CLUSTER SLOTS` is enabled by default.
+* `redisClusterSetOptionRouteUseSlots` removed, `CLUSTER SLOTS` is used by default.
 * `redisClusterSetOptionUsername` removed, use `valkeyClusterOptions.username`.
+* `redisClusterAsyncConnect` removed, use `valkeyClusterAsyncConnectWithOptions` with options flag `VALKEY_OPT_BLOCKING_INITIAL_UPDATE`.
+* `redisClusterAsyncConnect2` removed, use `valkeyClusterAsyncConnectWithOptions`.
+* `redisClusterAsyncContextInit` removed, `valkeyClusterAsyncConnectWithOptions` will initiate the context.
 * `redisClusterAsyncSetConnectCallback` removed, but `valkeyClusterOptions.async_connect_callback` can be used which accepts a non-const callback function prototype.
 * `redisClusterAsyncSetConnectCallbackNC` removed, use `valkeyClusterOptions.async_connect_callback`.
 * `redisClusterAsyncSetDisconnectCallback` removed, use `valkeyClusterOptions.async_disconnect_callback`.
