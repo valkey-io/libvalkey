@@ -196,8 +196,8 @@ void eventCallback(const valkeyClusterContext *cc, int event, void *privdata) {
     (void)privdata;
     if (event == VALKEYCLUSTER_EVENT_READY) {
         /* Schedule a read from stdin and send next command.
-         * Get the async context by a simple cast since the
-         * valkeyClusterAsyncContext is a reallocated valkeyClusterContext. */
+         * Get the async context by a simple cast since in the Async API a
+         * valkeyClusterAsyncContext is an extension of the valkeyClusterContext. */
         valkeyClusterAsyncContext *acc = (valkeyClusterAsyncContext *)cc;
         struct timeval timeout = {0, 10};
         struct event_base *base = acc->attach_data;

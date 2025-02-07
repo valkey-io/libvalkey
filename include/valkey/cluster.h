@@ -115,7 +115,7 @@ typedef struct valkeyClusterContext {
 
 /* Context for accessing a Valkey Cluster asynchronously */
 typedef struct valkeyClusterAsyncContext {
-    /* Hold the regular context, so it can be realloc'ed. */
+    /* Hold the regular context. */
     valkeyClusterContext cc;
 
     int err;      /* Error flag, 0 when there is no error,

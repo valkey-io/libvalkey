@@ -36,8 +36,8 @@ void disconnectCallback(const valkeyAsyncContext *ac, int status) {
 void eventCallback(const valkeyClusterContext *cc, int event, void *privdata) {
     (void)cc;
     (void)privdata;
-    /* Get the async context by a simple cast since the
-     * valkeyClusterAsyncContext is a reallocated valkeyClusterContext. */
+    /* Get the async context by a simple cast since in the Async API a
+     * valkeyClusterAsyncContext is an extension of the valkeyClusterContext. */
     valkeyClusterAsyncContext *acc = (valkeyClusterAsyncContext *)cc;
 
     /* We send our commands when the client is ready to accept commands. */
