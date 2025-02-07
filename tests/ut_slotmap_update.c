@@ -22,6 +22,12 @@ const char *__asan_default_options(void) {
 valkeyReply *create_reply(const char *buf, size_t len);
 char *resp_encode_array(char *p, sds *resp);
 
+valkeyClusterContext *createClusterContext(const valkeyClusterOptions *options) {
+    valkeyClusterContext *cc = vk_calloc(1, sizeof(valkeyClusterContext));
+    assert(valkeyClusterContextInit(cc, options) == VALKEY_OK);
+    return cc;
+}
+
 /* Helper to create a valkeyReply that contains a bulkstring. */
 valkeyReply *create_cluster_nodes_reply(const char *str) {
     /* Create a RESP Bulk String. */
@@ -127,7 +133,7 @@ void test_parse_cluster_nodes(bool parse_replicas) {
     if (parse_replicas)
         options.options |= VALKEY_OPT_USE_REPLICAS;
 
-    valkeyClusterContext *cc = valkeyClusterContextInit(&options);
+    valkeyClusterContext *cc = createClusterContext(&options);
     valkeyContext *c = valkeyContextInit();
     valkeyClusterNode *node;
     cluster_slot *slot;
@@ -211,7 +217,7 @@ void test_parse_cluster_nodes(bool parse_replicas) {
 
 void test_parse_cluster_nodes_during_failover(void) {
     valkeyClusterOptions options = {0};
-    valkeyClusterContext *cc = valkeyClusterContextInit(&options);
+    valkeyClusterContext *cc = createClusterContext(&options);
     valkeyContext *c = valkeyContextInit();
     valkeyClusterNode *node;
     cluster_slot *slot;
@@ -277,7 +283,7 @@ void test_parse_cluster_nodes_during_failover(void) {
 /* Skip nodes with the `noaddr` flag. */
 void test_parse_cluster_nodes_with_noaddr(void) {
     valkeyClusterOptions options = {0};
-    valkeyClusterContext *cc = valkeyClusterContextInit(&options);
+    valkeyClusterContext *cc = createClusterContext(&options);
     valkeyContext *c = valkeyContextInit();
     valkeyClusterNode *node;
     dictIterator di;
@@ -306,7 +312,7 @@ void test_parse_cluster_nodes_with_noaddr(void) {
 
 void test_parse_cluster_nodes_with_empty_ip(void) {
     valkeyClusterOptions options = {0};
-    valkeyClusterContext *cc = valkeyClusterContextInit(&options);
+    valkeyClusterContext *cc = createClusterContext(&options);
     valkeyClusterNode *node;
     dictIterator di;
 
@@ -342,7 +348,7 @@ void test_parse_cluster_nodes_with_empty_ip(void) {
 /* Parse replies with additional importing and migrating information. */
 void test_parse_cluster_nodes_with_special_slot_entries(void) {
     valkeyClusterOptions options = {0};
-    valkeyClusterContext *cc = valkeyClusterContextInit(&options);
+    valkeyClusterContext *cc = createClusterContext(&options);
     valkeyContext *c = valkeyContextInit();
     valkeyClusterNode *node;
     cluster_slot *slot;
@@ -385,7 +391,7 @@ void test_parse_cluster_nodes_with_multiple_replicas(void) {
     valkeyClusterOptions options = {0};
     options.options |= VALKEY_OPT_USE_REPLICAS;
 
-    valkeyClusterContext *cc = valkeyClusterContextInit(&options);
+    valkeyClusterContext *cc = createClusterContext(&options);
     valkeyContext *c = valkeyContextInit();
     valkeyClusterNode *node;
     cluster_slot *slot;
@@ -449,7 +455,7 @@ void test_parse_cluster_nodes_with_multiple_replicas(void) {
 /* Give error when parsing erroneous data. */
 void test_parse_cluster_nodes_with_parse_error(void) {
     valkeyClusterOptions options = {0};
-    valkeyClusterContext *cc = valkeyClusterContextInit(&options);
+    valkeyClusterContext *cc = createClusterContext(&options);
     valkeyContext *c = valkeyContextInit();
     valkeyReply *reply;
     dict *nodes;
@@ -498,7 +504,7 @@ void test_parse_cluster_nodes_with_parse_error(void) {
  * i.e. `ip:port` instead of `ip:port@cport` */
 void test_parse_cluster_nodes_with_legacy_format(void) {
     valkeyClusterOptions options = {0};
-    valkeyClusterContext *cc = valkeyClusterContextInit(&options);
+    valkeyClusterContext *cc = createClusterContext(&options);
     valkeyContext *c = valkeyContextInit();
     valkeyClusterNode *node;
     dictIterator di;
@@ -526,7 +532,7 @@ void test_parse_cluster_slots(bool parse_replicas) {
     if (parse_replicas)
         options.options |= VALKEY_OPT_USE_REPLICAS;
 
-    valkeyClusterContext *cc = valkeyClusterContextInit(&options);
+    valkeyClusterContext *cc = createClusterContext(&options);
     valkeyContext *c = valkeyContextInit();
     valkeyClusterNode *node;
     cluster_slot *slot;
@@ -608,7 +614,7 @@ void test_parse_cluster_slots(bool parse_replicas) {
 
 void test_parse_cluster_slots_with_empty_ip(void) {
     valkeyClusterOptions options = {0};
-    valkeyClusterContext *cc = valkeyClusterContextInit(&options);
+    valkeyClusterContext *cc = createClusterContext(&options);
     valkeyClusterNode *node;
     dictIterator di;
 
@@ -644,7 +650,7 @@ void test_parse_cluster_slots_with_empty_ip(void) {
 
 void test_parse_cluster_slots_with_null_ip(void) {
     valkeyClusterOptions options = {0};
-    valkeyClusterContext *cc = valkeyClusterContextInit(&options);
+    valkeyClusterContext *cc = createClusterContext(&options);
     valkeyClusterNode *node;
     dictIterator di;
 
@@ -683,7 +689,7 @@ void test_parse_cluster_slots_with_multiple_replicas(void) {
     valkeyClusterOptions options = {0};
     options.options |= VALKEY_OPT_USE_REPLICAS;
 
-    valkeyClusterContext *cc = valkeyClusterContextInit(&options);
+    valkeyClusterContext *cc = createClusterContext(&options);
     valkeyContext *c = valkeyContextInit();
     valkeyClusterNode *node;
     cluster_slot *slot;
@@ -743,7 +749,7 @@ void test_parse_cluster_slots_with_noncontiguous_slots(void) {
     valkeyClusterOptions options = {0};
     options.options |= VALKEY_OPT_USE_REPLICAS;
 
-    valkeyClusterContext *cc = valkeyClusterContextInit(&options);
+    valkeyClusterContext *cc = createClusterContext(&options);
     valkeyContext *c = valkeyContextInit();
     valkeyClusterNode *node;
     cluster_slot *slot;

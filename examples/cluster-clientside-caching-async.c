@@ -36,7 +36,10 @@ void connectCallback(valkeyAsyncContext *ac, int status) {
    commands. A reply is expected via a call to 'setCallback()' */
 void eventCallback(const valkeyClusterContext *cc, int event, void *privdata) {
     (void)cc;
-    valkeyClusterAsyncContext *acc = (valkeyClusterAsyncContext *)privdata;
+    (void)privdata;
+    /* Get the async context by a simple cast since in the Async API a
+     * valkeyClusterAsyncContext is an extension of the valkeyClusterContext. */
+    valkeyClusterAsyncContext *acc = (valkeyClusterAsyncContext *)cc;
 
     /* We send our commands when the client is ready to accept commands. */
     if (event == VALKEYCLUSTER_EVENT_READY) {
@@ -145,17 +148,14 @@ int main(int argc, char **argv) {
     options.initial_nodes = CLUSTER_NODE;
     options.async_connect_callback = connectCallback;
     options.async_disconnect_callback = disconnectCallback;
+    options.event_callback = eventCallback;
     valkeyClusterOptionsUseLibevent(&options, base);
 
-    valkeyClusterAsyncContext *acc = valkeyClusterAsyncContextInit(&options);
-    assert(acc);
-
-    int status;
-    status = valkeyClusterAsyncSetEventCallback(acc, eventCallback, acc);
-    assert(status == VALKEY_OK);
-
-    status = valkeyClusterAsyncConnect(acc);
-    assert(status == VALKEY_OK);
+    valkeyClusterAsyncContext *acc = valkeyClusterAsyncConnectWithOptions(&options);
+    if (acc == NULL || acc->err != 0) {
+        printf("Connect error: %s\n", acc ? acc->errstr : "OOM");
+        exit(2);
+    }
 
     event_base_dispatch(base);
 

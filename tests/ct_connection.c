@@ -333,9 +333,9 @@ void test_async_password_wrong(void) {
     assert(acc);
     assert(acc->err == VALKEY_ERR_OTHER);
     if (valkey_version_less_than(6, 0))
-        assert(strcmp(acc->cc->errstr, "ERR invalid password") == 0);
+        assert(strcmp(acc->errstr, "ERR invalid password") == 0);
     else
-        assert(strncmp(acc->cc->errstr, "WRONGPASS", 9) == 0);
+        assert(strncmp(acc->errstr, "WRONGPASS", 9) == 0);
 
     // No connection
     ExpectedResult r;
@@ -364,7 +364,7 @@ void test_async_password_missing(void) {
     valkeyClusterAsyncContext *acc = valkeyClusterAsyncConnectWithOptions(&options);
     assert(acc);
     assert(acc->err == VALKEY_ERR_OTHER);
-    assert(strncmp(acc->cc->errstr, "NOAUTH", 6) == 0);
+    assert(strncmp(acc->errstr, "NOAUTH", 6) == 0);
 
     // No connection
     ExpectedResult r;
@@ -519,7 +519,7 @@ void test_async_command_timeout(void) {
     ASSERT_MSG(acc && acc->err == 0, acc ? acc->errstr : "OOM");
 
     valkeyClusterNodeIterator ni;
-    valkeyClusterInitNodeIterator(&ni, acc->cc);
+    valkeyClusterInitNodeIterator(&ni, &acc->cc);
     valkeyClusterNode *node = valkeyClusterNodeNext(&ni);
     assert(node);
 
