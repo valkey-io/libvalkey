@@ -35,7 +35,10 @@ void disconnectCallback(const valkeyAsyncContext *ac, int status) {
 
 void eventCallback(const valkeyClusterContext *cc, int event, void *privdata) {
     (void)cc;
-    valkeyClusterAsyncContext *acc = (valkeyClusterAsyncContext *)privdata;
+    (void)privdata;
+    /* Get the async context by a simple cast since in the Async API a
+     * valkeyClusterAsyncContext is an extension of the valkeyClusterContext. */
+    valkeyClusterAsyncContext *acc = (valkeyClusterAsyncContext *)cc;
 
     /* We send our commands when the client is ready to accept commands. */
     if (event == VALKEYCLUSTER_EVENT_READY) {
@@ -66,17 +69,11 @@ int main(void) {
     options.initial_nodes = CLUSTER_NODE;
     options.async_connect_callback = connectCallback;
     options.async_disconnect_callback = disconnectCallback;
+    options.event_callback = eventCallback;
     valkeyClusterOptionsUseLibevent(&options, base);
 
-    valkeyClusterAsyncContext *acc = valkeyClusterAsyncContextInit(&options);
-    assert(acc);
-
-    /* Set an event callback that uses acc as privdata */
-    int status = valkeyClusterAsyncSetEventCallback(acc, eventCallback, acc);
-    assert(status == VALKEY_OK);
-
-    status = valkeyClusterAsyncConnect(acc);
-    assert(status == VALKEY_OK);
+    valkeyClusterAsyncContext *acc = valkeyClusterAsyncConnectWithOptions(&options);
+    assert(acc && acc->err == 0);
 
     event_base_dispatch(base);
 

@@ -332,7 +332,7 @@ void test_async_to_single_node(void) {
     ASSERT_MSG(acc && acc->err == 0, acc ? acc->errstr : "OOM");
 
     valkeyClusterNodeIterator ni;
-    valkeyClusterInitNodeIterator(&ni, acc->cc);
+    valkeyClusterInitNodeIterator(&ni, &acc->cc);
     valkeyClusterNode *node = valkeyClusterNodeNext(&ni);
     assert(node);
 
@@ -363,7 +363,7 @@ void test_async_formatted_to_single_node(void) {
     ASSERT_MSG(acc && acc->err == 0, acc ? acc->errstr : "OOM");
 
     valkeyClusterNodeIterator ni;
-    valkeyClusterInitNodeIterator(&ni, acc->cc);
+    valkeyClusterInitNodeIterator(&ni, &acc->cc);
     valkeyClusterNode *node = valkeyClusterNodeNext(&ni);
     assert(node);
 
@@ -395,7 +395,7 @@ void test_async_command_argv_to_single_node(void) {
     ASSERT_MSG(acc && acc->err == 0, acc ? acc->errstr : "OOM");
 
     valkeyClusterNodeIterator ni;
-    valkeyClusterInitNodeIterator(&ni, acc->cc);
+    valkeyClusterInitNodeIterator(&ni, &acc->cc);
     valkeyClusterNode *node = valkeyClusterNodeNext(&ni);
     assert(node);
 
@@ -427,7 +427,7 @@ void test_async_to_all_nodes(void) {
     ASSERT_MSG(acc && acc->err == 0, acc ? acc->errstr : "OOM");
 
     valkeyClusterNodeIterator ni;
-    valkeyClusterInitNodeIterator(&ni, acc->cc);
+    valkeyClusterInitNodeIterator(&ni, &acc->cc);
 
     int status;
     ExpectedResult r1 = {.type = VALKEY_REPLY_INTEGER};
@@ -466,7 +466,7 @@ void test_async_transaction(void) {
     valkeyClusterAsyncContext *acc = valkeyClusterAsyncConnectWithOptions(&options);
     ASSERT_MSG(acc && acc->err == 0, acc ? acc->errstr : "OOM");
 
-    valkeyClusterNode *node = valkeyClusterGetNodeByKey(acc->cc, (char *)"foo");
+    valkeyClusterNode *node = valkeyClusterGetNodeByKey(&acc->cc, (char *)"foo");
     assert(node);
 
     int status;

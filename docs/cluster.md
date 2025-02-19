@@ -193,8 +193,9 @@ The callback is called with `event` set to one of the following values:
 * `VALKEYCLUSTER_EVENT_SLOTMAP_UPDATED` when the slot mapping has been updated;
 * `VALKEYCLUSTER_EVENT_READY` when the slot mapping has been fetched for the first
   time and the client is ready to accept commands, useful when initiating the
-  client with `valkeyClusterAsyncConnect` where a client is not immediately
-  ready after a successful call;
+  client using `valkeyClusterAsyncConnectWithOptions` without enabling the option
+  `VALKEY_OPT_BLOCKING_INITIAL_UPDATE` where a client is not immediately ready
+  after a successful call;
 * `VALKEYCLUSTER_EVENT_FREE_CONTEXT` when the cluster context is being freed, so
   that the user can free the event `privdata`.
 
@@ -254,26 +255,6 @@ Another option is to enable blocking initial slot map updates using the option `
 When enabled `valkeyClusterAsyncConnectWithOptions` will initially connect to the cluster in a blocking fashion and wait for the slot map before returning.
 Any command sent by the user thereafter will create a new non-blocking connection, unless a non-blocking connection already exists to the destination.
 The function returns a pointer to a newly created `valkeyClusterAsyncContext` struct and its `err` field should be checked to make sure the initial slot map update was successful.
-
-There is also a separate API to perform the context initiation and initial connect in separate steps.
-This is useful when there is a need to provide an event callback with the current `valkeyClusterAsyncContext`.
-The context is first initiated using `valkeyClusterAsyncContextInit` and then `valkeyClusterAsyncConnect` will initiate connection attempts.
-
-```c
-valkeyClusterOptions options = {
-   .initial_nodes = "127.0.0.1:7000";
-};
-valkeyClusterOptionsUseLibev(&options, EV_DEFAULT);
-
-// Initiate the context.
-valkeyClusterAsyncContext *acc = valkeyClusterAsyncContextInit(&options);
-
-// Set the event callback using the context as privdata.
-valkeyClusterAsyncSetEventCallback(acc, eventCallback, acc);
-
-// Start connecting to the initial nodes.
-valkeyClusterAsyncConnect(acc)
-```
 
 ### Connection options
 
@@ -339,9 +320,14 @@ After this, the disconnection callback is executed with the `VALKEY_OK` status a
 
 Use [`event_callback` in `valkeyClusterOptions`](#events-per-cluster-context) to get notified when certain events occur.
 
-When the callback function requires the current `valkeyClusterAsyncContext` it can be provided in the `privdata`.
-In this case initiate the context using `valkeyClusterAsyncContextInit`, set the callback and `privdata` using `valkeyClusterAsyncSetEventCallback`,
-and initiate connection attempts using `valkeyClusterAsyncConnect` as described under the [Connecting](#connecting-1) section.
+When the callback function requires the current `valkeyClusterAsyncContext`, it can typecast the given `valkeyClusterContext` to a `valkeyClusterAsyncContext`.
+The `valkeyClusterAsyncContext` struct is an extension of the `valkeyClusterContext` struct.
+
+```c
+void eventCallback(const valkeyClusterContext *cc, int event, void *privdata) {
+   valkeyClusterAsyncContext *acc = (valkeyClusterAsyncContext *)cc;
+}
+```
 
 #### Events per connection
 
