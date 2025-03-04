@@ -22,7 +22,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        compiler: [gcc-14, clang-18]
+        compiler: [gcc-14, clang-19]
         cmake-version: [3.29]
         cmake-build-type: [Release]
         sanitizer: ["", thread, undefined, leak, address]
@@ -33,16 +33,16 @@ jobs:
             cmake-build-type: Debug
             sanitizer: ""
             runner: ubuntu-24.04
-          - compiler: gcc-7
+          - compiler: gcc-9
             cmake-version: 3.13
             cmake-build-type: Release
             sanitizer: ""
-            runner: ubuntu-20.04
-          - compiler: clang-12
+            runner: ubuntu-22.04
+          - compiler: clang-14
             cmake-version: 3.13
             cmake-build-type: Release
             sanitizer: ""
-            runner: ubuntu-20.04
+            runner: ubuntu-22.04
     steps:
     - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
     - name: Prepare
@@ -59,13 +59,15 @@ jobs:
       with:
         cmake-version: ${{ matrix.cmake-version }}
     - name: Build and install Valkey for non-cluster tests
-      if: ${{ matrix.runner == 'ubuntu-20.04' }}
+      if: ${{ matrix.runner == 'ubuntu-22.04' }}
       run: |
         git clone --depth 1 --branch 7.2.5 https://github.com/valkey-io/valkey.git
         cd valkey && BUILD_TLS=yes make install
     - name: Install Valkey for non-cluster tests
-      if: ${{ matrix.runner != 'ubuntu-20.04' }}
-      run: sudo apt install valkey
+      if: ${{ matrix.runner != 'ubuntu-22.04' }}
+      run: |
+        sudo apt update
+        sudo apt install valkey
     - name: Generate makefiles
       env:
         CC: ${{ matrix.compiler }}
@@ -102,7 +104,9 @@ jobs:
           packages: libevent-dev valgrind
           version: 1.0
       - name: Install Valkey
-        run: sudo apt install valkey
+        run: |
+          sudo apt update
+          sudo apt install valkey
       - name: Build
         run: USE_TLS=1 TEST_ASYNC=1 make
       - name: Run tests
@@ -130,7 +134,9 @@ jobs:
           packages: gcc-multilib
           version: 1.0
       - name: Install Valkey
-        run: sudo apt install valkey
+        run: |
+          sudo apt update
+          sudo apt install valkey
       - name: Build
         run: |
           make 32bit

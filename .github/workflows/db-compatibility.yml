@@ -8,7 +8,7 @@ permissions:
 jobs:
   valkey:
     name: Valkey ${{ matrix.valkey-version }}
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
@@ -55,7 +55,7 @@ jobs:
 
   redis-comp:
     name: Redis ${{ matrix.redis-version }}
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
