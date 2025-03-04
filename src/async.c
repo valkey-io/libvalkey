@@ -95,12 +95,11 @@ static void callbackValDestructor(void *val) {
 }
 
 static dictType callbackDict = {
-    callbackHash,
-    NULL,
-    callbackValDup,
-    callbackKeyCompare,
-    callbackKeyDestructor,
-    callbackValDestructor};
+    .hashFunction = callbackHash,
+    .valDup = callbackValDup,
+    .keyCompare = callbackKeyCompare,
+    .keyDestructor = callbackKeyDestructor,
+    .valDestructor = callbackValDestructor};
 
 static valkeyAsyncContext *valkeyAsyncInitialize(valkeyContext *c) {
     valkeyAsyncContext *ac;

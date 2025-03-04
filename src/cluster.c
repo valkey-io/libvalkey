@@ -152,23 +152,17 @@ void dictClusterNodeListDestructor(void *val) {
  * Has ownership of valkeyClusterNode memory
  */
 dictType clusterNodesDictType = {
-    dictSdsHash,              /* hash function */
-    NULL,                     /* key dup */
-    NULL,                     /* val dup */
-    dictSdsKeyCompare,        /* key compare */
-    dictSdsDestructor,        /* key destructor */
-    dictClusterNodeDestructor /* val destructor */
-};
+    .hashFunction = dictSdsHash,
+    .keyCompare = dictSdsKeyCompare,
+    .keyDestructor = dictSdsDestructor,
+    .valDestructor = dictClusterNodeDestructor};
 
 /* Hash table dictType to map node address to a list of valkeyClusterNodes. */
 dictType clusterNodeListDictType = {
-    dictSdsHash,                  /* hashFunction */
-    NULL,                         /* keyDup */
-    NULL,                         /* valDup */
-    dictSdsKeyCompare,            /* keyCompare */
-    dictSdsDestructor,            /* keyDestructor */
-    dictClusterNodeListDestructor /* valDestructor */
-};
+    .hashFunction = dictSdsHash,
+    .keyCompare = dictSdsKeyCompare,
+    .keyDestructor = dictSdsDestructor,
+    .valDestructor = dictClusterNodeListDestructor};
 
 void listCommandFree(void *command) {
     struct cmd *cmd = command;
