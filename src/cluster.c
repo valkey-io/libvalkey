@@ -1848,7 +1848,7 @@ static valkeyClusterNode *getNodeFromRedirectReply(valkeyClusterContext *cc,
 
     dictEntry *de = dictFind(cc->nodes, part[2]);
     if (de != NULL) {
-        node = de->val;
+        node = dictGetVal(de);
         goto done;
     }
 

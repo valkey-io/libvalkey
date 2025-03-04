@@ -43,6 +43,13 @@
 #include <limits.h>
 #include <stdlib.h>
 
+/* -------------------------- types ----------------------------------------- */
+struct dictEntry {
+    void *key;
+    void *val;
+    struct dictEntry *next;
+};
+
 /* -------------------------- private prototypes ---------------------------- */
 
 static int _dictExpandIfNeeded(dict *ht);
@@ -273,6 +280,28 @@ dictEntry *dictFind(dict *ht, const void *key) {
         he = he->next;
     }
     return NULL;
+}
+
+void dictSetKey(dict *d, dictEntry *de, void *key) {
+    if (d->type->keyDup)
+        de->key = d->type->keyDup(d->privdata, key);
+    else
+        de->key = key;
+}
+
+void dictSetVal(dict *d, dictEntry *de, void *val) {
+    if (d->type->valDup)
+        de->val = d->type->valDup(d->privdata, val);
+    else
+        de->val = val;
+}
+
+void *dictGetKey(const dictEntry *de) {
+    return de->key;
+}
+
+void *dictGetVal(const dictEntry *de) {
+    return de->val;
 }
 
 void dictInitIterator(dictIterator *iter, dict *ht) {

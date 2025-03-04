@@ -42,11 +42,7 @@
 /* Unused arguments generate annoying warnings... */
 #define DICT_NOTUSED(V) ((void)V)
 
-typedef struct dictEntry {
-    void *key;
-    void *val;
-    struct dictEntry *next;
-} dictEntry;
+typedef struct dictEntry dictEntry; /* opaque */
 
 typedef struct dictType {
     unsigned int (*hashFunction)(const void *key);
@@ -78,27 +74,11 @@ typedef struct dictIterator {
 /* ------------------------------- Macros ------------------------------------*/
 #define dictFreeEntryVal(ht, entry) \
     if ((ht)->type->valDestructor)  \
-    (ht)->type->valDestructor((ht)->privdata, (entry)->val)
-
-#define dictSetVal(ht, entry, _val_)                                \
-    do {                                                            \
-        if ((ht)->type->valDup)                                     \
-            entry->val = (ht)->type->valDup((ht)->privdata, _val_); \
-        else                                                        \
-            entry->val = (_val_);                                   \
-    } while (0)
+    (ht)->type->valDestructor((ht)->privdata, dictGetVal(entry))
 
 #define dictFreeEntryKey(ht, entry) \
     if ((ht)->type->keyDestructor)  \
-    (ht)->type->keyDestructor((ht)->privdata, (entry)->key)
-
-#define dictSetKey(ht, entry, _key_)                                \
-    do {                                                            \
-        if ((ht)->type->keyDup)                                     \
-            entry->key = (ht)->type->keyDup((ht)->privdata, _key_); \
-        else                                                        \
-            entry->key = (_key_);                                   \
-    } while (0)
+    (ht)->type->keyDestructor((ht)->privdata, dictGetKey(entry))
 
 #define dictCompareHashKeys(ht, key1, key2)                   \
     (((ht)->type->keyCompare) ?                               \
@@ -107,8 +87,6 @@ typedef struct dictIterator {
 
 #define dictHashKey(ht, key) (ht)->type->hashFunction(key)
 
-#define dictGetKey(he) ((he)->key)
-#define dictGetVal(he) ((he)->val)
 #define dictSlots(ht) ((ht)->size)
 #define dictSize(ht) ((ht)->used)
 
@@ -121,6 +99,10 @@ int dictReplace(dict *ht, void *key, void *val);
 int dictDelete(dict *ht, const void *key);
 void dictRelease(dict *ht);
 dictEntry *dictFind(dict *ht, const void *key);
+void dictSetKey(dict *d, dictEntry *de, void *key);
+void dictSetVal(dict *d, dictEntry *de, void *val);
+void *dictGetKey(const dictEntry *de);
+void *dictGetVal(const dictEntry *de);
 void dictInitIterator(dictIterator *iter, dict *ht);
 dictEntry *dictNext(dictIterator *iter);
 
