@@ -160,8 +160,8 @@ int dictAdd(dict *ht, void *key, void *val) {
     ht->table[index] = entry;
 
     /* Set the hash entry fields. */
-    dictSetHashKey(ht, entry, key);
-    dictSetHashVal(ht, entry, val);
+    dictSetKey(ht, entry, key);
+    dictSetVal(ht, entry, val);
     ht->used++;
     return DICT_OK;
 }
@@ -189,7 +189,7 @@ int dictReplace(dict *ht, void *key, void *val) {
      * you want to increment (set), and then decrement (free), and not the
      * reverse. */
     auxentry = *entry;
-    dictSetHashVal(ht, entry, val);
+    dictSetVal(ht, entry, val);
     dictFreeEntryVal(ht, &auxentry);
     return 0;
 }

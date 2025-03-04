@@ -742,7 +742,7 @@ static int store_replica_nodes(dict *nodes, dict *replicas) {
             assert(primary->replicas == NULL);
             /* Move replica list from replicas dict to nodes dict. */
             primary->replicas = dictGetVal(der);
-            dictSetHashVal(replicas, der, NULL);
+            dictSetVal(replicas, der, NULL);
         }
     }
     return VALKEY_OK;
