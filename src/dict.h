@@ -107,8 +107,8 @@ typedef struct dictIterator {
 
 #define dictHashKey(ht, key) (ht)->type->hashFunction(key)
 
-#define dictGetEntryKey(he) ((he)->key)
-#define dictGetEntryVal(he) ((he)->val)
+#define dictGetKey(he) ((he)->key)
+#define dictGetVal(he) ((he)->val)
 #define dictSlots(ht) ((ht)->size)
 #define dictSize(ht) ((ht)->used)
 

@@ -352,7 +352,7 @@ static void valkeyAsyncFreeInternal(valkeyAsyncContext *ac) {
     if (ac->sub.channels) {
         dictInitIterator(&it, ac->sub.channels);
         while ((de = dictNext(&it)) != NULL)
-            valkeyRunCallback(ac, dictGetEntryVal(de), NULL);
+            valkeyRunCallback(ac, dictGetVal(de), NULL);
 
         dictRelease(ac->sub.channels);
     }
@@ -360,7 +360,7 @@ static void valkeyAsyncFreeInternal(valkeyAsyncContext *ac) {
     if (ac->sub.patterns) {
         dictInitIterator(&it, ac->sub.patterns);
         while ((de = dictNext(&it)) != NULL)
-            valkeyRunCallback(ac, dictGetEntryVal(de), NULL);
+            valkeyRunCallback(ac, dictGetVal(de), NULL);
 
         dictRelease(ac->sub.patterns);
     }
@@ -474,7 +474,7 @@ static int valkeyGetSubscribeCallback(valkeyAsyncContext *ac, valkeyReply *reply
                 goto oom;
 
             if ((de = dictFind(callbacks, sname)) != NULL) {
-                cb = dictGetEntryVal(de);
+                cb = dictGetVal(de);
                 memcpy(dstcb, cb, sizeof(*dstcb));
             }
         }
@@ -858,7 +858,7 @@ static int valkeyAsyncAppendCmdLen(valkeyAsyncContext *ac, valkeyCallbackFn *fn,
             de = dictFind(cbdict, sname);
 
             if (de != NULL) {
-                existcb = dictGetEntryVal(de);
+                existcb = dictGetVal(de);
                 cb.pending_subs = existcb->pending_subs + 1;
             }
 
@@ -888,7 +888,7 @@ static int valkeyAsyncAppendCmdLen(valkeyAsyncContext *ac, valkeyCallbackFn *fn,
 
                 de = dictFind(cbdict, sname);
                 if (de != NULL) {
-                    existcb = dictGetEntryVal(de);
+                    existcb = dictGetVal(de);
                     if (existcb->unsubscribe_sent == 0)
                         existcb->unsubscribe_sent = 1;
                     else
@@ -906,7 +906,7 @@ static int valkeyAsyncAppendCmdLen(valkeyAsyncContext *ac, valkeyCallbackFn *fn,
             int no_subs = 1;
             dictInitIterator(&it, cbdict);
             while ((de = dictNext(&it)) != NULL) {
-                existcb = dictGetEntryVal(de);
+                existcb = dictGetVal(de);
                 if (existcb->unsubscribe_sent == 0) {
                     existcb->unsubscribe_sent = 1;
                     no_subs = 0;

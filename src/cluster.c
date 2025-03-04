@@ -461,7 +461,7 @@ static void cluster_nodes_swap_ctx(dict *nodes_f, dict *nodes_t) {
     dictInitIterator(&di, nodes_t);
 
     while ((de_t = dictNext(&di)) != NULL) {
-        node_t = dictGetEntryVal(de_t);
+        node_t = dictGetVal(de_t);
         if (node_t == NULL) {
             continue;
         }
@@ -471,7 +471,7 @@ static void cluster_nodes_swap_ctx(dict *nodes_f, dict *nodes_t) {
             continue;
         }
 
-        node_f = dictGetEntryVal(de_f);
+        node_f = dictGetVal(de_f);
         if (node_f->con != NULL) {
             c = node_f->con;
             node_f->con = node_t->con;
@@ -619,7 +619,7 @@ static dict *parse_cluster_slots(valkeyClusterContext *cc, valkeyContext *c,
                     sdsfree(address);
                     if (den != NULL) {
                         /* Skip parsing this primary node since it's already known. */
-                        primary = dictGetEntryVal(den);
+                        primary = dictGetVal(den);
                         ret = cluster_slot_ref_node(slot, primary);
                         if (ret != VALKEY_OK) {
                             goto oom;
@@ -715,7 +715,7 @@ static int retain_replica_node(dict *replicas, char *primary_id, valkeyClusterNo
         }
     } else {
         sdsfree(key);
-        replicaList = dictGetEntryVal(de);
+        replicaList = dictGetVal(de);
     }
 
     if (listAddNodeTail(replicaList, node) == NULL)
@@ -734,14 +734,14 @@ static int store_replica_nodes(dict *nodes, dict *replicas) {
     dictInitIterator(&di, nodes);
     dictEntry *de;
     while ((de = dictNext(&di))) {
-        valkeyClusterNode *primary = dictGetEntryVal(de);
+        valkeyClusterNode *primary = dictGetVal(de);
 
         /* Move replica nodes related to this primary. */
         dictEntry *der = dictFind(replicas, primary->name);
         if (der != NULL) {
             assert(primary->replicas == NULL);
             /* Move replica list from replicas dict to nodes dict. */
-            primary->replicas = dictGetEntryVal(der);
+            primary->replicas = dictGetVal(der);
             dictSetHashVal(replicas, der, NULL);
         }
     }
@@ -1149,7 +1149,7 @@ static int updateNodesAndSlotmap(valkeyClusterContext *cc, dict *nodes) {
 
     dictEntry *de;
     while ((de = dictNext(&di))) {
-        valkeyClusterNode *node = dictGetEntryVal(de);
+        valkeyClusterNode *node = dictGetVal(de);
         if (node->role != VALKEY_ROLE_PRIMARY) {
             valkeyClusterSetError(cc, VALKEY_ERR_OTHER,
                                   "Node role must be primary");
@@ -1236,7 +1236,7 @@ int valkeyClusterUpdateSlotmap(valkeyClusterContext *cc) {
     dictInitIterator(&di, cc->nodes);
 
     while ((de = dictNext(&di)) != NULL) {
-        node = dictGetEntryVal(de);
+        node = dictGetVal(de);
         if (node == NULL || node->host == NULL) {
             continue;
         }
@@ -1607,7 +1607,7 @@ int valkeyClusterSetOptionTimeout(valkeyClusterContext *cc,
             dictInitIterator(&di, cc->nodes);
 
             while ((de = dictNext(&di)) != NULL) {
-                node = dictGetEntryVal(de);
+                node = dictGetVal(de);
                 if (node->acon) {
                     valkeyAsyncSetTimeout(node->acon, tv);
                 }
@@ -2452,7 +2452,7 @@ static int valkeyClusterSendAll(valkeyClusterContext *cc) {
     dictInitIterator(&di, cc->nodes);
 
     while ((de = dictNext(&di)) != NULL) {
-        node = dictGetEntryVal(de);
+        node = dictGetVal(de);
         if (node == NULL) {
             continue;
         }
@@ -2489,7 +2489,7 @@ static int valkeyClusterClearAll(valkeyClusterContext *cc) {
     dictInitIterator(&di, cc->nodes);
 
     while ((de = dictNext(&di)) != NULL) {
-        node = dictGetEntryVal(de);
+        node = dictGetVal(de);
         if (node == NULL) {
             continue;
         }
@@ -2552,7 +2552,7 @@ int valkeyClusterGetReply(valkeyClusterContext *cc, void **reply) {
         }
 
         listDelNode(cc->requests, list_command);
-        return valkeyClusterGetReplyFromNode(cc, dictGetEntryVal(de), reply);
+        return valkeyClusterGetReplyFromNode(cc, dictGetVal(de), reply);
     }
 
 error:
@@ -2864,7 +2864,7 @@ static valkeyClusterNode *selectNode(dict *nodes) {
 
     dictEntry *de;
     while ((de = dictNext(&di)) != NULL) {
-        node = dictGetEntryVal(de);
+        node = dictGetVal(de);
 
         if (nodeIsConnected(node)) {
             /* Keep any connected node */
@@ -3368,7 +3368,7 @@ void valkeyClusterAsyncDisconnect(valkeyClusterAsyncContext *acc) {
     dictInitIterator(&di, cc->nodes);
 
     while ((de = dictNext(&di)) != NULL) {
-        node = dictGetEntryVal(de);
+        node = dictGetVal(de);
 
         ac = node->acon;
 
@@ -3427,7 +3427,7 @@ valkeyClusterNode *valkeyClusterNodeNext(valkeyClusterNodeIterator *iter) {
 
     dictEntry *de;
     if ((de = dictNext(&ni->di)) != NULL)
-        return dictGetEntryVal(de);
+        return dictGetVal(de);
     else
         return NULL;
 }

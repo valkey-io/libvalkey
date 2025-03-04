@@ -153,7 +153,7 @@ void test_parse_cluster_nodes(bool parse_replicas) {
     assert(dictSize(nodes) == 3); /* 3 masters */
     dictInitIterator(&di, nodes);
     /* Verify node 1 */
-    node = dictGetEntryVal(dictNext(&di));
+    node = dictGetVal(dictNext(&di));
     assert(strcmp(node->name, "e7d1eecce10fd6bb5eb35b9f99a514335d9ba9ca") == 0);
     assert(strcmp(node->addr, "127.0.0.1:30001") == 0);
     assert(strcmp(node->host, "127.0.0.1") == 0);
@@ -172,7 +172,7 @@ void test_parse_cluster_nodes(bool parse_replicas) {
         assert(node->replicas == NULL);
     }
     /* Verify node 2 */
-    node = dictGetEntryVal(dictNext(&di));
+    node = dictGetVal(dictNext(&di));
     assert(strcmp(node->name, "67ed2db8d677e59ec4a4cefb06858cf2a1a89fa1") == 0);
     assert(strcmp(node->addr, "127.0.0.1:30002") == 0);
     assert(strcmp(node->host, "127.0.0.1") == 0);
@@ -191,7 +191,7 @@ void test_parse_cluster_nodes(bool parse_replicas) {
         assert(node->replicas == NULL);
     }
     /* Verify node 3 */
-    node = dictGetEntryVal(dictNext(&di));
+    node = dictGetVal(dictNext(&di));
     assert(strcmp(node->name, "292f8b365bb7edb5e285caf0b7e6ddc7265d2f4f") == 0);
     assert(strcmp(node->addr, "127.0.0.1:30003") == 0);
     assert(strcmp(node->host, "127.0.0.1") == 0);
@@ -238,14 +238,14 @@ void test_parse_cluster_nodes_during_failover(void) {
     assert(dictSize(nodes) == 4); /* 4 masters */
     dictInitIterator(&di, nodes);
     /* Verify node 1 */
-    node = dictGetEntryVal(dictNext(&di));
+    node = dictGetVal(dictNext(&di));
     assert(strcmp(node->name, "5cc0f693985913c553c6901e102ea3cb8d6678bd") == 0);
     assert(strcmp(node->addr, "10.10.10.122:7000") == 0);
     assert(strcmp(node->host, "10.10.10.122") == 0);
     assert(node->port == 7000);
     assert(listLength(node->slots) == 0); /* No slots (fail flag). */
     /* Verify node 2 */
-    node = dictGetEntryVal(dictNext(&di));
+    node = dictGetVal(dictNext(&di));
     assert(strcmp(node->name, "184ada329264e994781412f3986c425a248f386e") == 0);
     assert(strcmp(node->addr, "10.10.10.126:7000") == 0);
     assert(strcmp(node->host, "10.10.10.126") == 0);
@@ -255,7 +255,7 @@ void test_parse_cluster_nodes_during_failover(void) {
     assert(slot->start == 5461);
     assert(slot->end == 10922);
     /* Verify node 3 */
-    node = dictGetEntryVal(dictNext(&di));
+    node = dictGetVal(dictNext(&di));
     assert(strcmp(node->name, "22de56650b3714c1c42fc0d120f80c66c24d8795") == 0);
     assert(strcmp(node->addr, "10.10.10.123:7000") == 0);
     assert(strcmp(node->host, "10.10.10.123") == 0);
@@ -265,7 +265,7 @@ void test_parse_cluster_nodes_during_failover(void) {
     assert(slot->start == 10923);
     assert(slot->end == 16383);
     /* Verify node 4 */
-    node = dictGetEntryVal(dictNext(&di));
+    node = dictGetVal(dictNext(&di));
     assert(strcmp(node->name, "4394d8eb03de1f524b56cb385f0eb9052ce65283") == 0);
     assert(strcmp(node->addr, "10.10.10.121:7000") == 0);
     assert(strcmp(node->host, "10.10.10.121") == 0);
@@ -299,10 +299,10 @@ void test_parse_cluster_nodes_with_noaddr(void) {
     assert(dictSize(nodes) == 2); /* Only 2 primaries since `noaddr` nodes are skipped. */
     dictInitIterator(&di, nodes);
     /* Verify node 1 */
-    node = dictGetEntryVal(dictNext(&di));
+    node = dictGetVal(dictNext(&di));
     assert(strcmp(node->addr, "127.0.0.0:6379") == 0);
     /* Verify node 2 */
-    node = dictGetEntryVal(dictNext(&di));
+    node = dictGetVal(dictNext(&di));
     assert(strcmp(node->addr, "127.0.0.2:6379") == 0);
 
     dictRelease(nodes);
@@ -331,13 +331,13 @@ void test_parse_cluster_nodes_with_empty_ip(void) {
     assert(dictSize(nodes) == 3);
     dictInitIterator(&di, nodes);
     /* Verify node 1 */
-    node = dictGetEntryVal(dictNext(&di));
+    node = dictGetVal(dictNext(&di));
     assert(strcmp(node->addr, "127.0.0.1:6379") == 0);
     /* Verify node 2 */
-    node = dictGetEntryVal(dictNext(&di));
+    node = dictGetVal(dictNext(&di));
     assert(strcmp(node->addr, "127.0.0.2:6379") == 0);
     /* Verify node 3 */
-    node = dictGetEntryVal(dictNext(&di));
+    node = dictGetVal(dictNext(&di));
     assert(strcmp(node->addr, "127.0.0.99:6379") == 0); /* Uses the IP from which the response was received from. */
 
     dictRelease(nodes);
@@ -366,7 +366,7 @@ void test_parse_cluster_nodes_with_special_slot_entries(void) {
     assert(dictSize(nodes) == 1); /* 1 master */
     dictInitIterator(&di, nodes);
     /* Verify node. */
-    node = dictGetEntryVal(dictNext(&di));
+    node = dictGetVal(dictNext(&di));
     assert(strcmp(node->name, "4394d8eb03de1f524b56cb385f0eb9052ce65283") == 0);
     assert(strcmp(node->addr, "10.10.10.121:7000") == 0);
     assert(strcmp(node->host, "10.10.10.121") == 0);
@@ -412,7 +412,7 @@ void test_parse_cluster_nodes_with_multiple_replicas(void) {
     assert(nodes);
     assert(dictSize(nodes) == 1); /* 1 master */
     dictInitIterator(&di, nodes);
-    node = dictGetEntryVal(dictNext(&di));
+    node = dictGetVal(dictNext(&di));
     assert(strcmp(node->name, "e7d1eecce10fd6bb5eb35b9f99a514335d9ba9ca") == 0);
     assert(strcmp(node->addr, "127.0.0.1:30001") == 0);
     assert(strcmp(node->host, "127.0.0.1") == 0);
@@ -518,7 +518,7 @@ void test_parse_cluster_nodes_with_legacy_format(void) {
     assert(nodes);
     assert(dictSize(nodes) == 1); /* Only 1 primary since `noaddr` nodes are skipped. */
     dictInitIterator(&di, nodes);
-    node = dictGetEntryVal(dictNext(&di));
+    node = dictGetVal(dictNext(&di));
     assert(strcmp(node->addr, "127.0.0.0:6379") == 0);
 
     dictRelease(nodes);
@@ -553,7 +553,7 @@ void test_parse_cluster_slots(bool parse_replicas) {
     assert(dictSize(nodes) == 3); /* 3 primaries */
     dictInitIterator(&di, nodes);
     /* Verify node 1 */
-    node = dictGetEntryVal(dictNext(&di));
+    node = dictGetVal(dictNext(&di));
     assert(strcmp(node->addr, "127.0.0.1:30001") == 0);
     assert(strcmp(node->host, "127.0.0.1") == 0);
     assert(node->port == 30001);
@@ -571,7 +571,7 @@ void test_parse_cluster_slots(bool parse_replicas) {
         assert(node->replicas == NULL);
     }
     /* Verify node 2 */
-    node = dictGetEntryVal(dictNext(&di));
+    node = dictGetVal(dictNext(&di));
     assert(strcmp(node->addr, "127.0.0.1:30002") == 0);
     assert(strcmp(node->host, "127.0.0.1") == 0);
     assert(node->port == 30002);
@@ -589,7 +589,7 @@ void test_parse_cluster_slots(bool parse_replicas) {
         assert(node->replicas == NULL);
     }
     /* Verify node 3 */
-    node = dictGetEntryVal(dictNext(&di));
+    node = dictGetVal(dictNext(&di));
     assert(strcmp(node->addr, "127.0.0.1:30003") == 0);
     assert(strcmp(node->host, "127.0.0.1") == 0);
     assert(node->port == 30003);
@@ -634,13 +634,13 @@ void test_parse_cluster_slots_with_empty_ip(void) {
     assert(dictSize(nodes) == 3);
     dictInitIterator(&di, nodes);
     /* Verify node 1 */
-    node = dictGetEntryVal(dictNext(&di));
+    node = dictGetVal(dictNext(&di));
     assert(strcmp(node->addr, "127.0.0.1:6379") == 0);
     /* Verify node 2 */
-    node = dictGetEntryVal(dictNext(&di));
+    node = dictGetVal(dictNext(&di));
     assert(strcmp(node->addr, "127.0.0.2:6379") == 0);
     /* Verify node 3 */
-    node = dictGetEntryVal(dictNext(&di));
+    node = dictGetVal(dictNext(&di));
     assert(strcmp(node->addr, "127.0.0.99:6379") == 0); /* Uses the IP from which the response was received from. */
 
     dictRelease(nodes);
@@ -670,13 +670,13 @@ void test_parse_cluster_slots_with_null_ip(void) {
     assert(dictSize(nodes) == 3);
     dictInitIterator(&di, nodes);
     /* Verify node 1 */
-    node = dictGetEntryVal(dictNext(&di));
+    node = dictGetVal(dictNext(&di));
     assert(strcmp(node->addr, "127.0.0.1:6379") == 0);
     /* Verify node 2 */
-    node = dictGetEntryVal(dictNext(&di));
+    node = dictGetVal(dictNext(&di));
     assert(strcmp(node->addr, "127.0.0.2:6379") == 0);
     /* Verify node 3 */
-    node = dictGetEntryVal(dictNext(&di));
+    node = dictGetVal(dictNext(&di));
     assert(strcmp(node->addr, "127.0.0.99:6379") == 0); /* Uses the IP from which the response was received from. */
 
     dictRelease(nodes);
@@ -711,7 +711,7 @@ void test_parse_cluster_slots_with_multiple_replicas(void) {
     assert(nodes);
     assert(dictSize(nodes) == 1); /* 1 primary */
     dictInitIterator(&di, nodes);
-    node = dictGetEntryVal(dictNext(&di));
+    node = dictGetVal(dictNext(&di));
     assert(strcmp(node->addr, "127.0.0.1:30001") == 0);
     assert(strcmp(node->host, "127.0.0.1") == 0);
     assert(node->port == 30001);
@@ -771,7 +771,7 @@ void test_parse_cluster_slots_with_noncontiguous_slots(void) {
     assert(nodes);
     assert(dictSize(nodes) == 1); /* 1 primary */
     dictInitIterator(&di, nodes);
-    node = dictGetEntryVal(dictNext(&di));
+    node = dictGetVal(dictNext(&di));
     assert(strcmp(node->addr, "127.0.0.1:30001") == 0);
     assert(strcmp(node->host, "127.0.0.1") == 0);
     assert(node->port == 30001);
