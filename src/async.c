@@ -60,7 +60,7 @@
 int valkeyAppendCmdLen(valkeyContext *c, const char *cmd, size_t len);
 
 /* Functions managing dictionary of callbacks for pub/sub. */
-static unsigned int callbackHash(const void *key) {
+static unsigned long int callbackHash(const void *key) {
     return dictGenHashFunction((const unsigned char *)key,
                                sdslen((const sds)key));
 }

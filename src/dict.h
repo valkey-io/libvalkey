@@ -42,7 +42,7 @@
 typedef struct dictEntry dictEntry; /* opaque */
 
 typedef struct dictType {
-    unsigned int (*hashFunction)(const void *key);
+    unsigned long int (*hashFunction)(const void *key);
     void *(*keyDup)(const void *key);
     void *(*valDup)(const void *obj);
     int (*keyCompare)(const void *key1, const void *key2);
@@ -87,7 +87,7 @@ typedef struct dictIterator {
 #define dictSize(ht) ((ht)->used)
 
 /* API */
-unsigned int dictGenHashFunction(const unsigned char *buf, int len);
+unsigned long int dictGenHashFunction(const unsigned char *buf, int len);
 dict *dictCreate(dictType *type);
 int dictExpand(dict *ht, unsigned long size);
 int dictAdd(dict *ht, void *key, void *val);
