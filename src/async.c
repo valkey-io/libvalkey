@@ -65,17 +65,6 @@ static unsigned int callbackHash(const void *key) {
                                sdslen((const sds)key));
 }
 
-static void *callbackValDup(const void *src) {
-    valkeyCallback *dup;
-
-    dup = vk_malloc(sizeof(*dup));
-    if (dup == NULL)
-        return NULL;
-
-    memcpy(dup, src, sizeof(*dup));
-    return dup;
-}
-
 static int callbackKeyCompare(const void *key1, const void *key2) {
     int l1, l2;
 
@@ -96,7 +85,6 @@ static void callbackValDestructor(void *val) {
 
 static dictType callbackDict = {
     .hashFunction = callbackHash,
-    .valDup = callbackValDup,
     .keyCompare = callbackKeyCompare,
     .keyDestructor = callbackKeyDestructor,
     .valDestructor = callbackValDestructor};
@@ -815,8 +803,7 @@ static int valkeyAsyncAppendCmdLen(valkeyAsyncContext *ac, valkeyCallbackFn *fn,
     const char *cstr, *astr;
     size_t clen, alen;
     const char *p;
-    sds sname;
-    int ret;
+    sds sname = NULL;
 
     /* Don't accept new commands when the connection is about to be closed. */
     if (c->flags & (VALKEY_DISCONNECTING | VALKEY_FREEING))
@@ -850,16 +837,18 @@ static int valkeyAsyncAppendCmdLen(valkeyAsyncContext *ac, valkeyCallbackFn *fn,
             else
                 cbdict = ac->sub.channels;
 
-            de = dictFind(cbdict, sname);
-
-            if (de != NULL) {
+            if ((de = dictFind(cbdict, sname)) != NULL) {
                 existcb = dictGetVal(de);
                 cb.pending_subs = existcb->pending_subs + 1;
             }
 
-            ret = dictReplace(cbdict, sname, &cb);
+            /* Create a duplicate to be stored in dict. */
+            valkeyCallback *dup = vk_malloc(sizeof(*dup));
+            if (dup == NULL)
+                goto oom;
+            memcpy(dup, &cb, sizeof(*dup));
 
-            if (ret == 0)
+            if (dictReplace(cbdict, sname, dup) == 0)
                 sdsfree(sname);
         }
     } else if (strncasecmp(cstr, "unsubscribe\r\n", 13) == 0) {
@@ -940,6 +929,7 @@ static int valkeyAsyncAppendCmdLen(valkeyAsyncContext *ac, valkeyCallbackFn *fn,
 oom:
     valkeySetError(&(ac->c), VALKEY_ERR_OOM, "Out of memory");
     valkeyAsyncCopyError(ac);
+    sdsfree(sname);
     return VALKEY_ERR;
 }
 
