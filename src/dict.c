@@ -55,7 +55,7 @@ struct dictEntry {
 static int _dictExpandIfNeeded(dict *ht);
 static unsigned long _dictNextPower(unsigned long size);
 static int _dictKeyIndex(dict *ht, const void *key);
-static int _dictInit(dict *ht, dictType *type, void *privDataPtr);
+static int _dictInit(dict *ht, dictType *type);
 
 /* -------------------------- hash functions -------------------------------- */
 
@@ -81,20 +81,19 @@ static void _dictReset(dict *ht) {
 }
 
 /* Create a new hash table */
-dict *dictCreate(dictType *type, void *privDataPtr) {
+dict *dictCreate(dictType *type) {
     dict *ht = vk_malloc(sizeof(*ht));
     if (ht == NULL)
         return NULL;
 
-    _dictInit(ht, type, privDataPtr);
+    _dictInit(ht, type);
     return ht;
 }
 
 /* Initialize the hash table */
-static int _dictInit(dict *ht, dictType *type, void *privDataPtr) {
+static int _dictInit(dict *ht, dictType *type) {
     _dictReset(ht);
     ht->type = type;
-    ht->privdata = privDataPtr;
     return DICT_OK;
 }
 
@@ -108,7 +107,7 @@ int dictExpand(dict *ht, unsigned long size) {
     if (ht->used > size)
         return DICT_ERR;
 
-    _dictInit(&n, ht->type, ht->privdata);
+    _dictInit(&n, ht->type);
     n.size = realsize;
     n.sizemask = realsize - 1;
     n.table = vk_calloc(realsize, sizeof(dictEntry *));
@@ -284,14 +283,14 @@ dictEntry *dictFind(dict *ht, const void *key) {
 
 void dictSetKey(dict *d, dictEntry *de, void *key) {
     if (d->type->keyDup)
-        de->key = d->type->keyDup(d->privdata, key);
+        de->key = d->type->keyDup(key);
     else
         de->key = key;
 }
 
 void dictSetVal(dict *d, dictEntry *de, void *val) {
     if (d->type->valDup)
-        de->val = d->type->valDup(d->privdata, val);
+        de->val = d->type->valDup(val);
     else
         de->val = val;
 }

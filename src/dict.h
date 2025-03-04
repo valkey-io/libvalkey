@@ -39,18 +39,15 @@
 #define DICT_OK 0
 #define DICT_ERR 1
 
-/* Unused arguments generate annoying warnings... */
-#define DICT_NOTUSED(V) ((void)V)
-
 typedef struct dictEntry dictEntry; /* opaque */
 
 typedef struct dictType {
     unsigned int (*hashFunction)(const void *key);
-    void *(*keyDup)(void *privdata, const void *key);
-    void *(*valDup)(void *privdata, const void *obj);
-    int (*keyCompare)(void *privdata, const void *key1, const void *key2);
-    void (*keyDestructor)(void *privdata, void *key);
-    void (*valDestructor)(void *privdata, void *obj);
+    void *(*keyDup)(const void *key);
+    void *(*valDup)(const void *obj);
+    int (*keyCompare)(const void *key1, const void *key2);
+    void (*keyDestructor)(void *key);
+    void (*valDestructor)(void *obj);
 } dictType;
 
 typedef struct dict {
@@ -59,7 +56,6 @@ typedef struct dict {
     unsigned long size;
     unsigned long sizemask;
     unsigned long used;
-    void *privdata;
 } dict;
 
 typedef struct dictIterator {
@@ -74,15 +70,15 @@ typedef struct dictIterator {
 /* ------------------------------- Macros ------------------------------------*/
 #define dictFreeEntryVal(ht, entry) \
     if ((ht)->type->valDestructor)  \
-    (ht)->type->valDestructor((ht)->privdata, dictGetVal(entry))
+    (ht)->type->valDestructor(dictGetVal(entry))
 
 #define dictFreeEntryKey(ht, entry) \
     if ((ht)->type->keyDestructor)  \
-    (ht)->type->keyDestructor((ht)->privdata, dictGetKey(entry))
+    (ht)->type->keyDestructor(dictGetKey(entry))
 
-#define dictCompareHashKeys(ht, key1, key2)                   \
-    (((ht)->type->keyCompare) ?                               \
-         (ht)->type->keyCompare((ht)->privdata, key1, key2) : \
+#define dictCompareHashKeys(ht, key1, key2)   \
+    (((ht)->type->keyCompare) ?               \
+         (ht)->type->keyCompare(key1, key2) : \
          (key1) == (key2))
 
 #define dictHashKey(ht, key) (ht)->type->hashFunction(key)
@@ -92,7 +88,7 @@ typedef struct dictIterator {
 
 /* API */
 unsigned int dictGenHashFunction(const unsigned char *buf, int len);
-dict *dictCreate(dictType *type, void *privDataPtr);
+dict *dictCreate(dictType *type);
 int dictExpand(dict *ht, unsigned long size);
 int dictAdd(dict *ht, void *key, void *val);
 int dictReplace(dict *ht, void *key, void *val);

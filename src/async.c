@@ -65,8 +65,7 @@ static unsigned int callbackHash(const void *key) {
                                sdslen((const sds)key));
 }
 
-static void *callbackValDup(void *privdata, const void *src) {
-    ((void)privdata);
+static void *callbackValDup(const void *src) {
     valkeyCallback *dup;
 
     dup = vk_malloc(sizeof(*dup));
@@ -77,9 +76,8 @@ static void *callbackValDup(void *privdata, const void *src) {
     return dup;
 }
 
-static int callbackKeyCompare(void *privdata, const void *key1, const void *key2) {
+static int callbackKeyCompare(const void *key1, const void *key2) {
     int l1, l2;
-    ((void)privdata);
 
     l1 = sdslen((const sds)key1);
     l2 = sdslen((const sds)key2);
@@ -88,13 +86,11 @@ static int callbackKeyCompare(void *privdata, const void *key1, const void *key2
     return memcmp(key1, key2, l1) == 0;
 }
 
-static void callbackKeyDestructor(void *privdata, void *key) {
-    ((void)privdata);
+static void callbackKeyDestructor(void *key) {
     sdsfree((sds)key);
 }
 
-static void callbackValDestructor(void *privdata, void *val) {
-    ((void)privdata);
+static void callbackValDestructor(void *val) {
     vk_free(val);
 }
 
@@ -110,11 +106,11 @@ static valkeyAsyncContext *valkeyAsyncInitialize(valkeyContext *c) {
     valkeyAsyncContext *ac;
     dict *channels = NULL, *patterns = NULL;
 
-    channels = dictCreate(&callbackDict, NULL);
+    channels = dictCreate(&callbackDict);
     if (channels == NULL)
         goto oom;
 
-    patterns = dictCreate(&callbackDict, NULL);
+    patterns = dictCreate(&callbackDict);
     if (patterns == NULL)
         goto oom;
 
