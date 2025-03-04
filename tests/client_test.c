@@ -40,6 +40,7 @@
 
 enum connection_type {
     CONN_TCP,
+    CONN_MPTCP,
     CONN_UNIX,
     CONN_FD,
     CONN_TLS,
@@ -266,6 +267,10 @@ static valkeyContext *do_connect(struct config config) {
 
     if (config.type == CONN_TCP) {
         c = valkeyConnect(config.tcp.host, config.tcp.port);
+    } else if (config.type == CONN_MPTCP) {
+        valkeyOptions options = {0};
+        VALKEY_OPTIONS_SET_MPTCP(&options, config.tcp.host, config.tcp.port);
+        c = valkeyConnectWithOptions(&options);
     } else if (config.type == CONN_TLS) {
         c = valkeyConnect(config.tls.host, config.tls.port);
     } else if (config.type == CONN_UNIX) {
@@ -1467,6 +1472,11 @@ static void test_invalid_timeout_errors(struct config config) {
 
     if (config.type == CONN_TCP || config.type == CONN_TLS) {
         c = valkeyConnectWithTimeout(config.tcp.host, config.tcp.port, config.connect_timeout);
+    } else if (config.type == CONN_MPTCP) {
+        valkeyOptions options = {0};
+        VALKEY_OPTIONS_SET_MPTCP(&options, config.tcp.host, config.tcp.port);
+        options.connect_timeout = &config.connect_timeout;
+        c = valkeyConnectWithOptions(&options);
     } else if (config.type == CONN_UNIX) {
         c = valkeyConnectUnixWithTimeout(config.unix_sock.path, config.connect_timeout);
 #ifdef VALKEY_TEST_RDMA
@@ -1490,6 +1500,11 @@ static void test_invalid_timeout_errors(struct config config) {
 
     if (config.type == CONN_TCP || config.type == CONN_TLS) {
         c = valkeyConnectWithTimeout(config.tcp.host, config.tcp.port, config.connect_timeout);
+    } else if (config.type == CONN_MPTCP) {
+        valkeyOptions options = {0};
+        VALKEY_OPTIONS_SET_MPTCP(&options, config.tcp.host, config.tcp.port);
+        options.connect_timeout = &config.connect_timeout;
+        c = valkeyConnectWithOptions(&options);
     } else if (config.type == CONN_UNIX) {
         c = valkeyConnectUnixWithTimeout(config.unix_sock.path, config.connect_timeout);
 #ifdef VALKEY_TEST_RDMA
@@ -2388,6 +2403,19 @@ int main(int argc, char **argv) {
     test_tcp_options(cfg);
     if (throughput)
         test_throughput(cfg);
+
+#ifdef IPPROTO_MPTCP
+    printf("\nTesting against MPTCP connection (%s:%d):\n", cfg.tcp.host, cfg.tcp.port);
+    cfg.type = CONN_MPTCP;
+    test_blocking_connection(cfg);
+    test_blocking_connection_timeouts(cfg);
+    test_blocking_io_errors(cfg);
+    test_invalid_timeout_errors(cfg);
+    test_append_formatted_commands(cfg);
+    test_tcp_options(cfg);
+    if (throughput)
+        test_throughput(cfg);
+#endif
 
     printf("\nTesting against Unix socket connection (%s): ", cfg.unix_sock.path);
     if (test_unix_socket) {

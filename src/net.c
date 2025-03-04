@@ -374,6 +374,25 @@ int valkeyTcpSetTimeout(valkeyContext *c, const struct timeval tv) {
     return VALKEY_OK;
 }
 
+/* Until glibc 2.39, getaddrinfo with hints.ai_protocol of IPPROTO_MPTCP leads error.
+ * Use hints.ai_protocol IPPROTO_IP (0) or IPPROTO_TCP (6) to resolve address and overwrite
+ * it when MPTCP is enabled.
+ * Ref: https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/tools/testing/selftests/net/mptcp/mptcp_connect.c
+ */
+static int valkeyContextSetMptcp(valkeyContext *c, int ai_protocol) {
+    if (c->flags & VALKEY_MPTCP) {
+#ifdef IPPROTO_MPTCP
+        (void)(c);
+        return IPPROTO_MPTCP;
+    }
+#else
+        valkeySetErrorFromErrno(c, VALKEY_ERR_PROTOCOL, "MPTCP is not supported on this platform");
+        return VALKEY_ERR;
+    }
+#endif
+    return ai_protocol;
+}
+
 int valkeyContextConnectTcp(valkeyContext *c, const valkeyOptions *options) {
     const struct timeval *timeout = options->connect_timeout;
     const char *addr = options->endpoint.tcp.ip;
@@ -454,7 +473,11 @@ int valkeyContextConnectTcp(valkeyContext *c, const valkeyOptions *options) {
     }
     for (p = servinfo; p != NULL; p = p->ai_next) {
     addrretry:
-        if ((s = socket(p->ai_family, p->ai_socktype, p->ai_protocol)) == VALKEY_INVALID_FD)
+        rv = valkeyContextSetMptcp(c, p->ai_protocol);
+        if (rv == VALKEY_ERR)
+            goto error;
+
+        if ((s = socket(p->ai_family, p->ai_socktype, rv)) == VALKEY_INVALID_FD)
             continue;
 
         c->fd = s;
