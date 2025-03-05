@@ -120,11 +120,11 @@ void listClusterNodeDestructor(void *val) { freeValkeyClusterNode(val); }
 
 void listClusterSlotDestructor(void *val) { cluster_slot_destroy(val); }
 
-unsigned long int dictSdsHash(const void *key) {
+static unsigned long int dictSdsHash(const void *key) {
     return dictGenHashFunction((unsigned char *)key, sdslen((char *)key));
 }
 
-int dictSdsKeyCompare(const void *key1, const void *key2) {
+static int dictSdsKeyCompare(const void *key1, const void *key2) {
     int l1, l2;
 
     l1 = sdslen((sds)key1);
@@ -134,16 +134,16 @@ int dictSdsKeyCompare(const void *key1, const void *key2) {
     return memcmp(key1, key2, l1) == 0;
 }
 
-void dictSdsDestructor(void *val) {
+static void dictSdsDestructor(void *val) {
     sdsfree(val);
 }
 
-void dictClusterNodeDestructor(void *val) {
+static void dictClusterNodeDestructor(void *val) {
     freeValkeyClusterNode(val);
 }
 
 /* Destructor function for clusterNodeListDictType. */
-void dictClusterNodeListDestructor(void *val) {
+static void dictClusterNodeListDestructor(void *val) {
     listRelease(val);
 }
 
