@@ -43,19 +43,26 @@
 #include <limits.h>
 #include <stdlib.h>
 
+/* -------------------------- types ----------------------------------------- */
+struct dictEntry {
+    void *key;
+    void *val;
+    struct dictEntry *next;
+};
+
 /* -------------------------- private prototypes ---------------------------- */
 
 static int _dictExpandIfNeeded(dict *ht);
 static unsigned long _dictNextPower(unsigned long size);
 static int _dictKeyIndex(dict *ht, const void *key);
-static int _dictInit(dict *ht, dictType *type, void *privDataPtr);
+static int _dictInit(dict *ht, dictType *type);
 
 /* -------------------------- hash functions -------------------------------- */
 
 /* Generic hash function (a popular one from Bernstein).
  * I tested a few and this was the best. */
-unsigned int dictGenHashFunction(const unsigned char *buf, int len) {
-    unsigned int hash = 5381;
+unsigned long int dictGenHashFunction(const unsigned char *buf, int len) {
+    unsigned long int hash = 5381;
 
     while (len--)
         hash = ((hash << 5) + hash) + (*buf++); /* hash * 33 + c */
@@ -74,20 +81,19 @@ static void _dictReset(dict *ht) {
 }
 
 /* Create a new hash table */
-dict *dictCreate(dictType *type, void *privDataPtr) {
+dict *dictCreate(dictType *type) {
     dict *ht = vk_malloc(sizeof(*ht));
     if (ht == NULL)
         return NULL;
 
-    _dictInit(ht, type, privDataPtr);
+    _dictInit(ht, type);
     return ht;
 }
 
 /* Initialize the hash table */
-static int _dictInit(dict *ht, dictType *type, void *privDataPtr) {
+static int _dictInit(dict *ht, dictType *type) {
     _dictReset(ht);
     ht->type = type;
-    ht->privdata = privDataPtr;
     return DICT_OK;
 }
 
@@ -101,7 +107,7 @@ int dictExpand(dict *ht, unsigned long size) {
     if (ht->used > size)
         return DICT_ERR;
 
-    _dictInit(&n, ht->type, ht->privdata);
+    _dictInit(&n, ht->type);
     n.size = realsize;
     n.sizemask = realsize - 1;
     n.table = vk_calloc(realsize, sizeof(dictEntry *));
@@ -160,8 +166,8 @@ int dictAdd(dict *ht, void *key, void *val) {
     ht->table[index] = entry;
 
     /* Set the hash entry fields. */
-    dictSetHashKey(ht, entry, key);
-    dictSetHashVal(ht, entry, val);
+    dictSetKey(ht, entry, key);
+    dictSetVal(ht, entry, val);
     ht->used++;
     return DICT_OK;
 }
@@ -189,7 +195,7 @@ int dictReplace(dict *ht, void *key, void *val) {
      * you want to increment (set), and then decrement (free), and not the
      * reverse. */
     auxentry = *entry;
-    dictSetHashVal(ht, entry, val);
+    dictSetVal(ht, entry, val);
     dictFreeEntryVal(ht, &auxentry);
     return 0;
 }
@@ -273,6 +279,28 @@ dictEntry *dictFind(dict *ht, const void *key) {
         he = he->next;
     }
     return NULL;
+}
+
+void dictSetKey(dict *d, dictEntry *de, void *key) {
+    if (d->type->keyDup)
+        de->key = d->type->keyDup(key);
+    else
+        de->key = key;
+}
+
+void dictSetVal(dict *d, dictEntry *de, void *val) {
+    if (d->type->valDup)
+        de->val = d->type->valDup(val);
+    else
+        de->val = val;
+}
+
+void *dictGetKey(const dictEntry *de) {
+    return de->key;
+}
+
+void *dictGetVal(const dictEntry *de) {
+    return de->val;
 }
 
 void dictInitIterator(dictIterator *iter, dict *ht) {

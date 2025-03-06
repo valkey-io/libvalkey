@@ -39,22 +39,15 @@
 #define DICT_OK 0
 #define DICT_ERR 1
 
-/* Unused arguments generate annoying warnings... */
-#define DICT_NOTUSED(V) ((void)V)
-
-typedef struct dictEntry {
-    void *key;
-    void *val;
-    struct dictEntry *next;
-} dictEntry;
+typedef struct dictEntry dictEntry; /* opaque */
 
 typedef struct dictType {
-    unsigned int (*hashFunction)(const void *key);
-    void *(*keyDup)(void *privdata, const void *key);
-    void *(*valDup)(void *privdata, const void *obj);
-    int (*keyCompare)(void *privdata, const void *key1, const void *key2);
-    void (*keyDestructor)(void *privdata, void *key);
-    void (*valDestructor)(void *privdata, void *obj);
+    unsigned long int (*hashFunction)(const void *key);
+    void *(*keyDup)(const void *key);
+    void *(*valDup)(const void *obj);
+    int (*keyCompare)(const void *key1, const void *key2);
+    void (*keyDestructor)(void *key);
+    void (*valDestructor)(void *obj);
 } dictType;
 
 typedef struct dict {
@@ -63,7 +56,6 @@ typedef struct dict {
     unsigned long size;
     unsigned long sizemask;
     unsigned long used;
-    void *privdata;
 } dict;
 
 typedef struct dictIterator {
@@ -78,49 +70,35 @@ typedef struct dictIterator {
 /* ------------------------------- Macros ------------------------------------*/
 #define dictFreeEntryVal(ht, entry) \
     if ((ht)->type->valDestructor)  \
-    (ht)->type->valDestructor((ht)->privdata, (entry)->val)
-
-#define dictSetHashVal(ht, entry, _val_)                            \
-    do {                                                            \
-        if ((ht)->type->valDup)                                     \
-            entry->val = (ht)->type->valDup((ht)->privdata, _val_); \
-        else                                                        \
-            entry->val = (_val_);                                   \
-    } while (0)
+    (ht)->type->valDestructor(dictGetVal(entry))
 
 #define dictFreeEntryKey(ht, entry) \
     if ((ht)->type->keyDestructor)  \
-    (ht)->type->keyDestructor((ht)->privdata, (entry)->key)
+    (ht)->type->keyDestructor(dictGetKey(entry))
 
-#define dictSetHashKey(ht, entry, _key_)                            \
-    do {                                                            \
-        if ((ht)->type->keyDup)                                     \
-            entry->key = (ht)->type->keyDup((ht)->privdata, _key_); \
-        else                                                        \
-            entry->key = (_key_);                                   \
-    } while (0)
-
-#define dictCompareHashKeys(ht, key1, key2)                   \
-    (((ht)->type->keyCompare) ?                               \
-         (ht)->type->keyCompare((ht)->privdata, key1, key2) : \
+#define dictCompareHashKeys(ht, key1, key2)   \
+    (((ht)->type->keyCompare) ?               \
+         (ht)->type->keyCompare(key1, key2) : \
          (key1) == (key2))
 
 #define dictHashKey(ht, key) (ht)->type->hashFunction(key)
 
-#define dictGetEntryKey(he) ((he)->key)
-#define dictGetEntryVal(he) ((he)->val)
 #define dictSlots(ht) ((ht)->size)
 #define dictSize(ht) ((ht)->used)
 
 /* API */
-unsigned int dictGenHashFunction(const unsigned char *buf, int len);
-dict *dictCreate(dictType *type, void *privDataPtr);
+unsigned long int dictGenHashFunction(const unsigned char *buf, int len);
+dict *dictCreate(dictType *type);
 int dictExpand(dict *ht, unsigned long size);
 int dictAdd(dict *ht, void *key, void *val);
 int dictReplace(dict *ht, void *key, void *val);
 int dictDelete(dict *ht, const void *key);
 void dictRelease(dict *ht);
 dictEntry *dictFind(dict *ht, const void *key);
+void dictSetKey(dict *d, dictEntry *de, void *key);
+void dictSetVal(dict *d, dictEntry *de, void *val);
+void *dictGetKey(const dictEntry *de);
+void *dictGetVal(const dictEntry *de);
 void dictInitIterator(dictIterator *iter, dict *ht);
 dictEntry *dictNext(dictIterator *iter);
 
