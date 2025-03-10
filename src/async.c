@@ -92,7 +92,7 @@ static dictType callbackDict = {
 
 static valkeyAsyncContext *valkeyAsyncInitialize(valkeyContext *c) {
     valkeyAsyncContext *ac;
-    dict *channels = NULL, *patterns = NULL;
+    dict *channels = NULL, *patterns = NULL, *schannels = NULL;
 
     channels = dictCreate(&callbackDict);
     if (channels == NULL)
@@ -100,6 +100,10 @@ static valkeyAsyncContext *valkeyAsyncInitialize(valkeyContext *c) {
 
     patterns = dictCreate(&callbackDict);
     if (patterns == NULL)
+        goto oom;
+
+    schannels = dictCreate(&callbackDict);
+    if (schannels == NULL)
         goto oom;
 
     ac = vk_realloc(c, sizeof(valkeyAsyncContext));
@@ -135,12 +139,14 @@ static valkeyAsyncContext *valkeyAsyncInitialize(valkeyContext *c) {
     ac->sub.replies.tail = NULL;
     ac->sub.channels = channels;
     ac->sub.patterns = patterns;
+    ac->sub.schannels = schannels;
     ac->sub.pending_unsubs = 0;
 
     return ac;
 oom:
     dictRelease(channels);
     dictRelease(patterns);
+    dictRelease(schannels);
     return NULL;
 }
 
@@ -349,6 +355,14 @@ static void valkeyAsyncFreeInternal(valkeyAsyncContext *ac) {
         dictRelease(ac->sub.patterns);
     }
 
+    if (ac->sub.schannels) {
+        dictInitIterator(&it, ac->sub.schannels);
+        while ((de = dictNext(&it)) != NULL)
+            valkeyRunCallback(ac, dictGetVal(de), NULL);
+
+        dictRelease(ac->sub.schannels);
+    }
+
     /* Signal event lib to clean up */
     _EL_CLEANUP(ac);
 
@@ -428,12 +442,18 @@ void valkeyAsyncDisconnect(valkeyAsyncContext *ac) {
         valkeyAsyncDisconnectInternal(ac);
 }
 
+static int valkeyIsShardedVariant(const char* cstr) {
+    return !strncasecmp("sm", cstr, 2) || /* smessage */
+           !strncasecmp("ss", cstr, 2) || /* ssubscribe */
+           !strncasecmp("sun",cstr, 3);   /* sunsubscribe */
+}
+
 static int valkeyGetSubscribeCallback(valkeyAsyncContext *ac, valkeyReply *reply, valkeyCallback *dstcb) {
     valkeyContext *c = &(ac->c);
     dict *callbacks;
     valkeyCallback *cb = NULL;
     dictEntry *de;
-    int pvariant;
+    int pvariant, svariant;
     char *stype;
     sds sname = NULL;
 
@@ -445,11 +465,11 @@ static int valkeyGetSubscribeCallback(valkeyAsyncContext *ac, valkeyReply *reply
         assert(reply->element[0]->type == VALKEY_REPLY_STRING);
         stype = reply->element[0]->str;
         pvariant = (tolower(stype[0]) == 'p') ? 1 : 0;
+        svariant = valkeyIsShardedVariant(stype);
 
-        if (pvariant)
-            callbacks = ac->sub.patterns;
-        else
-            callbacks = ac->sub.channels;
+        callbacks = pvariant ? ac->sub.patterns :
+                    svariant ? ac->sub.schannels :
+                    ac->sub.channels;
 
         /* Locate the right callback */
         if (reply->element[1]->type == VALKEY_REPLY_STRING) {
@@ -464,11 +484,11 @@ static int valkeyGetSubscribeCallback(valkeyAsyncContext *ac, valkeyReply *reply
         }
 
         /* If this is an subscribe reply decrease pending counter. */
-        if (strcasecmp(stype + pvariant, "subscribe") == 0) {
+        if (strcasecmp(stype + pvariant + svariant, "subscribe") == 0) {
             assert(cb != NULL);
             cb->pending_subs -= 1;
 
-        } else if (strcasecmp(stype + pvariant, "unsubscribe") == 0) {
+        } else if (strcasecmp(stype + pvariant + svariant, "unsubscribe") == 0) {
             if (cb == NULL)
                 ac->sub.pending_unsubs -= 1;
             else if (cb->pending_subs == 0)
@@ -483,6 +503,7 @@ static int valkeyGetSubscribeCallback(valkeyAsyncContext *ac, valkeyReply *reply
             if (reply->element[2]->integer == 0 &&
                 dictSize(ac->sub.channels) == 0 &&
                 dictSize(ac->sub.patterns) == 0 &&
+                dictSize(ac->sub.schannels) == 0 &&
                 ac->sub.pending_unsubs == 0) {
                 c->flags &= ~VALKEY_SUBSCRIBED;
 
@@ -519,7 +540,7 @@ static int valkeyIsSubscribeReply(valkeyReply *reply) {
     }
 
     /* Get the string/len moving past 'p' if needed */
-    off = tolower(reply->element[0]->str[0]) == 'p';
+    off = tolower(reply->element[0]->str[0]) == 'p' || valkeyIsShardedVariant(reply->element[0]->str);
     str = reply->element[0]->str + off;
     len = reply->element[0]->len - off;
 
@@ -800,7 +821,7 @@ static int valkeyAsyncAppendCmdLen(valkeyAsyncContext *ac, valkeyCallbackFn *fn,
     dictIterator it;
     dictEntry *de;
     valkeyCallback *existcb;
-    int pvariant, hasnext;
+    int pvariant, hasnext, hasprefix, svariant;
     const char *cstr, *astr;
     size_t clen, alen;
     const char *p;
@@ -821,8 +842,10 @@ static int valkeyAsyncAppendCmdLen(valkeyAsyncContext *ac, valkeyCallbackFn *fn,
     assert(p != NULL);
     hasnext = (p[0] == '$');
     pvariant = (tolower(cstr[0]) == 'p') ? 1 : 0;
-    cstr += pvariant;
-    clen -= pvariant;
+    svariant = valkeyIsShardedVariant(cstr);
+    hasprefix = svariant || pvariant;
+    cstr += hasprefix;
+    clen -= hasprefix;
 
     if (hasnext && strncasecmp(cstr, "subscribe\r\n", 11) == 0) {
         c->flags |= VALKEY_SUBSCRIBED;
@@ -833,10 +856,9 @@ static int valkeyAsyncAppendCmdLen(valkeyAsyncContext *ac, valkeyCallbackFn *fn,
             if (sname == NULL)
                 goto oom;
 
-            if (pvariant)
-                cbdict = ac->sub.patterns;
-            else
-                cbdict = ac->sub.channels;
+            cbdict = pvariant ? ac->sub.patterns :
+                     svariant ? ac->sub.schannels :
+                     ac->sub.channels;
 
             if ((de = dictFind(cbdict, sname)) != NULL) {
                 existcb = dictGetVal(de);
@@ -858,10 +880,9 @@ static int valkeyAsyncAppendCmdLen(valkeyAsyncContext *ac, valkeyCallbackFn *fn,
         if (!(c->flags & VALKEY_SUBSCRIBED))
             return VALKEY_ERR;
 
-        if (pvariant)
-            cbdict = ac->sub.patterns;
-        else
-            cbdict = ac->sub.channels;
+        cbdict = pvariant ? ac->sub.patterns :
+                 svariant ? ac->sub.schannels :
+                 ac->sub.channels;
 
         if (hasnext) {
             /* Send an unsubscribe with specific channels/patterns.
