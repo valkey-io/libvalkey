@@ -442,10 +442,10 @@ void valkeyAsyncDisconnect(valkeyAsyncContext *ac) {
         valkeyAsyncDisconnectInternal(ac);
 }
 
-static int valkeyIsShardedVariant(const char* cstr) {
+static int valkeyIsShardedVariant(const char *cstr) {
     return !strncasecmp("sm", cstr, 2) || /* smessage */
            !strncasecmp("ss", cstr, 2) || /* ssubscribe */
-           !strncasecmp("sun",cstr, 3);   /* sunsubscribe */
+           !strncasecmp("sun", cstr, 3);  /* sunsubscribe */
 }
 
 static int valkeyGetSubscribeCallback(valkeyAsyncContext *ac, valkeyReply *reply, valkeyCallback *dstcb) {
@@ -469,7 +469,7 @@ static int valkeyGetSubscribeCallback(valkeyAsyncContext *ac, valkeyReply *reply
 
         callbacks = pvariant ? ac->sub.patterns :
                     svariant ? ac->sub.schannels :
-                    ac->sub.channels;
+                               ac->sub.channels;
 
         /* Locate the right callback */
         if (reply->element[1]->type == VALKEY_REPLY_STRING) {
@@ -858,7 +858,7 @@ static int valkeyAsyncAppendCmdLen(valkeyAsyncContext *ac, valkeyCallbackFn *fn,
 
             cbdict = pvariant ? ac->sub.patterns :
                      svariant ? ac->sub.schannels :
-                     ac->sub.channels;
+                                ac->sub.channels;
 
             if ((de = dictFind(cbdict, sname)) != NULL) {
                 existcb = dictGetVal(de);
@@ -882,7 +882,7 @@ static int valkeyAsyncAppendCmdLen(valkeyAsyncContext *ac, valkeyCallbackFn *fn,
 
         cbdict = pvariant ? ac->sub.patterns :
                  svariant ? ac->sub.schannels :
-                 ac->sub.channels;
+                            ac->sub.channels;
 
         if (hasnext) {
             /* Send an unsubscribe with specific channels/patterns.
