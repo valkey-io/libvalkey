@@ -113,6 +113,7 @@ typedef struct valkeyAsyncContext {
         valkeyCallbackList replies;
         struct dict *channels;
         struct dict *patterns;
+        struct dict *schannels;
         int pending_unsubs;
     } sub;
 

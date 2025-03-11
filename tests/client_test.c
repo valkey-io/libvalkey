@@ -1646,6 +1646,16 @@ void publish_msg(valkeyOptions *options, const char *channel, const char *msg) {
     disconnect(c, 0);
 }
 
+/* Helper function to publish a message via own client. */
+void spublish_msg(valkeyOptions *options, const char *channel, const char *msg) {
+    valkeyContext *c = valkeyConnectWithOptions(options);
+    assert(c != NULL);
+    valkeyReply *reply = valkeyCommand(c, "SPUBLISH %s %s", channel, msg);
+    assert(reply->type == VALKEY_REPLY_INTEGER && reply->integer == 1);
+    freeReplyObject(reply);
+    disconnect(c, 0);
+}
+
 /* Expect a reply of type INTEGER */
 void integer_cb(valkeyAsyncContext *ac, void *r, void *privdata) {
     valkeyReply *reply = r;
@@ -1687,6 +1697,44 @@ void subscribe_cb(valkeyAsyncContext *ac, void *r, void *privdata) {
 
     } else if (strcmp(reply->element[0]->str, "unsubscribe") == 0) {
         assert(strcmp(reply->element[1]->str, "mychannel") == 0 &&
+               reply->element[2]->str == NULL);
+    } else {
+        printf("Unexpected pubsub command: %s\n", reply->element[0]->str);
+        exit(1);
+    }
+}
+
+/* Subscribe callback for test_pubsub_handling and test_pubsub_handling_resp3:
+ * - a published message triggers an unsubscribe
+ * - a command is sent before the unsubscribe response is received. */
+void ssubscribe_cb(valkeyAsyncContext *ac, void *r, void *privdata) {
+    valkeyReply *reply = r;
+    TestState *state = privdata;
+
+    assert(reply != NULL &&
+           reply->type == (state->resp3 ? VALKEY_REPLY_PUSH : VALKEY_REPLY_ARRAY) &&
+           reply->elements == 3);
+
+    if (strcmp(reply->element[0]->str, "ssubscribe") == 0) {
+        assert(strcmp(reply->element[1]->str, "aaaa") == 0 &&
+               reply->element[2]->str == NULL);
+        spublish_msg(state->options, "aaaa", "Hello!");
+    } else if (strcmp(reply->element[0]->str, "smessage") == 0) {
+        assert(strcmp(reply->element[1]->str, "aaaa") == 0 &&
+               strcmp(reply->element[2]->str, "Hello!") == 0);
+        state->checkpoint++;
+
+        /* Unsubscribe after receiving the published message. Send unsubscribe
+         * which should call the callback registered during subscribe */
+        valkeyAsyncCommand(ac, unexpected_cb,
+                           (void *)"unsubscribe should call ssubscribe_cb()",
+                           "sunsubscribe");
+        /* Send a regular command after unsubscribing, then disconnect */
+        state->disconnect = 1;
+        valkeyAsyncCommand(ac, integer_cb, state, "LPUSH mylist foo");
+
+    } else if (strcmp(reply->element[0]->str, "sunsubscribe") == 0) {
+        assert(strcmp(reply->element[1]->str, "aaaa") == 0 &&
                reply->element[2]->str == NULL);
     } else {
         printf("Unexpected pubsub command: %s\n", reply->element[0]->str);
@@ -1745,6 +1793,40 @@ static void test_pubsub_handling(struct config config) {
     assert(state.checkpoint == 3);
 }
 
+static void test_sharded_pubsub_handling(void) {
+    test("Subscribe, handle published sharded message and unsubscribe: ");
+    /* Setup event dispatcher with a testcase timeout */
+    base = event_base_new();
+    struct event *timeout = evtimer_new(base, timeout_cb, NULL);
+    assert(timeout != NULL);
+
+    evtimer_assign(timeout, base, timeout_cb, NULL);
+    struct timeval timeout_tv = {.tv_sec = 10};
+    evtimer_add(timeout, &timeout_tv);
+
+    /* Connect */
+    valkeyOptions options = {0};
+    VALKEY_OPTIONS_SET_TCP(&options, "127.0.0.1", 7000);
+    valkeyAsyncContext *ac = valkeyAsyncConnectWithOptions(&options);
+    assert(ac != NULL && ac->err == 0);
+    valkeyLibeventAttach(ac, base);
+
+    /* Start subscribe */
+    TestState state = {.options = &options};
+    valkeyAsyncCommand(ac, ssubscribe_cb, &state, "ssubscribe aaaa");
+
+    /* Make sure non-subscribe commands are handled */
+    valkeyAsyncCommand(ac, array_cb, &state, "PING");
+
+    /* Start event dispatching loop */
+    test_cond(event_base_dispatch(base) == 0);
+    event_free(timeout);
+    event_base_free(base);
+
+    /* Verify test checkpoints */
+    assert(state.checkpoint == 3);
+}
+
 /* Unexpected push message, will trigger a failure */
 void unexpected_push_cb(valkeyAsyncContext *ac, void *r) {
     (void)ac;
@@ -1786,6 +1868,50 @@ static void test_pubsub_handling_resp3(struct config config) {
     valkeyAsyncCommand(ac, integer_cb, &state, "LPUSH mylist foo");
     /* Handle an array with 3 elements as a non-subscribe command */
     valkeyAsyncCommand(ac, array_cb, &state, "LRANGE mylist 0 2");
+
+    /* Start event dispatching loop */
+    test_cond(event_base_dispatch(base) == 0);
+    event_free(timeout);
+    event_base_free(base);
+
+    /* Verify test checkpoints */
+    assert(state.checkpoint == 6);
+}
+
+static void test_sharded_pubsub_handling_resp3(void) {
+    test("Sharded subscribe, handle published message and unsubscribe using RESP3: ");
+    /* Setup event dispatcher with a testcase timeout */
+    base = event_base_new();
+    struct event *timeout = evtimer_new(base, timeout_cb, NULL);
+    assert(timeout != NULL);
+
+    evtimer_assign(timeout, base, timeout_cb, NULL);
+    struct timeval timeout_tv = {.tv_sec = 10};
+    evtimer_add(timeout, &timeout_tv);
+
+    /* Connect */
+    valkeyOptions options = {0};
+    VALKEY_OPTIONS_SET_TCP(&options, "127.0.0.1", 7000);
+    valkeyAsyncContext *ac = valkeyAsyncConnectWithOptions(&options);
+    assert(ac != NULL && ac->err == 0);
+    valkeyLibeventAttach(ac, base);
+
+    /* Not expecting any push messages in this test */
+    valkeyAsyncSetPushCallback(ac, unexpected_push_cb);
+
+    /* Switch protocol */
+    valkeyAsyncCommand(ac, NULL, NULL, "HELLO 3");
+
+    /* Start subscribe */
+    TestState state = {.options = &options, .resp3 = 1};
+    valkeyAsyncCommand(ac, ssubscribe_cb, &state, "ssubscribe aaaa");
+
+    /* Make sure non-subscribe commands are handled in RESP3 */
+    valkeyAsyncCommand(ac, integer_cb, &state, "LPUSH mylist{aaaa} foo");
+    valkeyAsyncCommand(ac, integer_cb, &state, "LPUSH mylist{aaaa} foo");
+    valkeyAsyncCommand(ac, integer_cb, &state, "LPUSH mylist{aaaa} foo");
+    /* Handle an array with 3 elements as a non-subscribe command */
+    valkeyAsyncCommand(ac, array_cb, &state, "LRANGE mylist{aaaa} 0 2");
 
     /* Start event dispatching loop */
     test_cond(event_base_dispatch(base) == 0);
@@ -2452,10 +2578,12 @@ int main(int argc, char **argv) {
     disconnect(c, 0);
 
     test_pubsub_handling(cfg);
+    test_sharded_pubsub_handling();
     test_pubsub_multiple_channels(cfg);
     test_monitor(cfg);
     if (major >= 6) {
         test_pubsub_handling_resp3(cfg);
+        test_sharded_pubsub_handling_resp3();
         test_command_timeout_during_pubsub(cfg);
     }
 #endif /* VALKEY_TEST_ASYNC */
