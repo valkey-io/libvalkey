@@ -773,10 +773,10 @@ int valkeyReconnect(valkeyContext *c) {
     memset(c->errstr, '\0', strlen(c->errstr));
 
     assert(c->funcs);
-    if (c->funcs->close)
+    if (c->funcs && c->funcs->close)
         c->funcs->close(c);
 
-    if (c->privctx && c->funcs->free_privctx) {
+    if (c->privctx && c->funcs && c->funcs->free_privctx) {
         c->funcs->free_privctx(c->privctx);
         c->privctx = NULL;
     }
@@ -810,11 +810,13 @@ int valkeyReconnect(valkeyContext *c) {
         return VALKEY_ERR;
     }
 
-    if (c->funcs->connect(c, &options) != VALKEY_OK) {
+    if (c->funcs && c->funcs->connect &&
+        c->funcs->connect(c, &options) != VALKEY_OK) {
         return VALKEY_ERR;
     }
 
-    if (c->command_timeout != NULL && (c->flags & VALKEY_BLOCK) && c->fd != VALKEY_INVALID_FD) {
+    if (c->command_timeout != NULL && (c->flags & VALKEY_BLOCK) &&
+        c->fd != VALKEY_INVALID_FD && c->funcs && c->funcs->set_timeout) {
         c->funcs->set_timeout(c, *c->command_timeout);
     }
 
