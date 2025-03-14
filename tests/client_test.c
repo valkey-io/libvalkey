@@ -1,6 +1,7 @@
 #include "fmacros.h"
 
 #include "sockcompat.h"
+#include "vkutil.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -2074,9 +2075,10 @@ struct _astest {
     int disconnect_status;
     int connected;
     int err;
-    char errstr[256];
+    char errstr[128];
 };
 static struct _astest astest;
+vk_static_assert(sizeof(astest.errstr) == sizeof(((valkeyContext){0}).errstr));
 
 /* async callbacks */
 static void asCleanup(void *data) {
@@ -2091,7 +2093,7 @@ static void connectCallback(valkeyAsyncContext *c, int status) {
     assert(t == &astest);
     assert(t->connects == 0);
     t->err = c->err;
-    strcpy(t->errstr, c->errstr);
+    memcpy(t->errstr, c->errstr, sizeof(t->errstr));
     t->connects++;
     t->connect_status = status;
     t->connected = status == VALKEY_OK ? 1 : -1;
@@ -2107,7 +2109,7 @@ static void disconnectCallback(const valkeyAsyncContext *c, int status) {
     assert(c->data == (void *)&astest);
     assert(astest.disconnects == 0);
     astest.err = c->err;
-    strcpy(astest.errstr, c->errstr);
+    memcpy(astest.errstr, c->errstr, sizeof(astest.errstr));
     astest.disconnects++;
     astest.disconnect_status = status;
     astest.connected = 0;
@@ -2119,7 +2121,7 @@ static void commandCallback(struct valkeyAsyncContext *ac, void *_reply, void *_
     assert(t == &astest);
     (void)_privdata;
     t->err = ac->err;
-    strcpy(t->errstr, ac->errstr);
+    memcpy(t->errstr, ac->errstr, sizeof(t->errstr));
     t->counter++;
     if (t->testno == ASTEST_PINGPONG || t->testno == ASTEST_ISSUE_931_PING) {
         assert(reply != NULL && reply->type == VALKEY_REPLY_STATUS && strcmp(reply->str, "PONG") == 0);
