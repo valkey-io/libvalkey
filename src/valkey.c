@@ -772,11 +772,11 @@ int valkeyReconnect(valkeyContext *c) {
     c->err = 0;
     memset(c->errstr, '\0', strlen(c->errstr));
 
-    if (c->funcs && c->funcs->close) {
+    assert(c->funcs);
+    if (c->funcs && c->funcs->close)
         c->funcs->close(c);
-    }
 
-    if (c->privctx && c->funcs->free_privctx) {
+    if (c->privctx && c->funcs && c->funcs->free_privctx) {
         c->funcs->free_privctx(c->privctx);
         c->privctx = NULL;
     }
@@ -810,11 +810,13 @@ int valkeyReconnect(valkeyContext *c) {
         return VALKEY_ERR;
     }
 
-    if (c->funcs->connect(c, &options) != VALKEY_OK) {
+    if (c->funcs && c->funcs->connect &&
+        c->funcs->connect(c, &options) != VALKEY_OK) {
         return VALKEY_ERR;
     }
 
-    if (c->command_timeout != NULL && (c->flags & VALKEY_BLOCK) && c->fd != VALKEY_INVALID_FD) {
+    if (c->command_timeout != NULL && (c->flags & VALKEY_BLOCK) &&
+        c->fd != VALKEY_INVALID_FD && c->funcs && c->funcs->set_timeout) {
         c->funcs->set_timeout(c, *c->command_timeout);
     }
 
@@ -860,6 +862,9 @@ valkeyContext *valkeyConnectWithOptions(const valkeyOptions *options) {
 
     c->privdata = options->privdata;
     c->free_privdata = options->free_privdata;
+    c->connection_type = options->type;
+    /* Make sure we set a valkeyContextFuncs before returning any context. */
+    valkeyContextSetFuncs(c);
 
     if (valkeyContextUpdateConnectTimeout(c, options->connect_timeout) != VALKEY_OK ||
         valkeyContextUpdateCommandTimeout(c, options->command_timeout) != VALKEY_OK) {
@@ -867,8 +872,6 @@ valkeyContext *valkeyConnectWithOptions(const valkeyOptions *options) {
         return c;
     }
 
-    c->connection_type = options->type;
-    valkeyContextSetFuncs(c);
     c->funcs->connect(c, options);
     if (c->err == 0 && c->fd != VALKEY_INVALID_FD &&
         options->command_timeout != NULL && (c->flags & VALKEY_BLOCK)) {

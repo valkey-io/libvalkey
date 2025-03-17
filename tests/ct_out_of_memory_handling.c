@@ -467,8 +467,8 @@ void test_alloc_failure_handling_async(void) {
         for (int i = 1; i < 100; ++i) {
             successfulAllocations = i;
             acc = valkeyClusterAsyncConnectWithOptions(&options);
-            ASSERT_STR_EQ(acc->errstr, "Out of memory");
             assert(acc != NULL);
+            ASSERT_STR_EQ(acc->errstr, "Out of memory");
             valkeyClusterAsyncFree(acc);
         }
         // Skip iteration 100 to 156 since sdscatfmt give leak warnings during OOM.
