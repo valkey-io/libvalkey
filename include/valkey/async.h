@@ -55,6 +55,7 @@ typedef struct valkeyCallback {
     int pending_subs;
     int unsubscribe_sent;
     void *privdata;
+    int subscribed;
 } valkeyCallback;
 
 /* List of callbacks for either regular replies or pub/sub */

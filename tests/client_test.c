@@ -1729,10 +1729,48 @@ void subscribe_cb(valkeyAsyncContext *ac, void *r, void *privdata) {
     }
 }
 
-/* Subscribe callback for test_pubsub_handling and test_pubsub_handling_resp3:
- * - a published message triggers an unsubscribe
+/* Expect a reply of type STATUS */
+void status_cb(valkeyAsyncContext *ac, void *r, void *privdata) {
+    valkeyReply *reply = r;
+    TestState *state = privdata;
+    assert(reply != NULL && reply->type == VALKEY_REPLY_STATUS);
+    state->checkpoint++;
+    if (state->disconnect)
+        async_disconnect(ac);
+}
+
+void ssubscribe_moved_cb(valkeyAsyncContext *ac, void *r, void *privdata) {
+    valkeyReply *reply = r;
+    (void)ac;
+    TestState *state = privdata;
+    assert(reply != NULL);
+    assert(reply->type == VALKEY_REPLY_ERROR);
+    assert(strncmp(reply->str, "MOVED", 5) == 0);
+
+    // assert(reply == NULL);
+    // assert(ac->err != 0);
+    // assert(strncmp(ac->errstr, "MOVED", 5)==0);
+    state->checkpoint++;
+    state->disconnect = 1;
+}
+
+void ssubscribe_crossslot_error_cb(valkeyAsyncContext *ac, void *r, void *privdata) {
+    valkeyReply *reply = r;
+    (void)ac;
+    TestState *state = privdata;
+
+    assert(reply != NULL);
+    assert(reply->type == VALKEY_REPLY_ERROR);
+    assert(strncmp(reply->str, "CROSSSLOT", 9) == 0);
+    state->checkpoint++;
+    spublish_msg(state->options, "aaaa", "Hello!");
+}
+
+/* Subscribe callback for test_sharded_pubsub_crossslot_handling:
+ * - a published message triggers another ssubscribe to first channel and other slot chahhel
+ * - after receiving CROSSLOT error send smessage to first channel
  * - a command is sent before the unsubscribe response is received. */
-void ssubscribe_cb(valkeyAsyncContext *ac, void *r, void *privdata) {
+void ssubscribe_crossslot_cb(valkeyAsyncContext *ac, void *r, void *privdata) {
     valkeyReply *reply = r;
     TestState *state = privdata;
 
@@ -1742,8 +1780,10 @@ void ssubscribe_cb(valkeyAsyncContext *ac, void *r, void *privdata) {
 
     if (strcmp(reply->element[0]->str, "ssubscribe") == 0) {
         assert(strcmp(reply->element[1]->str, "aaaa") == 0 &&
-               reply->element[2]->str == NULL);
-        spublish_msg(state->options, "aaaa", "Hello!");
+               reply->element[2]->str == NULL &&
+               reply->element[2]->type == VALKEY_REPLY_INTEGER &&
+               reply->element[2]->integer == 1);
+        valkeyAsyncCommand(ac, ssubscribe_crossslot_error_cb, state, "ssubscribe aaa aaaa");
     } else if (strcmp(reply->element[0]->str, "smessage") == 0) {
         assert(strcmp(reply->element[1]->str, "aaaa") == 0 &&
                strcmp(reply->element[2]->str, "Hello!") == 0);
@@ -1757,6 +1797,45 @@ void ssubscribe_cb(valkeyAsyncContext *ac, void *r, void *privdata) {
         /* Send a regular command after unsubscribing, then disconnect */
         state->disconnect = 1;
         valkeyAsyncCommand(ac, integer_cb, state, "LPUSH mylist foo");
+    } else if (strcmp(reply->element[0]->str, "sunsubscribe") == 0) {
+        assert(strcmp(reply->element[1]->str, "aaaa") == 0 &&
+               reply->element[2]->str == NULL);
+    } else {
+        printf("Unexpected pubsub command: %s\n", reply->element[0]->str);
+        exit(1);
+    }
+}
+
+/* Subscribe callback for test_sharded_pubsub_handling:
+ * - a published message triggers an unsubscribe
+ * - a command is sent before the unsubscribe response is received. */
+void ssubscribe_cb(valkeyAsyncContext *ac, void *r, void *privdata) {
+    valkeyReply *reply = r;
+    TestState *state = privdata;
+
+    assert(reply != NULL &&
+           reply->type == (state->resp3 ? VALKEY_REPLY_PUSH : VALKEY_REPLY_ARRAY) &&
+           reply->elements == 3);
+
+    if (strcmp(reply->element[0]->str, "ssubscribe") == 0) {
+        assert(strcmp(reply->element[1]->str, "aaaa") == 0 &&
+               reply->element[2]->str == NULL &&
+               reply->element[2]->type == VALKEY_REPLY_INTEGER &&
+               reply->element[2]->integer == 1);
+        spublish_msg(state->options, "aaaa", "Hello!");
+    } else if (strcmp(reply->element[0]->str, "smessage") == 0) {
+        assert(strcmp(reply->element[1]->str, "aaaa") == 0 &&
+               strcmp(reply->element[2]->str, "Hello!") == 0);
+        state->checkpoint++;
+
+        /* Unsubscribe after receiving the published message. Send unsubscribe
+         * which should call the callback registered during subscribe */
+        valkeyAsyncCommand(ac, unexpected_cb,
+                           (void *)"unsubscribe should call ssubscribe_cb()",
+                           "sunsubscribe");
+        /* Send a regular command after unsubscribing, then disconnect */
+        state->disconnect = 1;
+        valkeyAsyncCommand(ac, integer_cb, state, "LPUSH mylist{aaaa} foo");
 
     } else if (strcmp(reply->element[0]->str, "sunsubscribe") == 0) {
         assert(strcmp(reply->element[1]->str, "aaaa") == 0 &&
@@ -1850,6 +1929,70 @@ static void test_sharded_pubsub_handling(void) {
 
     /* Verify test checkpoints */
     assert(state.checkpoint == 3);
+}
+
+static void test_sharded_pubsub_error_handling(void) {
+    test("Subscribe, handle MOVED error: ");
+    /* Setup event dispatcher with a testcase timeout */
+    base = event_base_new();
+    struct event *timeout = evtimer_new(base, timeout_cb, NULL);
+    assert(timeout != NULL);
+
+    evtimer_assign(timeout, base, timeout_cb, NULL);
+    struct timeval timeout_tv = {.tv_sec = 10};
+    evtimer_add(timeout, &timeout_tv);
+
+    /* Connect */
+    valkeyOptions options = {0};
+    VALKEY_OPTIONS_SET_TCP(&options, "127.0.0.1", 7000);
+    valkeyAsyncContext *ac = valkeyAsyncConnectWithOptions(&options);
+    assert(ac != NULL && ac->err == 0);
+    valkeyLibeventAttach(ac, base);
+
+    /* Start subscribe */
+    TestState state = {.options = &options};
+    valkeyAsyncCommand(ac, ssubscribe_moved_cb, &state, "ssubscribe aaa");
+    valkeyAsyncCommand(ac, status_cb, &state, "PING");
+
+    /* Start event dispatching loop */
+    test_cond(event_base_dispatch(base) == 0);
+    event_free(timeout);
+    event_base_free(base);
+
+    /* Verify test checkpoints */
+    assert(state.checkpoint == 2);
+}
+
+static void test_sharded_pubsub_crossslot_handling(void) {
+    test("Subscribe, handle published sharded message and unsubscribe: ");
+    /* Setup event dispatcher with a testcase timeout */
+    base = event_base_new();
+    struct event *timeout = evtimer_new(base, timeout_cb, NULL);
+    assert(timeout != NULL);
+
+    evtimer_assign(timeout, base, timeout_cb, NULL);
+    struct timeval timeout_tv = {.tv_sec = 10};
+    evtimer_add(timeout, &timeout_tv);
+
+    /* Connect */
+    valkeyOptions options = {0};
+    VALKEY_OPTIONS_SET_TCP(&options, "127.0.0.1", 7000);
+    valkeyAsyncContext *ac = valkeyAsyncConnectWithOptions(&options);
+    assert(ac != NULL && ac->err == 0);
+    valkeyLibeventAttach(ac, base);
+
+    /* Start subscribe */
+    TestState state = {.options = &options};
+    valkeyAsyncCommand(ac, ssubscribe_crossslot_cb, &state, "ssubscribe aaaa");
+    valkeyAsyncCommand(ac, array_cb, &state, "PING");
+
+    /* Start event dispatching loop */
+    test_cond(event_base_dispatch(base) == 0);
+    event_free(timeout);
+    event_base_free(base);
+
+    /* Verify test checkpoints */
+    assert(state.checkpoint == 4);
 }
 
 /* Unexpected push message, will trigger a failure */
@@ -2621,14 +2764,19 @@ int main(int argc, char **argv) {
     disconnect(c, 0);
 
     test_pubsub_handling(cfg);
-    test_sharded_pubsub_handling();
     test_pubsub_multiple_channels(cfg);
     test_monitor(cfg);
     if (major >= 6) {
         test_pubsub_handling_resp3(cfg);
-        test_sharded_pubsub_handling_resp3();
         test_command_timeout_during_pubsub(cfg);
     }
+
+    /// TODO: pass cfg to test_sharded_* with port for cluster connection
+    /// also limit to major version 7.0+ of cluster
+    test_sharded_pubsub_handling();
+    test_sharded_pubsub_error_handling();
+    test_sharded_pubsub_crossslot_handling();
+    test_sharded_pubsub_handling_resp3();
 
 #ifdef IPPROTO_MPTCP
     cfg.type = CONN_MPTCP;
