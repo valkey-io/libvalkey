@@ -617,7 +617,7 @@ void valkeyProcessCallbacks(valkeyAsyncContext *ac) {
                     valkeyGetSubscribeCallback(ac, reply, &cb);
             } else if (
                 (c->flags & VALKEY_SUBSCRIBED) && (((valkeyReply *)reply)->type == VALKEY_REPLY_ERROR) && (strncmp(((valkeyReply *)reply)->str, "MOVED", 5) == 0 || strncmp(((valkeyReply *)reply)->str, "CROSSSLOT", 9) == 0) && valkeyShiftCallback(&ac->sub.replies, &cb) == VALKEY_OK) {
-                // Ssubscribe error
+                /* Ssubscribe error */
             } else {
                 c->err = VALKEY_ERR_OTHER;
                 snprintf(c->errstr, sizeof(c->errstr), "%s", ((valkeyReply *)reply)->str);
@@ -826,14 +826,13 @@ static const char *nextArgument(const char *start, const char **str, size_t *len
 }
 
 void valkeySsubscribeCallback(struct valkeyAsyncContext *ac, void *reply, void *privdata) {
-    /// Here on the first reply from ssubscribe:
-    /// TODO: Improve comment
-    //  - on success ssubscribe:
-    //      valkeyGetSubscribeCallback(ac, reply, &cb);
-    //      valkeyRunCallback(ac, &cb, reply);
-    //  - on failed ssubscribe:
-    //      remove callback form sub.schannels
-    //      call original user callback with error
+    /*
+      This callback called on the first reply from ssubscribe:
+      - on successfull subscribtion:
+          iterate over all channels specifed in original ssubscribe command, assign them user provided callback and mark as subscribed, then call original user callback.
+      - on failed ssubscribe:
+          iterate over all channels specifed in original ssubscribe command, reduce pending_sub and remove all not subscribed callbacks
+    */
     valkeyReply *r = reply;
     ssubscribeCallbackData *data = privdata;
     size_t clen, alen;
@@ -846,7 +845,7 @@ void valkeySsubscribeCallback(struct valkeyAsyncContext *ac, void *reply, void *
     assert(data->command != NULL);
     assert(r != NULL);
     if (r->type == VALKEY_REPLY_ERROR) {
-        /// On CROSSSLOT, MOVED and other errors
+        /*/ On CROSSSLOT, MOVED and other errors */
         p = nextArgument(data->command, &cstr, &clen);
         while ((p = nextArgument(p, &astr, &alen)) != NULL) {
             sname = sdsnewlen(astr, alen);
@@ -978,7 +977,7 @@ static int valkeyAsyncAppendCmdLen(valkeyAsyncContext *ac, valkeyCallbackFn *fn,
             if (ssubscribe_data == NULL)
                 goto oom;
 
-            // copy command to iterate over all channels
+            /* copy command to iterate over all channels */
             ssubscribe_data->command = vk_malloc(len);
             if (ssubscribe_data->command == NULL)
                 goto oom;
@@ -989,8 +988,8 @@ static int valkeyAsyncAppendCmdLen(valkeyAsyncContext *ac, valkeyCallbackFn *fn,
 
             cb.fn = &valkeySsubscribeCallback;
             cb.privdata = ssubscribe_data;
-            cb.pending_subs = 1;     //
-            cb.unsubscribe_sent = 0; //
+            cb.pending_subs = 1;
+            cb.unsubscribe_sent = 0;
             cb.subscribed = 1;
             if (was_subscribed) {
                 if (valkeyPushCallback(&ac->sub.replies, &cb) != VALKEY_OK)
