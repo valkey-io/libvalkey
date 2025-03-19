@@ -40,6 +40,7 @@
 
 enum connection_type {
     CONN_TCP,
+    CONN_TCP_CLUSTER,
     CONN_MPTCP,
     CONN_UNIX,
     CONN_FD,
@@ -55,6 +56,11 @@ struct config {
         const char *host;
         int port;
     } tcp;
+
+    struct {
+        const char *host;
+        int port;
+    } tcp_cluster;
 
     struct {
         const char *path;
@@ -267,6 +273,8 @@ static valkeyContext *do_connect(struct config config) {
 
     if (config.type == CONN_TCP) {
         c = valkeyConnect(config.tcp.host, config.tcp.port);
+    } else if (config.type == CONN_TCP_CLUSTER) {
+        c = valkeyConnect(config.tcp_cluster.host, config.tcp_cluster.port);
     } else if (config.type == CONN_MPTCP) {
         valkeyOptions options = {0};
         VALKEY_OPTIONS_SET_MPTCP(&options, config.tcp.host, config.tcp.port);
@@ -1187,6 +1195,12 @@ valkeyOptions get_server_tcp_options(struct config config) {
     return options;
 }
 
+valkeyOptions get_server_tcp_cluster_options(struct config config) {
+    valkeyOptions options = {0};
+    VALKEY_OPTIONS_SET_TCP(&options, config.tcp_cluster.host, config.tcp_cluster.port);
+    return options;
+}
+
 static void test_resp3_push_options(struct config config) {
     valkeyAsyncContext *ac;
     valkeyContext *c;
@@ -1894,7 +1908,7 @@ static void test_pubsub_handling(struct config config) {
     assert(state.checkpoint == 3);
 }
 
-static void test_sharded_pubsub_handling(void) {
+static void test_sharded_pubsub_handling(struct config config) {
     test("Subscribe, handle published sharded message and unsubscribe: ");
     /* Setup event dispatcher with a testcase timeout */
     base = event_base_new();
@@ -1906,8 +1920,7 @@ static void test_sharded_pubsub_handling(void) {
     evtimer_add(timeout, &timeout_tv);
 
     /* Connect */
-    valkeyOptions options = {0};
-    VALKEY_OPTIONS_SET_TCP(&options, "127.0.0.1", 7000);
+    valkeyOptions options = get_server_tcp_cluster_options(config);
     valkeyAsyncContext *ac = valkeyAsyncConnectWithOptions(&options);
     assert(ac != NULL && ac->err == 0);
     valkeyLibeventAttach(ac, base);
@@ -1928,7 +1941,7 @@ static void test_sharded_pubsub_handling(void) {
     assert(state.checkpoint == 3);
 }
 
-static void test_sharded_pubsub_error_handling(void) {
+static void test_sharded_pubsub_error_handling(struct config config) {
     test("Subscribe, handle MOVED error: ");
     /* Setup event dispatcher with a testcase timeout */
     base = event_base_new();
@@ -1940,8 +1953,7 @@ static void test_sharded_pubsub_error_handling(void) {
     evtimer_add(timeout, &timeout_tv);
 
     /* Connect */
-    valkeyOptions options = {0};
-    VALKEY_OPTIONS_SET_TCP(&options, "127.0.0.1", 7000);
+    valkeyOptions options = get_server_tcp_cluster_options(config);
     valkeyAsyncContext *ac = valkeyAsyncConnectWithOptions(&options);
     assert(ac != NULL && ac->err == 0);
     valkeyLibeventAttach(ac, base);
@@ -1960,8 +1972,13 @@ static void test_sharded_pubsub_error_handling(void) {
     assert(state.checkpoint == 2);
 }
 
-static void test_sharded_pubsub_crossslot_handling(void) {
-    test("Subscribe, handle published sharded message and unsubscribe: ");
+static void test_sharded_pubsub_crossslot_handling(struct config config) {
+    test("Subscribe, handle CROSSSLOT error: ");
+    /*
+     *  Here we are subscribing to first channel (ssubscribe aaaa). Then we are trying to subscribe to two channel: aaaa and aaa. It should trigger a CROSSSLOT error.
+     *  This Error should be processed in user provided callback. Subscription to initial channel shuld be preserved.
+     *  We check this by sending message to "aaaa" channel.
+     */
     /* Setup event dispatcher with a testcase timeout */
     base = event_base_new();
     struct event *timeout = evtimer_new(base, timeout_cb, NULL);
@@ -1972,8 +1989,7 @@ static void test_sharded_pubsub_crossslot_handling(void) {
     evtimer_add(timeout, &timeout_tv);
 
     /* Connect */
-    valkeyOptions options = {0};
-    VALKEY_OPTIONS_SET_TCP(&options, "127.0.0.1", 7000);
+    valkeyOptions options = get_server_tcp_cluster_options(config);
     valkeyAsyncContext *ac = valkeyAsyncConnectWithOptions(&options);
     assert(ac != NULL && ac->err == 0);
     valkeyLibeventAttach(ac, base);
@@ -2043,7 +2059,7 @@ static void test_pubsub_handling_resp3(struct config config) {
     assert(state.checkpoint == 6);
 }
 
-static void test_sharded_pubsub_handling_resp3(void) {
+static void test_sharded_pubsub_handling_resp3(struct config config) {
     test("Sharded subscribe, handle published message and unsubscribe using RESP3: ");
     /* Setup event dispatcher with a testcase timeout */
     base = event_base_new();
@@ -2055,8 +2071,7 @@ static void test_sharded_pubsub_handling_resp3(void) {
     evtimer_add(timeout, &timeout_tv);
 
     /* Connect */
-    valkeyOptions options = {0};
-    VALKEY_OPTIONS_SET_TCP(&options, "127.0.0.1", 7000);
+    valkeyOptions options = get_server_tcp_cluster_options(config);
     valkeyAsyncContext *ac = valkeyAsyncConnectWithOptions(&options);
     assert(ac != NULL && ac->err == 0);
     valkeyLibeventAttach(ac, base);
@@ -2577,11 +2592,30 @@ static void test_async_polling(struct config config) {
 }
 /* End of Async polling_adapter driven tests */
 
+#ifdef VALKEY_TEST_ASYNC
+static void sharded_pubsub_test(struct config cfg) {
+    int major;
+
+    cfg.type = CONN_TCP_CLUSTER;
+    valkeyContext *c = do_connect(cfg);
+    get_server_version(c, &major, NULL);
+    disconnect(c, 0);
+
+    if (major >= 7) {
+        test_sharded_pubsub_handling(cfg);
+        test_sharded_pubsub_error_handling(cfg);
+        test_sharded_pubsub_crossslot_handling(cfg);
+        test_sharded_pubsub_handling_resp3(cfg);
+    }
+}
+#endif /* VALKEY_TEST_ASYNC */
+
 int main(int argc, char **argv) {
     struct config cfg = {
         .tcp = {
             .host = "127.0.0.1",
             .port = 6379},
+        .tcp_cluster = {.host = "127.0.0.1", .port = 7000},
         .unix_sock = {
             .path = "/tmp/valkey.sock",
         },
@@ -2603,6 +2637,14 @@ int main(int argc, char **argv) {
             argv++;
             argc--;
             cfg.tcp.port = atoi(argv[0]);
+        } else if (argc >= 2 && !strcmp(argv[0], "--cluster-host")) {
+            argv++;
+            argc--;
+            cfg.tcp_cluster.host = argv[0];
+        } else if (argc >= 2 && !strcmp(argv[0], "--cluster-port")) {
+            argv++;
+            argc--;
+            cfg.tcp_cluster.port = atoi(argv[0]);
         } else if (argc >= 2 && !strcmp(argv[0], "-s")) {
             argv++;
             argc--;
@@ -2768,12 +2810,7 @@ int main(int argc, char **argv) {
         test_command_timeout_during_pubsub(cfg);
     }
 
-    /// TODO: pass cfg to test_sharded_* with port for cluster connection
-    /// also limit to major version 7.0+ of cluster
-    test_sharded_pubsub_handling();
-    test_sharded_pubsub_error_handling();
-    test_sharded_pubsub_crossslot_handling();
-    test_sharded_pubsub_handling_resp3();
+    sharded_pubsub_test(cfg);
 
 #ifdef IPPROTO_MPTCP
     cfg.type = CONN_MPTCP;
