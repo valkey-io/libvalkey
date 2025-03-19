@@ -1747,9 +1747,6 @@ void ssubscribe_moved_cb(valkeyAsyncContext *ac, void *r, void *privdata) {
     assert(reply->type == VALKEY_REPLY_ERROR);
     assert(strncmp(reply->str, "MOVED", 5) == 0);
 
-    // assert(reply == NULL);
-    // assert(ac->err != 0);
-    // assert(strncmp(ac->errstr, "MOVED", 5)==0);
     state->checkpoint++;
     state->disconnect = 1;
 }
