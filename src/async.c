@@ -842,13 +842,11 @@ void valkeySsubscribeCallback(struct valkeyAsyncContext *ac, void *reply, void *
     valkeyCallback *cb = NULL;
     dictEntry *de;
 
-    // TODO: add asserts on every dereferenced pointer
-    // !!!!!
     assert(data != NULL);
     assert(data->command != NULL);
     assert(r != NULL);
     if (r->type == VALKEY_REPLY_ERROR) {
-        /// On CROSSSLOT and other errors
+        /// On CROSSSLOT, MOVED and other errors
         p = nextArgument(data->command, &cstr, &clen);
         while ((p = nextArgument(p, &astr, &alen)) != NULL) {
             sname = sdsnewlen(astr, alen);
@@ -888,6 +886,7 @@ void valkeySsubscribeCallback(struct valkeyAsyncContext *ac, void *reply, void *
         valkeyCallback cb = {0};
         valkeyGetSubscribeCallback(ac, reply, &cb);
         valkeyRunCallback(ac, &cb, reply);
+        vk_free(data->command);
         vk_free(privdata);
         return;
     }
