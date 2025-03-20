@@ -828,10 +828,10 @@ static const char *nextArgument(const char *start, const char **str, size_t *len
 void valkeySsubscribeCallback(struct valkeyAsyncContext *ac, void *reply, void *privdata) {
     /*
       This callback called on the first reply from ssubscribe:
-      - on successfull subscribtion:
-          iterate over all channels specifed in original ssubscribe command, assign them user provided callback and mark as subscribed, then call original user callback.
+      - on successful subscription:
+          iterate over all channels specified in original ssubscribe command, assign them user provided callback and mark as subscribed, then call original user callback.
       - on failed ssubscribe:
-          iterate over all channels specifed in original ssubscribe command, reduce pending_sub and remove all not subscribed callbacks
+          iterate over all channels specified in original ssubscribe command, reduce pending_subs and remove all not subscribed callbacks
     */
     valkeyReply *r = reply;
     ssubscribeCallbackData *data = privdata;
@@ -977,11 +977,15 @@ static int valkeyAsyncAppendCmdLen(valkeyAsyncContext *ac, valkeyCallbackFn *fn,
             if (ssubscribe_data == NULL)
                 goto oom;
 
-            /* copy command to iterate over all channels */
-            ssubscribe_data->command = vk_malloc(len);
+            /* copy command to iterate over all channels.
+             * actual length of cmd is actualy len + 1 (see valkeyvFormatCommand).
+             * last byte important in nextArgument function.
+             */
+            ssubscribe_data->command = vk_malloc(len + 1);
             if (ssubscribe_data->command == NULL)
                 goto oom;
             memcpy(ssubscribe_data->command, cmd, len);
+            ssubscribe_data->command[len] = '\0';
 
             ssubscribe_data->user_callback = fn;
             ssubscribe_data->user_priv_data = privdata;

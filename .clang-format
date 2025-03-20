@@ -4,7 +4,7 @@ IndentWidth: 4
 BreakBeforeTernaryOperators: false
 ReflowComments: false
 AllowAllArgumentsOnNextLine: true
-AlignTrailingComments: Always
+AlignTrailingComments: true
 IncludeBlocks: Regroup
 IncludeCategories:
   # Headers that must always be first since they define macros that affect the
