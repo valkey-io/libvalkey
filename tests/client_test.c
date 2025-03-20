@@ -1976,7 +1976,7 @@ static void test_sharded_pubsub_crossslot_handling(struct config config) {
     test("Subscribe, handle CROSSSLOT error: ");
     /*
      *  Here we are subscribing to first channel (ssubscribe aaaa). Then we are trying to subscribe to two channel: aaaa and aaa. It should trigger a CROSSSLOT error.
-     *  This Error should be processed in user provided callback. Subscription to initial channel shuld be preserved.
+     *  This Error should be processed in user provided callback. Subscription to initial channel should be preserved.
      *  We check this by sending message to "aaaa" channel.
      */
     /* Setup event dispatcher with a testcase timeout */
