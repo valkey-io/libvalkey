@@ -893,7 +893,7 @@ sds *sdssplitlen(const char *s, int len, const char *sep, int seplen, int *count
     *count = elements;
     return tokens;
 
-cleanup : {
+cleanup: {
     int i;
     for (i = 0; i < elements; i++)
         sdsfree(tokens[i]);
