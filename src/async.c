@@ -984,8 +984,7 @@ static int valkeyAsyncAppendCmdLen(valkeyAsyncContext *ac, valkeyCallbackFn *fn,
             ssubscribe_data->command = vk_malloc(len + 1);
             if (ssubscribe_data->command == NULL)
                 goto oom;
-            memcpy(ssubscribe_data->command, cmd, len);
-            ssubscribe_data->command[len] = '\0';
+            memcpy(ssubscribe_data->command, cmd, len + 1);
 
             ssubscribe_data->user_callback = fn;
             ssubscribe_data->user_priv_data = privdata;
