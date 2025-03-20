@@ -39,6 +39,8 @@ else()
 endif()
 
 SET(valkey_sources
+    src/adaptable/dict.c
+    src/adaptable/sds.c
     src/adlist.c
     src/alloc.c
     src/async.c
@@ -46,10 +48,8 @@ SET(valkey_sources
     src/command.c
     src/conn.c
     src/crc16.c
-    src/dict.c
     src/net.c
     src/read.c
-    src/sds.c
     src/sockcompat.c
     src/valkey.c
     src/vkutil.c)
@@ -78,6 +78,8 @@ TARGET_INCLUDE_DIRECTORIES(valkey
     PUBLIC
         $<INSTALL_INTERFACE:include>
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/valkey>
+    PRIVATE
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/adaptable>
 )
 
 CONFIGURE_FILE(valkey.pc.in valkey.pc @ONLY)
@@ -169,6 +171,7 @@ IF(ENABLE_TLS)
         PRIVATE
             $<INSTALL_INTERFACE:include>
             $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/valkey>
+            $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/adaptable>
     )
 
     IF (APPLE AND BUILD_SHARED_LIBS)
@@ -238,6 +241,7 @@ if(ENABLE_RDMA)
         PRIVATE
             $<INSTALL_INTERFACE:include>
             $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/valkey>
+            $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/adaptable>
     )
 
     set_target_properties(valkey_rdma
