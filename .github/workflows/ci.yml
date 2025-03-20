@@ -179,6 +179,21 @@ jobs:
         cmake -DCMAKE_PREFIX_PATH=${{ github.workspace }}/cmake-install/usr/local -DENABLE_TLS=ON ..
         make
 
+  cmake-minimum-required:
+    name: CMake 3.0.0 (min. required)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Setup CMake
+        uses: jwlawson/actions-setup-cmake@802fa1a2c4e212495c05bf94dba2704a92a472be # v2.0.2
+        with:
+          cmake-version: '3.0.0'
+      - name: Generate makefiles
+        run: |
+          mkdir build && cd build
+          cmake -DENABLE_TLS=ON -DENABLE_IPV6_TESTS=ON -DENABLE_EXAMPLES=ON ..
+          sudo make install
+
   macos:
     name: macOS
     runs-on: macos-latest
