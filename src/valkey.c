@@ -1034,8 +1034,10 @@ int valkeyBufferWrite(valkeyContext *c, int *done) {
                 if (c->obuf == NULL)
                     goto oom;
             } else {
-                if (sdsrange(c->obuf, nwritten, -1) < 0)
+                /* No length check in Valkeys sdsrange() */
+                if (sdslen(c->obuf) > SSIZE_MAX)
                     goto oom;
+                sdsrange(c->obuf, nwritten, -1);
             }
         }
     }
