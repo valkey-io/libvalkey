@@ -138,14 +138,10 @@ typedef struct valkeyClusterAsyncContext {
 
 } valkeyClusterAsyncContext;
 
-#if UINTPTR_MAX == UINT64_MAX
-#define VALKEY_NODE_ITERATOR_SIZE 56
-#else
-#define VALKEY_NODE_ITERATOR_SIZE 32
-#endif
-typedef struct valkeyClusterNodeIterator {
-    char opaque_data[VALKEY_NODE_ITERATOR_SIZE];
-} valkeyClusterNodeIterator;
+/* --- Opaque types --- */
+
+/* 72 bytes needed when using Valkey's dict. */
+typedef uint64_t valkeyClusterNodeIterator[9];
 
 /* --- Configuration options --- */
 
