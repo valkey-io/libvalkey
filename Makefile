@@ -9,6 +9,7 @@ SRC_DIR = src
 OBJ_DIR = obj
 LIB_DIR = lib
 TEST_DIR = tests
+ADAPT_DIR = src/adaptable
 
 INCLUDE_DIR = include/valkey
 
@@ -19,6 +20,15 @@ SOURCES = $(filter-out $(SRC_DIR)/tls.c $(SRC_DIR)/rdma.c, $(wildcard $(SRC_DIR)
 HEADERS = $(filter-out $(INCLUDE_DIR)/tls.h $(INCLUDE_DIR)/rdma.h, $(wildcard $(INCLUDE_DIR)/*.h))
 
 OBJS = $(patsubst $(SRC_DIR)/%.c,$(OBJ_DIR)/%.o,$(SOURCES))
+
+USE_INCLUDE?=
+ifeq ($(USE_INCLUDE),)
+  # Use sds and dict provided in libvalkey
+  ADAPT_INCLUDE_DIR = $(ADAPT_DIR)
+  OBJS += $(patsubst $(ADAPT_DIR)/%.c,$(OBJ_DIR)/%.o,$(wildcard $(ADAPT_DIR)/*.c))
+else
+  ADAPT_INCLUDE_DIR = $(USE_INCLUDE)
+endif
 
 LIBNAME=libvalkey
 PKGCONFNAME=$(LIB_DIR)/valkey.pc
@@ -217,10 +227,13 @@ $(RDMA_STLIBNAME): $(RDMA_OBJS)
 	$(STLIB_MAKE_CMD) $(RDMA_STLIBNAME) $(RDMA_OBJS)
 
 $(OBJ_DIR)/%.o: $(SRC_DIR)/%.c | $(OBJ_DIR)
-	$(CC) -std=c99 -pedantic $(REAL_CFLAGS) -I$(INCLUDE_DIR) -MMD -MP -c $< -o $@
+	$(CC) -std=c99 -pedantic $(REAL_CFLAGS) -I$(INCLUDE_DIR) -I$(ADAPT_INCLUDE_DIR) -MMD -MP -c $< -o $@
+
+$(OBJ_DIR)/%.o: $(ADAPT_DIR)/%.c | $(OBJ_DIR)
+	$(CC) -std=c99 -pedantic $(REAL_CFLAGS) -I$(INCLUDE_DIR) -I$(ADAPT_INCLUDE_DIR) -MMD -MP -c $< -o $@
 
 $(OBJ_DIR)/%.o: $(TEST_DIR)/%.c | $(OBJ_DIR)
-	$(CC) -std=c99 -pedantic $(REAL_CFLAGS) -I$(INCLUDE_DIR) -I$(SRC_DIR) -MMD -MP -c $< -o $@
+	$(CC) -std=c99 -pedantic $(REAL_CFLAGS) -I$(INCLUDE_DIR) -I$(ADAPT_INCLUDE_DIR) -I$(SRC_DIR) -MMD -MP -c $< -o $@
 
 $(TEST_DIR)/%: $(OBJ_DIR)/%.o $(STLIBNAME)
 	$(CC) -o $@ $< $(RDMA_STLIB) $(STLIBNAME) $(TLS_STLIB) $(LDFLAGS) $(TEST_LDFLAGS)
