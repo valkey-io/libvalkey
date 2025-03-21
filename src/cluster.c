@@ -121,7 +121,7 @@ void listClusterNodeDestructor(void *val) { freeValkeyClusterNode(val); }
 
 void listClusterSlotDestructor(void *val) { cluster_slot_destroy(val); }
 
-static unsigned long int dictSdsHash(const void *key) {
+static uint64_t dictSdsHash(const void *key) {
     return dictGenHashFunction((unsigned char *)key, sdslen((char *)key));
 }
 
