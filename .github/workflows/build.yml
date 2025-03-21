@@ -28,6 +28,7 @@ jobs:
         env:
           SKIPS_AS_FAILS: 1
           TEST_TLS: 1
+          SKIP_CLUSTER_TESTS_ARGS: 1
         run: ./test.sh
 
   centos8:
@@ -58,6 +59,7 @@ jobs:
         env:
           SKIPS_AS_FAILS: 1
           TEST_TLS: 1
+          SKIP_CLUSTER_TESTS_ARGS: 1
         run: ./test.sh
 
   freebsd:

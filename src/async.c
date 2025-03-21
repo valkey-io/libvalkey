@@ -978,7 +978,7 @@ static int valkeyAsyncAppendCmdLen(valkeyAsyncContext *ac, valkeyCallbackFn *fn,
                 goto oom;
 
             /* copy command to iterate over all channels.
-             * actual length of cmd is actualy len + 1 (see valkeyvFormatCommand).
+             * actual length of cmd is actually len + 1 (see valkeyvFormatCommand).
              * last byte important in nextArgument function.
              */
             ssubscribe_data->command = vk_malloc(len + 1);

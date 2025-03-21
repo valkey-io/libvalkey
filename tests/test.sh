@@ -18,6 +18,8 @@ SKIPS_ARG=${SKIPS_ARG:-}
 VALKEY_DOCKER=${VALKEY_DOCKER:-}
 TEST_RDMA=${TEST_RDMA:-0}
 RDMA_TEST_ARGS=
+SKIP_CLUSTER_TESTS=${SKIP_CLUSTER_TESTS:-0}
+SKIP_CLUSTER_TESTS_ARGS=
 
 check_executable "$VALKEY_SERVER"
 
@@ -133,4 +135,9 @@ done
 # Treat skips as failures if directed
 [ "$SKIPS_AS_FAILS" = 1 ] && SKIPS_ARG="${SKIPS_ARG} --skips-as-fails"
 
-${TEST_PREFIX:-} ./client_test -h 127.0.0.1 -p ${VALKEY_PORT} -s ${SOCK_FILE} ${TLS_TEST_ARGS} ${SKIPS_ARG} ${RDMA_TEST_ARGS}
+# if cluster is not available, skip cluster tests
+if [ "$SKIP_CLUSTER_TESTS" = "1" ]; then
+    SKIPS_CLUSTER_TESTS_ARGS="${SKIPS_CLUSTER_TESTS_ARGS} --skip-cluster-tests"
+fi
+
+${TEST_PREFIX:-} ./client_test -h 127.0.0.1 -p ${VALKEY_PORT} -s ${SOCK_FILE} ${TLS_TEST_ARGS} ${SKIPS_ARG} ${RDMA_TEST_ARGS} ${SKIPS_CLUSTER_TESTS_ARGS}

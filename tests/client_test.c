@@ -2624,6 +2624,7 @@ int main(int argc, char **argv) {
     int test_inherit_fd = 1;
     int skips_as_fails = 0;
     int test_unix_socket;
+    int enable_cluster_tests = 1;
 
     /* Parse command line options. */
     argv++;
@@ -2653,6 +2654,8 @@ int main(int argc, char **argv) {
             throughput = 0;
         } else if (argc >= 1 && !strcmp(argv[0], "--skip-inherit-fd")) {
             test_inherit_fd = 0;
+        } else if (argc >= 1 && !strcmp(argv[0], "--skip-cluster-tests")) {
+            enable_cluster_tests = 0;
         } else if (argc >= 1 && !strcmp(argv[0], "--skips-as-fails")) {
             skips_as_fails = 1;
 #ifdef VALKEY_TEST_TLS
@@ -2810,7 +2813,9 @@ int main(int argc, char **argv) {
         test_command_timeout_during_pubsub(cfg);
     }
 
-    sharded_pubsub_test(cfg);
+    if (enable_cluster_tests) {
+        sharded_pubsub_test(cfg);
+    }
 
 #ifdef IPPROTO_MPTCP
     cfg.type = CONN_MPTCP;
