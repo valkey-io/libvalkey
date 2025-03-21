@@ -137,7 +137,7 @@ done
 
 # if cluster is not available, skip cluster tests
 if [ "$SKIP_CLUSTER_TESTS" = "1" ]; then
-    SKIPS_CLUSTER_TESTS_ARGS="${SKIPS_CLUSTER_TESTS_ARGS} --skip-cluster-tests"
+    SKIP_CLUSTER_TESTS_ARGS="${SKIP_CLUSTER_TESTS_ARGS} --skip-cluster-tests"
 fi
 
-${TEST_PREFIX:-} ./client_test -h 127.0.0.1 -p ${VALKEY_PORT} -s ${SOCK_FILE} ${TLS_TEST_ARGS} ${SKIPS_ARG} ${RDMA_TEST_ARGS} ${SKIPS_CLUSTER_TESTS_ARGS}
+${TEST_PREFIX:-} ./client_test -h 127.0.0.1 -p ${VALKEY_PORT} -s ${SOCK_FILE} ${TLS_TEST_ARGS} ${SKIPS_ARG} ${RDMA_TEST_ARGS} ${SKIP_CLUSTER_TESTS_ARGS}
