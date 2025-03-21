@@ -3385,8 +3385,8 @@ struct nodeIterator {
     int retries_left;
     dictIterator di;
 };
-/* Make sure VALKEY_NODE_ITERATOR_SIZE is correct. */
-vk_static_assert(sizeof(struct nodeIterator) == VALKEY_NODE_ITERATOR_SIZE);
+/* Make sure the opaque memory blob can contain a nodeIterator. */
+vk_static_assert(sizeof(valkeyClusterNodeIterator) >= sizeof(struct nodeIterator));
 
 /* Initiate an iterator for iterating over current cluster nodes */
 void valkeyClusterInitNodeIterator(valkeyClusterNodeIterator *iter,
