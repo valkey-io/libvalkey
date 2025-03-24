@@ -21,7 +21,7 @@ jobs:
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - name: Install typos
-        uses: taiki-e/install-action@2c41309d51ede152b6f2ee6bf3b71e6dc9a8b7df # v2.49.27
+        uses: taiki-e/install-action@914ac1e29db2d22aef69891f032778d9adc3990d # v2.49.34
         with:
           tool: typos
       - name: Run typos
