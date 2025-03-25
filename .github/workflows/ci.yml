@@ -179,6 +179,30 @@ jobs:
         cmake -DCMAKE_PREFIX_PATH=${{ github.workspace }}/cmake-install/usr/local -DENABLE_TLS=ON ..
         make
 
+  rdma:
+    name: RDMA support enabled
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Prepare
+        uses: awalsh128/cache-apt-pkgs-action@7ca5f46d061ad9aa95863cd9b214dd48edef361d # v1.5.0
+        with:
+          packages: librdmacm-dev libibverbs-dev
+          version: 1.0
+      - name: Build shared libraries using CMake
+        run: |
+          mkdir build-shared && cd build-shared
+          cmake -DENABLE_RDMA=ON ..
+          sudo make install
+      - name: Build static libraries using CMake
+        run: |
+          mkdir build-static && cd build-static
+          cmake -DBUILD_SHARED_LIBS=OFF -DENABLE_RDMA=ON ..
+          sudo make install
+      - name: Build using Makefile
+        run: |
+          sudo USE_RDMA=1 make install
+
   cmake-minimum-required:
     name: CMake 3.7.0 (min. required)
     runs-on: ubuntu-latest
