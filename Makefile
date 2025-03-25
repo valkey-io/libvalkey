@@ -126,10 +126,9 @@ RDMA_DYLIB_MAKE_CMD=$(CC) $(OPTIMIZATION) $(PLATFORM_FLAGS) -shared -Wl,-soname,
 USE_RDMA?=0
 
 ifeq ($(USE_RDMA),1)
-  RDMA_SOURCES = $(wildcard $(SRC_DIR)/*rdma.c)
-  RDMA_OBJS = $(patsubst $(SRC_DIR)/%.c,$(OBJ_DIR)/%.o,$(RDMA_SOURCES))
-
-  RDMA_LDFLAGS+=-lrdmacm -libverbs
+  RDMA_SOURCES=$(SRC_DIR)/rdma.c
+  RDMA_OBJS=$(patsubst $(SRC_DIR)/%.c,$(OBJ_DIR)/%.o,$(RDMA_SOURCES))
+  RDMA_LDFLAGS=-lrdmacm -libverbs
   # This is required for test.c only
   CFLAGS+=-DVALKEY_TEST_RDMA
   RDMA_STLIB=$(RDMA_STLIBNAME)
@@ -282,7 +281,7 @@ $(RDMA_PKGCONFNAME): $(RDMA_PKGCONF_TEMPLATE)
 		-e 's|@PROJECT_VERSION@|$(LIBVALKEY_SONAME)|g' \
 		$< > $@
 
-install: $(DYLIBNAME) $(STLIBNAME) $(PKGCONFNAME) $(TLS_INSTALL)
+install: $(DYLIBNAME) $(STLIBNAME) $(PKGCONFNAME) $(TLS_INSTALL) $(RDMA_INSTALL)
 	mkdir -p $(INSTALL_INCLUDE_PATH)/adapters $(INSTALL_LIBRARY_PATH)
 	$(INSTALL) $(HEADERS) $(INSTALL_INCLUDE_PATH)
 	$(INSTALL) $(INCLUDE_DIR)/adapters/*.h $(INSTALL_INCLUDE_PATH)/adapters
