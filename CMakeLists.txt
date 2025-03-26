@@ -78,6 +78,8 @@ TARGET_INCLUDE_DIRECTORIES(valkey
     PUBLIC
         $<INSTALL_INTERFACE:include>
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/valkey>
+    PRIVATE
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
 )
 
 CONFIGURE_FILE(valkey.pc.in valkey.pc @ONLY)
@@ -169,6 +171,7 @@ IF(ENABLE_TLS)
         PRIVATE
             $<INSTALL_INTERFACE:include>
             $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/valkey>
+            $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
     )
 
     IF (APPLE AND BUILD_SHARED_LIBS)
@@ -238,6 +241,7 @@ if(ENABLE_RDMA)
         PRIVATE
             $<INSTALL_INTERFACE:include>
             $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/valkey>
+            $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
     )
 
     set_target_properties(valkey_rdma

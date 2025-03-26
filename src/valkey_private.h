@@ -33,8 +33,9 @@
 
 #include "win32.h"
 
-#include "sds.h"
 #include "valkey.h"
+
+#include <sds.h>
 
 #include <limits.h>
 #include <string.h>

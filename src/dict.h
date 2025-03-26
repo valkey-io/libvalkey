@@ -36,13 +36,15 @@
 #ifndef __DICT_H
 #define __DICT_H
 
+#include <stdint.h>
+
 #define DICT_OK 0
 #define DICT_ERR 1
 
 typedef struct dictEntry dictEntry; /* opaque */
 
 typedef struct dictType {
-    unsigned long int (*hashFunction)(const void *key);
+    uint64_t (*hashFunction)(const void *key);
     void *(*keyDup)(const void *key);
     void *(*valDup)(const void *obj);
     int (*keyCompare)(const void *key1, const void *key2);
@@ -87,7 +89,7 @@ typedef struct dictIterator {
 #define dictSize(ht) ((ht)->used)
 
 /* API */
-unsigned long int dictGenHashFunction(const unsigned char *buf, int len);
+uint64_t dictGenHashFunction(const unsigned char *buf, int len);
 dict *dictCreate(dictType *type);
 int dictExpand(dict *ht, unsigned long size);
 int dictAdd(dict *ht, void *key, void *val);
