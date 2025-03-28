@@ -18,7 +18,7 @@ jobs:
 
   ubuntu-cmake:
     name: Build with CMake [${{ matrix.cmake-build-type }}, ${{ matrix.compiler }}, cmake-${{ matrix.cmake-version }}, sanitizer="${{ matrix.sanitizer }}"]
-    runs-on: ${{ matrix.runner }}
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
@@ -26,23 +26,19 @@ jobs:
         cmake-version: [3.29]
         cmake-build-type: [Release]
         sanitizer: ["", thread, undefined, leak, address]
-        runner: [ubuntu-24.04]
         include:
           - compiler: clang-18
             cmake-version: 3.29
             cmake-build-type: Debug
             sanitizer: ""
-            runner: ubuntu-24.04
           - compiler: gcc-9
             cmake-version: 3.13
             cmake-build-type: Release
             sanitizer: ""
-            runner: ubuntu-22.04
           - compiler: clang-14
             cmake-version: 3.13
             cmake-build-type: Release
             sanitizer: ""
-            runner: ubuntu-22.04
     steps:
     - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
     - name: Prepare
@@ -58,19 +54,11 @@ jobs:
       uses: jwlawson/actions-setup-cmake@802fa1a2c4e212495c05bf94dba2704a92a472be # v2.0.2
       with:
         cmake-version: ${{ matrix.cmake-version }}
-    - name: Build and install Valkey for non-cluster tests
-      if: ${{ matrix.runner == 'ubuntu-22.04' }}
-      run: |
-        git clone --depth 1 --branch 7.2.5 https://github.com/valkey-io/valkey.git
-        cd valkey && BUILD_TLS=yes make install
     - name: Install Valkey for non-cluster tests
-      if: ${{ matrix.runner != 'ubuntu-22.04' }}
       run: |
         sudo apt update
         sudo apt install valkey
     - name: Generate makefiles
-      env:
-        CC: ${{ matrix.compiler }}
       run: |
         if [ -n "${{ matrix.sanitizer }}" ]; then
           export CFLAGS="-fno-omit-frame-pointer -fsanitize=${{ matrix.sanitizer }}"
