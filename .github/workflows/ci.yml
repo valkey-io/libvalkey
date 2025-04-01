@@ -209,11 +209,9 @@ jobs:
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - name: Install dependencies
-        run: brew install ninja
-      - name: Install Valkey for non-cluster tests
         run: |
-          git clone --depth 1 --branch 7.2.5 https://github.com/valkey-io/valkey.git
-          cd valkey && BUILD_TLS=yes make install
+          brew update
+          brew install valkey
       - name: Build using CMake
         run: |
           mkdir build && cd build
