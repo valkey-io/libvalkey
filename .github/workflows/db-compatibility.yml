@@ -8,16 +8,17 @@ permissions:
 jobs:
   valkey:
     name: Valkey ${{ matrix.valkey-version }}
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
         include:
-          - valkey-version: '8.0.0'
-          - valkey-version: '7.2.5'
+          - valkey-version: '8.1.0'
+          - valkey-version: '8.0.2'
+          - valkey-version: '7.2.8'
     steps:
       - name: Prepare
-        uses: awalsh128/cache-apt-pkgs-action@5902b33ae29014e6ca012c5d8025d4346556bd40 # v1.4.3
+        uses: awalsh128/cache-apt-pkgs-action@7ca5f46d061ad9aa95863cd9b214dd48edef361d # v1.5.0
         with:
           packages: libevent-dev
           version: 1.0
@@ -55,7 +56,7 @@ jobs:
 
   redis-comp:
     name: Redis ${{ matrix.redis-version }}
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
@@ -65,7 +66,7 @@ jobs:
           - redis-version: '6.2.14'
     steps:
       - name: Prepare
-        uses: awalsh128/cache-apt-pkgs-action@5902b33ae29014e6ca012c5d8025d4346556bd40 # v1.4.3
+        uses: awalsh128/cache-apt-pkgs-action@7ca5f46d061ad9aa95863cd9b214dd48edef361d # v1.5.0
         with:
           packages: libevent-dev
           version: 1.0

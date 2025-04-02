@@ -13,6 +13,8 @@ IncludeCategories:
     Priority: -1
   - Regex: '^"'
     Priority: 1
+  - Regex: '^<(sds|dict).h>'
+    Priority: 2
   - Regex: '^<valkey/adapters/'
     Priority: 3
   - Regex: '^<valkey/'

@@ -38,9 +38,10 @@
 #include "adlist.h"
 #include "alloc.h"
 #include "command.h"
-#include "dict.h"
-#include "sds.h"
 #include "vkutil.h"
+
+#include <dict.h>
+#include <sds.h>
 
 #include <assert.h>
 #include <ctype.h>
@@ -120,13 +121,12 @@ void listClusterNodeDestructor(void *val) { freeValkeyClusterNode(val); }
 
 void listClusterSlotDestructor(void *val) { cluster_slot_destroy(val); }
 
-unsigned int dictSdsHash(const void *key) {
+static uint64_t dictSdsHash(const void *key) {
     return dictGenHashFunction((unsigned char *)key, sdslen((char *)key));
 }
 
-int dictSdsKeyCompare(void *privdata, const void *key1, const void *key2) {
+static int dictSdsKeyCompare(const void *key1, const void *key2) {
     int l1, l2;
-    DICT_NOTUSED(privdata);
 
     l1 = sdslen((sds)key1);
     l2 = sdslen((sds)key2);
@@ -135,20 +135,16 @@ int dictSdsKeyCompare(void *privdata, const void *key1, const void *key2) {
     return memcmp(key1, key2, l1) == 0;
 }
 
-void dictSdsDestructor(void *privdata, void *val) {
-    DICT_NOTUSED(privdata);
-
+static void dictSdsDestructor(void *val) {
     sdsfree(val);
 }
 
-void dictClusterNodeDestructor(void *privdata, void *val) {
-    DICT_NOTUSED(privdata);
+static void dictClusterNodeDestructor(void *val) {
     freeValkeyClusterNode(val);
 }
 
 /* Destructor function for clusterNodeListDictType. */
-void dictClusterNodeListDestructor(void *privdata, void *val) {
-    DICT_NOTUSED(privdata);
+static void dictClusterNodeListDestructor(void *val) {
     listRelease(val);
 }
 
@@ -157,23 +153,17 @@ void dictClusterNodeListDestructor(void *privdata, void *val) {
  * Has ownership of valkeyClusterNode memory
  */
 dictType clusterNodesDictType = {
-    dictSdsHash,              /* hash function */
-    NULL,                     /* key dup */
-    NULL,                     /* val dup */
-    dictSdsKeyCompare,        /* key compare */
-    dictSdsDestructor,        /* key destructor */
-    dictClusterNodeDestructor /* val destructor */
-};
+    .hashFunction = dictSdsHash,
+    .keyCompare = dictSdsKeyCompare,
+    .keyDestructor = dictSdsDestructor,
+    .valDestructor = dictClusterNodeDestructor};
 
 /* Hash table dictType to map node address to a list of valkeyClusterNodes. */
 dictType clusterNodeListDictType = {
-    dictSdsHash,                  /* hashFunction */
-    NULL,                         /* keyDup */
-    NULL,                         /* valDup */
-    dictSdsKeyCompare,            /* keyCompare */
-    dictSdsDestructor,            /* keyDestructor */
-    dictClusterNodeListDestructor /* valDestructor */
-};
+    .hashFunction = dictSdsHash,
+    .keyCompare = dictSdsKeyCompare,
+    .keyDestructor = dictSdsDestructor,
+    .valDestructor = dictClusterNodeListDestructor};
 
 void listCommandFree(void *command) {
     struct cmd *cmd = command;
@@ -461,7 +451,7 @@ static void cluster_nodes_swap_ctx(dict *nodes_f, dict *nodes_t) {
     dictInitIterator(&di, nodes_t);
 
     while ((de_t = dictNext(&di)) != NULL) {
-        node_t = dictGetEntryVal(de_t);
+        node_t = dictGetVal(de_t);
         if (node_t == NULL) {
             continue;
         }
@@ -471,7 +461,7 @@ static void cluster_nodes_swap_ctx(dict *nodes_f, dict *nodes_t) {
             continue;
         }
 
-        node_f = dictGetEntryVal(de_f);
+        node_f = dictGetVal(de_f);
         if (node_f->con != NULL) {
             c = node_f->con;
             node_f->con = node_t->con;
@@ -515,7 +505,7 @@ static dict *parse_cluster_slots(valkeyClusterContext *cc, valkeyContext *c,
         goto error;
     }
 
-    nodes = dictCreate(&clusterNodesDictType, NULL);
+    nodes = dictCreate(&clusterNodesDictType);
     if (nodes == NULL) {
         goto oom;
     }
@@ -619,7 +609,7 @@ static dict *parse_cluster_slots(valkeyClusterContext *cc, valkeyContext *c,
                     sdsfree(address);
                     if (den != NULL) {
                         /* Skip parsing this primary node since it's already known. */
-                        primary = dictGetEntryVal(den);
+                        primary = dictGetVal(den);
                         ret = cluster_slot_ref_node(slot, primary);
                         if (ret != VALKEY_OK) {
                             goto oom;
@@ -715,7 +705,7 @@ static int retain_replica_node(dict *replicas, char *primary_id, valkeyClusterNo
         }
     } else {
         sdsfree(key);
-        replicaList = dictGetEntryVal(de);
+        replicaList = dictGetVal(de);
     }
 
     if (listAddNodeTail(replicaList, node) == NULL)
@@ -734,15 +724,15 @@ static int store_replica_nodes(dict *nodes, dict *replicas) {
     dictInitIterator(&di, nodes);
     dictEntry *de;
     while ((de = dictNext(&di))) {
-        valkeyClusterNode *primary = dictGetEntryVal(de);
+        valkeyClusterNode *primary = dictGetVal(de);
 
         /* Move replica nodes related to this primary. */
         dictEntry *der = dictFind(replicas, primary->name);
         if (der != NULL) {
             assert(primary->replicas == NULL);
             /* Move replica list from replicas dict to nodes dict. */
-            primary->replicas = dictGetEntryVal(der);
-            dictSetHashVal(replicas, der, NULL);
+            primary->replicas = dictGetVal(der);
+            dictSetVal(replicas, der, NULL);
         }
     }
     return VALKEY_OK;
@@ -948,7 +938,7 @@ static dict *parse_cluster_nodes(valkeyClusterContext *cc, valkeyContext *c, val
         goto error;
     }
 
-    nodes = dictCreate(&clusterNodesDictType, NULL);
+    nodes = dictCreate(&clusterNodesDictType);
     if (nodes == NULL) {
         goto oom;
     }
@@ -989,7 +979,7 @@ static dict *parse_cluster_nodes(valkeyClusterContext *cc, valkeyContext *c, val
         } else {
             assert(node->role == VALKEY_ROLE_REPLICA);
             if (replicas == NULL) {
-                if ((replicas = dictCreate(&clusterNodeListDictType, NULL)) == NULL) {
+                if ((replicas = dictCreate(&clusterNodeListDictType)) == NULL) {
                     freeValkeyClusterNode(node);
                     goto oom;
                 }
@@ -1149,7 +1139,7 @@ static int updateNodesAndSlotmap(valkeyClusterContext *cc, dict *nodes) {
 
     dictEntry *de;
     while ((de = dictNext(&di))) {
-        valkeyClusterNode *node = dictGetEntryVal(de);
+        valkeyClusterNode *node = dictGetVal(de);
         if (node->role != VALKEY_ROLE_PRIMARY) {
             valkeyClusterSetError(cc, VALKEY_ERR_OTHER,
                                   "Node role must be primary");
@@ -1236,7 +1226,7 @@ int valkeyClusterUpdateSlotmap(valkeyClusterContext *cc) {
     dictInitIterator(&di, cc->nodes);
 
     while ((de = dictNext(&di)) != NULL) {
-        node = dictGetEntryVal(de);
+        node = dictGetVal(de);
         if (node == NULL || node->host == NULL) {
             continue;
         }
@@ -1259,7 +1249,7 @@ int valkeyClusterUpdateSlotmap(valkeyClusterContext *cc) {
 
 static int valkeyClusterContextInit(valkeyClusterContext *cc,
                                     const valkeyClusterOptions *options) {
-    cc->nodes = dictCreate(&clusterNodesDictType, NULL);
+    cc->nodes = dictCreate(&clusterNodesDictType);
     if (cc->nodes == NULL) {
         valkeyClusterSetError(cc, VALKEY_ERR_OOM, "Out of memory");
         return VALKEY_ERR;
@@ -1607,7 +1597,7 @@ int valkeyClusterSetOptionTimeout(valkeyClusterContext *cc,
             dictInitIterator(&di, cc->nodes);
 
             while ((de = dictNext(&di)) != NULL) {
-                node = dictGetEntryVal(de);
+                node = dictGetVal(de);
                 if (node->acon) {
                     valkeyAsyncSetTimeout(node->acon, tv);
                 }
@@ -1895,7 +1885,7 @@ static valkeyClusterNode *getNodeFromRedirectReply(valkeyClusterContext *cc,
     if (de != NULL) {
         sdsfree(key);
         sdsfree(endpoint);
-        return de->val;
+        return dictGetVal(de);
     }
 
     /* Add this node since it was unknown */
@@ -2485,7 +2475,7 @@ static int valkeyClusterSendAll(valkeyClusterContext *cc) {
     dictInitIterator(&di, cc->nodes);
 
     while ((de = dictNext(&di)) != NULL) {
-        node = dictGetEntryVal(de);
+        node = dictGetVal(de);
         if (node == NULL) {
             continue;
         }
@@ -2522,7 +2512,7 @@ static int valkeyClusterClearAll(valkeyClusterContext *cc) {
     dictInitIterator(&di, cc->nodes);
 
     while ((de = dictNext(&di)) != NULL) {
-        node = dictGetEntryVal(de);
+        node = dictGetVal(de);
         if (node == NULL) {
             continue;
         }
@@ -2585,7 +2575,7 @@ int valkeyClusterGetReply(valkeyClusterContext *cc, void **reply) {
         }
 
         listDelNode(cc->requests, list_command);
-        return valkeyClusterGetReplyFromNode(cc, dictGetEntryVal(de), reply);
+        return valkeyClusterGetReplyFromNode(cc, dictGetVal(de), reply);
     }
 
 error:
@@ -2897,7 +2887,7 @@ static valkeyClusterNode *selectNode(dict *nodes) {
 
     dictEntry *de;
     while ((de = dictNext(&di)) != NULL) {
-        node = dictGetEntryVal(de);
+        node = dictGetVal(de);
 
         if (nodeIsConnected(node)) {
             /* Keep any connected node */
@@ -3401,7 +3391,7 @@ void valkeyClusterAsyncDisconnect(valkeyClusterAsyncContext *acc) {
     dictInitIterator(&di, cc->nodes);
 
     while ((de = dictNext(&di)) != NULL) {
-        node = dictGetEntryVal(de);
+        node = dictGetVal(de);
 
         ac = node->acon;
 
@@ -3428,8 +3418,8 @@ struct nodeIterator {
     int retries_left;
     dictIterator di;
 };
-/* Make sure VALKEY_NODE_ITERATOR_SIZE is correct. */
-vk_static_assert(sizeof(struct nodeIterator) == VALKEY_NODE_ITERATOR_SIZE);
+/* Make sure the opaque memory blob can contain a nodeIterator. */
+vk_static_assert(sizeof(valkeyClusterNodeIterator) >= sizeof(struct nodeIterator));
 
 /* Initiate an iterator for iterating over current cluster nodes */
 void valkeyClusterInitNodeIterator(valkeyClusterNodeIterator *iter,
@@ -3460,7 +3450,7 @@ valkeyClusterNode *valkeyClusterNodeNext(valkeyClusterNodeIterator *iter) {
 
     dictEntry *de;
     if ((de = dictNext(&ni->di)) != NULL)
-        return dictGetEntryVal(de);
+        return dictGetVal(de);
     else
         return NULL;
 }

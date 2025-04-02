@@ -42,10 +42,11 @@
 
 #include "async.h"
 #include "async_private.h"
-#include "dict.h"
 #include "net.h"
-#include "sds.h"
 #include "valkey_private.h"
+
+#include <dict.h>
+#include <sds.h>
 
 #include <assert.h>
 #include <ctype.h>
@@ -60,26 +61,13 @@
 int valkeyAppendCmdLen(valkeyContext *c, const char *cmd, size_t len);
 
 /* Functions managing dictionary of callbacks for pub/sub. */
-static unsigned int callbackHash(const void *key) {
+static uint64_t callbackHash(const void *key) {
     return dictGenHashFunction((const unsigned char *)key,
                                sdslen((const sds)key));
 }
 
-static void *callbackValDup(void *privdata, const void *src) {
-    ((void)privdata);
-    valkeyCallback *dup;
-
-    dup = vk_malloc(sizeof(*dup));
-    if (dup == NULL)
-        return NULL;
-
-    memcpy(dup, src, sizeof(*dup));
-    return dup;
-}
-
-static int callbackKeyCompare(void *privdata, const void *key1, const void *key2) {
+static int callbackKeyCompare(const void *key1, const void *key2) {
     int l1, l2;
-    ((void)privdata);
 
     l1 = sdslen((const sds)key1);
     l2 = sdslen((const sds)key2);
@@ -88,33 +76,29 @@ static int callbackKeyCompare(void *privdata, const void *key1, const void *key2
     return memcmp(key1, key2, l1) == 0;
 }
 
-static void callbackKeyDestructor(void *privdata, void *key) {
-    ((void)privdata);
+static void callbackKeyDestructor(void *key) {
     sdsfree((sds)key);
 }
 
-static void callbackValDestructor(void *privdata, void *val) {
-    ((void)privdata);
+static void callbackValDestructor(void *val) {
     vk_free(val);
 }
 
 static dictType callbackDict = {
-    callbackHash,
-    NULL,
-    callbackValDup,
-    callbackKeyCompare,
-    callbackKeyDestructor,
-    callbackValDestructor};
+    .hashFunction = callbackHash,
+    .keyCompare = callbackKeyCompare,
+    .keyDestructor = callbackKeyDestructor,
+    .valDestructor = callbackValDestructor};
 
 static valkeyAsyncContext *valkeyAsyncInitialize(valkeyContext *c) {
     valkeyAsyncContext *ac;
     dict *channels = NULL, *patterns = NULL;
 
-    channels = dictCreate(&callbackDict, NULL);
+    channels = dictCreate(&callbackDict);
     if (channels == NULL)
         goto oom;
 
-    patterns = dictCreate(&callbackDict, NULL);
+    patterns = dictCreate(&callbackDict);
     if (patterns == NULL)
         goto oom;
 
@@ -352,7 +336,7 @@ static void valkeyAsyncFreeInternal(valkeyAsyncContext *ac) {
     if (ac->sub.channels) {
         dictInitIterator(&it, ac->sub.channels);
         while ((de = dictNext(&it)) != NULL)
-            valkeyRunCallback(ac, dictGetEntryVal(de), NULL);
+            valkeyRunCallback(ac, dictGetVal(de), NULL);
 
         dictRelease(ac->sub.channels);
     }
@@ -360,7 +344,7 @@ static void valkeyAsyncFreeInternal(valkeyAsyncContext *ac) {
     if (ac->sub.patterns) {
         dictInitIterator(&it, ac->sub.patterns);
         while ((de = dictNext(&it)) != NULL)
-            valkeyRunCallback(ac, dictGetEntryVal(de), NULL);
+            valkeyRunCallback(ac, dictGetVal(de), NULL);
 
         dictRelease(ac->sub.patterns);
     }
@@ -474,7 +458,7 @@ static int valkeyGetSubscribeCallback(valkeyAsyncContext *ac, valkeyReply *reply
                 goto oom;
 
             if ((de = dictFind(callbacks, sname)) != NULL) {
-                cb = dictGetEntryVal(de);
+                cb = dictGetVal(de);
                 memcpy(dstcb, cb, sizeof(*dstcb));
             }
         }
@@ -820,8 +804,7 @@ static int valkeyAsyncAppendCmdLen(valkeyAsyncContext *ac, valkeyCallbackFn *fn,
     const char *cstr, *astr;
     size_t clen, alen;
     const char *p;
-    sds sname;
-    int ret;
+    sds sname = NULL;
 
     /* Don't accept new commands when the connection is about to be closed. */
     if (c->flags & (VALKEY_DISCONNECTING | VALKEY_FREEING))
@@ -855,16 +838,18 @@ static int valkeyAsyncAppendCmdLen(valkeyAsyncContext *ac, valkeyCallbackFn *fn,
             else
                 cbdict = ac->sub.channels;
 
-            de = dictFind(cbdict, sname);
-
-            if (de != NULL) {
-                existcb = dictGetEntryVal(de);
+            if ((de = dictFind(cbdict, sname)) != NULL) {
+                existcb = dictGetVal(de);
                 cb.pending_subs = existcb->pending_subs + 1;
             }
 
-            ret = dictReplace(cbdict, sname, &cb);
+            /* Create a duplicate to be stored in dict. */
+            valkeyCallback *dup = vk_malloc(sizeof(*dup));
+            if (dup == NULL)
+                goto oom;
+            memcpy(dup, &cb, sizeof(*dup));
 
-            if (ret == 0)
+            if (dictReplace(cbdict, sname, dup) == 0)
                 sdsfree(sname);
         }
     } else if (strncasecmp(cstr, "unsubscribe\r\n", 13) == 0) {
@@ -888,7 +873,7 @@ static int valkeyAsyncAppendCmdLen(valkeyAsyncContext *ac, valkeyCallbackFn *fn,
 
                 de = dictFind(cbdict, sname);
                 if (de != NULL) {
-                    existcb = dictGetEntryVal(de);
+                    existcb = dictGetVal(de);
                     if (existcb->unsubscribe_sent == 0)
                         existcb->unsubscribe_sent = 1;
                     else
@@ -906,7 +891,7 @@ static int valkeyAsyncAppendCmdLen(valkeyAsyncContext *ac, valkeyCallbackFn *fn,
             int no_subs = 1;
             dictInitIterator(&it, cbdict);
             while ((de = dictNext(&it)) != NULL) {
-                existcb = dictGetEntryVal(de);
+                existcb = dictGetVal(de);
                 if (existcb->unsubscribe_sent == 0) {
                     existcb->unsubscribe_sent = 1;
                     no_subs = 0;
@@ -945,6 +930,7 @@ static int valkeyAsyncAppendCmdLen(valkeyAsyncContext *ac, valkeyCallbackFn *fn,
 oom:
     valkeySetError(&(ac->c), VALKEY_ERR_OOM, "Out of memory");
     valkeyAsyncCopyError(ac);
+    sdsfree(sname);
     return VALKEY_ERR;
 }
 

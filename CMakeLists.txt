@@ -1,4 +1,4 @@
-CMAKE_MINIMUM_REQUIRED(VERSION 3.0.0)
+cmake_minimum_required(VERSION 3.7.0)
 
 MACRO(getVersionBit name)
   SET(VERSION_REGEX "^#define ${name} (.+)$")
@@ -38,7 +38,7 @@ else()
   add_definitions(-D_CRT_SECURE_NO_WARNINGS -DWIN32_LEAN_AND_MEAN)
 endif()
 
-SET(valkey_sources
+set(valkey_sources
     src/adlist.c
     src/alloc.c
     src/async.c
@@ -46,13 +46,23 @@ SET(valkey_sources
     src/command.c
     src/conn.c
     src/crc16.c
-    src/dict.c
     src/net.c
     src/read.c
-    src/sds.c
     src/sockcompat.c
     src/valkey.c
     src/vkutil.c)
+
+# Allow the libvalkey provided sds and dict types to be replaced by
+# compatible implementations (like Valkey's).
+# A replaced type is not included in a built archive or shared library.
+if(NOT DICT_INCLUDE_DIR)
+  set(valkey_sources ${valkey_sources} src/dict.c)
+  set(DICT_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/src)
+endif()
+if(NOT SDS_INCLUDE_DIR)
+  set(valkey_sources ${valkey_sources} src/sds.c)
+  set(SDS_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/src)
+endif()
 
 ADD_LIBRARY(valkey ${valkey_sources})
 ADD_LIBRARY(valkey::valkey ALIAS valkey)
@@ -78,6 +88,9 @@ TARGET_INCLUDE_DIRECTORIES(valkey
     PUBLIC
         $<INSTALL_INTERFACE:include>
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/valkey>
+    PRIVATE
+        $<BUILD_INTERFACE:${DICT_INCLUDE_DIR}>
+        $<BUILD_INTERFACE:${SDS_INCLUDE_DIR}>
 )
 
 CONFIGURE_FILE(valkey.pc.in valkey.pc @ONLY)
@@ -169,6 +182,8 @@ IF(ENABLE_TLS)
         PRIVATE
             $<INSTALL_INTERFACE:include>
             $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/valkey>
+            $<BUILD_INTERFACE:${DICT_INCLUDE_DIR}>
+            $<BUILD_INTERFACE:${SDS_INCLUDE_DIR}>
     )
 
     IF (APPLE AND BUILD_SHARED_LIBS)
@@ -227,8 +242,8 @@ IF(ENABLE_TLS)
 ENDIF()
 
 if(ENABLE_RDMA)
-    find_library(RDMACM_LIBRARIES rdmacm)
-    find_library(IBVERBS_LIBRARIES ibverbs)
+    find_library(RDMACM_LIBRARIES rdmacm REQUIRED)
+    find_library(IBVERBS_LIBRARIES ibverbs REQUIRED)
     set(valkey_rdma_sources src/rdma.c)
     add_library(valkey_rdma ${valkey_rdma_sources})
     add_library(valkey::valkey_rdma ALIAS valkey_rdma)
@@ -238,6 +253,8 @@ if(ENABLE_RDMA)
         PRIVATE
             $<INSTALL_INTERFACE:include>
             $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/valkey>
+            $<BUILD_INTERFACE:${DICT_INCLUDE_DIR}>
+            $<BUILD_INTERFACE:${SDS_INCLUDE_DIR}>
     )
 
     set_target_properties(valkey_rdma
