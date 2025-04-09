@@ -407,6 +407,14 @@ static void test_format_commands(void) {
     len = valkeyFormatCommand(&cmd, "%-");
     test_cond(len == -1);
 
+    test("Format command with %%b and an invalid string (NULL string): ");
+    len = valkeyFormatCommand(&cmd, "%b", NULL, 45);
+    test_cond(len == -1);
+
+    test("Format command with %%s and an invalid string (NULL string): ");
+    len = valkeyFormatCommand(&cmd, "%s", NULL);
+    test_cond(len == -1);
+
     const char *argv[3];
     argv[0] = "SET";
     argv[1] = "foo\0xxx";
