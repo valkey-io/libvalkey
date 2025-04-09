@@ -371,12 +371,16 @@ int valkeyvFormatCommand(char **target, const char *format, va_list ap) {
             switch (c[1]) {
             case 's':
                 arg = va_arg(ap, char *);
+                if (arg == NULL)
+                    goto format_err;
                 size = strlen(arg);
                 if (size > 0)
                     newarg = sdscatlen(curarg, arg, size);
                 break;
             case 'b':
                 arg = va_arg(ap, char *);
+                if (arg == NULL)
+                    goto format_err;
                 size = va_arg(ap, size_t);
                 if (size > 0)
                     newarg = sdscatlen(curarg, arg, size);
