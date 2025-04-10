@@ -2168,6 +2168,10 @@ static valkeyAsyncContext *do_aconnect(struct config config, astest_no testno) {
         options.type = VALKEY_CONN_TCP;
         options.connect_timeout = &config.connect_timeout;
         VALKEY_OPTIONS_SET_TCP(&options, config.tcp.host, config.tcp.port);
+    } else if (config.type == CONN_MPTCP) {
+        options.type = VALKEY_CONN_TCP;
+        options.connect_timeout = &config.connect_timeout;
+        VALKEY_OPTIONS_SET_MPTCP(&options, config.tcp.host, config.tcp.port);
     } else if (config.type == CONN_TLS) {
         options.type = VALKEY_CONN_TCP;
         options.connect_timeout = &config.connect_timeout;
@@ -2489,11 +2493,35 @@ int main(int argc, char **argv) {
         test_pubsub_handling_resp3(cfg);
         test_command_timeout_during_pubsub(cfg);
     }
+
+#ifdef IPPROTO_MPTCP
+    cfg.type = CONN_MPTCP;
+    printf("\nTesting asynchronous API against MPTCP connection (%s:%d):\n", cfg.tcp.host, cfg.tcp.port);
+    cfg.type = CONN_MPTCP;
+
+    c = do_connect(cfg);
+    get_server_version(c, &major, NULL);
+    disconnect(c, 0);
+
+    test_pubsub_handling(cfg);
+    test_pubsub_multiple_channels(cfg);
+    test_monitor(cfg);
+    if (major >= 6) {
+        test_pubsub_handling_resp3(cfg);
+        test_command_timeout_during_pubsub(cfg);
+    }
+#endif /* IPPROTO_MPTCP */
+
 #endif /* VALKEY_TEST_ASYNC */
 
     cfg.type = CONN_TCP;
     printf("\nTesting asynchronous API using polling_adapter TCP (%s:%d):\n", cfg.tcp.host, cfg.tcp.port);
     test_async_polling(cfg);
+#ifdef IPPROTO_MPTCP
+    cfg.type = CONN_MPTCP;
+    printf("\nTesting asynchronous API using polling_adapter MPTCP (%s:%d):\n", cfg.tcp.host, cfg.tcp.port);
+    test_async_polling(cfg);
+#endif /* IPPROTO_MPTCP */
     if (test_unix_socket) {
         cfg.type = CONN_UNIX;
         printf("\nTesting asynchronous API using polling_adapter UNIX (%s):\n", cfg.unix_sock.path);

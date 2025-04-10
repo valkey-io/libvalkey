@@ -855,6 +855,10 @@ valkeyContext *valkeyConnectWithOptions(const valkeyOptions *options) {
     }
 
     if (options->options & VALKEY_OPT_MPTCP) {
+        if (!valkeyHasMptcp()) {
+            valkeySetError(c, VALKEY_ERR_PROTOCOL, "MPTCP is not supported on this platform");
+            return c;
+        }
         c->flags |= VALKEY_MPTCP;
     }
 
