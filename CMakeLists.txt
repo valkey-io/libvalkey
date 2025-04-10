@@ -199,9 +199,9 @@ IF(ENABLE_TLS)
             PROPERTIES COMPILE_FLAGS /Z7)
     ENDIF()
     TARGET_LINK_LIBRARIES(valkey_tls PRIVATE OpenSSL::SSL)
-    IF(WIN32)
-        TARGET_LINK_LIBRARIES(valkey_tls PRIVATE valkey)
-    ENDIF()
+    if(WIN32 OR CYGWIN)
+        target_link_libraries(valkey_tls PRIVATE valkey)
+    endif()
     CONFIGURE_FILE(valkey_tls.pc.in valkey_tls.pc @ONLY)
 
     INSTALL(TARGETS valkey_tls
