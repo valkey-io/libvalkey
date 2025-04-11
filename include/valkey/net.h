@@ -39,6 +39,7 @@
 
 void valkeyNetClose(valkeyContext *c);
 
+int valkeyHasMptcp(void);
 int valkeyCheckSocketError(valkeyContext *c);
 int valkeyTcpSetTimeout(valkeyContext *c, const struct timeval tv);
 int valkeyContextConnectTcp(valkeyContext *c, const valkeyOptions *options);

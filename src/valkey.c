@@ -858,6 +858,14 @@ valkeyContext *valkeyConnectWithOptions(const valkeyOptions *options) {
         c->flags |= VALKEY_PREFER_IPV6;
     }
 
+    if (options->options & VALKEY_OPT_MPTCP) {
+        if (!valkeyHasMptcp()) {
+            valkeySetError(c, VALKEY_ERR_PROTOCOL, "MPTCP is not supported on this platform");
+            return c;
+        }
+        c->flags |= VALKEY_MPTCP;
+    }
+
     /* Set any user supplied RESP3 PUSH handler or use freeReplyObject
      * as a default unless specifically flagged that we don't want one. */
     if (options->push_cb != NULL)
