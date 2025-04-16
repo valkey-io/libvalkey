@@ -243,7 +243,7 @@ typedef struct {
         (opts)->type = VALKEY_CONN_TCP;            \
         (opts)->endpoint.tcp.ip = ip_;             \
         (opts)->endpoint.tcp.port = port_;         \
-        (opts)->options = VALKEY_OPT_MPTCP;        \
+        (opts)->options |= VALKEY_OPT_MPTCP;       \
     } while (0)
 
 #define VALKEY_OPTIONS_SET_UNIX(opts, path)  \
