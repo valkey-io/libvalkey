@@ -71,6 +71,7 @@ set_target_properties(valkey PROPERTIES EXPORT_NAME ${valkey_export_name})
 
 SET_TARGET_PROPERTIES(valkey
     PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS TRUE
+    SOVERSION "${LIBVALKEY_SONAME}"
     VERSION "${LIBVALKEY_SONAME}")
 IF(MSVC)
     SET_TARGET_PROPERTIES(valkey
@@ -193,15 +194,16 @@ IF(ENABLE_TLS)
     SET_TARGET_PROPERTIES(valkey_tls
         PROPERTIES
         WINDOWS_EXPORT_ALL_SYMBOLS TRUE
+        SOVERSION "${LIBVALKEY_SONAME}"
         VERSION "${LIBVALKEY_SONAME}")
     IF(MSVC)
         SET_TARGET_PROPERTIES(valkey_tls
             PROPERTIES COMPILE_FLAGS /Z7)
     ENDIF()
     TARGET_LINK_LIBRARIES(valkey_tls PRIVATE OpenSSL::SSL)
-    IF(WIN32)
-        TARGET_LINK_LIBRARIES(valkey_tls PRIVATE valkey)
-    ENDIF()
+    if(WIN32 OR CYGWIN)
+        target_link_libraries(valkey_tls PRIVATE valkey)
+    endif()
     CONFIGURE_FILE(valkey_tls.pc.in valkey_tls.pc @ONLY)
 
     INSTALL(TARGETS valkey_tls
