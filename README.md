@@ -20,7 +20,7 @@ Libvalkey is the official C client for the [Valkey](https://valkey.io) database.
 - Commands are executed in a generic way, with printf-like invocation.
 - Supports both `RESP2` and `RESP3` protocol versions.
 - Supports both synchronous and asynchronous operation.
-- Optional support for `TLS` and `RDMA` connections.
+- Optional support for `MPTCP`, `TLS` and `RDMA` connections.
 - Asynchronous API with several event libraries to choose from.
 - Supports both standalone and cluster mode operation.
 - Can be compiled with either `make` or `CMake`.

@@ -78,6 +78,7 @@ There are also several flags you can specify when using the `valkeyOptions` help
 | `VALKEY_OPT_NO_PUSH_AUTOFREE` | Tells libvalkey to not install the default RESP3 PUSH handler (which just intercepts and frees the replies).  This is useful in situations where you want to process these messages in-band. |
 | `VALKEY_OPT_NOAUTOFREEREPLIES` | **ASYNC**: tells libvalkey not to automatically invoke `freeReplyObject` after executing the reply callback. |
 | `VALKEY_OPT_NOAUTOFREE` | **ASYNC**: Tells libvalkey not to automatically free the `valkeyAsyncContext` on connection/communication failure, but only if the user makes an explicit call to `valkeyAsyncDisconnect` or `valkeyAsyncFree` |
+| `VALKEY_OPT_MPTCP` | Tells libvalkey to use multipath TCP (MPTCP). Note that only when both the server and client are using MPTCP do they establish an MPTCP connection between them; otherwise, they use a regular TCP connection instead. |
 
 ### Executing commands
 

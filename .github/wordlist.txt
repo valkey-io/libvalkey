@@ -58,6 +58,8 @@ localhost
 Lua
 michael
 minimalistic
+MPTCP
+multipath
 musl
 namespace
 NOAUTOFREE
