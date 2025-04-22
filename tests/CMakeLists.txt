@@ -60,6 +60,9 @@ else()
   set(CMAKE_BUILD_TYPE "Debug" CACHE STRING "" FORCE)
 endif()
 
+# Make sure ctest gives the output when tests fail
+list(APPEND CMAKE_CTEST_ARGUMENTS "--output-on-failure")
+
 # Add non-cluster tests
 add_executable(client_test client_test.c)
 target_include_directories(client_test PRIVATE "${PROJECT_SOURCE_DIR}/src")

@@ -371,12 +371,16 @@ int valkeyvFormatCommand(char **target, const char *format, va_list ap) {
             switch (c[1]) {
             case 's':
                 arg = va_arg(ap, char *);
+                if (arg == NULL)
+                    goto format_err;
                 size = strlen(arg);
                 if (size > 0)
                     newarg = sdscatlen(curarg, arg, size);
                 break;
             case 'b':
                 arg = va_arg(ap, char *);
+                if (arg == NULL)
+                    goto format_err;
                 size = va_arg(ap, size_t);
                 if (size > 0)
                     newarg = sdscatlen(curarg, arg, size);
@@ -852,6 +856,14 @@ valkeyContext *valkeyConnectWithOptions(const valkeyOptions *options) {
     }
     if (options->options & VALKEY_OPT_PREFER_IPV6) {
         c->flags |= VALKEY_PREFER_IPV6;
+    }
+
+    if (options->options & VALKEY_OPT_MPTCP) {
+        if (!valkeyHasMptcp()) {
+            valkeySetError(c, VALKEY_ERR_PROTOCOL, "MPTCP is not supported on this platform");
+            return c;
+        }
+        c->flags |= VALKEY_MPTCP;
     }
 
     /* Set any user supplied RESP3 PUSH handler or use freeReplyObject
