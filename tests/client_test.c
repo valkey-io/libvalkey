@@ -1069,8 +1069,14 @@ static void test_blocking_connection_errors(void) {
     opt.command_timeout = opt.connect_timeout = &tv;
     VALKEY_OPTIONS_SET_TCP(&opt, "localhost", 10337);
     c = valkeyConnectWithOptions(&opt);
+#ifdef __CYGWIN__
+    /* Cygwin's socket layer will poll until timeout. */
+    test_cond(c->err == VALKEY_ERR_IO &&
+              strcmp(c->errstr, "Connection timed out") == 0);
+#else
     test_cond(c->err == VALKEY_ERR_IO &&
               strcmp(c->errstr, "Connection refused") == 0);
+#endif
     valkeyFree(c);
 
     test("Returns error when the unix_sock socket path doesn't accept connections: ");
