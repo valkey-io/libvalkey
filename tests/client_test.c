@@ -2625,7 +2625,7 @@ int main(int argc, char **argv) {
     int skips_as_fails = 0;
     int test_unix_socket;
 #ifdef VALKEY_TEST_ASYNC
-    int enable_cluster_tests = 1;
+    int enable_cluster_tests = 0;
 #endif
 
     /* Parse command line options. */
@@ -2657,8 +2657,8 @@ int main(int argc, char **argv) {
         } else if (argc >= 1 && !strcmp(argv[0], "--skip-inherit-fd")) {
             test_inherit_fd = 0;
 #ifdef VALKEY_TEST_ASYNC
-        } else if (argc >= 1 && !strcmp(argv[0], "--skip-cluster-tests")) {
-            enable_cluster_tests = 0;
+        } else if (argc >= 1 && !strcmp(argv[0], "--enable-cluster-tests")) {
+            enable_cluster_tests = 1;
 #endif
         } else if (argc >= 1 && !strcmp(argv[0], "--skips-as-fails")) {
             skips_as_fails = 1;
