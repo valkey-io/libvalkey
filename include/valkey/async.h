@@ -55,6 +55,7 @@ typedef struct valkeyCallback {
     int pending_subs;
     int unsubscribe_sent;
     void *privdata;
+    int subscribed;
 } valkeyCallback;
 
 /* List of callbacks for either regular replies or pub/sub */
@@ -113,6 +114,7 @@ typedef struct valkeyAsyncContext {
         valkeyCallbackList replies;
         struct dict *channels;
         struct dict *patterns;
+        struct dict *schannels;
         int pending_unsubs;
     } sub;
 

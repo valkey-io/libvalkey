@@ -483,11 +483,11 @@ void test_alloc_failure_handling_async(void) {
     {
         const char *cmd1 = "SET foo one";
 
-        for (int i = 0; i < 35; ++i) {
+        for (int i = 0; i < 36; ++i) {
             prepare_allocation_test_async(acc, i);
             result = valkeyClusterAsyncCommand(acc, commandCallback, &r1, cmd1);
             assert(result == VALKEY_ERR);
-            if (i != 33) {
+            if (i != 34) {
                 ASSERT_STR_EQ(acc->errstr, "Out of memory");
             } else {
                 ASSERT_STR_EQ(acc->errstr, "Failed to attach event adapter");

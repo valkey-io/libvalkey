@@ -90,6 +90,9 @@ endif()
 if(ENABLE_RDMA)
   set_property(TEST client_test PROPERTY ENVIRONMENT "TEST_RDMA=1")
 endif()
+if(LIBEVENT_LIBRARY)
+  set_property(TEST client_test APPEND PROPERTY ENVIRONMENT "TEST_CLUSTER=1")
+endif()
 
 # Unit tests
 add_executable(ut_parse_cmd ut_parse_cmd.c test_utils.c)
