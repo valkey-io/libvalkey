@@ -2809,7 +2809,6 @@ int main(int argc, char **argv) {
 #endif
 
 #ifdef VALKEY_TEST_ASYNC
-    cfg.type = CONN_TCP;
     printf("\nTesting asynchronous API against TCP connection (%s:%d):\n", cfg.tcp.host, cfg.tcp.port);
     cfg.type = CONN_TCP;
 
@@ -2831,7 +2830,6 @@ int main(int argc, char **argv) {
     }
 
 #ifdef IPPROTO_MPTCP
-    cfg.type = CONN_MPTCP;
     printf("\nTesting asynchronous API against MPTCP connection (%s:%d):\n", cfg.tcp.host, cfg.tcp.port);
     cfg.type = CONN_MPTCP;
 
