@@ -1814,16 +1814,16 @@ static valkeyClusterNode *getNodeFromRedirectReply(valkeyClusterContext *cc,
     int field = 0;
     while (*str != '\0') {
         // clang-format off
-        if ((p = strchr(str, ' ')) != NULL)
-            *p = '\0';
         switch (field++) {
             // Skip field 0, i.e. ASK/MOVED
             case 1: slot = str; break;
             case 2: addr = str; break;
         }
-        if (p == NULL) break; /* No more fields. */
-        str = p + 1; /* Start of next field. */
         // clang-format on
+        if ((p = strchr(str, ' ')) == NULL)
+            break; /* No more fields. */
+        *p = '\0';
+        str = p + 1; /* Start of next field. */
     }
 
     /* Make sure all expected fields are found. */
