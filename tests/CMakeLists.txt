@@ -105,66 +105,39 @@ target_include_directories(ut_slotmap_update PRIVATE "${PROJECT_SOURCE_DIR}/src"
 target_link_libraries(ut_slotmap_update valkey)
 add_test(NAME ut_slotmap_update COMMAND "$<TARGET_FILE:ut_slotmap_update>")
 
-# Add cluster tests if we have libevent
+# Cluster tests
+add_executable(ct_commands ct_commands.c test_utils.c)
+target_link_libraries(ct_commands valkey ${TLS_LIBRARY})
+add_test(NAME ct_commands COMMAND "$<TARGET_FILE:ct_commands>")
+
 if (LIBEVENT_LIBRARY)
   add_executable(ct_async ct_async.c)
   target_link_libraries(ct_async valkey ${TLS_LIBRARY} ${LIBEVENT_LIBRARY})
   add_test(NAME ct_async COMMAND "$<TARGET_FILE:ct_async>")
-  
-  add_executable(ct_commands ct_commands.c test_utils.c)
-  target_link_libraries(ct_commands valkey ${TLS_LIBRARY})
-  add_test(NAME ct_commands COMMAND "$<TARGET_FILE:ct_commands>")
-  
+
   add_executable(ct_connection ct_connection.c test_utils.c)
   target_link_libraries(ct_connection valkey ${TLS_LIBRARY} ${LIBEVENT_LIBRARY})
   add_test(NAME ct_connection COMMAND "$<TARGET_FILE:ct_connection>")
-  
+
   add_executable(ct_pipeline ct_pipeline.c)
   target_link_libraries(ct_pipeline valkey ${TLS_LIBRARY} ${LIBEVENT_LIBRARY})
   add_test(NAME ct_pipeline COMMAND "$<TARGET_FILE:ct_pipeline>")
-  
+
   add_executable(ct_connection_ipv6 ct_connection_ipv6.c)
   target_link_libraries(ct_connection_ipv6 valkey ${TLS_LIBRARY} ${LIBEVENT_LIBRARY})
   add_test(NAME ct_connection_ipv6 COMMAND "$<TARGET_FILE:ct_connection_ipv6>")
   if(NOT ENABLE_IPV6_TESTS)
     set_tests_properties(ct_connection_ipv6 PROPERTIES DISABLED True)
   endif()
-  
+
   add_executable(ct_out_of_memory_handling ct_out_of_memory_handling.c)
   target_link_libraries(ct_out_of_memory_handling valkey ${TLS_LIBRARY} ${LIBEVENT_LIBRARY})
   add_test(NAME ct_out_of_memory_handling COMMAND "$<TARGET_FILE:ct_out_of_memory_handling>")
-  
+
   add_executable(ct_specific_nodes ct_specific_nodes.c test_utils.c)
   target_link_libraries(ct_specific_nodes valkey ${TLS_LIBRARY} ${LIBEVENT_LIBRARY})
   add_test(NAME ct_specific_nodes COMMAND "$<TARGET_FILE:ct_specific_nodes>")
-  
-  if(LIBUV_LIBRARY)
-    add_executable(ct_async_libuv ct_async_libuv.c)
-    target_link_libraries(ct_async_libuv valkey ${TLS_LIBRARY} ${LIBUV_LIBRARY})
-    add_test(NAME ct_async_libuv COMMAND "$<TARGET_FILE:ct_async_libuv>")
-  else()
-    add_test(NAME ct_async_libuv COMMAND "")
-    set_tests_properties(ct_async_libuv PROPERTIES DISABLED True)
-  endif()
-  
-  if(LIBEV_LIBRARY)
-    add_executable(ct_async_libev ct_async_libev.c)
-    target_link_libraries(ct_async_libev valkey ${TLS_LIBRARY} ${LIBEV_LIBRARY})
-    add_test(NAME ct_async_libev COMMAND "$<TARGET_FILE:ct_async_libev>")
-  else()
-    add_test(NAME ct_async_libev COMMAND "")
-    set_tests_properties(ct_async_libev PROPERTIES DISABLED True)
-  endif()
-  
-  if(GLIB_LIBRARY_FOUND)
-    add_executable(ct_async_glib ct_async_glib.c)
-    target_link_libraries(ct_async_glib valkey ${TLS_LIBRARY} PkgConfig::GLIB_LIBRARY)
-    add_test(NAME ct_async_glib COMMAND "$<TARGET_FILE:ct_async_glib>")
-  else()
-    add_test(NAME ct_async_glib COMMAND "")
-    set_tests_properties(ct_async_glib PROPERTIES DISABLED True)
-  endif()
-  
+
   # Tests using simulated Valkey node
   add_executable(clusterclient clusterclient.c)
   target_link_libraries(clusterclient valkey ${TLS_LIBRARY})
@@ -290,4 +263,31 @@ if (LIBEVENT_LIBRARY)
            COMMAND "${CMAKE_SOURCE_DIR}/tests/scripts/connect-during-cluster-startup-using-cluster-nodes-test.sh"
                    "$<TARGET_FILE:clusterclient_async>"
            WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/tests/scripts/")
+endif()
+
+if(LIBUV_LIBRARY)
+  add_executable(ct_async_libuv ct_async_libuv.c)
+  target_link_libraries(ct_async_libuv valkey ${TLS_LIBRARY} ${LIBUV_LIBRARY})
+  add_test(NAME ct_async_libuv COMMAND "$<TARGET_FILE:ct_async_libuv>")
+else()
+  add_test(NAME ct_async_libuv COMMAND "")
+  set_tests_properties(ct_async_libuv PROPERTIES DISABLED True)
+endif()
+
+if(LIBEV_LIBRARY)
+  add_executable(ct_async_libev ct_async_libev.c)
+  target_link_libraries(ct_async_libev valkey ${TLS_LIBRARY} ${LIBEV_LIBRARY})
+  add_test(NAME ct_async_libev COMMAND "$<TARGET_FILE:ct_async_libev>")
+else()
+  add_test(NAME ct_async_libev COMMAND "")
+  set_tests_properties(ct_async_libev PROPERTIES DISABLED True)
+endif()
+
+if(GLIB_LIBRARY_FOUND)
+  add_executable(ct_async_glib ct_async_glib.c)
+  target_link_libraries(ct_async_glib valkey ${TLS_LIBRARY} PkgConfig::GLIB_LIBRARY)
+  add_test(NAME ct_async_glib COMMAND "$<TARGET_FILE:ct_async_glib>")
+else()
+  add_test(NAME ct_async_glib COMMAND "")
+  set_tests_properties(ct_async_glib PROPERTIES DISABLED True)
 endif()
