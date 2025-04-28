@@ -70,7 +70,7 @@ set_target_properties(valkey PROPERTIES EXPORT_NAME ${valkey_export_name})
 SET_TARGET_PROPERTIES(valkey
     PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS TRUE
     SOVERSION "${VERSION_MAJOR}.${VERSION_MINOR}"
-    VERSION "${VERSION_MAJOR}.${VERSION_MINOR}")
+    VERSION "${VERSION}")
 IF(MSVC)
     SET_TARGET_PROPERTIES(valkey
         PROPERTIES COMPILE_FLAGS /Z7)
@@ -193,7 +193,7 @@ IF(ENABLE_TLS)
         PROPERTIES
         WINDOWS_EXPORT_ALL_SYMBOLS TRUE
         SOVERSION "${VERSION_MAJOR}.${VERSION_MINOR}"
-        VERSION "${VERSION_MAJOR}.${VERSION_MINOR}")
+        VERSION "${VERSION}")
     IF(MSVC)
         SET_TARGET_PROPERTIES(valkey_tls
             PROPERTIES COMPILE_FLAGS /Z7)
@@ -260,7 +260,7 @@ if(ENABLE_RDMA)
     set_target_properties(valkey_rdma
         PROPERTIES
         WINDOWS_EXPORT_ALL_SYMBOLS TRUE
-        VERSION "${VERSION_MAJOR}.${VERSION_MINOR}")
+        VERSION "${VERSION}")
     configure_file(valkey_rdma.pc.in valkey_rdma.pc @ONLY)
 
     install(TARGETS valkey_rdma
