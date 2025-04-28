@@ -81,6 +81,8 @@ pidfile ${PID_FILE}
 port ${VALKEY_PORT}
 unixsocket ${SOCK_FILE}
 unixsocketperm 777
+appendonly no
+save ""
 EOF
 
 # if not running in docker add these:
