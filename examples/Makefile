@@ -1,8 +1,14 @@
 CC?=gcc
 CXX?=g++
 
-CFLAGS?=-fPIC -Wall -Wextra -g -O2 -I../include
+WARNINGS=-Wall -Wextra
+CFLAGS?=-fPIC -g -O2 $(WARNINGS) -I../include
 STLIBNAME?=../lib/libvalkey.a
+
+USE_WERROR?=1
+ifeq ($(USE_WERROR),1)
+  WARNINGS+=-Werror
+endif
 
 # Define examples
 EXAMPLES=example-blocking example-blocking-push example-async-libevent \
