@@ -21,7 +21,7 @@ void getCallback(valkeyAsyncContext *c, void *r, void *privdata) {
     valkeyAsyncDisconnect(c);
 }
 
-void connectCallback(const valkeyAsyncContext *c, int status) {
+void connectCallback(valkeyAsyncContext *c, int status) {
     if (status != VALKEY_OK) {
         printf("Error: %s\n", c->errstr);
         aeStop(loop);
