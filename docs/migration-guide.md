@@ -25,6 +25,10 @@ The type `sds` is removed from the public API.
 * `redisFreeSdsCommand` removed since the `sds` type is for internal use only.
 * `redisAsyncSetConnectCallback` is removed, but can be replaced with `valkeyAsyncSetConnectCallback` which accepts the non-const callback function prototype.
 
+### Removed API defines
+
+* `HIREDIS_SONAME` removed.
+
 ## Migrating from `hiredis-cluster` 0.14.0
 
 * The cluster client initiation procedure is changed and `valkeyClusterOptions`
