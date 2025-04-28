@@ -25,6 +25,12 @@ The type `sds` is removed from the public API.
 * `redisFreeSdsCommand` removed since the `sds` type is for internal use only.
 * `redisAsyncSetConnectCallback` is removed, but can be replaced with `valkeyAsyncSetConnectCallback` which accepts the non-const callback function prototype.
 
+### Renamed API defines
+
+* `HIREDIS_MAJOR` is renamed to `LIBVALKEY_VERSION_MAJOR`.
+* `HIREDIS_MINOR` is renamed to `LIBVALKEY_VERSION_MINOR`.
+* `HIREDIS_PATCH` is renamed to `LIBVALKEY_VERSION_PATCH`.
+
 ### Removed API defines
 
 * `HIREDIS_SONAME` removed.
