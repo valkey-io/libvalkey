@@ -26,6 +26,20 @@ void reset_counters(void) {
     connect_success_counter = connect_failure_counter = 0;
 }
 
+/* Creating a context using unsupported client options should give errors */
+void test_unsupported_option(void) {
+    valkeyClusterOptions options = {0};
+    options.initial_nodes = CLUSTER_NODE;
+    options.options = VALKEY_OPT_PREFER_IPV4;
+    options.options |= VALKEY_OPT_NONBLOCK; /* unsupported in cluster */
+
+    valkeyClusterContext *cc = valkeyClusterConnectWithOptions(&options);
+    assert(cc);
+    assert(strcmp(cc->errstr, "All options not supported") == 0);
+
+    valkeyClusterFree(cc);
+}
+
 // Connecting to a password protected cluster and
 // providing a correct password.
 void test_password_ok(void) {
@@ -537,6 +551,8 @@ void test_async_command_timeout(void) {
 }
 
 int main(void) {
+
+    test_unsupported_option();
 
     test_password_ok();
     test_password_wrong();
