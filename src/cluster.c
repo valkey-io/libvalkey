@@ -1079,6 +1079,7 @@ static int cluster_update_route_by_addr(valkeyClusterContext *cc,
     VALKEY_OPTIONS_SET_TCP(&options, ip, port);
     options.connect_timeout = cc->connect_timeout;
     options.command_timeout = cc->command_timeout;
+    options.options = cc->options;
 
     c = valkeyConnectWithOptions(&options);
     if (c == NULL) {
@@ -1260,6 +1261,16 @@ static int valkeyClusterContextInit(valkeyClusterContext *cc,
         return VALKEY_ERR;
     }
     cc->requests->free = listCommandFree;
+
+    int supported_options = (VALKEY_OPT_USE_CLUSTER_NODES | VALKEY_OPT_USE_REPLICAS |
+                             VALKEY_OPT_BLOCKING_INITIAL_UPDATE | VALKEY_OPT_REUSEADDR |
+                             VALKEY_OPT_PREFER_IPV4 | VALKEY_OPT_PREFER_IPV6 |
+                             VALKEY_OPT_PREFER_IP_UNSPEC | VALKEY_OPT_MPTCP);
+    if (options->options & ~supported_options) {
+        valkeyClusterSetError(cc, VALKEY_ERR_OTHER, "Unsupported options");
+        return VALKEY_ERR;
+    }
+    cc->options = options->options;
 
     if (options->options & VALKEY_OPT_USE_CLUSTER_NODES) {
         cc->flags |= VALKEY_FLAG_USE_CLUSTER_NODES;
@@ -1663,6 +1674,7 @@ valkeyContext *valkeyClusterGetValkeyContext(valkeyClusterContext *cc,
     VALKEY_OPTIONS_SET_TCP(&options, node->host, node->port);
     options.connect_timeout = cc->connect_timeout;
     options.command_timeout = cc->command_timeout;
+    options.options = cc->options;
 
     c = valkeyConnectWithOptions(&options);
     if (c == NULL) {
@@ -2704,6 +2716,7 @@ valkeyClusterGetValkeyAsyncContext(valkeyClusterAsyncContext *acc,
     VALKEY_OPTIONS_SET_TCP(&options, node->host, node->port);
     options.connect_timeout = acc->cc.connect_timeout;
     options.command_timeout = acc->cc.command_timeout;
+    options.options = acc->cc.options;
 
     node->lastConnectionAttempt = vk_usec_now();
 

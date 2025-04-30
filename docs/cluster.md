@@ -81,6 +81,9 @@ There are also several flags you can specify in `valkeyClusterOptions.options`. 
 | `VALKEY_OPT_USE_CLUSTER_NODES` | Tells libvalkey to use the command `CLUSTER NODES` when updating its slot map (cluster topology).<br>Libvalkey uses `CLUSTER SLOTS` by default. |
 | `VALKEY_OPT_USE_REPLICAS` | Tells libvalkey to keep parsed information of replica nodes. |
 | `VALKEY_OPT_BLOCKING_INITIAL_UPDATE` | **ASYNC**: Tells libvalkey to perform the initial slot map update in a blocking fashion. The function call will wait for a slot map update before returning so that the returned context is immediately ready to accept commands. |
+| `VALKEY_OPT_REUSEADDR` | Tells libvalkey to set the [SO_REUSEADDR](https://man7.org/linux/man-pages/man7/socket.7.html) socket option |
+| `VALKEY_OPT_PREFER_IPV4`<br>`VALKEY_OPT_PREFER_IPV6`<br>`VALKEY_OPT_PREFER_IP_UNSPEC` | Informs libvalkey to either prefer IPv4 or IPv6 when invoking [getaddrinfo](https://man7.org/linux/man-pages/man3/gai_strerror.3.html).  `VALKEY_OPT_PREFER_IP_UNSPEC` will cause libvalkey to specify `AF_UNSPEC` in the getaddrinfo call, which means both IPv4 and IPv6 addresses will be searched simultaneously.<br>Libvalkey prefers IPv4 by default. |
+| `VALKEY_OPT_MPTCP` | Tells libvalkey to use multipath TCP (MPTCP). Note that only when both the server and client are using MPTCP do they establish an MPTCP connection between them; otherwise, they use a regular TCP connection instead. |
 
 ### Executing commands
 

@@ -87,7 +87,8 @@ typedef struct valkeyClusterContext {
     char errstr[128]; /* String representation of error when applicable */
 
     /* Configurations */
-    int flags;                       /* Configuration flags */
+    int options;                     /* Client configuration */
+    int flags;                       /* Config and state flags */
     struct timeval *connect_timeout; /* TCP connect timeout */
     struct timeval *command_timeout; /* Receive and send timeout */
     int max_retry_count;             /* Allowed retry attempts */
