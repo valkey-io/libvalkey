@@ -1267,7 +1267,7 @@ static int valkeyClusterContextInit(valkeyClusterContext *cc,
                              VALKEY_OPT_PREFER_IPV4 | VALKEY_OPT_PREFER_IPV6 |
                              VALKEY_OPT_PREFER_IP_UNSPEC | VALKEY_OPT_MPTCP);
     if (options->options & ~supported_options) {
-        valkeyClusterSetError(cc, VALKEY_ERR_OTHER, "All options not supported");
+        valkeyClusterSetError(cc, VALKEY_ERR_OTHER, "Unsupported options");
         return VALKEY_ERR;
     }
     cc->options = options->options;
