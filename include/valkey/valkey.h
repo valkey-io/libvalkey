@@ -48,10 +48,9 @@ typedef SSIZE_T ssize_t;
 
 #include <stdint.h> /* uintXX_t, etc */
 
-#define LIBVALKEY_MAJOR 0
-#define LIBVALKEY_MINOR 1
-#define LIBVALKEY_PATCH 0
-#define LIBVALKEY_SONAME "0.1"
+#define LIBVALKEY_VERSION_MAJOR 0
+#define LIBVALKEY_VERSION_MINOR 1
+#define LIBVALKEY_VERSION_PATCH 0
 
 /* Connection type can be blocking or non-blocking and is set in the
  * least significant bit of the flags field in valkeyContext. */

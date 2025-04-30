@@ -1,18 +1,16 @@
 cmake_minimum_required(VERSION 3.7.0)
 
-MACRO(getVersionBit name)
-  SET(VERSION_REGEX "^#define ${name} (.+)$")
-  FILE(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/include/valkey/valkey.h"
-    VERSION_BIT REGEX ${VERSION_REGEX})
-  STRING(REGEX REPLACE ${VERSION_REGEX} "\\1" VERSION_MATCHED "${VERSION_BIT}")
-  STRING(REPLACE "\"" "" ${name} "${VERSION_MATCHED}")
-ENDMACRO(getVersionBit)
+macro(getDefinedVersion name)
+  set(VERSION_REGEX "^#define LIBVALKEY_${name} (.+)$")
+  file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/include/valkey/valkey.h"
+    MATCHED_LINE REGEX ${VERSION_REGEX})
+  string(REGEX REPLACE ${VERSION_REGEX} "\\1" ${name} "${MATCHED_LINE}")
+endmacro()
 
-getVersionBit(LIBVALKEY_MAJOR)
-getVersionBit(LIBVALKEY_MINOR)
-getVersionBit(LIBVALKEY_PATCH)
-getVersionBit(LIBVALKEY_SONAME)
-SET(VERSION "${LIBVALKEY_MAJOR}.${LIBVALKEY_MINOR}.${LIBVALKEY_PATCH}")
+getDefinedVersion(VERSION_MAJOR)
+getDefinedVersion(VERSION_MINOR)
+getDefinedVersion(VERSION_PATCH)
+set(VERSION "${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}")
 MESSAGE("Detected version: ${VERSION}")
 
 PROJECT(valkey LANGUAGES "C" VERSION "${VERSION}")
@@ -71,8 +69,8 @@ set_target_properties(valkey PROPERTIES EXPORT_NAME ${valkey_export_name})
 
 SET_TARGET_PROPERTIES(valkey
     PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS TRUE
-    SOVERSION "${LIBVALKEY_SONAME}"
-    VERSION "${LIBVALKEY_SONAME}")
+    SOVERSION "${VERSION_MAJOR}"
+    VERSION "${VERSION}")
 IF(MSVC)
     SET_TARGET_PROPERTIES(valkey
         PROPERTIES COMPILE_FLAGS /Z7)
@@ -194,8 +192,8 @@ IF(ENABLE_TLS)
     SET_TARGET_PROPERTIES(valkey_tls
         PROPERTIES
         WINDOWS_EXPORT_ALL_SYMBOLS TRUE
-        SOVERSION "${LIBVALKEY_SONAME}"
-        VERSION "${LIBVALKEY_SONAME}")
+        SOVERSION "${VERSION_MAJOR}"
+        VERSION "${VERSION}")
     IF(MSVC)
         SET_TARGET_PROPERTIES(valkey_tls
             PROPERTIES COMPILE_FLAGS /Z7)
@@ -262,7 +260,8 @@ if(ENABLE_RDMA)
     set_target_properties(valkey_rdma
         PROPERTIES
         WINDOWS_EXPORT_ALL_SYMBOLS TRUE
-        VERSION "${LIBVALKEY_SONAME}")
+        SOVERSION "${VERSION_MAJOR}"
+        VERSION "${VERSION}")
     configure_file(valkey_rdma.pc.in valkey_rdma.pc @ONLY)
 
     install(TARGETS valkey_rdma
