@@ -35,7 +35,7 @@ void test_unsupported_option(void) {
 
     valkeyClusterContext *cc = valkeyClusterConnectWithOptions(&options);
     assert(cc);
-    assert(strcmp(cc->errstr, "All options not supported") == 0);
+    assert(strcmp(cc->errstr, "Unsupported options") == 0);
 
     valkeyClusterFree(cc);
 }
