@@ -1059,68 +1059,6 @@ static int clusterUpdateRouteHandleReply(valkeyClusterContext *cc,
     return updateNodesAndSlotmap(cc, nodes);
 }
 
-/**
- * Update route with the "cluster nodes" or "cluster slots" command reply.
- */
-static int cluster_update_route_by_addr(valkeyClusterContext *cc,
-                                        const char *ip, int port) {
-    valkeyContext *c = NULL;
-
-    if (cc == NULL) {
-        return VALKEY_ERR;
-    }
-
-    if (ip == NULL || port <= 0) {
-        valkeyClusterSetError(cc, VALKEY_ERR_OTHER, "Ip or port error!");
-        goto error;
-    }
-
-    valkeyOptions options = {0};
-    VALKEY_OPTIONS_SET_TCP(&options, ip, port);
-    options.connect_timeout = cc->connect_timeout;
-    options.command_timeout = cc->command_timeout;
-    options.options = cc->options;
-
-    c = valkeyConnectWithOptions(&options);
-    if (c == NULL) {
-        valkeyClusterSetError(cc, VALKEY_ERR_OOM, "Out of memory");
-        return VALKEY_ERR;
-    }
-
-    if (cc->on_connect) {
-        cc->on_connect(c, c->err ? VALKEY_ERR : VALKEY_OK);
-    }
-
-    if (c->err) {
-        valkeyClusterSetError(cc, c->err, c->errstr);
-        goto error;
-    }
-
-    if (cc->tls && cc->tls_init_fn(c, cc->tls) != VALKEY_OK) {
-        valkeyClusterSetError(cc, c->err, c->errstr);
-        goto error;
-    }
-
-    if (authenticate(cc, c) != VALKEY_OK) {
-        goto error;
-    }
-
-    if (clusterUpdateRouteSendCommand(cc, c) != VALKEY_OK) {
-        goto error;
-    }
-
-    if (clusterUpdateRouteHandleReply(cc, c) != VALKEY_OK) {
-        goto error;
-    }
-
-    valkeyFree(c);
-    return VALKEY_OK;
-
-error:
-    valkeyFree(c);
-    return VALKEY_ERR;
-}
-
 /* Update known cluster nodes with a new collection of valkeyClusterNodes.
  * Will also update the slot-to-node lookup table for the new nodes. */
 static int updateNodesAndSlotmap(valkeyClusterContext *cc, dict *nodes) {
@@ -1214,35 +1152,31 @@ error:
 }
 
 int valkeyClusterUpdateSlotmap(valkeyClusterContext *cc) {
-    int ret;
-    int flag_err_not_set = 1;
-    valkeyClusterNode *node;
-    dictEntry *de;
-
     if (cc == NULL) {
         return VALKEY_ERR;
     }
+
+    valkeyClusterNode *node;
+    dictEntry *de;
 
     dictIterator di;
     dictInitIterator(&di, cc->nodes);
 
     while ((de = dictNext(&di)) != NULL) {
         node = dictGetVal(de);
-        if (node == NULL || node->host == NULL) {
+
+        /* Use existing connection or (re)connect to the node. */
+        valkeyContext *c = valkeyClusterGetValkeyContext(cc, node);
+        if (c == NULL)
+            continue;
+        if (clusterUpdateRouteSendCommand(cc, c) != VALKEY_OK ||
+            clusterUpdateRouteHandleReply(cc, c) != VALKEY_OK) {
+            valkeyFree(node->con);
+            node->con = NULL;
             continue;
         }
-
-        ret = cluster_update_route_by_addr(cc, node->host, node->port);
-        if (ret == VALKEY_OK) {
-            valkeyClusterClearError(cc);
-            return VALKEY_OK;
-        }
-
-        flag_err_not_set = 0;
-    }
-
-    if (flag_err_not_set) {
-        valkeyClusterSetError(cc, VALKEY_ERR_OTHER, "no valid server address");
+        valkeyClusterClearError(cc);
+        return VALKEY_OK;
     }
 
     return VALKEY_ERR;
