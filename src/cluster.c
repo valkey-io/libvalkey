@@ -2763,6 +2763,19 @@ static int valkeyClusterAsyncConnect(valkeyClusterAsyncContext *acc) {
             valkeyClusterAsyncSetError(acc, acc->cc.err, acc->cc.errstr);
             return VALKEY_ERR;
         }
+
+        /* Disconnect any non-async context used for the initial update. */
+        dictIterator di;
+        dictInitIterator(&di, acc->cc.nodes);
+        dictEntry *de;
+        while ((de = dictNext(&di)) != NULL) {
+            valkeyClusterNode *node = dictGetVal(de);
+            if (node->con) {
+                valkeyFree(node->con);
+                node->con = NULL;
+            }
+        }
+
         return VALKEY_OK;
     }
     /* Use non-blocking initial slotmap update. */
