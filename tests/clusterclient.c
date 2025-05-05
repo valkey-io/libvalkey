@@ -73,8 +73,6 @@ int main(int argc, char **argv) {
             show_events = 1;
         } else if (strcmp(argv[argindex], "--use-cluster-nodes") == 0) {
             use_cluster_nodes = 1;
-        } else if (strcmp(argv[argindex], "--blocking-initial-update") == 0) {
-            /* ignore */
         } else {
             fprintf(stderr, "Unknown argument: '%s'\n", argv[argindex]);
             exit(1);

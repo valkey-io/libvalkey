@@ -14,8 +14,6 @@ timeout 5s ./simulated-valkey.pl -p 7400 -d --sigcont $syncpid <<'EOF' &
 EXPECT CONNECT
 EXPECT ["CLUSTER", "SLOTS"]
 SEND [[0, 16383, ["127.0.0.1", 7400, "nodeid123"]]]
-EXPECT CLOSE
-EXPECT CONNECT
 EXPECT ["SET", "foo", "bar"]
 SEND +OK
 EXPECT ["GET", "foo"]
@@ -28,7 +26,7 @@ server=$!
 wait $syncpid;
 
 # Run client
-timeout 3s "$clientprog" --blocking-initial-update 127.0.0.1:7400 > "$testname.out" <<'EOF'
+timeout 3s "$clientprog" 127.0.0.1:7400 > "$testname.out" <<'EOF'
 SET foo bar
 GET foo
 EOF

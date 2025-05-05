@@ -16,8 +16,6 @@ timeout 5s ./simulated-valkey.pl -p 7401 -d --sigcont $syncpid1 <<'EOF' &
 EXPECT CONNECT
 EXPECT ["CLUSTER", "SLOTS"]
 SEND [[0, 16383, ["127.0.0.1", 7401, "nodeid123"]]]
-EXPECT CLOSE
-EXPECT CONNECT
 EXPECT ["GET", "foo"]
 SEND -ASK 12182 127.0.0.1:7402
 # A second redirect is needed to test reuse of the new cluster node
@@ -46,7 +44,7 @@ server2=$!
 wait $syncpid1 $syncpid2;
 
 # Run client
-timeout 3s "$clientprog" --blocking-initial-update 127.0.0.1:7401 > "$testname.out" <<'EOF'
+timeout 3s "$clientprog" 127.0.0.1:7401 > "$testname.out" <<'EOF'
 GET foo
 GET foo
 EOF
