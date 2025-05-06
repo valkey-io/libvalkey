@@ -44,7 +44,7 @@ server=$!
 wait $syncpid;
 
 # Run client which will fetch the initial slotmap asynchronously.
-timeout 3s "$clientprog" --events --async-initial-update 127.0.0.1:7400 > "$testname.out" <<'EOF'
+timeout 3s "$clientprog" --events 127.0.0.1:7400 > "$testname.out" <<'EOF'
 # Slot not yet handled, will trigger a slotmap update which will be throttled.
 SET foo bar1
 
