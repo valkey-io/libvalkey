@@ -54,7 +54,7 @@ server2=$!
 wait $syncpid1 $syncpid2;
 
 # Run client
-timeout 3s "$clientprog" ::1:7401 > "$testname.out" <<'EOF'
+timeout 3s "$clientprog" --blocking-initial-update ::1:7401 > "$testname.out" <<'EOF'
 GET foo
 GET foo
 EOF

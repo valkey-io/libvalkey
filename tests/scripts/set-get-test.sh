@@ -28,7 +28,7 @@ server=$!
 wait $syncpid;
 
 # Run client
-timeout 3s "$clientprog" 127.0.0.1:7400 > "$testname.out" <<'EOF'
+timeout 3s "$clientprog" --blocking-initial-update 127.0.0.1:7400 > "$testname.out" <<'EOF'
 SET foo bar
 GET foo
 EOF

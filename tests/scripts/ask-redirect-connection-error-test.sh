@@ -48,7 +48,7 @@ server1=$!
 wait $syncpid1;
 
 # Run client
-timeout 4s "$clientprog" 127.0.0.1:7401 > "$testname.out" <<'EOF'
+timeout 4s "$clientprog" --blocking-initial-update 127.0.0.1:7401 > "$testname.out" <<'EOF'
 SET foo initial
 
 !async
