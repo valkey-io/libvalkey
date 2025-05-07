@@ -36,8 +36,6 @@
 #include "async.h"
 #include "valkey.h"
 
-#define UNUSED(x) (void)(x)
-
 #define VALKEYCLUSTER_SLOTS 16384
 
 #define VALKEY_ROLE_UNKNOWN 0
