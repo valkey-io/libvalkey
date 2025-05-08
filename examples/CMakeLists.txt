@@ -22,14 +22,14 @@ if(PkgConfig_FOUND)
   endif()
 endif()
 
-find_path(LIBEV ev.h
-  HINTS /usr/local /usr/opt/local
-  ENV LIBEV_INCLUDE_DIR)
+# Examples using libev
+find_path(LIBEV ev.h)
 if(LIBEV)
   add_executable(example-async-libev async-libev.c)
   target_link_libraries(example-async-libev valkey::valkey ev)
 endif()
 
+# Examples using libevent
 find_path(LIBEVENT event.h)
 if(LIBEVENT)
   add_executable(example-async-libevent async-libevent.c)
@@ -41,24 +41,28 @@ if(LIBEVENT)
   endif()
 endif()
 
+# Examples using libhv
 find_path(LIBHV hv/hv.h)
 if(LIBHV)
   add_executable(example-async-libhv async-libhv.c)
   target_link_libraries(example-async-libhv valkey::valkey hv)
 endif()
 
+# Examples using libuv
 find_path(LIBUV uv.h)
 if(LIBUV)
   add_executable(example-async-libuv async-libuv.c)
   target_link_libraries(example-async-libuv valkey::valkey uv)
 endif()
 
+# Examples using libsystemd
 find_path(LIBSDEVENT systemd/sd-event.h)
 if(LIBSDEVENT)
   add_executable(example-async-libsdevent async-libsdevent.c)
   target_link_libraries(example-async-libsdevent valkey::valkey systemd)
 endif()
 
+# Examples using the RunLoop in Apple's CoreFoundation
 if(APPLE)
   find_library(CF CoreFoundation)
   add_executable(example-async-macosx async-macosx.c)
