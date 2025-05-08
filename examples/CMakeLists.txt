@@ -12,14 +12,13 @@ else()
   include_directories(${CMAKE_SOURCE_DIR}/include)
 endif()
 
-# Check for GLib
+# Examples using GLib
 find_package(PkgConfig QUIET)
 if(PkgConfig_FOUND)
-  pkg_check_modules(GLIB2 glib-2.0)
+  pkg_check_modules(GLIB2 IMPORTED_TARGET glib-2.0)
   if(GLIB2_FOUND)
     add_executable(example-async-glib async-glib.c)
-    target_include_directories(example-async-glib PUBLIC ${GLIB2_INCLUDE_DIRS})
-    target_link_libraries(example-async-glib valkey::valkey ${GLIB2_LIBRARIES})
+    target_link_libraries(example-async-glib valkey::valkey PkgConfig::GLIB2)
   endif()
 endif()
 
