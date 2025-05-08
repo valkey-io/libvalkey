@@ -12,6 +12,23 @@ else()
   include_directories(${CMAKE_SOURCE_DIR}/include)
 endif()
 
+add_executable(example-blocking blocking.c)
+target_link_libraries(example-blocking valkey::valkey)
+
+add_executable(example-blocking-push blocking-push.c)
+target_link_libraries(example-blocking-push valkey::valkey)
+
+add_executable(example-cluster-simple cluster-simple.c)
+target_link_libraries(example-cluster-simple valkey::valkey)
+
+if(ENABLE_TLS)
+  add_executable(example-blocking-tls blocking-tls.c)
+  target_link_libraries(example-blocking-tls valkey::valkey valkey::valkey_tls)
+
+  add_executable(example-cluster-tls cluster-tls.c)
+  target_link_libraries(example-cluster-tls valkey::valkey valkey::valkey_tls)
+endif()
+
 # Examples using GLib
 find_package(PkgConfig QUIET)
 if(PkgConfig_FOUND)
@@ -35,9 +52,18 @@ if(LIBEVENT)
   add_executable(example-async-libevent async-libevent.c)
   target_link_libraries(example-async-libevent valkey::valkey event)
 
+  add_executable(example-cluster-async cluster-async.c)
+  target_link_libraries(example-cluster-async valkey::valkey event)
+
+  add_executable(example-cluster-clientside-caching-async cluster-clientside-caching-async.c)
+  target_link_libraries(example-cluster-clientside-caching-async valkey::valkey event)
+
   if(ENABLE_TLS)
     add_executable(example-async-libevent-tls async-libevent-tls.c)
     target_link_libraries(example-async-libevent-tls valkey::valkey valkey::valkey_tls event)
+
+    add_executable(example-cluster-async-tls cluster-async-tls.c)
+    target_link_libraries(example-cluster-async-tls valkey::valkey valkey::valkey_tls event)
   endif()
 endif()
 
@@ -67,36 +93,4 @@ if(APPLE)
   find_library(CF CoreFoundation)
   add_executable(example-async-macosx async-macosx.c)
   target_link_libraries(example-async-macosx valkey::valkey ${CF})
-endif()
-
-if(ENABLE_TLS)
-  add_executable(example-blocking-tls blocking-tls.c)
-  target_link_libraries(example-blocking-tls valkey::valkey valkey::valkey_tls)
-endif()
-
-add_executable(example-blocking blocking.c)
-target_link_libraries(example-blocking valkey::valkey)
-
-add_executable(example-blocking-push blocking-push.c)
-target_link_libraries(example-blocking-push valkey::valkey)
-
-if(LIBEVENT)
-  add_executable(example-cluster-async cluster-async.c)
-  target_link_libraries(example-cluster-async valkey::valkey event)
-
-  if(ENABLE_TLS)
-    add_executable(example-cluster-async-tls cluster-async-tls.c)
-    target_link_libraries(example-cluster-async-tls valkey::valkey valkey::valkey_tls event)
-  endif()
-
-  add_executable(example-cluster-clientside-caching-async cluster-clientside-caching-async.c)
-  target_link_libraries(example-cluster-clientside-caching-async valkey::valkey event)
-endif()
-
-add_executable(example-cluster-simple cluster-simple.c)
-target_link_libraries(example-cluster-simple valkey::valkey)
-
-if(ENABLE_TLS)
-  add_executable(example-cluster-tls cluster-tls.c)
-  target_link_libraries(example-cluster-tls valkey::valkey valkey::valkey_tls)
 endif()
