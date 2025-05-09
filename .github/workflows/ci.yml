@@ -155,13 +155,15 @@ jobs:
         make DESTDIR=${{ github.workspace }}/static-cmake-install install
     - name: Build examples with Makefile using a Makefile-installed libvalkey
       run: |
-        make CFLAGS="-I${{ github.workspace }}/make-install/usr/local/include" \
-             STLIBNAME="${{ github.workspace }}/make-install/usr/local/lib/libvalkey.a" \
+        make STLIBNAME="${{ github.workspace }}/make-install/usr/local/lib/libvalkey.a" \
+             TLS_STLIBNAME="${{ github.workspace }}/make-install/usr/local/lib/libvalkey_tls.a" \
+             INCLUDE_DIR="${{ github.workspace }}/make-install/usr/local/include" \
              USE_TLS=1 -C examples
     - name: Build examples with Makefile using a CMake-installed libvalkey
       run: |
-        make CFLAGS="-I${{ github.workspace }}/static-cmake-install/usr/local/include" \
-             STLIBNAME="${{ github.workspace }}/static-cmake-install/usr/local/lib/libvalkey.a" \
+        make STLIBNAME="${{ github.workspace }}/static-cmake-install/usr/local/lib/libvalkey.a" \
+             TLS_STLIBNAME="${{ github.workspace }}/static-cmake-install/usr/local/lib/libvalkey_tls.a" \
+             INCLUDE_DIR="${{ github.workspace }}/static-cmake-install/usr/local/include" \
              USE_TLS=1 -C examples
     - name: Build examples with CMake using CMake-installed dynamic libraries
       run: |
