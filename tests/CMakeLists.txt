@@ -69,7 +69,7 @@ list(APPEND CMAKE_CTEST_ARGUMENTS "--output-on-failure")
 # Add non-cluster tests
 add_executable(client_test client_test.c)
 target_include_directories(client_test PRIVATE "${PROJECT_SOURCE_DIR}/src")
-target_link_libraries(client_test valkey)
+target_link_libraries(client_test valkey_unittest)
 if(TLS_LIBRARY)
   target_compile_definitions(client_test PUBLIC VALKEY_TEST_TLS=1)
   target_link_libraries(client_test ${TLS_LIBRARY})
@@ -100,12 +100,12 @@ endif()
 # Unit tests
 add_executable(ut_parse_cmd ut_parse_cmd.c test_utils.c)
 target_include_directories(ut_parse_cmd PRIVATE "${PROJECT_SOURCE_DIR}/src")
-target_link_libraries(ut_parse_cmd valkey)
+target_link_libraries(ut_parse_cmd valkey_unittest)
 add_test(NAME ut_parse_cmd COMMAND "$<TARGET_FILE:ut_parse_cmd>")
 
 add_executable(ut_slotmap_update ut_slotmap_update.c)
 target_include_directories(ut_slotmap_update PRIVATE "${PROJECT_SOURCE_DIR}/src")
-target_link_libraries(ut_slotmap_update valkey)
+target_link_libraries(ut_slotmap_update valkey_unittest)
 add_test(NAME ut_slotmap_update COMMAND "$<TARGET_FILE:ut_slotmap_update>")
 
 # Cluster tests
