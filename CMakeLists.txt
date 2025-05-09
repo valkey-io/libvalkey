@@ -64,13 +64,12 @@ endif()
 
 ADD_LIBRARY(valkey ${valkey_sources})
 ADD_LIBRARY(valkey::valkey ALIAS valkey)
-set(valkey_export_name valkey CACHE STRING "Name of the exported target")
-set_target_properties(valkey PROPERTIES EXPORT_NAME ${valkey_export_name})
+set_target_properties(valkey PROPERTIES
+  C_VISIBILITY_PRESET hidden
+  WINDOWS_EXPORT_ALL_SYMBOLS TRUE
+  SOVERSION "${VERSION_MAJOR}"
+  VERSION "${VERSION}")
 
-SET_TARGET_PROPERTIES(valkey
-    PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS TRUE
-    SOVERSION "${VERSION_MAJOR}"
-    VERSION "${VERSION}")
 IF(MSVC)
     SET_TARGET_PROPERTIES(valkey
         PROPERTIES COMPILE_FLAGS /Z7)
@@ -189,11 +188,11 @@ IF(ENABLE_TLS)
         SET_PROPERTY(TARGET valkey_tls PROPERTY LINK_FLAGS "-Wl,-undefined -Wl,dynamic_lookup")
     ENDIF()
 
-    SET_TARGET_PROPERTIES(valkey_tls
-        PROPERTIES
-        WINDOWS_EXPORT_ALL_SYMBOLS TRUE
-        SOVERSION "${VERSION_MAJOR}"
-        VERSION "${VERSION}")
+    set_target_properties(valkey_tls PROPERTIES
+      C_VISIBILITY_PRESET hidden
+      WINDOWS_EXPORT_ALL_SYMBOLS TRUE
+      SOVERSION "${VERSION_MAJOR}"
+      VERSION "${VERSION}")
     IF(MSVC)
         SET_TARGET_PROPERTIES(valkey_tls
             PROPERTIES COMPILE_FLAGS /Z7)
@@ -257,11 +256,11 @@ if(ENABLE_RDMA)
             $<BUILD_INTERFACE:${SDS_INCLUDE_DIR}>
     )
 
-    set_target_properties(valkey_rdma
-        PROPERTIES
-        WINDOWS_EXPORT_ALL_SYMBOLS TRUE
-        SOVERSION "${VERSION_MAJOR}"
-        VERSION "${VERSION}")
+    set_target_properties(valkey_rdma PROPERTIES
+      C_VISIBILITY_PRESET hidden
+      WINDOWS_EXPORT_ALL_SYMBOLS TRUE
+      SOVERSION "${VERSION_MAJOR}"
+      VERSION "${VERSION}")
     configure_file(valkey_rdma.pc.in valkey_rdma.pc @ONLY)
 
     install(TARGETS valkey_rdma
