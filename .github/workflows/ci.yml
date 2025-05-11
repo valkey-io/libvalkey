@@ -243,7 +243,7 @@ jobs:
       - run: rm 'C:/Program Files/OpenSSL/' -rf
         shell: bash
 
-      - run: vcpkg install openssl
+      - run: choco install openssl
 
       - name: Build
         run: |
