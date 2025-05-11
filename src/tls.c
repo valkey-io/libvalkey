@@ -38,8 +38,8 @@
 #include <errno.h>
 #include <string.h>
 #ifdef _WIN32
-#include <wincrypt.h>
 #include <windows.h>
+#include <wincrypt.h>
 #ifdef OPENSSL_IS_BORINGSSL
 #undef X509_NAME
 #undef X509_EXTENSIONS
