@@ -243,6 +243,8 @@ jobs:
       - run: rm 'C:/Program Files/OpenSSL/' -rf
         shell: bash
 
+      - run: vcpkg install openssl
+
       - name: Build
         run: |
           mkdir build && cd build
