@@ -39,6 +39,7 @@
 #include <string.h>
 #ifdef _WIN32
 #include <windows.h>
+
 #include <wincrypt.h>
 #ifdef OPENSSL_IS_BORINGSSL
 #undef X509_NAME
