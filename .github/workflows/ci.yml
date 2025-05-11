@@ -239,6 +239,10 @@ jobs:
           sed -i '3i   set(ENV{CMAKE_POLICY_VERSION_MINIMUM} 3.5)'  ${env:VCPKG_INSTALLATION_ROOT}/scripts/ports.cmake
           sed -i '4i endif()'                                       ${env:VCPKG_INSTALLATION_ROOT}/scripts/ports.cmake
           vcpkg install --triplet x64-windows pkgconf libevent
+
+      - run: rm 'C:/Program Files/OpenSSL/' -rf
+        shell: bash
+
       - name: Build
         run: |
           mkdir build && cd build
