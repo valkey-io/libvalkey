@@ -19,9 +19,7 @@ IncludeCategories:
     Priority: 3
   - Regex: '^<valkey/'
     Priority: 2
-  - Regex: '^<windows.h>'
-    Priority: 4
   - Regex: '^<'
-    Priority: 5
+    Priority: 4
   - Regex: '.*'
-    Priority: 6
+    Priority: 5
