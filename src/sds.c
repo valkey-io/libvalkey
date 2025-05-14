@@ -1220,7 +1220,6 @@ void sds_free(void *ptr) { s_free(ptr); }
 
 #include <stdio.h>
 
-#define UNUSED(x) (void)(x)
 int sdsTest(void) {
     {
         sds x = sdsnew("foo"), y;
