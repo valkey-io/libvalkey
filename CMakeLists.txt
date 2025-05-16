@@ -132,8 +132,11 @@ if (MSVC AND BUILD_SHARED_LIBS)
         CONFIGURATIONS Debug RelWithDebInfo)
 endif()
 
+# Install public headers
 install(DIRECTORY include/valkey
-        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+        PATTERN "tls.h" EXCLUDE
+        PATTERN "rdma.h" EXCLUDE)
 
 INSTALL(FILES ${CMAKE_CURRENT_BINARY_DIR}/valkey.pc
     DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig)
@@ -210,6 +213,10 @@ IF(ENABLE_TLS)
         LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
         ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
 
+    # Install public header
+    install(FILES include/valkey/tls.h
+            DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/valkey)
+
     if (MSVC AND BUILD_SHARED_LIBS)
         INSTALL(FILES $<TARGET_PDB_FILE:valkey_tls>
             DESTINATION ${CMAKE_INSTALL_BINDIR}
@@ -269,6 +276,10 @@ if(ENABLE_RDMA)
         RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
         LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
         ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
+
+    # Install public header
+    install(FILES include/valkey/rdma.h
+            DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/valkey)
 
     install(FILES ${CMAKE_CURRENT_BINARY_DIR}/valkey_rdma.pc
         DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig)
