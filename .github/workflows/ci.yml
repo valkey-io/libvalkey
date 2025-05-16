@@ -212,11 +212,11 @@ jobs:
         run: |
           brew update
           brew install valkey
-      - name: Build using CMake
+      - name: Build and install using CMake
         run: |
           mkdir build && cd build
           cmake .. -G Ninja -DCMAKE_BUILD_TYPE=Release -DENABLE_TLS=ON
-          ninja -v
+          sudo ninja -v install
       - name: Build using Makefile
         run: USE_TLS=1 make
       - name: Run tests
@@ -242,12 +242,11 @@ jobs:
           sed -i '3i   set(ENV{CMAKE_POLICY_VERSION_MINIMUM} 3.5)'  ${env:VCPKG_INSTALLATION_ROOT}/scripts/ports.cmake
           sed -i '4i endif()'                                       ${env:VCPKG_INSTALLATION_ROOT}/scripts/ports.cmake
           vcpkg install --triplet x64-windows pkgconf libevent
-
-      - name: Build
+      - name: Build and install
         run: |
           mkdir build && cd build
           cmake .. -G Ninja -DENABLE_TLS=ON -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE=C:\vcpkg\scripts\buildsystems\vcpkg.cmake
-          ninja -v
+          ninja -v install
       - name: Run tests
         working-directory: build
         run: .\tests\client_test.exe
@@ -288,9 +287,9 @@ jobs:
             mingw-w64-x86_64-cmake
             mingw-w64-x86_64-ninja
             mingw-w64-x86_64-libevent
-      - name: Build
+      - name: Build and install
         shell: msys2 {0}
         run: |
           mkdir build && cd build
           cmake .. -G Ninja
-          cmake --build .
+          ninja -v install
