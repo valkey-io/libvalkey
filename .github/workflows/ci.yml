@@ -140,28 +140,40 @@ jobs:
       with:
         packages: libevent-dev libuv1-dev libev-dev libglib2.0-dev
         version: 1.0
-    - name: Install libvalkey using Makefile
+    - name: Install static and dynamic libraries using Makefile
       run: |
         make USE_TLS=1 DESTDIR=${{ github.workspace }}/make-install install
-    - name: Install libvalkey using CMake
+    - name: Install dynamic libraries using CMake
       run: |
-        mkdir build && cd build
+        mkdir build-dyn && cd build-dyn
         cmake -DDISABLE_TESTS=ON -DENABLE_TLS=ON ..
-        make DESTDIR=${{ github.workspace }}/cmake-install install
+        make DESTDIR=${{ github.workspace }}/dynamic-cmake-install install
+    - name: Install static libraries using CMake
+      run: |
+        mkdir build-static && cd build-static
+        cmake -DDISABLE_TESTS=ON -DENABLE_TLS=ON -DBUILD_SHARED_LIBS=OFF ..
+        make DESTDIR=${{ github.workspace }}/static-cmake-install install
     - name: Build examples with Makefile using a Makefile-installed libvalkey
       run: |
-        make CFLAGS="-I${{ github.workspace }}/make-install/usr/local/include" \
-             STLIBNAME="${{ github.workspace }}/make-install/usr/local/lib/libvalkey.a" \
+        make STLIBNAME="${{ github.workspace }}/make-install/usr/local/lib/libvalkey.a" \
+             TLS_STLIBNAME="${{ github.workspace }}/make-install/usr/local/lib/libvalkey_tls.a" \
+             INCLUDE_DIR="${{ github.workspace }}/make-install/usr/local/include" \
              USE_TLS=1 -C examples
     - name: Build examples with Makefile using a CMake-installed libvalkey
       run: |
-        make CFLAGS="-I${{ github.workspace }}/cmake-install/usr/local/include" \
-             STLIBNAME="${{ github.workspace }}/cmake-install/usr/local/lib/libvalkey.a" \
+        make STLIBNAME="${{ github.workspace }}/static-cmake-install/usr/local/lib/libvalkey.a" \
+             TLS_STLIBNAME="${{ github.workspace }}/static-cmake-install/usr/local/lib/libvalkey_tls.a" \
+             INCLUDE_DIR="${{ github.workspace }}/static-cmake-install/usr/local/include" \
              USE_TLS=1 -C examples
-    - name: Build examples with CMake using a CMake-installed libvalkey
+    - name: Build examples with CMake using CMake-installed dynamic libraries
       run: |
-        cd examples && mkdir build && cd build
-        cmake -DCMAKE_PREFIX_PATH=${{ github.workspace }}/cmake-install/usr/local -DENABLE_TLS=ON ..
+        cd examples && mkdir build-dyn && cd build-dyn
+        cmake -DCMAKE_PREFIX_PATH=${{ github.workspace }}/dynamic-cmake-install/usr/local -DENABLE_TLS=ON ..
+        make
+    - name: Build examples with CMake using CMake-installed static libraries
+      run: |
+        cd examples && mkdir build-static && cd build-static
+        cmake -DCMAKE_PREFIX_PATH=${{ github.workspace }}/static-cmake-install/usr/local -DENABLE_TLS=ON ..
         make
 
   rdma:
