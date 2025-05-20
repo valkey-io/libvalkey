@@ -408,6 +408,16 @@ void valkeyAsyncFree(valkeyAsyncContext *ac) {
         valkeyAsyncFreeInternal(ac);
 }
 
+/* Get context error status (VALKEY_OK or VALKEY_ERR_x). */
+int valkeyAsyncGetError(const valkeyAsyncContext *ac) {
+    return ac->err;
+}
+
+/* Get context error description. */
+const char *valkeyAsyncGetErrorString(const valkeyAsyncContext *ac) {
+    return ac->errstr;
+}
+
 /* Helper function to make the disconnect happen and clean up. */
 void valkeyAsyncDisconnectInternal(valkeyAsyncContext *ac) {
     valkeyContext *c = &(ac->c);

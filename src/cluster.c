@@ -1640,6 +1640,16 @@ int valkeyClusterSetOptionTimeout(valkeyClusterContext *cc,
     return VALKEY_OK;
 }
 
+/* Get context error status (VALKEY_OK or VALKEY_ERR_x). */
+int valkeyClusterGetError(const valkeyClusterContext *cc) {
+    return cc->err;
+}
+
+/* Get context error description. */
+const char *valkeyClusterGetErrorString(const valkeyClusterContext *cc) {
+    return cc->errstr;
+}
+
 valkeyContext *valkeyClusterGetValkeyContext(valkeyClusterContext *cc,
                                              valkeyClusterNode *node) {
     valkeyContext *c = NULL;
@@ -2833,6 +2843,16 @@ static int valkeyClusterAsyncConnect(valkeyClusterAsyncContext *acc) {
     }
     /* Use non-blocking initial slotmap update. */
     return updateSlotMapAsync(acc, NULL /*any node*/);
+}
+
+/* Get context error status (VALKEY_OK or VALKEY_ERR_x). */
+int valkeyClusterAsyncGetError(const valkeyClusterAsyncContext *acc) {
+    return acc->err;
+}
+
+/* Get context error description. */
+const char *valkeyClusterAsyncGetErrorString(const valkeyClusterAsyncContext *acc) {
+    return acc->errstr;
 }
 
 /* Reply callback function for CLUSTER SLOTS */
