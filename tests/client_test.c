@@ -2402,28 +2402,28 @@ static void asCleanup(void *data) {
 
 static void commandCallback(struct valkeyAsyncContext *ac, void *_reply, void *_privdata);
 
-static void connectCallback(valkeyAsyncContext *c, int status) {
-    struct _astest *t = (struct _astest *)c->data;
+static void connectCallback(valkeyAsyncContext *ac, int status) {
+    struct _astest *t = (struct _astest *)ac->data;
     assert(t == &astest);
     assert(t->connects == 0);
-    t->err = c->err;
-    memcpy(t->errstr, c->errstr, sizeof(t->errstr));
+    t->err = ac->err;
+    memcpy(t->errstr, ac->errstr, sizeof(t->errstr));
     t->connects++;
     t->connect_status = status;
     t->connected = status == VALKEY_OK ? 1 : -1;
 
     if (t->testno == ASTEST_ISSUE_931) {
         /* disconnect again */
-        valkeyAsyncDisconnect(c);
+        valkeyAsyncDisconnect(ac);
     } else if (t->testno == ASTEST_ISSUE_931_PING) {
-        valkeyAsyncCommand(c, commandCallback, NULL, "PING");
+        valkeyAsyncCommand(ac, commandCallback, NULL, "PING");
     }
 }
-static void disconnectCallback(const valkeyAsyncContext *c, int status) {
-    assert(c->data == (void *)&astest);
+static void disconnectCallback(const valkeyAsyncContext *ac, int status) {
+    assert(ac->data == (void *)&astest);
     assert(astest.disconnects == 0);
-    astest.err = c->err;
-    memcpy(astest.errstr, c->errstr, sizeof(astest.errstr));
+    astest.err = ac->err;
+    memcpy(astest.errstr, ac->errstr, sizeof(astest.errstr));
     astest.disconnects++;
     astest.disconnect_status = status;
     astest.connected = 0;
@@ -2511,14 +2511,14 @@ static void as_printerr(void) {
 
 static void test_async_polling(struct config config) {
     int status;
-    valkeyAsyncContext *c;
+    valkeyAsyncContext *ac;
     struct config defaultconfig = config;
 
     test("Async connect: ");
-    c = do_aconnect(config, ASTEST_CONNECT);
-    assert(c);
+    ac = do_aconnect(config, ASTEST_CONNECT);
+    assert(ac);
     while (astest.connected == 0)
-        valkeyPollTick(c, 0.1);
+        valkeyPollTick(ac, 0.1);
     assert(astest.connects == 1);
     ASASSERT(astest.connect_status == VALKEY_OK);
     assert(astest.disconnects == 0);
@@ -2526,7 +2526,7 @@ static void test_async_polling(struct config config) {
 
     test("Async free after connect: ");
     assert(astest.ac != NULL);
-    valkeyAsyncFree(c);
+    valkeyAsyncFree(ac);
     assert(astest.disconnects == 1);
     assert(astest.ac == NULL);
     test_cond(astest.disconnect_status == VALKEY_OK);
@@ -2536,11 +2536,11 @@ static void test_async_polling(struct config config) {
         test("Async connect timeout: ");
         config.tcp.host = "192.168.254.254"; /* blackhole ip */
         config.connect_timeout.tv_usec = 100000;
-        c = do_aconnect(config, ASTEST_CONN_TIMEOUT);
-        assert(c);
-        assert(c->err == 0);
+        ac = do_aconnect(config, ASTEST_CONN_TIMEOUT);
+        assert(ac);
+        assert(ac->err == 0);
         while (astest.connected == 0)
-            valkeyPollTick(c, 0.1);
+            valkeyPollTick(ac, 0.1);
         assert(astest.connected == -1);
         /*
          * freeing should not be done, clearing should have happened.
@@ -2553,47 +2553,47 @@ static void test_async_polling(struct config config) {
 
     /* Test a ping/pong after connection */
     test("Async PING/PONG: ");
-    c = do_aconnect(config, ASTEST_PINGPONG);
+    ac = do_aconnect(config, ASTEST_PINGPONG);
     while (astest.connected == 0)
-        valkeyPollTick(c, 0.1);
-    status = valkeyAsyncCommand(c, commandCallback, NULL, "PING");
+        valkeyPollTick(ac, 0.1);
+    status = valkeyAsyncCommand(ac, commandCallback, NULL, "PING");
     assert(status == VALKEY_OK);
     while (astest.ac)
-        valkeyPollTick(c, 0.1);
+        valkeyPollTick(ac, 0.1);
     test_cond(astest.pongs == 1);
 
     /* Test a ping/pong after connection that didn't time out. */
     if (config.type == CONN_TCP || config.type == CONN_TLS) {
         test("Async PING/PONG after connect timeout: ");
         config.connect_timeout.tv_usec = 10000; /* 10ms  */
-        c = do_aconnect(config, ASTEST_PINGPONG_TIMEOUT);
+        ac = do_aconnect(config, ASTEST_PINGPONG_TIMEOUT);
         while (astest.connected == 0)
-            valkeyPollTick(c, 0.1);
+            valkeyPollTick(ac, 0.1);
         /* sleep 0.1 s, allowing old timeout to arrive */
         millisleep(10);
-        status = valkeyAsyncCommand(c, commandCallback, NULL, "PING");
+        status = valkeyAsyncCommand(ac, commandCallback, NULL, "PING");
         assert(status == VALKEY_OK);
         while (astest.ac)
-            valkeyPollTick(c, 0.1);
+            valkeyPollTick(ac, 0.1);
         test_cond(astest.pongs == 2);
         config = defaultconfig;
     }
 
     /* Test disconnect from an on_connect callback */
     test("Disconnect from onConnected callback (Issue #931): ");
-    c = do_aconnect(config, ASTEST_ISSUE_931);
+    ac = do_aconnect(config, ASTEST_ISSUE_931);
     while (astest.disconnects == 0)
-        valkeyPollTick(c, 0.1);
+        valkeyPollTick(ac, 0.1);
     assert(astest.connected == 0);
     assert(astest.connects == 1);
     test_cond(astest.disconnects == 1);
 
     /* Test ping/pong from an on_connect callback */
     test("Ping/Pong from onConnected callback (Issue #931): ");
-    c = do_aconnect(config, ASTEST_ISSUE_931_PING);
+    ac = do_aconnect(config, ASTEST_ISSUE_931_PING);
     /* connect callback issues ping, response callback destroys context */
     while (astest.ac)
-        valkeyPollTick(c, 0.1);
+        valkeyPollTick(ac, 0.1);
     assert(astest.connected == 0);
     assert(astest.connects == 1);
     assert(astest.disconnects == 1);

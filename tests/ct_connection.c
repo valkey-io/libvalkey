@@ -283,12 +283,12 @@ void disconnectCallback(const valkeyAsyncContext *ac, int status) {
 }
 
 // Callback for async commands, verifies the valkeyReply
-void commandCallback(valkeyClusterAsyncContext *cc, void *r, void *privdata) {
+void commandCallback(valkeyClusterAsyncContext *acc, void *r, void *privdata) {
     valkeyReply *reply = (valkeyReply *)r;
     ExpectedResult *expect = (ExpectedResult *)privdata;
     if (expect->noreply) {
         assert(reply == NULL);
-        assert(strcmp(cc->errstr, expect->errstr) == 0);
+        assert(strcmp(acc->errstr, expect->errstr) == 0);
     } else {
         assert(reply != NULL);
         assert(reply->type == expect->type);
@@ -301,7 +301,7 @@ void commandCallback(valkeyClusterAsyncContext *cc, void *r, void *privdata) {
         }
     }
     if (expect->disconnect)
-        valkeyClusterAsyncDisconnect(cc);
+        valkeyClusterAsyncDisconnect(acc);
 }
 
 // Connecting to a password protected cluster using
