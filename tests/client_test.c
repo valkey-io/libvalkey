@@ -161,7 +161,7 @@ void get_server_version(valkeyContext *c, int *majorptr, int *minorptr) {
     int major, minor;
 
     reply = valkeyCommand(c, "INFO");
-    if (reply == NULL || c->err || reply->type != VALKEY_REPLY_STRING)
+    if (reply == NULL || valkeyGetError(c) || reply->type != VALKEY_REPLY_STRING)
         goto abort;
     if ((s = strstr(reply->str, VALKEY_VERSION_FIELD)) != NULL)
         s += strlen(VALKEY_VERSION_FIELD);
@@ -258,8 +258,8 @@ static int disconnect(valkeyContext *c, int keep_fd) {
 static void do_tls_handshake(valkeyContext *c) {
 #ifdef VALKEY_TEST_TLS
     valkeyInitiateTLSWithContext(c, _tls_ctx);
-    if (c->err) {
-        printf("TLS error: %s\n", c->errstr);
+    if (valkeyGetError(c)) {
+        printf("TLS error: %s\n", valkeyGetErrorString(c));
         valkeyFree(c);
         exit(1);
     }
@@ -309,8 +309,8 @@ static valkeyContext *do_connect(struct config config) {
     if (c == NULL) {
         printf("Connection error: can't allocate valkey context\n");
         exit(1);
-    } else if (c->err) {
-        printf("Connection error: %s\n", c->errstr);
+    } else if (valkeyGetError(c)) {
+        printf("Connection error: %s\n", valkeyGetErrorString(c));
         valkeyFree(c);
         exit(1);
     }
@@ -502,7 +502,7 @@ static void test_tcp_options(struct config cfg) {
     test_cond(valkeySetTcpUserTimeout(c, 100) == VALKEY_OK);
 #else
     test("Setting TCP_USER_TIMEOUT errors when unsupported: ");
-    test_cond(valkeySetTcpUserTimeout(c, 100) == VALKEY_ERR && c->err == VALKEY_ERR_IO);
+    test_cond(valkeySetTcpUserTimeout(c, 100) == VALKEY_ERR && valkeyGetError(c) == VALKEY_ERR_IO);
 #endif
 
     valkeyFree(c);
@@ -515,7 +515,7 @@ static void test_unix_keepalive(struct config cfg) {
     c = do_connect(cfg);
 
     test("Setting TCP_KEEPALIVE on a unix socket returns an error: ");
-    test_cond(valkeyEnableKeepAlive(c) == VALKEY_ERR && c->err == 0);
+    test_cond(valkeyEnableKeepAlive(c) == VALKEY_ERR && valkeyGetError(c) == 0);
 
     test("Setting TCP_KEEPALIVE on a unix socket doesn't break the connection: ");
     r = valkeyCommand(c, "PING");
@@ -1047,17 +1047,17 @@ static void test_blocking_connection_errors(void) {
         // First see if this domain name *actually* resolves to NXDOMAIN
         c = valkeyConnect(VALKEY_BAD_DOMAIN, 6379);
         test_cond(
-            c->err == VALKEY_ERR_OTHER &&
-            (strcmp(c->errstr, "Name or service not known") == 0 ||
-             strcmp(c->errstr, "Can't resolve: " VALKEY_BAD_DOMAIN) == 0 ||
-             strcmp(c->errstr, "Name does not resolve") == 0 ||
-             strcmp(c->errstr, "nodename nor servname provided, or not known") == 0 ||
-             strcmp(c->errstr, "node name or service name not known") == 0 ||
-             strcmp(c->errstr, "No address associated with hostname") == 0 ||
-             strcmp(c->errstr, "Temporary failure in name resolution") == 0 ||
-             strcmp(c->errstr, "hostname nor servname provided, or not known") == 0 ||
-             strcmp(c->errstr, "no address associated with name") == 0 ||
-             strcmp(c->errstr, "No such host is known. ") == 0));
+            valkeyGetError(c) == VALKEY_ERR_OTHER &&
+            (strcmp(valkeyGetErrorString(c), "Name or service not known") == 0 ||
+             strcmp(valkeyGetErrorString(c), "Can't resolve: " VALKEY_BAD_DOMAIN) == 0 ||
+             strcmp(valkeyGetErrorString(c), "Name does not resolve") == 0 ||
+             strcmp(valkeyGetErrorString(c), "nodename nor servname provided, or not known") == 0 ||
+             strcmp(valkeyGetErrorString(c), "node name or service name not known") == 0 ||
+             strcmp(valkeyGetErrorString(c), "No address associated with hostname") == 0 ||
+             strcmp(valkeyGetErrorString(c), "Temporary failure in name resolution") == 0 ||
+             strcmp(valkeyGetErrorString(c), "hostname nor servname provided, or not known") == 0 ||
+             strcmp(valkeyGetErrorString(c), "no address associated with name") == 0 ||
+             strcmp(valkeyGetErrorString(c), "No such host is known. ") == 0));
         valkeyFree(c);
     } else {
         printf("Skipping NXDOMAIN test. Found evil ISP!\n");
@@ -1070,8 +1070,8 @@ static void test_blocking_connection_errors(void) {
 
     test("Returns error when the port is not open: ");
     c = valkeyConnect((char *)"localhost", 1);
-    test_cond(c->err == VALKEY_ERR_IO &&
-              strcmp(c->errstr, "Connection refused") == 0);
+    test_cond(valkeyGetError(c) == VALKEY_ERR_IO &&
+              strcmp(valkeyGetErrorString(c), "Connection refused") == 0);
     valkeyFree(c);
 
     /* Verify we don't regress from the fix in PR #1180 */
@@ -1082,17 +1082,17 @@ static void test_blocking_connection_errors(void) {
     c = valkeyConnectWithOptions(&opt);
 #ifdef __CYGWIN__
     /* Cygwin's socket layer will poll until timeout. */
-    test_cond(c->err == VALKEY_ERR_IO &&
-              strcmp(c->errstr, "Connection timed out") == 0);
+    test_cond(valkeyGetError(c) == VALKEY_ERR_IO &&
+              strcmp(valkeyGetErrorString(c), "Connection timed out") == 0);
 #else
-    test_cond(c->err == VALKEY_ERR_IO &&
-              strcmp(c->errstr, "Connection refused") == 0);
+    test_cond(valkeyGetError(c) == VALKEY_ERR_IO &&
+              strcmp(valkeyGetErrorString(c), "Connection refused") == 0);
 #endif
     valkeyFree(c);
 
     test("Returns error when the unix_sock socket path doesn't accept connections: ");
     c = valkeyConnectUnix((char *)"/tmp/idontexist.sock");
-    test_cond(c->err == VALKEY_ERR_IO); /* Don't care about the message... */
+    test_cond(valkeyGetError(c) == VALKEY_ERR_IO); /* Don't care about the message... */
     valkeyFree(c);
 #endif
 }
@@ -1373,8 +1373,8 @@ static int detect_debug_sleep(valkeyContext *c) {
     int detected;
     valkeyReply *reply = valkeyCommand(c, "DEBUG SLEEP 0\r\n");
 
-    if (reply == NULL || c->err) {
-        const char *cause = c->err ? c->errstr : "(none)";
+    if (reply == NULL || valkeyGetError(c)) {
+        const char *cause = valkeyGetError(c) ? valkeyGetErrorString(c) : "(none)";
         fprintf(stderr, "Error testing for DEBUG SLEEP (server error: %s), exiting\n", cause);
         exit(-1);
     }
@@ -1416,11 +1416,11 @@ static void test_blocking_connection_timeouts(struct config config) {
         valkeySetTimeout(c, tv);
         reply = valkeyCommand(c, "GET foo");
 #ifndef _WIN32
-        test_cond(s > 0 && reply == NULL && c->err == VALKEY_ERR_IO &&
-                  strcmp(c->errstr, "Resource temporarily unavailable") == 0);
+        test_cond(s > 0 && reply == NULL && valkeyGetError(c) == VALKEY_ERR_IO &&
+                  strcmp(valkeyGetErrorString(c), "Resource temporarily unavailable") == 0);
 #else
-        test_cond(s > 0 && reply == NULL && c->err == VALKEY_ERR_TIMEOUT &&
-                  strcmp(c->errstr, "recv timeout") == 0);
+        test_cond(s > 0 && reply == NULL && valkeyGetError(c) == VALKEY_ERR_TIMEOUT &&
+                  strcmp(valkeyGetErrorString(c), "recv timeout") == 0);
 #endif
         freeReplyObject(reply);
 
@@ -1475,8 +1475,8 @@ static void test_blocking_io_errors(struct config config) {
      * On >2.0, QUIT will return with OK and another read(2) needed to be
      * issued to find out the socket was closed by the server. In both
      * conditions, the error will be set to EOF. */
-    assert(c->err == VALKEY_ERR_EOF &&
-           strcmp(c->errstr, "Server closed the connection") == 0);
+    assert(valkeyGetError(c) == VALKEY_ERR_EOF &&
+           strcmp(valkeyGetErrorString(c), "Server closed the connection") == 0);
 #endif
     valkeyFree(c);
 
@@ -1486,9 +1486,9 @@ static void test_blocking_io_errors(struct config config) {
     assert(valkeySetTimeout(c, tv) == VALKEY_OK);
     int respcode = valkeyGetReply(c, &_reply);
 #ifndef _WIN32
-    test_cond(respcode == VALKEY_ERR && c->err == VALKEY_ERR_IO && errno == EAGAIN);
+    test_cond(respcode == VALKEY_ERR && valkeyGetError(c) == VALKEY_ERR_IO && errno == EAGAIN);
 #else
-    test_cond(respcode == VALKEY_ERR && c->err == VALKEY_ERR_TIMEOUT);
+    test_cond(respcode == VALKEY_ERR && valkeyGetError(c) == VALKEY_ERR_TIMEOUT);
 #endif
     valkeyFree(c);
 }
@@ -1521,7 +1521,7 @@ static void test_invalid_timeout_errors(struct config config) {
         valkeyTestPanic("Unknown connection type!");
     }
 
-    test_cond(c != NULL && c->err == VALKEY_ERR_IO && strcmp(c->errstr, "Invalid timeout specified") == 0);
+    test_cond(c != NULL && valkeyGetError(c) == VALKEY_ERR_IO && strcmp(valkeyGetErrorString(c), "Invalid timeout specified") == 0);
     valkeyFree(c);
 
     test("Set error when an invalid timeout sec value is used during connect: ");
@@ -1549,7 +1549,7 @@ static void test_invalid_timeout_errors(struct config config) {
         valkeyTestPanic("Unknown connection type!");
     }
 
-    test_cond(c != NULL && c->err == VALKEY_ERR_IO && strcmp(c->errstr, "Invalid timeout specified") == 0);
+    test_cond(c != NULL && valkeyGetError(c) == VALKEY_ERR_IO && strcmp(valkeyGetErrorString(c), "Invalid timeout specified") == 0);
     valkeyFree(c);
 }
 
@@ -1898,7 +1898,7 @@ static void test_pubsub_handling(struct config config) {
     /* Connect */
     valkeyOptions options = get_server_tcp_options(config);
     valkeyAsyncContext *ac = valkeyAsyncConnectWithOptions(&options);
-    assert(ac != NULL && ac->err == 0);
+    assert(ac != NULL && valkeyAsyncGetError(ac) == 0);
     valkeyLibeventAttach(ac, base);
 
     /* Start subscribe */
@@ -1931,7 +1931,7 @@ static void test_sharded_pubsub_handling(struct config config) {
     /* Connect */
     valkeyOptions options = get_server_tcp_cluster_options(config);
     valkeyAsyncContext *ac = valkeyAsyncConnectWithOptions(&options);
-    assert(ac != NULL && ac->err == 0);
+    assert(ac != NULL && valkeyAsyncGetError(ac) == 0);
     valkeyLibeventAttach(ac, base);
 
     /* Start subscribe */
@@ -1964,7 +1964,7 @@ static void test_sharded_pubsub_error_handling(struct config config) {
     /* Connect */
     valkeyOptions options = get_server_tcp_cluster_options(config);
     valkeyAsyncContext *ac = valkeyAsyncConnectWithOptions(&options);
-    assert(ac != NULL && ac->err == 0);
+    assert(ac != NULL && valkeyAsyncGetError(ac) == 0);
     valkeyLibeventAttach(ac, base);
 
     /* Start subscribe */
@@ -2000,7 +2000,7 @@ static void test_sharded_pubsub_crossslot_handling(struct config config) {
     /* Connect */
     valkeyOptions options = get_server_tcp_cluster_options(config);
     valkeyAsyncContext *ac = valkeyAsyncConnectWithOptions(&options);
-    assert(ac != NULL && ac->err == 0);
+    assert(ac != NULL && valkeyAsyncGetError(ac) == 0);
     valkeyLibeventAttach(ac, base);
 
     /* Start subscribe */
@@ -2039,7 +2039,7 @@ static void test_pubsub_handling_resp3(struct config config) {
     /* Connect */
     valkeyOptions options = get_server_tcp_options(config);
     valkeyAsyncContext *ac = valkeyAsyncConnectWithOptions(&options);
-    assert(ac != NULL && ac->err == 0);
+    assert(ac != NULL && valkeyAsyncGetError(ac) == 0);
     valkeyLibeventAttach(ac, base);
 
     /* Not expecting any push messages in this test */
@@ -2082,7 +2082,7 @@ static void test_sharded_pubsub_handling_resp3(struct config config) {
     /* Connect */
     valkeyOptions options = get_server_tcp_cluster_options(config);
     valkeyAsyncContext *ac = valkeyAsyncConnectWithOptions(&options);
-    assert(ac != NULL && ac->err == 0);
+    assert(ac != NULL && valkeyAsyncGetError(ac) == 0);
     valkeyLibeventAttach(ac, base);
 
     /* Not expecting any push messages in this test */
@@ -2163,7 +2163,7 @@ static void test_command_timeout_during_pubsub(struct config config) {
     /* Connect */
     valkeyOptions options = get_server_tcp_options(config);
     valkeyAsyncContext *ac = valkeyAsyncConnectWithOptions(&options);
-    assert(ac != NULL && ac->err == 0);
+    assert(ac != NULL && valkeyAsyncGetError(ac) == 0);
     valkeyLibeventAttach(ac, base);
 
     /* Configure a command timeout */
@@ -2268,7 +2268,7 @@ static void test_pubsub_multiple_channels(struct config config) {
     /* Connect */
     valkeyOptions options = get_server_tcp_options(config);
     valkeyAsyncContext *ac = valkeyAsyncConnectWithOptions(&options);
-    assert(ac != NULL && ac->err == 0);
+    assert(ac != NULL && valkeyAsyncGetError(ac) == 0);
     valkeyLibeventAttach(ac, base);
 
     /* Not expecting any push messages in this test */
@@ -2345,7 +2345,7 @@ static void test_monitor(struct config config) {
     /* Connect */
     valkeyOptions options = get_server_tcp_options(config);
     valkeyAsyncContext *ac = valkeyAsyncConnectWithOptions(&options);
-    assert(ac != NULL && ac->err == 0);
+    assert(ac != NULL && valkeyAsyncGetError(ac) == 0);
     valkeyLibeventAttach(ac, base);
 
     /* Not expecting any push messages in this test */
@@ -2406,8 +2406,8 @@ static void connectCallback(valkeyAsyncContext *ac, int status) {
     struct _astest *t = (struct _astest *)ac->data;
     assert(t == &astest);
     assert(t->connects == 0);
-    t->err = ac->err;
-    memcpy(t->errstr, ac->errstr, sizeof(t->errstr));
+    t->err = valkeyAsyncGetError(ac);
+    memcpy(t->errstr, valkeyAsyncGetErrorString(ac), sizeof(t->errstr));
     t->connects++;
     t->connect_status = status;
     t->connected = status == VALKEY_OK ? 1 : -1;
@@ -2422,8 +2422,8 @@ static void connectCallback(valkeyAsyncContext *ac, int status) {
 static void disconnectCallback(const valkeyAsyncContext *ac, int status) {
     assert(ac->data == (void *)&astest);
     assert(astest.disconnects == 0);
-    astest.err = ac->err;
-    memcpy(astest.errstr, ac->errstr, sizeof(astest.errstr));
+    astest.err = valkeyAsyncGetError(ac);
+    memcpy(astest.errstr, valkeyAsyncGetErrorString(ac), sizeof(astest.errstr));
     astest.disconnects++;
     astest.disconnect_status = status;
     astest.connected = 0;
@@ -2434,8 +2434,8 @@ static void commandCallback(struct valkeyAsyncContext *ac, void *_reply, void *_
     struct _astest *t = (struct _astest *)ac->data;
     assert(t == &astest);
     (void)_privdata;
-    t->err = ac->err;
-    memcpy(t->errstr, ac->errstr, sizeof(t->errstr));
+    t->err = valkeyAsyncGetError(ac);
+    memcpy(t->errstr, valkeyAsyncGetErrorString(ac), sizeof(t->errstr));
     t->counter++;
     if (t->testno == ASTEST_PINGPONG || t->testno == ASTEST_ISSUE_931_PING) {
         assert(reply != NULL && reply->type == VALKEY_REPLY_STATUS && strcmp(reply->str, "PONG") == 0);
@@ -2538,7 +2538,7 @@ static void test_async_polling(struct config config) {
         config.connect_timeout.tv_usec = 100000;
         ac = do_aconnect(config, ASTEST_CONN_TIMEOUT);
         assert(ac);
-        assert(ac->err == 0);
+        assert(valkeyAsyncGetError(ac) == 0);
         while (astest.connected == 0)
             valkeyPollTick(ac, 0.1);
         assert(astest.connected == -1);

@@ -35,7 +35,7 @@ void test_unsupported_option(void) {
 
     valkeyClusterContext *cc = valkeyClusterConnectWithOptions(&options);
     assert(cc);
-    assert(strcmp(cc->errstr, "Unsupported options") == 0);
+    assert(strcmp(valkeyClusterGetErrorString(cc), "Unsupported options") == 0);
 
     valkeyClusterFree(cc);
 }
@@ -49,7 +49,7 @@ void test_password_ok(void) {
     options.connect_callback = connect_callback;
 
     valkeyClusterContext *cc = valkeyClusterConnectWithOptions(&options);
-    ASSERT_MSG(cc && cc->err == 0, cc ? cc->errstr : "OOM");
+    ASSERT_MSG(cc && valkeyClusterGetError(cc) == 0, cc ? valkeyClusterGetErrorString(cc) : "OOM");
     assert(connect_success_counter == 1); // for CLUSTER SLOTS
     load_valkey_version(cc);
     assert(connect_success_counter == 2); // for checking valkey version
@@ -77,11 +77,11 @@ void test_password_wrong(void) {
     valkeyClusterContext *cc = valkeyClusterConnectWithOptions(&options);
     assert(cc);
 
-    assert(cc->err == VALKEY_ERR_OTHER);
+    assert(valkeyClusterGetError(cc) == VALKEY_ERR_OTHER);
     if (valkey_version_less_than(6, 0))
-        assert(strcmp(cc->errstr, "ERR invalid password") == 0);
+        assert(strcmp(valkeyClusterGetErrorString(cc), "ERR invalid password") == 0);
     else
-        assert(strncmp(cc->errstr, "WRONGPASS", 9) == 0);
+        assert(strncmp(valkeyClusterGetErrorString(cc), "WRONGPASS", 9) == 0);
 
     valkeyClusterFree(cc);
 }
@@ -96,8 +96,8 @@ void test_password_missing(void) {
     valkeyClusterContext *cc = valkeyClusterConnectWithOptions(&options);
     assert(cc);
 
-    assert(cc->err == VALKEY_ERR_OTHER);
-    assert(strncmp(cc->errstr, "NOAUTH", 6) == 0);
+    assert(valkeyClusterGetError(cc) == VALKEY_ERR_OTHER);
+    assert(strncmp(valkeyClusterGetErrorString(cc), "NOAUTH", 6) == 0);
 
     valkeyClusterFree(cc);
 }
@@ -115,7 +115,7 @@ void test_username_ok(void) {
     options.password = CLUSTER_PASSWORD;
 
     valkeyClusterContext *cc = valkeyClusterConnectWithOptions(&options);
-    ASSERT_MSG(cc && cc->err == 0, cc ? cc->errstr : "OOM");
+    ASSERT_MSG(cc && valkeyClusterGetError(cc) == 0, cc ? valkeyClusterGetErrorString(cc) : "OOM");
 
     // Test connection
     valkeyReply *reply = valkeyClusterCommand(cc, "SET key1 Hello");
@@ -183,8 +183,8 @@ void test_connect_timeout(void) {
 
     valkeyClusterContext *cc = valkeyClusterConnectWithOptions(&options);
     assert(cc);
-    assert(cc->err == VALKEY_ERR_IO);
-    assert(strcmp(cc->errstr, "Connection timed out") == 0);
+    assert(valkeyClusterGetError(cc) == VALKEY_ERR_IO);
+    assert(strcmp(valkeyClusterGetErrorString(cc), "Connection timed out") == 0);
     assert(connect_success_counter == 0);
     assert(connect_failure_counter == 1);
     reset_counters();
@@ -201,7 +201,7 @@ void test_command_timeout(void) {
     options.command_timeout = &timeout;
 
     valkeyClusterContext *cc = valkeyClusterConnectWithOptions(&options);
-    ASSERT_MSG(cc && cc->err == 0, cc ? cc->errstr : "OOM");
+    ASSERT_MSG(cc && valkeyClusterGetError(cc) == 0, cc ? valkeyClusterGetErrorString(cc) : "OOM");
 
     valkeyClusterNodeIterator ni;
     valkeyClusterInitNodeIterator(&ni, cc);
@@ -212,7 +212,7 @@ void test_command_timeout(void) {
     valkeyReply *reply;
     reply = valkeyClusterCommandToNode(cc, node, "DEBUG SLEEP 0.2");
     assert(reply == NULL);
-    assert(cc->err == VALKEY_ERR_IO);
+    assert(valkeyClusterGetError(cc) == VALKEY_ERR_IO);
 
     /* Make sure debug sleep is done before leaving testcase */
     for (int i = 0; i < 20; ++i) {
@@ -229,7 +229,7 @@ void test_command_timeout(void) {
 /* Connect and configure a command timeout while connected. */
 void test_command_timeout_set_while_connected(void) {
     valkeyClusterContext *cc = valkeyClusterConnect(CLUSTER_NODE);
-    ASSERT_MSG(cc && cc->err == 0, cc ? cc->errstr : "OOM");
+    ASSERT_MSG(cc && valkeyClusterGetError(cc) == 0, cc ? valkeyClusterGetErrorString(cc) : "OOM");
 
     valkeyClusterNodeIterator ni;
     valkeyClusterInitNodeIterator(&ni, cc);
@@ -247,7 +247,7 @@ void test_command_timeout_set_while_connected(void) {
 
     reply = valkeyClusterCommandToNode(cc, node, "DEBUG SLEEP 0.2");
     assert(reply == NULL);
-    assert(cc->err == VALKEY_ERR_IO);
+    assert(valkeyClusterGetError(cc) == VALKEY_ERR_IO);
 
     /* Make sure debug sleep is done before leaving testcase */
     for (int i = 0; i < 20; ++i) {
@@ -288,7 +288,7 @@ void commandCallback(valkeyClusterAsyncContext *acc, void *r, void *privdata) {
     ExpectedResult *expect = (ExpectedResult *)privdata;
     if (expect->noreply) {
         assert(reply == NULL);
-        assert(strcmp(acc->errstr, expect->errstr) == 0);
+        assert(strcmp(valkeyClusterAsyncGetErrorString(acc), expect->errstr) == 0);
     } else {
         assert(reply != NULL);
         assert(reply->type == expect->type);
@@ -318,7 +318,7 @@ void test_async_password_ok(void) {
     valkeyClusterOptionsUseLibevent(&options, base);
 
     valkeyClusterAsyncContext *acc = valkeyClusterAsyncConnectWithOptions(&options);
-    ASSERT_MSG(acc && acc->err == 0, acc ? acc->errstr : "OOM");
+    ASSERT_MSG(acc && valkeyClusterAsyncGetError(acc) == 0, acc ? valkeyClusterAsyncGetErrorString(acc) : "OOM");
 
     // Test connection
     ExpectedResult r = {
@@ -345,18 +345,18 @@ void test_async_password_wrong(void) {
 
     valkeyClusterAsyncContext *acc = valkeyClusterAsyncConnectWithOptions(&options);
     assert(acc);
-    assert(acc->err == VALKEY_ERR_OTHER);
+    assert(valkeyClusterAsyncGetError(acc) == VALKEY_ERR_OTHER);
     if (valkey_version_less_than(6, 0))
-        assert(strcmp(acc->errstr, "ERR invalid password") == 0);
+        assert(strcmp(valkeyClusterAsyncGetErrorString(acc), "ERR invalid password") == 0);
     else
-        assert(strncmp(acc->errstr, "WRONGPASS", 9) == 0);
+        assert(strncmp(valkeyClusterAsyncGetErrorString(acc), "WRONGPASS", 9) == 0);
 
     // No connection
     ExpectedResult r;
     int ret = valkeyClusterAsyncCommand(acc, commandCallback, &r, "SET key1 Hello");
     assert(ret == VALKEY_ERR);
-    assert(acc->err == VALKEY_ERR_OTHER);
-    assert(strcmp(acc->errstr, "slotmap not available") == 0);
+    assert(valkeyClusterAsyncGetError(acc) == VALKEY_ERR_OTHER);
+    assert(strcmp(valkeyClusterAsyncGetErrorString(acc), "slotmap not available") == 0);
 
     valkeyClusterAsyncFree(acc);
     event_base_free(base);
@@ -377,15 +377,15 @@ void test_async_password_missing(void) {
 
     valkeyClusterAsyncContext *acc = valkeyClusterAsyncConnectWithOptions(&options);
     assert(acc);
-    assert(acc->err == VALKEY_ERR_OTHER);
-    assert(strncmp(acc->errstr, "NOAUTH", 6) == 0);
+    assert(valkeyClusterAsyncGetError(acc) == VALKEY_ERR_OTHER);
+    assert(strncmp(valkeyClusterAsyncGetErrorString(acc), "NOAUTH", 6) == 0);
 
     // No connection
     ExpectedResult r;
     int ret = valkeyClusterAsyncCommand(acc, commandCallback, &r, "SET key1 Hello");
     assert(ret == VALKEY_ERR);
-    assert(acc->err == VALKEY_ERR_OTHER);
-    assert(strcmp(acc->errstr, "slotmap not available") == 0);
+    assert(valkeyClusterAsyncGetError(acc) == VALKEY_ERR_OTHER);
+    assert(strcmp(valkeyClusterAsyncGetErrorString(acc), "slotmap not available") == 0);
 
     valkeyClusterAsyncFree(acc);
     event_base_free(base);
@@ -410,8 +410,8 @@ void test_async_username_ok(void) {
     // Connect using wrong username should fail
     valkeyClusterAsyncContext *acc = valkeyClusterAsyncConnectWithOptions(&options);
     assert(acc);
-    assert(acc->err == VALKEY_ERR_OTHER);
-    assert(strncmp(acc->errstr, "WRONGPASS invalid username-password pair",
+    assert(valkeyClusterAsyncGetError(acc) == VALKEY_ERR_OTHER);
+    assert(strncmp(valkeyClusterAsyncGetErrorString(acc), "WRONGPASS invalid username-password pair",
                    40) == 0);
     valkeyClusterAsyncFree(acc);
 
@@ -421,7 +421,7 @@ void test_async_username_ok(void) {
     // Connect using correct username should pass
     acc = valkeyClusterAsyncConnectWithOptions(&options);
     assert(acc);
-    assert(acc->err == 0);
+    assert(valkeyClusterAsyncGetError(acc) == 0);
 
     // Test connection
     ExpectedResult r = {
@@ -509,8 +509,8 @@ void test_async_connect_timeout(void) {
 
     valkeyClusterAsyncContext *acc = valkeyClusterAsyncConnectWithOptions(&options);
     assert(acc);
-    assert(acc->err == VALKEY_ERR_IO);
-    assert(strcmp(acc->errstr, "Connection timed out") == 0);
+    assert(valkeyClusterAsyncGetError(acc) == VALKEY_ERR_IO);
+    assert(strcmp(valkeyClusterAsyncGetErrorString(acc), "Connection timed out") == 0);
 
     event_base_dispatch(base);
 
@@ -530,7 +530,7 @@ void test_async_command_timeout(void) {
     valkeyClusterOptionsUseLibevent(&options, base);
 
     valkeyClusterAsyncContext *acc = valkeyClusterAsyncConnectWithOptions(&options);
-    ASSERT_MSG(acc && acc->err == 0, acc ? acc->errstr : "OOM");
+    ASSERT_MSG(acc && valkeyClusterAsyncGetError(acc) == 0, acc ? valkeyClusterAsyncGetErrorString(acc) : "OOM");
 
     valkeyClusterNodeIterator ni;
     valkeyClusterInitNodeIterator(&ni, &acc->cc);

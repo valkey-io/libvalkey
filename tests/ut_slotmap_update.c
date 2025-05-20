@@ -466,7 +466,7 @@ void test_parse_cluster_nodes_with_parse_error(void) {
     nodes = parse_cluster_nodes(cc, c, reply);
     freeReplyObject(reply);
     assert(nodes == NULL);
-    assert(cc->err == VALKEY_ERR_OTHER);
+    assert(valkeyClusterGetError(cc) == VALKEY_ERR_OTHER);
     valkeyClusterClearError(cc);
 
     /* Missing port. */
@@ -475,7 +475,7 @@ void test_parse_cluster_nodes_with_parse_error(void) {
     nodes = parse_cluster_nodes(cc, c, reply);
     freeReplyObject(reply);
     assert(nodes == NULL);
-    assert(cc->err == VALKEY_ERR_OTHER);
+    assert(valkeyClusterGetError(cc) == VALKEY_ERR_OTHER);
     valkeyClusterClearError(cc);
 
     /* Missing port and cport. */
@@ -484,7 +484,7 @@ void test_parse_cluster_nodes_with_parse_error(void) {
     nodes = parse_cluster_nodes(cc, c, reply);
     freeReplyObject(reply);
     assert(nodes == NULL);
-    assert(cc->err == VALKEY_ERR_OTHER);
+    assert(valkeyClusterGetError(cc) == VALKEY_ERR_OTHER);
     valkeyClusterClearError(cc);
 
     /* Invalid port. */
@@ -493,7 +493,7 @@ void test_parse_cluster_nodes_with_parse_error(void) {
     nodes = parse_cluster_nodes(cc, c, reply);
     freeReplyObject(reply);
     assert(nodes == NULL);
-    assert(cc->err == VALKEY_ERR_OTHER);
+    assert(valkeyClusterGetError(cc) == VALKEY_ERR_OTHER);
     valkeyClusterClearError(cc);
 
     valkeyFree(c);

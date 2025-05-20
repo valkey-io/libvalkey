@@ -83,8 +83,8 @@ void replyCallback(valkeyClusterAsyncContext *acc, void *r, void *privdata) {
     intptr_t cmd_id = (intptr_t)privdata; /* Id to corresponding cmd */
 
     if (reply == NULL) {
-        if (acc->err) {
-            printf("error: %s\n", acc->errstr);
+        if (valkeyClusterAsyncGetError(acc)) {
+            printf("error: %s\n", valkeyClusterAsyncGetErrorString(acc));
         } else {
             printf("unknown error\n");
         }
@@ -163,7 +163,7 @@ void sendNextCommand(evutil_socket_t fd, short kind, void *arg) {
                 int status = valkeyClusterAsyncCommandToNode(
                     acc, node, replyCallback, (void *)((intptr_t)num_running),
                     cmd);
-                ASSERT_MSG(status == VALKEY_OK, acc->errstr);
+                ASSERT_MSG(status == VALKEY_OK, valkeyClusterAsyncGetErrorString(acc));
                 num_running++;
             }
         } else {
@@ -172,7 +172,7 @@ void sendNextCommand(evutil_socket_t fd, short kind, void *arg) {
             if (status == VALKEY_OK) {
                 num_running++;
             } else {
-                printf("error: %s\n", acc->errstr);
+                printf("error: %s\n", valkeyClusterAsyncGetErrorString(acc));
 
                 /* Schedule a read from stdin and handle next command. */
                 struct timeval timeout = {0, 10};
@@ -286,8 +286,8 @@ int main(int argc, char **argv) {
     valkeyClusterOptionsUseLibevent(&options, base);
 
     valkeyClusterAsyncContext *acc = valkeyClusterAsyncConnectWithOptions(&options);
-    if (acc == NULL || acc->err != 0) {
-        printf("Connect error: %s\n", acc ? acc->errstr : "OOM");
+    if (acc == NULL || valkeyClusterAsyncGetError(acc) != 0) {
+        printf("Connect error: %s\n", acc ? valkeyClusterAsyncGetErrorString(acc) : "OOM");
         exit(2);
     }
 

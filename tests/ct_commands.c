@@ -467,7 +467,7 @@ int main(void) {
     options.connect_timeout = &timeout;
 
     valkeyClusterContext *cc = valkeyClusterConnectWithOptions(&options);
-    ASSERT_MSG(cc && cc->err == 0, cc ? cc->errstr : "OOM");
+    ASSERT_MSG(cc && valkeyClusterGetError(cc) == 0, cc ? valkeyClusterGetErrorString(cc) : "OOM");
     load_valkey_version(cc);
 
     test_bitfield(cc);

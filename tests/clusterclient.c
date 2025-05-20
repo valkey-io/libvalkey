@@ -99,8 +99,8 @@ int main(int argc, char **argv) {
     }
 
     valkeyClusterContext *cc = valkeyClusterConnectWithOptions(&options);
-    if (cc == NULL || cc->err) {
-        printf("Connect error: %s\n", cc ? cc->errstr : "OOM");
+    if (cc == NULL || valkeyClusterGetError(cc)) {
+        printf("Connect error: %s\n", cc ? valkeyClusterGetErrorString(cc) : "OOM");
         exit(2);
     }
 
@@ -129,8 +129,8 @@ int main(int argc, char **argv) {
             while ((node = valkeyClusterNodeNext(&ni)) != NULL) {
                 valkeyReply *reply =
                     valkeyClusterCommandToNode(cc, node, command);
-                if (!reply || cc->err) {
-                    printf("error: %s\n", cc->errstr);
+                if (!reply || valkeyClusterGetError(cc)) {
+                    printf("error: %s\n", valkeyClusterGetErrorString(cc));
                 } else {
                     printReply(reply);
                 }
@@ -142,8 +142,8 @@ int main(int argc, char **argv) {
             }
         } else {
             valkeyReply *reply = valkeyClusterCommand(cc, command);
-            if (!reply || cc->err) {
-                printf("error: %s\n", cc->errstr);
+            if (!reply || valkeyClusterGetError(cc)) {
+                printf("error: %s\n", valkeyClusterGetErrorString(cc));
             } else {
                 printReply(reply);
             }
