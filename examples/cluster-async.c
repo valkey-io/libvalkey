@@ -5,25 +5,25 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-void getCallback(valkeyClusterAsyncContext *cc, void *r, void *privdata) {
+void getCallback(valkeyClusterAsyncContext *acc, void *r, void *privdata) {
     valkeyReply *reply = (valkeyReply *)r;
     if (reply == NULL) {
-        if (cc->err) {
-            printf("errstr: %s\n", cc->errstr);
+        if (acc->err) {
+            printf("errstr: %s\n", acc->errstr);
         }
         return;
     }
     printf("privdata: %s reply: %s\n", (char *)privdata, reply->str);
 
     /* Disconnect after receiving the reply to GET */
-    valkeyClusterAsyncDisconnect(cc);
+    valkeyClusterAsyncDisconnect(acc);
 }
 
-void setCallback(valkeyClusterAsyncContext *cc, void *r, void *privdata) {
+void setCallback(valkeyClusterAsyncContext *acc, void *r, void *privdata) {
     valkeyReply *reply = (valkeyReply *)r;
     if (reply == NULL) {
-        if (cc->err) {
-            printf("errstr: %s\n", cc->errstr);
+        if (acc->err) {
+            printf("errstr: %s\n", acc->errstr);
         }
         return;
     }
