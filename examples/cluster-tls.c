@@ -30,15 +30,15 @@ int main(void) {
     if (!cc) {
         printf("Error: Allocation failure\n");
         exit(-1);
-    } else if (cc->err) {
-        printf("Error: %s\n", cc->errstr);
+    } else if (valkeyClusterGetError(cc)) {
+        printf("Error: %s\n", valkeyClusterGetErrorString(cc));
         // handle error
         exit(-1);
     }
 
     valkeyReply *reply = valkeyClusterCommand(cc, "SET %s %s", "key", "value");
     if (!reply) {
-        printf("Reply missing: %s\n", cc->errstr);
+        printf("Reply missing: %s\n", valkeyClusterGetErrorString(cc));
         exit(-1);
     }
     printf("SET: %s\n", reply->str);
@@ -46,7 +46,7 @@ int main(void) {
 
     valkeyReply *reply2 = valkeyClusterCommand(cc, "GET %s", "key");
     if (!reply2) {
-        printf("Reply missing: %s\n", cc->errstr);
+        printf("Reply missing: %s\n", valkeyClusterGetErrorString(cc));
         exit(-1);
     }
     printf("GET: %s\n", reply2->str);

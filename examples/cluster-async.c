@@ -8,8 +8,8 @@
 void getCallback(valkeyClusterAsyncContext *acc, void *r, void *privdata) {
     valkeyReply *reply = (valkeyReply *)r;
     if (reply == NULL) {
-        if (acc->err) {
-            printf("errstr: %s\n", acc->errstr);
+        if (valkeyClusterAsyncGetError(acc)) {
+            printf("errstr: %s\n", valkeyClusterAsyncGetErrorString(acc));
         }
         return;
     }
@@ -22,8 +22,8 @@ void getCallback(valkeyClusterAsyncContext *acc, void *r, void *privdata) {
 void setCallback(valkeyClusterAsyncContext *acc, void *r, void *privdata) {
     valkeyReply *reply = (valkeyReply *)r;
     if (reply == NULL) {
-        if (acc->err) {
-            printf("errstr: %s\n", acc->errstr);
+        if (valkeyClusterAsyncGetError(acc)) {
+            printf("errstr: %s\n", valkeyClusterAsyncGetErrorString(acc));
         }
         return;
     }
@@ -32,7 +32,7 @@ void setCallback(valkeyClusterAsyncContext *acc, void *r, void *privdata) {
 
 void connectCallback(valkeyAsyncContext *ac, int status) {
     if (status != VALKEY_OK) {
-        printf("Error: %s\n", ac->errstr);
+        printf("Error: %s\n", valkeyAsyncGetErrorString(ac));
         return;
     }
     printf("Connected to %s:%d\n", ac->c.tcp.host, ac->c.tcp.port);
@@ -40,7 +40,7 @@ void connectCallback(valkeyAsyncContext *ac, int status) {
 
 void disconnectCallback(const valkeyAsyncContext *ac, int status) {
     if (status != VALKEY_OK) {
-        printf("Error: %s\n", ac->errstr);
+        printf("Error: %s\n", valkeyAsyncGetErrorString(ac));
         return;
     }
     printf("Disconnected from %s:%d\n", ac->c.tcp.host, ac->c.tcp.port);
@@ -60,8 +60,8 @@ int main(void) {
     if (!acc) {
         printf("Error: Allocation failure\n");
         exit(-1);
-    } else if (acc->err) {
-        printf("Error: %s\n", acc->errstr);
+    } else if (valkeyClusterAsyncGetError(acc)) {
+        printf("Error: %s\n", valkeyClusterAsyncGetErrorString(acc));
         // handle error
         exit(-1);
     }
@@ -70,25 +70,25 @@ int main(void) {
     status = valkeyClusterAsyncCommand(acc, setCallback, (char *)"THE_ID",
                                        "SET %s %s", "key", "value");
     if (status != VALKEY_OK) {
-        printf("error: err=%d errstr=%s\n", acc->err, acc->errstr);
+        printf("error: err=%d errstr=%s\n", valkeyClusterAsyncGetError(acc), valkeyClusterAsyncGetErrorString(acc));
     }
 
     status = valkeyClusterAsyncCommand(acc, getCallback, (char *)"THE_ID",
                                        "GET %s", "key");
     if (status != VALKEY_OK) {
-        printf("error: err=%d errstr=%s\n", acc->err, acc->errstr);
+        printf("error: err=%d errstr=%s\n", valkeyClusterAsyncGetError(acc), valkeyClusterAsyncGetErrorString(acc));
     }
 
     status = valkeyClusterAsyncCommand(acc, setCallback, (char *)"THE_ID",
                                        "SET %s %s", "key2", "value2");
     if (status != VALKEY_OK) {
-        printf("error: err=%d errstr=%s\n", acc->err, acc->errstr);
+        printf("error: err=%d errstr=%s\n", valkeyClusterAsyncGetError(acc), valkeyClusterAsyncGetErrorString(acc));
     }
 
     status = valkeyClusterAsyncCommand(acc, getCallback, (char *)"THE_ID",
                                        "GET %s", "key2");
     if (status != VALKEY_OK) {
-        printf("error: err=%d errstr=%s\n", acc->err, acc->errstr);
+        printf("error: err=%d errstr=%s\n", valkeyClusterAsyncGetError(acc), valkeyClusterAsyncGetErrorString(acc));
     }
 
     printf("Dispatch..\n");

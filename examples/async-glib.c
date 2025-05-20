@@ -11,7 +11,7 @@ static void
 connect_cb(valkeyAsyncContext *ac G_GNUC_UNUSED,
            int status) {
     if (status != VALKEY_OK) {
-        g_printerr("Failed to connect: %s\n", ac->errstr);
+        g_printerr("Failed to connect: %s\n", valkeyAsyncGetErrorString(ac));
         g_main_loop_quit(mainloop);
     } else {
         g_printerr("Connected...\n");
@@ -22,7 +22,7 @@ static void
 disconnect_cb(const valkeyAsyncContext *ac G_GNUC_UNUSED,
               int status) {
     if (status != VALKEY_OK) {
-        g_error("Failed to disconnect: %s", ac->errstr);
+        g_error("Failed to disconnect: %s", valkeyAsyncGetErrorString(ac));
     } else {
         g_printerr("Disconnected...\n");
         g_main_loop_quit(mainloop);
@@ -48,8 +48,8 @@ gint main(gint argc G_GNUC_UNUSED, gchar *argv[] G_GNUC_UNUSED) {
     GSource *source;
 
     ac = valkeyAsyncConnect("127.0.0.1", 6379);
-    if (ac->err) {
-        g_printerr("%s\n", ac->errstr);
+    if (valkeyAsyncGetError(ac)) {
+        g_printerr("%s\n", valkeyAsyncGetErrorString(ac));
         exit(EXIT_FAILURE);
     }
 

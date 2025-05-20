@@ -23,7 +23,7 @@ void getCallback(valkeyAsyncContext *c, void *r, void *privdata) {
 
 void connectCallback(valkeyAsyncContext *c, int status) {
     if (status != VALKEY_OK) {
-        printf("Error: %s\n", c->errstr);
+        printf("Error: %s\n", valkeyAsyncGetErrorString(c));
         exit_loop = 1;
         return;
     }
@@ -34,7 +34,7 @@ void connectCallback(valkeyAsyncContext *c, int status) {
 void disconnectCallback(const valkeyAsyncContext *c, int status) {
     exit_loop = 1;
     if (status != VALKEY_OK) {
-        printf("Error: %s\n", c->errstr);
+        printf("Error: %s\n", valkeyAsyncGetErrorString(c));
         return;
     }
 
@@ -45,9 +45,9 @@ int main(int argc, char **argv) {
     signal(SIGPIPE, SIG_IGN);
 
     valkeyAsyncContext *c = valkeyAsyncConnect("127.0.0.1", 6379);
-    if (c->err) {
+    if (valkeyAsyncGetError(c)) {
         /* Let *c leak for now... */
-        printf("Error: %s\n", c->errstr);
+        printf("Error: %s\n", valkeyAsyncGetErrorString(c));
         return 1;
     }
 
