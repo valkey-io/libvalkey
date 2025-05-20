@@ -77,15 +77,13 @@ static void *vk_realloc_fail(void *ptr, size_t size) {
 void prepare_allocation_test(valkeyClusterContext *cc,
                              int _successfulAllocations) {
     successfulAllocations = _successfulAllocations;
-    cc->err = 0;
-    memset(cc->errstr, '\0', strlen(cc->errstr));
+    valkeyClusterClearError(cc);
 }
 
 void prepare_allocation_test_async(valkeyClusterAsyncContext *acc,
                                    int _successfulAllocations) {
     successfulAllocations = _successfulAllocations;
-    acc->err = 0;
-    memset(acc->errstr, '\0', strlen(acc->errstr));
+    valkeyClusterAsyncClearError(acc);
 }
 
 /* Helper */

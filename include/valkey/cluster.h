@@ -219,6 +219,7 @@ void valkeyClusterFree(valkeyClusterContext *cc);
 
 int valkeyClusterGetError(const valkeyClusterContext *cc);
 const char *valkeyClusterGetErrorString(const valkeyClusterContext *cc);
+void valkeyClusterClearError(valkeyClusterContext *cc);
 
 /* Options configurable in runtime. */
 int valkeyClusterSetOptionTimeout(valkeyClusterContext *cc, const struct timeval tv);
@@ -292,6 +293,7 @@ void valkeyClusterAsyncFree(valkeyClusterAsyncContext *acc);
 
 int valkeyClusterAsyncGetError(const valkeyClusterAsyncContext *acc);
 const char *valkeyClusterAsyncGetErrorString(const valkeyClusterAsyncContext *acc);
+void valkeyClusterAsyncClearError(valkeyClusterAsyncContext *acc);
 
 /* Commands */
 int valkeyClusterAsyncCommand(valkeyClusterAsyncContext *acc,

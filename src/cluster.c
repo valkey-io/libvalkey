@@ -218,7 +218,7 @@ static void valkeyClusterSetError(valkeyClusterContext *cc, int type,
     }
 }
 
-static inline void valkeyClusterClearError(valkeyClusterContext *cc) {
+void valkeyClusterClearError(valkeyClusterContext *cc) {
     cc->err = 0;
     cc->errstr[0] = '\0';
 }
@@ -2660,7 +2660,7 @@ static void valkeyClusterAsyncSetError(valkeyClusterAsyncContext *acc, int type,
     acc->err = acc->cc.err;
 }
 
-static inline void valkeyClusterAsyncClearError(valkeyClusterAsyncContext *acc) {
+void valkeyClusterAsyncClearError(valkeyClusterAsyncContext *acc) {
     valkeyClusterClearError(&acc->cc);
     acc->err = acc->cc.err;
 }
