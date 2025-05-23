@@ -31,6 +31,7 @@
 
 #ifndef VALKEY_ASYNC_PRIVATE_H
 #define VALKEY_ASYNC_PRIVATE_H
+#include "visibility.h"
 
 #define _EL_ADD_READ(ctx)                      \
     do {                                       \
@@ -77,7 +78,7 @@ static inline void refreshTimeout(valkeyAsyncContext *ctx) {
     }
 }
 
-void valkeyAsyncDisconnectInternal(valkeyAsyncContext *ac);
-void valkeyProcessCallbacks(valkeyAsyncContext *ac);
+LIBVALKEY_API void valkeyAsyncDisconnectInternal(valkeyAsyncContext *ac);
+LIBVALKEY_API void valkeyProcessCallbacks(valkeyAsyncContext *ac);
 
 #endif /* VALKEY_ASYNC_PRIVATE_H */
