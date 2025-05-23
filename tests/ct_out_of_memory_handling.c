@@ -77,15 +77,13 @@ static void *vk_realloc_fail(void *ptr, size_t size) {
 void prepare_allocation_test(valkeyClusterContext *cc,
                              int _successfulAllocations) {
     successfulAllocations = _successfulAllocations;
-    cc->err = 0;
-    memset(cc->errstr, '\0', strlen(cc->errstr));
+    valkeyClusterClearError(cc);
 }
 
 void prepare_allocation_test_async(valkeyClusterAsyncContext *acc,
                                    int _successfulAllocations) {
     successfulAllocations = _successfulAllocations;
-    acc->err = 0;
-    memset(acc->errstr, '\0', strlen(acc->errstr));
+    valkeyClusterAsyncClearError(acc);
 }
 
 /* Helper */
@@ -133,14 +131,14 @@ void test_alloc_failure_handling(void) {
             successfulAllocations = i;
             cc = valkeyClusterConnectWithOptions(&options);
             assert(cc);
-            ASSERT_STR_EQ(cc->errstr, "Out of memory");
+            ASSERT_STR_EQ(valkeyClusterGetErrorString(cc), "Out of memory");
             valkeyClusterFree(cc);
         }
         // Skip iteration 100 to 159 since sdscatfmt give leak warnings during OOM.
 
         successfulAllocations = 160;
         cc = valkeyClusterConnectWithOptions(&options);
-        assert(cc && cc->err == 0);
+        assert(cc && valkeyClusterGetError(cc) == 0);
     }
 
     // Command
@@ -152,7 +150,7 @@ void test_alloc_failure_handling(void) {
             prepare_allocation_test(cc, i);
             reply = (valkeyReply *)valkeyClusterCommand(cc, cmd);
             assert(reply == NULL);
-            ASSERT_STR_EQ(cc->errstr, "Out of memory");
+            ASSERT_STR_EQ(valkeyClusterGetErrorString(cc), "Out of memory");
         }
 
         prepare_allocation_test(cc, 33);
@@ -174,7 +172,7 @@ void test_alloc_failure_handling(void) {
             prepare_allocation_test(cc, i);
             reply = valkeyClusterCommandToNode(cc, node, cmd);
             assert(reply == NULL);
-            ASSERT_STR_EQ(cc->errstr, "Out of memory");
+            ASSERT_STR_EQ(valkeyClusterGetErrorString(cc), "Out of memory");
         }
 
         // Successful command
@@ -193,7 +191,7 @@ void test_alloc_failure_handling(void) {
             prepare_allocation_test(cc, i);
             result = valkeyClusterAppendCommand(cc, cmd);
             assert(result == VALKEY_ERR);
-            ASSERT_STR_EQ(cc->errstr, "Out of memory");
+            ASSERT_STR_EQ(valkeyClusterGetErrorString(cc), "Out of memory");
 
             valkeyClusterReset(cc);
         }
@@ -208,7 +206,7 @@ void test_alloc_failure_handling(void) {
             prepare_allocation_test(cc, i);
             result = valkeyClusterGetReply(cc, (void *)&reply);
             assert(result == VALKEY_ERR);
-            ASSERT_STR_EQ(cc->errstr, "Out of memory");
+            ASSERT_STR_EQ(valkeyClusterGetErrorString(cc), "Out of memory");
 
             valkeyClusterReset(cc);
         }
@@ -237,7 +235,7 @@ void test_alloc_failure_handling(void) {
             prepare_allocation_test(cc, i);
             result = valkeyClusterAppendCommandToNode(cc, node, cmd);
             assert(result == VALKEY_ERR);
-            ASSERT_STR_EQ(cc->errstr, "Out of memory");
+            ASSERT_STR_EQ(valkeyClusterGetErrorString(cc), "Out of memory");
 
             valkeyClusterReset(cc);
         }
@@ -252,7 +250,7 @@ void test_alloc_failure_handling(void) {
             prepare_allocation_test(cc, i);
             result = valkeyClusterGetReply(cc, (void *)&reply);
             assert(result == VALKEY_ERR);
-            ASSERT_STR_EQ(cc->errstr, "Out of memory");
+            ASSERT_STR_EQ(valkeyClusterGetErrorString(cc), "Out of memory");
 
             valkeyClusterReset(cc);
         }
@@ -322,7 +320,7 @@ void test_alloc_failure_handling(void) {
             prepare_allocation_test(cc, i);
             reply = valkeyClusterCommand(cc, "GET foo");
             assert(reply == NULL);
-            ASSERT_STR_EQ(cc->errstr, "Out of memory");
+            ASSERT_STR_EQ(valkeyClusterGetErrorString(cc), "Out of memory");
         }
 
         /* Test ASK reply handling without OOM */
@@ -351,7 +349,7 @@ void test_alloc_failure_handling(void) {
             prepare_allocation_test(cc, i);
             reply = valkeyClusterCommand(cc, "GET foo");
             assert(reply == NULL);
-            ASSERT_STR_EQ(cc->errstr, "Out of memory");
+            ASSERT_STR_EQ(valkeyClusterGetErrorString(cc), "Out of memory");
         }
 
         /* Test MOVED reply handling without OOM */
@@ -468,14 +466,14 @@ void test_alloc_failure_handling_async(void) {
             successfulAllocations = i;
             acc = valkeyClusterAsyncConnectWithOptions(&options);
             assert(acc != NULL);
-            ASSERT_STR_EQ(acc->errstr, "Out of memory");
+            ASSERT_STR_EQ(valkeyClusterAsyncGetErrorString(acc), "Out of memory");
             valkeyClusterAsyncFree(acc);
         }
         // Skip iteration 100 to 156 since sdscatfmt give leak warnings during OOM.
 
         successfulAllocations = 157;
         acc = valkeyClusterAsyncConnectWithOptions(&options);
-        assert(acc && acc->err == 0);
+        assert(acc && valkeyClusterAsyncGetError(acc) == 0);
     }
 
     // Async command 1
@@ -488,15 +486,15 @@ void test_alloc_failure_handling_async(void) {
             result = valkeyClusterAsyncCommand(acc, commandCallback, &r1, cmd1);
             assert(result == VALKEY_ERR);
             if (i != 34) {
-                ASSERT_STR_EQ(acc->errstr, "Out of memory");
+                ASSERT_STR_EQ(valkeyClusterAsyncGetErrorString(acc), "Out of memory");
             } else {
-                ASSERT_STR_EQ(acc->errstr, "Failed to attach event adapter");
+                ASSERT_STR_EQ(valkeyClusterAsyncGetErrorString(acc), "Failed to attach event adapter");
             }
         }
 
         prepare_allocation_test_async(acc, 35);
         result = valkeyClusterAsyncCommand(acc, commandCallback, &r1, cmd1);
-        ASSERT_MSG(result == VALKEY_OK, acc->errstr);
+        ASSERT_MSG(result == VALKEY_OK, valkeyClusterAsyncGetErrorString(acc));
     }
 
     // Async command 2
@@ -509,14 +507,14 @@ void test_alloc_failure_handling_async(void) {
             prepare_allocation_test_async(acc, i);
             result = valkeyClusterAsyncCommand(acc, commandCallback, &r2, cmd2);
             assert(result == VALKEY_ERR);
-            ASSERT_STR_EQ(acc->errstr, "Out of memory");
+            ASSERT_STR_EQ(valkeyClusterAsyncGetErrorString(acc), "Out of memory");
         }
 
         /* Skip iteration 12, errstr not set by libvalkey when valkeyFormatSdsCommandArgv() fails. */
 
         prepare_allocation_test_async(acc, 13);
         result = valkeyClusterAsyncCommand(acc, commandCallback, &r2, cmd2);
-        ASSERT_MSG(result == VALKEY_OK, acc->errstr);
+        ASSERT_MSG(result == VALKEY_OK, valkeyClusterAsyncGetErrorString(acc));
     }
 
     prepare_allocation_test_async(acc, 7);

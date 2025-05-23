@@ -137,6 +137,9 @@ int valkeyAsyncSetTimeout(valkeyAsyncContext *ac, struct timeval tv);
 void valkeyAsyncDisconnect(valkeyAsyncContext *ac);
 void valkeyAsyncFree(valkeyAsyncContext *ac);
 
+int valkeyAsyncGetError(const valkeyAsyncContext *ac);
+const char *valkeyAsyncGetErrorString(const valkeyAsyncContext *ac);
+
 /* Handle read/write events */
 void valkeyAsyncHandleRead(valkeyAsyncContext *ac);
 void valkeyAsyncHandleWrite(valkeyAsyncContext *ac);

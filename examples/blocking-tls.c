@@ -38,9 +38,9 @@ int main(int argc, char **argv) {
     options.connect_timeout = &tv;
     c = valkeyConnectWithOptions(&options);
 
-    if (c == NULL || c->err) {
+    if (c == NULL || valkeyGetError(c)) {
         if (c) {
-            printf("Connection error: %s\n", c->errstr);
+            printf("Connection error: %s\n", valkeyGetErrorString(c));
             valkeyFree(c);
         } else {
             printf("Connection error: can't allocate valkey context\n");
@@ -50,7 +50,7 @@ int main(int argc, char **argv) {
 
     if (valkeyInitiateTLSWithContext(c, tls) != VALKEY_OK) {
         printf("Couldn't initialize TLS!\n");
-        printf("Error: %s\n", c->errstr);
+        printf("Error: %s\n", valkeyGetErrorString(c));
         valkeyFree(c);
         exit(1);
     }

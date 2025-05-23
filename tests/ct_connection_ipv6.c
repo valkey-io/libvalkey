@@ -17,7 +17,7 @@ void test_successful_ipv6_connection(void) {
     options.connect_timeout = &timeout;
 
     valkeyClusterContext *cc = valkeyClusterConnectWithOptions(&options);
-    ASSERT_MSG(cc && cc->err == 0, cc ? cc->errstr : "OOM");
+    ASSERT_MSG(cc && valkeyClusterGetError(cc) == 0, cc ? valkeyClusterGetErrorString(cc) : "OOM");
 
     valkeyReply *reply;
     reply = (valkeyReply *)valkeyClusterCommand(cc, "SET key_ipv6 value");

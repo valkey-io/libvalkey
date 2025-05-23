@@ -150,8 +150,8 @@ int main(void) {
     valkeyClusterOptionsUseLibevent(&options, base);
 
     valkeyClusterAsyncContext *acc = valkeyClusterAsyncConnectWithOptions(&options);
-    if (acc == NULL || acc->err != 0) {
-        printf("Connect error: %s\n", acc ? acc->errstr : "OOM");
+    if (acc == NULL || valkeyClusterAsyncGetError(acc) != 0) {
+        printf("Connect error: %s\n", acc ? valkeyClusterAsyncGetErrorString(acc) : "OOM");
         exit(2);
     }
 

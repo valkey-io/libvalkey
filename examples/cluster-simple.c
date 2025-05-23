@@ -14,8 +14,8 @@ int main(void) {
     if (!cc) {
         printf("Error: Allocation failure\n");
         exit(-1);
-    } else if (cc->err) {
-        printf("Error: %s\n", cc->errstr);
+    } else if (valkeyClusterGetError(cc)) {
+        printf("Error: %s\n", valkeyClusterGetErrorString(cc));
         // handle error
         exit(-1);
     }

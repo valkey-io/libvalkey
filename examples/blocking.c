@@ -38,7 +38,7 @@ static void example_argv_command(valkeyContext *c, size_t n) {
     reply = valkeyCommandArgv(
         c, n + 2, (const char **)argv, (const size_t *)argvlen);
 
-    if (reply == NULL || c->err) {
+    if (reply == NULL || valkeyGetError(c)) {
         fprintf(stderr, "Error:  Couldn't execute valkeyCommandArgv\n");
         exit(1);
     }
@@ -80,9 +80,9 @@ int main(int argc, char **argv) {
     } else {
         c = valkeyConnectWithTimeout(hostname, port, timeout);
     }
-    if (c == NULL || c->err) {
+    if (c == NULL || valkeyGetError(c)) {
         if (c) {
-            printf("Connection error: %s\n", c->errstr);
+            printf("Connection error: %s\n", valkeyGetErrorString(c));
             valkeyFree(c);
         } else {
             printf("Connection error: can't allocate valkey context\n");

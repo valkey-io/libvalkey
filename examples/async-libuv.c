@@ -14,7 +14,7 @@ void debugCallback(valkeyAsyncContext *c, void *r, void *privdata) {
     valkeyReply *reply = r;
     if (reply == NULL) {
         /* The DEBUG SLEEP command will almost always fail, because we have set a 1 second timeout */
-        printf("`DEBUG SLEEP` error: %s\n", c->errstr ? c->errstr : "unknown error");
+        printf("`DEBUG SLEEP` error: %s\n", valkeyAsyncGetErrorString(c) ? valkeyAsyncGetErrorString(c) : "unknown error");
         return;
     }
     /* Disconnect after receiving the reply of DEBUG SLEEP (which will not)*/
@@ -24,7 +24,7 @@ void debugCallback(valkeyAsyncContext *c, void *r, void *privdata) {
 void getCallback(valkeyAsyncContext *c, void *r, void *privdata) {
     valkeyReply *reply = r;
     if (reply == NULL) {
-        printf("`GET key` error: %s\n", c->errstr ? c->errstr : "unknown error");
+        printf("`GET key` error: %s\n", valkeyAsyncGetErrorString(c) ? valkeyAsyncGetErrorString(c) : "unknown error");
         return;
     }
     printf("`GET key` result: argv[%s]: %s\n", (char *)privdata, reply->str);
@@ -35,7 +35,7 @@ void getCallback(valkeyAsyncContext *c, void *r, void *privdata) {
 
 void connectCallback(valkeyAsyncContext *c, int status) {
     if (status != VALKEY_OK) {
-        printf("connect error: %s\n", c->errstr);
+        printf("connect error: %s\n", valkeyAsyncGetErrorString(c));
         return;
     }
     printf("Connected...\n");
@@ -43,7 +43,7 @@ void connectCallback(valkeyAsyncContext *c, int status) {
 
 void disconnectCallback(const valkeyAsyncContext *c, int status) {
     if (status != VALKEY_OK) {
-        printf("disconnect because of error: %s\n", c->errstr);
+        printf("disconnect because of error: %s\n", valkeyAsyncGetErrorString(c));
         return;
     }
     printf("Disconnected...\n");
@@ -57,9 +57,9 @@ int main(int argc, char **argv) {
     uv_loop_t *loop = uv_default_loop();
 
     valkeyAsyncContext *c = valkeyAsyncConnect("127.0.0.1", 6379);
-    if (c->err) {
+    if (valkeyAsyncGetError(c)) {
         /* Let *c leak for now... */
-        printf("Error: %s\n", c->errstr);
+        printf("Error: %s\n", valkeyAsyncGetErrorString(c));
         return 1;
     }
 

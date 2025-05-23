@@ -996,6 +996,16 @@ valkeyPushFn *valkeySetPushCallback(valkeyContext *c, valkeyPushFn *fn) {
     return old;
 }
 
+/* Get context error status (VALKEY_OK or VALKEY_ERR_x). */
+int valkeyGetError(const valkeyContext *c) {
+    return c->err;
+}
+
+/* Get context error description. */
+const char *valkeyGetErrorString(const valkeyContext *c) {
+    return c->errstr;
+}
+
 /* Use this function to handle a read event on the descriptor. It will try
  * and read some bytes from the socket and feed them to the reply parser.
  *

@@ -10,25 +10,25 @@
 void setCallback(valkeyClusterAsyncContext *acc, void *r, void *privdata) {
     UNUSED(privdata);
     valkeyReply *reply = (valkeyReply *)r;
-    ASSERT_MSG(reply != NULL, acc->errstr);
+    ASSERT_MSG(reply != NULL, valkeyClusterAsyncGetErrorString(acc));
 }
 
 void getCallback(valkeyClusterAsyncContext *acc, void *r, void *privdata) {
     UNUSED(privdata);
     valkeyReply *reply = (valkeyReply *)r;
-    ASSERT_MSG(reply != NULL, acc->errstr);
+    ASSERT_MSG(reply != NULL, valkeyClusterAsyncGetErrorString(acc));
 
     /* Disconnect after receiving the first reply to GET */
     valkeyClusterAsyncDisconnect(acc);
 }
 
 void connectCallback(valkeyAsyncContext *ac, int status) {
-    ASSERT_MSG(status == VALKEY_OK, ac->errstr);
+    ASSERT_MSG(status == VALKEY_OK, valkeyAsyncGetErrorString(ac));
     printf("Connected to %s:%d\n", ac->c.tcp.host, ac->c.tcp.port);
 }
 
 void disconnectCallback(const valkeyAsyncContext *ac, int status) {
-    ASSERT_MSG(status == VALKEY_OK, ac->errstr);
+    ASSERT_MSG(status == VALKEY_OK, valkeyAsyncGetErrorString(ac));
     printf("Disconnected from %s:%d\n", ac->c.tcp.host, ac->c.tcp.port);
 }
 
@@ -47,16 +47,16 @@ int main(int argc, char **argv) {
 
     valkeyClusterAsyncContext *acc = valkeyClusterAsyncConnectWithOptions(&options);
     assert(acc);
-    ASSERT_MSG(acc->err == 0, acc->errstr);
+    ASSERT_MSG(valkeyClusterAsyncGetError(acc) == 0, valkeyClusterAsyncGetErrorString(acc));
 
     int status;
     status = valkeyClusterAsyncCommand(acc, setCallback, (char *)"ID",
                                        "SET key value");
-    ASSERT_MSG(status == VALKEY_OK, acc->errstr);
+    ASSERT_MSG(status == VALKEY_OK, valkeyClusterAsyncGetErrorString(acc));
 
     status =
         valkeyClusterAsyncCommand(acc, getCallback, (char *)"ID", "GET key");
-    ASSERT_MSG(status == VALKEY_OK, acc->errstr);
+    ASSERT_MSG(status == VALKEY_OK, valkeyClusterAsyncGetErrorString(acc));
 
     uv_run(loop, UV_RUN_DEFAULT);
 

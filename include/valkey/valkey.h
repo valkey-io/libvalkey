@@ -348,6 +348,9 @@ int valkeyEnableKeepAlive(valkeyContext *c);
 int valkeyEnableKeepAliveWithInterval(valkeyContext *c, int interval);
 int valkeySetTcpUserTimeout(valkeyContext *c, unsigned int timeout);
 
+int valkeyGetError(const valkeyContext *c);
+const char *valkeyGetErrorString(const valkeyContext *c);
+
 void valkeyFree(valkeyContext *c);
 valkeyFD valkeyFreeKeepFd(valkeyContext *c);
 int valkeyBufferRead(valkeyContext *c);

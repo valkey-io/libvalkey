@@ -16,19 +16,19 @@ void test_pipeline(void) {
     options.initial_nodes = CLUSTER_NODE;
 
     valkeyClusterContext *cc = valkeyClusterConnectWithOptions(&options);
-    ASSERT_MSG(cc && cc->err == 0, cc ? cc->errstr : "OOM");
+    ASSERT_MSG(cc && valkeyClusterGetError(cc) == 0, cc ? valkeyClusterGetErrorString(cc) : "OOM");
 
     int status;
     status = valkeyClusterAppendCommand(cc, "SET foo one");
-    ASSERT_MSG(status == VALKEY_OK, cc->errstr);
+    ASSERT_MSG(status == VALKEY_OK, valkeyClusterGetErrorString(cc));
     status = valkeyClusterAppendCommand(cc, "SET bar two");
-    ASSERT_MSG(status == VALKEY_OK, cc->errstr);
+    ASSERT_MSG(status == VALKEY_OK, valkeyClusterGetErrorString(cc));
     status = valkeyClusterAppendCommand(cc, "GET foo");
-    ASSERT_MSG(status == VALKEY_OK, cc->errstr);
+    ASSERT_MSG(status == VALKEY_OK, valkeyClusterGetErrorString(cc));
     status = valkeyClusterAppendCommand(cc, "GET bar");
-    ASSERT_MSG(status == VALKEY_OK, cc->errstr);
+    ASSERT_MSG(status == VALKEY_OK, valkeyClusterGetErrorString(cc));
     status = valkeyClusterAppendCommand(cc, "SUNION a b");
-    ASSERT_MSG(status == VALKEY_OK, cc->errstr);
+    ASSERT_MSG(status == VALKEY_OK, valkeyClusterGetErrorString(cc));
 
     valkeyReply *reply;
     valkeyClusterGetReply(cc, (void *)&reply); // reply for: SET foo one
@@ -102,33 +102,33 @@ void test_async_pipeline(void) {
     valkeyClusterOptionsUseLibevent(&options, base);
 
     valkeyClusterAsyncContext *acc = valkeyClusterAsyncConnectWithOptions(&options);
-    ASSERT_MSG(acc && acc->err == 0, acc ? acc->errstr : "OOM");
+    ASSERT_MSG(acc && valkeyClusterAsyncGetError(acc) == 0, acc ? valkeyClusterAsyncGetErrorString(acc) : "OOM");
 
     int status;
     ExpectedResult r1 = {.type = VALKEY_REPLY_STATUS, .str = "OK"};
     status =
         valkeyClusterAsyncCommand(acc, commandCallback, &r1, "SET foo six");
-    ASSERT_MSG(status == VALKEY_OK, acc->errstr);
+    ASSERT_MSG(status == VALKEY_OK, valkeyClusterAsyncGetErrorString(acc));
 
     ExpectedResult r2 = {.type = VALKEY_REPLY_STATUS, .str = "OK"};
     status =
         valkeyClusterAsyncCommand(acc, commandCallback, &r2, "SET bar ten");
-    ASSERT_MSG(status == VALKEY_OK, acc->errstr);
+    ASSERT_MSG(status == VALKEY_OK, valkeyClusterAsyncGetErrorString(acc));
 
     ExpectedResult r3 = {.type = VALKEY_REPLY_STRING, .str = "six"};
     status = valkeyClusterAsyncCommand(acc, commandCallback, &r3, "GET foo");
-    ASSERT_MSG(status == VALKEY_OK, acc->errstr);
+    ASSERT_MSG(status == VALKEY_OK, valkeyClusterAsyncGetErrorString(acc));
 
     ExpectedResult r4 = {.type = VALKEY_REPLY_STRING, .str = "ten"};
     status = valkeyClusterAsyncCommand(acc, commandCallback, &r4, "GET bar");
-    ASSERT_MSG(status == VALKEY_OK, acc->errstr);
+    ASSERT_MSG(status == VALKEY_OK, valkeyClusterAsyncGetErrorString(acc));
 
     ExpectedResult r5 = {
         .type = VALKEY_REPLY_ERROR,
         .str = "CROSSSLOT Keys in request don't hash to the same slot",
         .disconnect = true};
     status = valkeyClusterAsyncCommand(acc, commandCallback, &r5, "SUNION a b");
-    ASSERT_MSG(status == VALKEY_OK, acc->errstr);
+    ASSERT_MSG(status == VALKEY_OK, valkeyClusterAsyncGetErrorString(acc));
 
     event_base_dispatch(base);
 
