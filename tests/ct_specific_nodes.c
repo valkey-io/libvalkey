@@ -185,7 +185,7 @@ void test_pipeline_to_single_node(valkeyClusterContext *cc) {
     assert(node);
 
     status = valkeyClusterAppendCommandToNode(cc, node, "DBSIZE");
-    ASSERT_MSG(status == VALKEY_OK, cc->errstr);
+    ASSERT_MSG(status == VALKEY_OK, valkeyClusterGetErrorString(cc));
 
     // Trigger send of pipeline commands
     valkeyClusterGetReply(cc, (void *)&reply);
@@ -202,7 +202,7 @@ void test_pipeline_to_all_nodes(valkeyClusterContext *cc) {
     valkeyClusterNode *node;
     while ((node = valkeyClusterNodeNext(&ni)) != NULL) {
         int status = valkeyClusterAppendCommandToNode(cc, node, "DBSIZE");
-        ASSERT_MSG(status == VALKEY_OK, cc->errstr);
+        ASSERT_MSG(status == VALKEY_OK, valkeyClusterGetErrorString(cc));
     }
 
     // Get replies from 3 node cluster
@@ -234,13 +234,13 @@ void test_pipeline_transaction(valkeyClusterContext *cc) {
     assert(node);
 
     status = valkeyClusterAppendCommandToNode(cc, node, "MULTI");
-    ASSERT_MSG(status == VALKEY_OK, cc->errstr);
+    ASSERT_MSG(status == VALKEY_OK, valkeyClusterGetErrorString(cc));
     status = valkeyClusterAppendCommandToNode(cc, node, "SET foo 199");
-    ASSERT_MSG(status == VALKEY_OK, cc->errstr);
+    ASSERT_MSG(status == VALKEY_OK, valkeyClusterGetErrorString(cc));
     status = valkeyClusterAppendCommandToNode(cc, node, "INCR foo");
-    ASSERT_MSG(status == VALKEY_OK, cc->errstr);
+    ASSERT_MSG(status == VALKEY_OK, valkeyClusterGetErrorString(cc));
     status = valkeyClusterAppendCommandToNode(cc, node, "EXEC");
-    ASSERT_MSG(status == VALKEY_OK, cc->errstr);
+    ASSERT_MSG(status == VALKEY_OK, valkeyClusterGetErrorString(cc));
 
     // Trigger send of pipeline commands
     {
@@ -287,12 +287,12 @@ void disconnectCallback(const valkeyAsyncContext *ac, int status) {
 }
 
 // Callback for async commands, verifies the valkeyReply
-void commandCallback(valkeyClusterAsyncContext *cc, void *r, void *privdata) {
+void commandCallback(valkeyClusterAsyncContext *acc, void *r, void *privdata) {
     valkeyReply *reply = (valkeyReply *)r;
     ExpectedResult *expect = (ExpectedResult *)privdata;
     if (expect->noreply) {
         assert(reply == NULL);
-        assert(strcmp(cc->errstr, expect->errstr) == 0);
+        assert(strcmp(valkeyClusterAsyncGetErrorString(acc), expect->errstr) == 0);
     } else {
         assert(reply != NULL);
         assert(reply->type == expect->type);
@@ -314,7 +314,7 @@ void commandCallback(valkeyClusterAsyncContext *cc, void *r, void *privdata) {
         }
     }
     if (expect->disconnect)
-        valkeyClusterAsyncDisconnect(cc);
+        valkeyClusterAsyncDisconnect(acc);
 }
 
 void test_async_to_single_node(void) {
@@ -329,7 +329,7 @@ void test_async_to_single_node(void) {
     valkeyClusterOptionsUseLibevent(&options, base);
 
     valkeyClusterAsyncContext *acc = valkeyClusterAsyncConnectWithOptions(&options);
-    ASSERT_MSG(acc && acc->err == 0, acc ? acc->errstr : "OOM");
+    ASSERT_MSG(acc && valkeyClusterAsyncGetError(acc) == 0, acc ? valkeyClusterAsyncGetErrorString(acc) : "OOM");
 
     valkeyClusterNodeIterator ni;
     valkeyClusterInitNodeIterator(&ni, &acc->cc);
@@ -340,7 +340,7 @@ void test_async_to_single_node(void) {
     ExpectedResult r1 = {.type = VALKEY_REPLY_INTEGER, .disconnect = true};
     status = valkeyClusterAsyncCommandToNode(acc, node, commandCallback, &r1,
                                              "DBSIZE");
-    ASSERT_MSG(status == VALKEY_OK, acc->errstr);
+    ASSERT_MSG(status == VALKEY_OK, valkeyClusterAsyncGetErrorString(acc));
 
     event_base_dispatch(base);
 
@@ -360,7 +360,7 @@ void test_async_formatted_to_single_node(void) {
     valkeyClusterOptionsUseLibevent(&options, base);
 
     valkeyClusterAsyncContext *acc = valkeyClusterAsyncConnectWithOptions(&options);
-    ASSERT_MSG(acc && acc->err == 0, acc ? acc->errstr : "OOM");
+    ASSERT_MSG(acc && valkeyClusterAsyncGetError(acc) == 0, acc ? valkeyClusterAsyncGetErrorString(acc) : "OOM");
 
     valkeyClusterNodeIterator ni;
     valkeyClusterInitNodeIterator(&ni, &acc->cc);
@@ -372,7 +372,7 @@ void test_async_formatted_to_single_node(void) {
     char command[] = "*1\r\n$6\r\nDBSIZE\r\n";
     status = valkeyClusterAsyncFormattedCommandToNode(
         acc, node, commandCallback, &r1, command, strlen(command));
-    ASSERT_MSG(status == VALKEY_OK, acc->errstr);
+    ASSERT_MSG(status == VALKEY_OK, valkeyClusterAsyncGetErrorString(acc));
 
     event_base_dispatch(base);
 
@@ -392,7 +392,7 @@ void test_async_command_argv_to_single_node(void) {
     valkeyClusterOptionsUseLibevent(&options, base);
 
     valkeyClusterAsyncContext *acc = valkeyClusterAsyncConnectWithOptions(&options);
-    ASSERT_MSG(acc && acc->err == 0, acc ? acc->errstr : "OOM");
+    ASSERT_MSG(acc && valkeyClusterAsyncGetError(acc) == 0, acc ? valkeyClusterAsyncGetErrorString(acc) : "OOM");
 
     valkeyClusterNodeIterator ni;
     valkeyClusterInitNodeIterator(&ni, &acc->cc);
@@ -404,7 +404,7 @@ void test_async_command_argv_to_single_node(void) {
     status = valkeyClusterAsyncCommandArgvToNode(
         acc, node, commandCallback, &r1, 1, (const char *[]){"DBSIZE"},
         (size_t[]){6});
-    ASSERT_MSG(status == VALKEY_OK, acc->errstr);
+    ASSERT_MSG(status == VALKEY_OK, valkeyClusterAsyncGetErrorString(acc));
 
     event_base_dispatch(base);
 
@@ -424,7 +424,7 @@ void test_async_to_all_nodes(void) {
     valkeyClusterOptionsUseLibevent(&options, base);
 
     valkeyClusterAsyncContext *acc = valkeyClusterAsyncConnectWithOptions(&options);
-    ASSERT_MSG(acc && acc->err == 0, acc ? acc->errstr : "OOM");
+    ASSERT_MSG(acc && valkeyClusterAsyncGetError(acc) == 0, acc ? valkeyClusterAsyncGetErrorString(acc) : "OOM");
 
     valkeyClusterNodeIterator ni;
     valkeyClusterInitNodeIterator(&ni, &acc->cc);
@@ -437,7 +437,7 @@ void test_async_to_all_nodes(void) {
 
         status = valkeyClusterAsyncCommandToNode(acc, node, commandCallback,
                                                  &r1, "DBSIZE");
-        ASSERT_MSG(status == VALKEY_OK, acc->errstr);
+        ASSERT_MSG(status == VALKEY_OK, valkeyClusterAsyncGetErrorString(acc));
     }
 
     // Normal command to trigger disconnect
@@ -464,7 +464,7 @@ void test_async_transaction(void) {
     valkeyClusterOptionsUseLibevent(&options, base);
 
     valkeyClusterAsyncContext *acc = valkeyClusterAsyncConnectWithOptions(&options);
-    ASSERT_MSG(acc && acc->err == 0, acc ? acc->errstr : "OOM");
+    ASSERT_MSG(acc && valkeyClusterAsyncGetError(acc) == 0, acc ? valkeyClusterAsyncGetErrorString(acc) : "OOM");
 
     valkeyClusterNode *node = valkeyClusterGetNodeByKey(&acc->cc, (char *)"foo");
     assert(node);
@@ -473,24 +473,24 @@ void test_async_transaction(void) {
     ExpectedResult r1 = {.type = VALKEY_REPLY_STATUS, .str = "OK"};
     status = valkeyClusterAsyncCommandToNode(acc, node, commandCallback, &r1,
                                              "MULTI");
-    ASSERT_MSG(status == VALKEY_OK, acc->errstr);
+    ASSERT_MSG(status == VALKEY_OK, valkeyClusterAsyncGetErrorString(acc));
 
     ExpectedResult r2 = {.type = VALKEY_REPLY_STATUS, .str = "QUEUED"};
     status = valkeyClusterAsyncCommandToNode(acc, node, commandCallback, &r2,
                                              "SET foo 99");
-    ASSERT_MSG(status == VALKEY_OK, acc->errstr);
+    ASSERT_MSG(status == VALKEY_OK, valkeyClusterAsyncGetErrorString(acc));
 
     ExpectedResult r3 = {.type = VALKEY_REPLY_STATUS, .str = "QUEUED"};
     status = valkeyClusterAsyncCommandToNode(acc, node, commandCallback, &r3,
                                              "INCR foo");
-    ASSERT_MSG(status == VALKEY_OK, acc->errstr);
+    ASSERT_MSG(status == VALKEY_OK, valkeyClusterAsyncGetErrorString(acc));
 
     /* The EXEC command will return an array with result from 2 queued commands. */
     ExpectedResult r4 = {
         .type = VALKEY_REPLY_ARRAY, .elements = 2, .disconnect = true};
     status = valkeyClusterAsyncCommandToNode(acc, node, commandCallback, &r4,
                                              "EXEC ");
-    ASSERT_MSG(status == VALKEY_OK, acc->errstr);
+    ASSERT_MSG(status == VALKEY_OK, valkeyClusterAsyncGetErrorString(acc));
 
     event_base_dispatch(base);
 
@@ -504,7 +504,7 @@ int main(void) {
     options.max_retry = 1;
 
     valkeyClusterContext *cc = valkeyClusterConnectWithOptions(&options);
-    ASSERT_MSG(cc && cc->err == 0, cc ? cc->errstr : "OOM");
+    ASSERT_MSG(cc && valkeyClusterGetError(cc) == 0, cc ? valkeyClusterGetErrorString(cc) : "OOM");
     load_valkey_version(cc);
 
     // Synchronous API

@@ -22,7 +22,7 @@ void load_valkey_version(valkeyClusterContext *cc) {
         goto abort;
 
     reply = valkeyClusterCommandToNode(cc, node, "INFO");
-    if (reply == NULL || cc->err || reply->type != VALKEY_REPLY_STRING)
+    if (reply == NULL || valkeyClusterGetError(cc) || reply->type != VALKEY_REPLY_STRING)
         goto abort;
     if ((s = strstr(reply->str, VALKEY_VERSION_FIELD)) != NULL)
         s += strlen(VALKEY_VERSION_FIELD);

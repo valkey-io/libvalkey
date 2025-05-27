@@ -60,8 +60,8 @@ static void assertReplyAndFree(valkeyContext *context, valkeyReply *reply, int t
 /* Switch to the RESP3 protocol and enable client tracking */
 static void enableClientTracking(valkeyContext *c) {
     valkeyReply *reply = valkeyCommand(c, "HELLO 3");
-    if (reply == NULL || c->err) {
-        panicAbort("NULL reply or server error (error: %s)", c->errstr);
+    if (reply == NULL || valkeyGetError(c)) {
+        panicAbort("NULL reply or server error (error: %s)", valkeyGetErrorString(c));
     }
 
     if (reply->type != VALKEY_REPLY_MAP) {
@@ -130,8 +130,8 @@ int main(int argc, char **argv) {
     o.push_cb = pushReplyHandler;
 
     c = valkeyConnectWithOptions(&o);
-    if (c == NULL || c->err)
-        panicAbort("Connection error:  %s", c ? c->errstr : "OOM");
+    if (c == NULL || valkeyGetError(c))
+        panicAbort("Connection error:  %s", c ? valkeyGetErrorString(c) : "OOM");
 
     /* Enable RESP3 and turn on client tracking */
     enableClientTracking(c);
