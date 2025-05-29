@@ -17,31 +17,37 @@ jobs:
         clang-format-version: '18'
 
   ubuntu-cmake:
-    name: Build with CMake [${{ matrix.cmake-build-type }}, ${{ matrix.compiler }}, cmake-${{ matrix.cmake-version }}, sanitizer="${{ matrix.sanitizer }}"]
+    name: Build with CMake ${{ matrix.sanitizer && format('and {0}-sanitizer', matrix.sanitizer ) }} [${{ matrix.compiler }}, cmake-${{ matrix.cmake-version }}, ${{ matrix.cmake-build-type }}]
     runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
+        include:
+          # New compilers
+          - compiler: 'clang-20'
+            cmake-version: '4.0'
+            cmake-build-type: Release
+          - compiler: 'gcc-14'
+            cmake-version: '4.0'
+            cmake-build-type: Release
+          # Old compilers
+          - compiler: 'clang-14'
+            cmake-version: '3.13'
+            cmake-build-type: Release
+          - compiler: 'gcc-9'
+            cmake-version: '3.13'
+            cmake-build-type: Release
+        # Sanitizers enabled
         compiler: ['gcc-14', 'clang-20']
         cmake-version: ['4.0']
-        cmake-build-type: [Release]
-        sanitizer: ["", thread, undefined, leak, address]
-        include:
-          - compiler: clang-18
-            cmake-version: 3.29
-            cmake-build-type: Debug
-          - compiler: gcc-9
-            cmake-version: 3.13
-            cmake-build-type: Release
-          - compiler: clang-14
-            cmake-version: 3.13
-            cmake-build-type: Release
+        cmake-build-type: [RelWithDebInfo]
+        sanitizer: [thread, undefined, leak, address]
     steps:
     - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
     - name: Prepare
       uses: awalsh128/cache-apt-pkgs-action@7ca5f46d061ad9aa95863cd9b214dd48edef361d # v1.5.0
       with:
-        packages: libevent-dev libuv1-dev libev-dev libglib2.0-dev
+        packages: libevent-dev libuv1-dev libev-dev libglib2.0-dev valkey
         version: 1.0
     - name: Setup compiler
       uses: aminya/setup-cpp@9dc9c217f497fe7342eed97e6f200bf101c9cc04 # v1.6.2
@@ -51,10 +57,6 @@ jobs:
       uses: jwlawson/actions-setup-cmake@802fa1a2c4e212495c05bf94dba2704a92a472be # v2.0.2
       with:
         cmake-version: ${{ matrix.cmake-version }}
-    - name: Install Valkey for non-cluster tests
-      run: |
-        sudo apt update
-        sudo apt install valkey
     - name: Generate makefiles
       run: |
         if [ -n "${{ matrix.sanitizer }}" ]; then
@@ -86,12 +88,8 @@ jobs:
       - name: Prepare
         uses: awalsh128/cache-apt-pkgs-action@7ca5f46d061ad9aa95863cd9b214dd48edef361d # v1.5.0
         with:
-          packages: libevent-dev valgrind
+          packages: libevent-dev valgrind valkey
           version: 1.0
-      - name: Install Valkey
-        run: |
-          sudo apt update
-          sudo apt install valkey
       - name: Build
         run: USE_TLS=1 TEST_ASYNC=1 make
       - name: Run tests
@@ -116,12 +114,8 @@ jobs:
       - name: Prepare
         uses: awalsh128/cache-apt-pkgs-action@7ca5f46d061ad9aa95863cd9b214dd48edef361d # v1.5.0
         with:
-          packages: gcc-multilib
+          packages: gcc-multilib valkey
           version: 1.0
-      - name: Install Valkey
-        run: |
-          sudo apt update
-          sudo apt install valkey
       - name: Build
         run: |
           make 32bit
