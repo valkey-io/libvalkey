@@ -218,7 +218,7 @@ static void *createIntegerObject(const valkeyReadTask *task, long long value) {
 static void *createDoubleObject(const valkeyReadTask *task, double value, char *str, size_t len) {
     valkeyReply *r, *parent;
 
-    if (len == SIZE_MAX) // Prevents vk_malloc(0) if len equals to SIZE_MAX
+    if (len == SIZE_MAX) // Prevents vk_malloc(0) if len equals SIZE_MAX
         return NULL;
 
     r = createReplyObject(VALKEY_REPLY_DOUBLE);
