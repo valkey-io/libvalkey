@@ -128,7 +128,7 @@ def extract_command_info(name, props):
         name = container.upper()
     else:
         # Ad-hoc handling of command and subcommand in the same string,
-        # sepatated by a space. This form is used in e.g. RediSearch's JSON file
+        # separated by a space. This form is used in e.g. RediSearch's JSON file
         # in commands like "FT.CONFIG GET".
         tokens = name.split(maxsplit=1)
         if len(tokens) > 1:
