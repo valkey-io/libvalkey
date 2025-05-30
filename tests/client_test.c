@@ -210,7 +210,7 @@ static valkeyContext *select_database(valkeyContext *c) {
         /* Awesome, DB 9 is empty and we can continue. */
         freeReplyObject(reply);
     } else {
-        printf("Database #9 is not empty, test can not continue\n");
+        printf("Database #9 is not empty, test cannot continue\n");
         exit(1);
     }
 
