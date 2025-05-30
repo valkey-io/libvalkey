@@ -1091,7 +1091,7 @@ static void test_blocking_connection_errors(void) {
     valkeyFree(c);
 
     test("Returns error when the unix_sock socket path doesn't accept connections: ");
-    c = valkeyConnectUnix((char *)"/tmp/idontexist.sock");
+    c = valkeyConnectUnix((char *)"/tmp/nonexistent.sock");
     test_cond(c->err == VALKEY_ERR_IO); /* Don't care about the message... */
     valkeyFree(c);
 #endif
