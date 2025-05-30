@@ -57,7 +57,7 @@ def any_argument_is_key(arguments):
 #                     keys (example EVAL)
 def firstkey(props):
     if not "key_specs" in props:
-        # Key specs missing. Best-effort fallback to "arguments".
+        # Key specs missing. Best-effort fall back to "arguments".
         if "arguments" in props:
             args = props["arguments"]
             for i in range(1, len(args)):
