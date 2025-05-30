@@ -738,7 +738,7 @@ static void test_reply_reader(void) {
     freeReplyObject(reply);
     valkeyReaderFree(reader);
 
-    /* RESP3 push messages (Github issue #815) */
+    /* RESP3 push messages (GitHub issue #815) */
     test("Can parse RESP3 push messages: ");
     reader = valkeyReaderCreate();
     valkeyReaderFeed(reader, (char *)">2\r\n$6\r\nLOLWUT\r\n:42\r\n", 21);
