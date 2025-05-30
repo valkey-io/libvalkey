@@ -4,7 +4,7 @@
 #
 # The first attempt to get the slotmap will receive a reply without any
 # slot information and this should result in a retry.
-# The following slotmap updates tests the handling of an nil/empty IP address.
+# The following slotmap updates tests the handling of a nil/empty IP address.
 #
 # The client is configured to use the CLUSTER SLOTS command.
 #
