@@ -1034,7 +1034,7 @@ static void test_allocator_injection(void) {
     valkeyResetAllocators();
 }
 
-#define VALKEY_BAD_DOMAIN "idontexist-noreally.com"
+#define VALKEY_BAD_DOMAIN "nonexistent.example.com"
 static void test_blocking_connection_errors(void) {
     struct addrinfo hints = {.ai_family = AF_INET};
     struct addrinfo *ai_tmp = NULL;
