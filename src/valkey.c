@@ -235,7 +235,7 @@ static void *createDoubleObject(const valkeyReadTask *task, double value, char *
     /* The double reply also has the original protocol string representing a
      * double as a null terminated string. This way the caller does not need
      * to format back for string conversion, especially since Valkey does efforts
-     * to make the string more human readable avoiding the calssical double
+     * to make the string more human readable avoiding the classical double
      * decimal string conversion artifacts. */
     memcpy(r->str, str, len);
     r->str[len] = '\0';
