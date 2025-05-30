@@ -80,7 +80,7 @@ void printReply(const valkeyReply *reply) {
 
 void replyCallback(valkeyClusterAsyncContext *acc, void *r, void *privdata) {
     valkeyReply *reply = (valkeyReply *)r;
-    intptr_t cmd_id = (intptr_t)privdata; /* Id to corresponding cmd */
+    intptr_t cmd_id = (intptr_t)privdata; /* ID for corresponding cmd */
 
     if (reply == NULL) {
         if (acc->err) {
