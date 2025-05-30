@@ -372,7 +372,7 @@ int valkeyAppendCommandArgv(valkeyContext *c, int argc, const char **argv, const
 
 /* Issue a command to Valkey. In a blocking context, it is identical to calling
  * valkeyAppendCommand, followed by valkeyGetReply. The function will return
- * NULL if there was an error in performing the request, otherwise it will
+ * NULL if there was an error in performing the request; otherwise, it will
  * return the reply. In a non-blocking context, it is identical to calling
  * only valkeyAppendCommand and will always return NULL. */
 void *valkeyvCommand(valkeyContext *c, const char *format, va_list ap);
