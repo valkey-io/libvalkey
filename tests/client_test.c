@@ -1787,7 +1787,7 @@ void ssubscribe_crossslot_error_cb(valkeyAsyncContext *ac, void *r, void *privda
 }
 
 /* Subscribe callback for test_sharded_pubsub_crossslot_handling:
- * - a published message triggers another ssubscribe to first channel and other slot chahhel
+ * - a published message triggers another ssubscribe to first channel and other slot channel
  * - after receiving CROSSLOT error send smessage to first channel
  * - a command is sent before the unsubscribe response is received. */
 void ssubscribe_crossslot_cb(valkeyAsyncContext *ac, void *r, void *privdata) {
