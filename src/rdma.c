@@ -614,7 +614,7 @@ waitcq:
     }
 }
 
-/* RDMA has no POLLOUT event supported, so it could't work well with valkey async mechanism */
+/* RDMA has no POLLOUT event supported, so it couldn't work well with valkey async mechanism */
 static void valkeyRdmaAsyncRead(VALKEY_UNUSED valkeyAsyncContext *ac) {
     assert("valkey async mechanism can't work with RDMA" == NULL);
 }

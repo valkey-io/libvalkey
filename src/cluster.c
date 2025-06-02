@@ -561,7 +561,7 @@ static dict *parse_cluster_slots(valkeyClusterContext *cc, valkeyContext *c,
                     valkeyClusterSetError(
                         cc, VALKEY_ERR_OTHER,
                         "Command(cluster slots) reply error: "
-                        "nodes sub_reply is not an correct array.");
+                        "nodes sub_reply is not a correct array.");
                     goto error;
                 }
 
