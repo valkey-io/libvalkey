@@ -58,8 +58,9 @@ endif()
 if(MSVC OR MINGW)
   find_library(LIBEVENT_LIBRARY Libevent)
 else()
-  # Use the Debug configuration when building tests (no -DNDEBUG)
-  set(CMAKE_BUILD_TYPE "Debug" CACHE STRING "" FORCE)
+  # Undefine any -DNDEBUG to make sure that tests can assert.
+  # CMake defines NDEBUG in Release and RelWithDebInfo.
+  add_compile_options("-UNDEBUG")
 endif()
 
 # Make sure ctest gives the output when tests fail
