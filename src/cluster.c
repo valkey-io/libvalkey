@@ -63,13 +63,6 @@ vk_static_assert(VALKEY_OPT_USE_CLUSTER_NODES > VALKEY_OPT_LAST_SA_OPTION);
 // standard Valkey errors
 #define VALKEY_ERR_CLUSTER_TOO_MANY_RETRIES 100
 
-#define VALKEY_ERROR_MOVED "MOVED"
-#define VALKEY_ERROR_ASK "ASK"
-#define VALKEY_ERROR_TRYAGAIN "TRYAGAIN"
-#define VALKEY_ERROR_CLUSTERDOWN "CLUSTERDOWN"
-
-#define VALKEY_STATUS_OK "OK"
-
 #define VALKEY_COMMAND_CLUSTER_NODES "CLUSTER NODES"
 #define VALKEY_COMMAND_CLUSTER_SLOTS "CLUSTER SLOTS"
 #define VALKEY_COMMAND_ASKING "ASKING"
@@ -97,14 +90,14 @@ typedef struct cluster_async_data {
     void *privdata;
 } cluster_async_data;
 
-typedef enum CLUSTER_ERR_TYPE {
-    CLUSTER_NOT_ERR = 0,
+typedef enum {
+    CLUSTER_NO_ERROR = 0,
     CLUSTER_ERR_MOVED,
     CLUSTER_ERR_ASK,
     CLUSTER_ERR_TRYAGAIN,
     CLUSTER_ERR_CLUSTERDOWN,
-    CLUSTER_ERR_SENTINEL
-} CLUSTER_ERR_TYPE;
+    CLUSTER_ERR_OTHER
+} replyErrorType;
 
 static void freeValkeyClusterNode(valkeyClusterNode *node);
 static void cluster_slot_destroy(cluster_slot *slot);
@@ -223,35 +216,20 @@ static inline void valkeyClusterClearError(valkeyClusterContext *cc) {
     cc->errstr[0] = '\0';
 }
 
-static int cluster_reply_error_type(valkeyReply *reply) {
+static replyErrorType getReplyErrorType(valkeyReply *reply) {
+    assert(reply);
 
-    if (reply == NULL) {
-        return VALKEY_ERR;
-    }
-
-    if (reply->type == VALKEY_REPLY_ERROR) {
-        if ((int)strlen(VALKEY_ERROR_MOVED) < reply->len &&
-            memcmp(reply->str, VALKEY_ERROR_MOVED,
-                   strlen(VALKEY_ERROR_MOVED)) == 0) {
-            return CLUSTER_ERR_MOVED;
-        } else if ((int)strlen(VALKEY_ERROR_ASK) < reply->len &&
-                   memcmp(reply->str, VALKEY_ERROR_ASK,
-                          strlen(VALKEY_ERROR_ASK)) == 0) {
-            return CLUSTER_ERR_ASK;
-        } else if ((int)strlen(VALKEY_ERROR_TRYAGAIN) < reply->len &&
-                   memcmp(reply->str, VALKEY_ERROR_TRYAGAIN,
-                          strlen(VALKEY_ERROR_TRYAGAIN)) == 0) {
-            return CLUSTER_ERR_TRYAGAIN;
-        } else if ((int)strlen(VALKEY_ERROR_CLUSTERDOWN) < reply->len &&
-                   memcmp(reply->str, VALKEY_ERROR_CLUSTERDOWN,
-                          strlen(VALKEY_ERROR_CLUSTERDOWN)) == 0) {
-            return CLUSTER_ERR_CLUSTERDOWN;
-        } else {
-            return CLUSTER_ERR_SENTINEL;
-        }
-    }
-
-    return CLUSTER_NOT_ERR;
+    if (reply->type != VALKEY_REPLY_ERROR)
+        return CLUSTER_NO_ERROR;
+    if (memcmp(reply->str, "MOVED", 5) == 0)
+        return CLUSTER_ERR_MOVED;
+    if (memcmp(reply->str, "ASK", 3) == 0)
+        return CLUSTER_ERR_ASK;
+    if (memcmp(reply->str, "TRYAGAIN", 8) == 0)
+        return CLUSTER_ERR_TRYAGAIN;
+    if (memcmp(reply->str, "CLUSTERDOWN", 11) == 0)
+        return CLUSTER_ERR_CLUSTERDOWN;
+    return CLUSTER_ERR_OTHER;
 }
 
 /* Create and initiate the cluster node structure */
@@ -1735,7 +1713,7 @@ static int valkeyClusterGetReplyFromNode(valkeyClusterContext *cc,
         return VALKEY_ERR;
     }
 
-    if (cluster_reply_error_type(*reply) == CLUSTER_ERR_MOVED)
+    if (getReplyErrorType(*reply) == CLUSTER_ERR_MOVED)
         cc->need_update_route = 1;
 
     return VALKEY_OK;
@@ -1868,7 +1846,6 @@ static void *valkey_cluster_command_execute(valkeyClusterContext *cc,
     void *reply = NULL;
     valkeyClusterNode *node;
     valkeyContext *c = NULL;
-    int error_type;
     valkeyContext *c_updating_route = NULL;
 
 retry:
@@ -1933,8 +1910,8 @@ ask_retry:
         goto error;
     }
 
-    error_type = cluster_reply_error_type(reply);
-    if (error_type > CLUSTER_NOT_ERR && error_type < CLUSTER_ERR_SENTINEL) {
+    replyErrorType error_type = getReplyErrorType(reply);
+    if (error_type > CLUSTER_NO_ERROR && error_type < CLUSTER_ERR_OTHER) {
         cc->retry_count++;
         if (cc->retry_count > cc->max_retry_count) {
             valkeyClusterSetError(cc, VALKEY_ERR_CLUSTER_TOO_MANY_RETRIES,
@@ -2932,7 +2909,6 @@ static void valkeyClusterAsyncCallback(valkeyAsyncContext *ac, void *r,
     valkeyClusterAsyncContext *acc;
     valkeyClusterContext *cc;
     valkeyAsyncContext *ac_retry = NULL;
-    int error_type;
     valkeyClusterNode *node;
     struct cmd *command;
 
@@ -2972,9 +2948,8 @@ static void valkeyClusterAsyncCallback(valkeyAsyncContext *ac, void *r,
     if (cad->retry_count == NO_RETRY || cc->flags & VALKEY_FLAG_DISCONNECTING)
         goto done;
 
-    error_type = cluster_reply_error_type(reply);
-
-    if (error_type > CLUSTER_NOT_ERR && error_type < CLUSTER_ERR_SENTINEL) {
+    replyErrorType error_type = getReplyErrorType(reply);
+    if (error_type > CLUSTER_NO_ERROR && error_type < CLUSTER_ERR_OTHER) {
         cad->retry_count++;
         if (cad->retry_count > cc->max_retry_count) {
             cad->retry_count = 0;
