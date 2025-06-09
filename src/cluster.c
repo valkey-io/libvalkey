@@ -67,8 +67,6 @@ vk_static_assert(VALKEY_OPT_USE_CLUSTER_NODES > VALKEY_OPT_LAST_SA_OPTION);
 #define VALKEY_COMMAND_CLUSTER_SLOTS "CLUSTER SLOTS"
 #define VALKEY_COMMAND_ASKING "ASKING"
 
-#define PORT_CPORT_SEPARATOR '@'
-
 #define CLUSTER_ADDRESS_SEPARATOR ","
 
 #define CLUSTER_DEFAULT_MAX_RETRY_COUNT 5
@@ -792,7 +790,7 @@ static int parse_cluster_nodes_line(valkeyClusterContext *cc, valkeyContext *c, 
 
     /* Parse the address field: <ip:port@cport[,hostname]>
      * Remove @cport.. to get <ip>:<port> which is our dict key. */
-    if ((p = strchr(addr, PORT_CPORT_SEPARATOR)) != NULL) {
+    if ((p = strchr(addr, '@')) != NULL) {
         *p = '\0';
     }
 
