@@ -67,8 +67,6 @@ vk_static_assert(VALKEY_OPT_USE_CLUSTER_NODES > VALKEY_OPT_LAST_SA_OPTION);
 #define VALKEY_COMMAND_CLUSTER_SLOTS "CLUSTER SLOTS"
 #define VALKEY_COMMAND_ASKING "ASKING"
 
-#define IP_PORT_SEPARATOR ':'
-
 #define PORT_CPORT_SEPARATOR '@'
 
 #define CLUSTER_ADDRESS_SEPARATOR ","
@@ -799,7 +797,7 @@ static int parse_cluster_nodes_line(valkeyClusterContext *cc, valkeyContext *c, 
     }
 
     /* Find the required port separator. */
-    if ((p = strrchr(addr, IP_PORT_SEPARATOR)) == NULL) {
+    if ((p = strrchr(addr, ':')) == NULL) {
         valkeyClusterSetError(cc, VALKEY_ERR_OTHER, "Invalid node address");
         freeValkeyClusterNode(node);
         return VALKEY_ERR;
@@ -1301,12 +1299,13 @@ static int valkeyClusterSetOptionAddNode(valkeyClusterContext *cc, const char *a
     node_entry = dictFind(cc->nodes, addr_sds);
     sdsfree(addr_sds);
     if (node_entry == NULL) {
-
         char *p;
-        if ((p = strrchr(addr, IP_PORT_SEPARATOR)) == NULL) {
-            valkeyClusterSetError(
-                cc, VALKEY_ERR_OTHER,
-                "server address is incorrect, port separator missing.");
+
+        /* Find the last occurrence of the port separator since
+         * IPv6 addresses can contain ':' */
+        if ((p = strrchr(addr, ':')) == NULL) {
+            valkeyClusterSetError(cc, VALKEY_ERR_OTHER,
+                                  "server address is incorrect, port separator missing.");
             return VALKEY_ERR;
         }
         // p includes separator
@@ -1757,7 +1756,7 @@ static valkeyClusterNode *getNodeFromRedirectReply(valkeyClusterContext *cc,
     }
     /* Find the last occurrence of the port separator since
      * IPv6 addresses can contain ':' */
-    if ((p = strrchr(addr, IP_PORT_SEPARATOR)) == NULL) {
+    if ((p = strrchr(addr, ':')) == NULL) {
         valkeyClusterSetError(cc, VALKEY_ERR_OTHER, "Invalid address in redirect");
         return NULL;
     }
