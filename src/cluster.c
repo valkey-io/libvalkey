@@ -67,8 +67,6 @@ vk_static_assert(VALKEY_OPT_USE_CLUSTER_NODES > VALKEY_OPT_LAST_SA_OPTION);
 #define VALKEY_COMMAND_CLUSTER_SLOTS "CLUSTER SLOTS"
 #define VALKEY_COMMAND_ASKING "ASKING"
 
-#define CLUSTER_ADDRESS_SEPARATOR ","
-
 #define CLUSTER_DEFAULT_MAX_RETRY_COUNT 5
 #define NO_RETRY -1
 
@@ -1382,8 +1380,9 @@ static int valkeyClusterSetOptionAddNodes(valkeyClusterContext *cc,
         return VALKEY_ERR;
     }
 
-    address = sdssplitlen(addrs, strlen(addrs), CLUSTER_ADDRESS_SEPARATOR,
-                          strlen(CLUSTER_ADDRESS_SEPARATOR), &address_count);
+    /* Split into individual addresses. */
+    const char *sep = ",";
+    address = sdssplitlen(addrs, strlen(addrs), sep, strlen(sep), &address_count);
     if (address == NULL) {
         valkeyClusterSetError(cc, VALKEY_ERR_OOM, "Out of memory");
         return VALKEY_ERR;
