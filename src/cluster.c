@@ -1381,8 +1381,7 @@ static int valkeyClusterSetOptionAddNodes(valkeyClusterContext *cc,
     }
 
     /* Split into individual addresses. */
-    const char *sep = ",";
-    address = sdssplitlen(addrs, strlen(addrs), sep, strlen(sep), &address_count);
+    address = sdssplitlen(addrs, strlen(addrs), ",", strlen(","), &address_count);
     if (address == NULL) {
         valkeyClusterSetError(cc, VALKEY_ERR_OOM, "Out of memory");
         return VALKEY_ERR;
