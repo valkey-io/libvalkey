@@ -47,7 +47,7 @@ jobs:
     - name: Prepare
       uses: awalsh128/cache-apt-pkgs-action@4c82c3ccdc1344ee11e9775dbdbdf43aa8a5614e # v1.5.1
       with:
-        packages: libevent-dev libuv1-dev libev-dev libglib2.0-dev valkey
+        packages: libevent-dev libuv1-dev libev-dev libglib2.0-dev valkey-server
         version: 1.0
     - name: Setup compiler
       uses: aminya/setup-cpp@a276e6e3d1db9160db5edc458e99a30d3b109949 # v1.7.1
@@ -88,7 +88,7 @@ jobs:
       - name: Prepare
         uses: awalsh128/cache-apt-pkgs-action@4c82c3ccdc1344ee11e9775dbdbdf43aa8a5614e # v1.5.1
         with:
-          packages: libevent-dev valgrind valkey
+          packages: libevent-dev valgrind valkey-server
           version: 1.0
       - name: Build
         run: USE_TLS=1 TEST_ASYNC=1 make
@@ -114,7 +114,7 @@ jobs:
       - name: Prepare
         uses: awalsh128/cache-apt-pkgs-action@4c82c3ccdc1344ee11e9775dbdbdf43aa8a5614e # v1.5.1
         with:
-          packages: gcc-multilib valkey
+          packages: gcc-multilib valkey-server
           version: 1.0
       - name: Build
         run: |
