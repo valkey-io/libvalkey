@@ -240,18 +240,19 @@ jobs:
       - name: Remove installed OpenSSL 1.1.1 (has reached End of Life)
         shell: bash
         run: rm -rf 'C:/Program Files/OpenSSL/'
-      - name: Install dependencies
+      - name: Install dependencies (choco)
         run: |
           choco install -y memurai-developer
-          # Workaround for libevent that specify minimum CMake version 3.1 (incompatible with CMake >= 4.0).
-          sed -i '2i if(CMAKE_VERSION VERSION_GREATER_EQUAL "4.0")' ${env:VCPKG_INSTALLATION_ROOT}/scripts/ports.cmake
-          sed -i '3i   set(ENV{CMAKE_POLICY_VERSION_MINIMUM} 3.5)'  ${env:VCPKG_INSTALLATION_ROOT}/scripts/ports.cmake
-          sed -i '4i endif()'                                       ${env:VCPKG_INSTALLATION_ROOT}/scripts/ports.cmake
-          vcpkg install --triplet x64-windows-release pkgconf libevent openssl
+      - name: Install dependencies (vcpkg)
+        uses: johnwason/vcpkg-action@caa1c94fbb94d8b023a0cc93edf10cd3791349a7 # v7.0.1
+        with:
+          pkgs: pkgconf libevent openssl
+          triplet: x64-windows
+          token: ${{ github.token }}
       - name: Build and install
         run: |
           mkdir build && cd build
-          cmake .. -G Ninja -DENABLE_TLS=ON -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE=C:\vcpkg\scripts\buildsystems\vcpkg.cmake
+          cmake .. -G Ninja -DENABLE_TLS=ON -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}\vcpkg\scripts\buildsystems\vcpkg.cmake
           ninja -v install
       - name: Run tests
         working-directory: build
