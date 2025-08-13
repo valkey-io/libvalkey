@@ -10,7 +10,7 @@ jobs:
   spellcheck:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
       - name: Run spellcheck
         uses: rojopolis/spellcheck-github-actions@35a02bae020e6999c5c37fabaf447f2eb8822ca7 # 0.51.0
         with:
@@ -19,9 +19,9 @@ jobs:
   typos:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
       - name: Install typos
-        uses: taiki-e/install-action@6064345e6658255e90e9500fdf9a06ab77e6909c # v2.57.6
+        uses: taiki-e/install-action@3839ec485e8ef50e4a86e9cd116260b68a412c07 # v2.58.10
         with:
           tool: typos
       - name: Run typos
