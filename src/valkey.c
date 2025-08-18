@@ -1009,13 +1009,41 @@ int valkeyBufferRead(valkeyContext *c) {
     if (c->err)
         return VALKEY_ERR;
 
-    nread = c->funcs->read(c, buf, sizeof(buf));
-    if (nread < 0) {
-        return VALKEY_ERR;
-    }
-    if (nread > 0 && valkeyReaderFeed(c->reader, buf, nread) != VALKEY_OK) {
-        valkeySetError(c, c->reader->err, c->reader->errstr);
-        return VALKEY_ERR;
+    if (c->connection_type != VALKEY_CONN_RDMA) {
+        nread = c->funcs->read(c, buf, sizeof(buf));
+        if (nread < 0) {
+            return VALKEY_ERR;
+        }
+        if (nread > 0 && valkeyReaderFeed(c->reader, buf, nread) != VALKEY_OK) {
+            valkeySetError(c, c->reader->err, c->reader->errstr);
+            return VALKEY_ERR;
+        }
+    } else {
+        /* For Valkey over RDMA, as the ready-to-read signal only exists per arrived RDMA write.
+         * This function has to copy all the data from communication buffer to client buffer.*/
+        struct timeval *recorded_timeout = c->command_timeout;
+        struct timeval zero_timeout;
+        while (1) {
+            nread = c->funcs->read(c, buf, sizeof(buf));
+            if (nread < 0) {
+                return VALKEY_ERR;
+            }
+            if (nread > 0 && valkeyReaderFeed(c->reader, buf, nread) != VALKEY_OK) {
+                valkeySetError(c, c->reader->err, c->reader->errstr);
+                return VALKEY_ERR;
+            }
+            if ((uint32_t)nread < sizeof(buf))
+                break;
+            /* Only the first read is required to be blocking, the rest of reads should be non-blocking
+             * and keep read until there is no data in the communication buffer.*/
+            zero_timeout.tv_sec = 0;
+            zero_timeout.tv_usec = 0;
+            c->command_timeout = &zero_timeout;
+        }
+        /*Recover the timeout back*/
+        if (c->command_timeout != recorded_timeout) {
+            c->command_timeout = recorded_timeout;
+        }
     }
     return VALKEY_OK;
 }
