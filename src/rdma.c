@@ -511,7 +511,12 @@ static ssize_t valkeyRdmaRead(valkeyContext *c, char *buf, size_t bufcap) {
         return VALKEY_ERR;
     }
 
-    end = vk_msec_now() + timed;
+    if (timed > 0) {
+        end = vk_msec_now() + timed;
+    } else {
+        /* end = -1 marks that we want a non-blocking read.*/
+        end = -1;
+    }
 
 pollcq:
     /* try to poll a CQ first */
@@ -531,6 +536,9 @@ pollcq:
         }
 
         return toread;
+    } else if (ctx->recv_offset == ctx->rx_offset && end == -1) {
+        /* non-blocking read over an empty buffer shall directly return here.*/
+        return 0;
     }
 
     if (valkeyRdmaPollCqCm(c, end) == VALKEY_OK) {
