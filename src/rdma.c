@@ -501,11 +501,10 @@ static int valkeyRdmaPollCqCm(valkeyContext *c, long timed) {
     return VALKEY_OK;
 }
 
-static ssize_t valkeyRdmaRead(valkeyContext *c, char *buf, size_t bufcap) {
+static ssize_t valkeyRdmaReadZC(valkeyContext *c, char **buf) {
     RdmaContext *ctx = c->privctx;
-    struct rdma_cm_id *cm_id = ctx->cm_id;
     long timed, end;
-    uint32_t toread, remained;
+    uint32_t remained;
 
     if (valkeyCommandTimeoutMsec(c, &timed)) {
         return VALKEY_ERR;
@@ -521,16 +520,9 @@ pollcq:
 
     if (ctx->recv_offset < ctx->rx_offset) {
         remained = ctx->rx_offset - ctx->recv_offset;
-        toread = valkeyMin(remained, bufcap);
-
-        memcpy(buf, ctx->recv_buf + ctx->recv_offset, toread);
-        ctx->recv_offset += toread;
-
-        if (ctx->recv_offset == ctx->recv_length) {
-            connRdmaRegisterRx(c, cm_id);
-        }
-
-        return toread;
+        *buf = ctx->recv_buf + ctx->recv_offset;
+        ctx->recv_offset = ctx->rx_offset;
+        return remained;
     }
 
     if (valkeyRdmaPollCqCm(c, end) == VALKEY_OK) {
@@ -538,6 +530,16 @@ pollcq:
     } else {
         return VALKEY_ERR;
     }
+}
+
+static ssize_t valkeyRdmaReadZCDone(valkeyContext *c) {
+    RdmaContext *ctx = c->privctx;
+    struct rdma_cm_id *cm_id = ctx->cm_id;
+
+    if (ctx->recv_offset == ctx->recv_length) {
+        return connRdmaRegisterRx(c, cm_id);
+    }
+    return VALKEY_OK;
 }
 
 static size_t connRdmaSend(RdmaContext *ctx, struct rdma_cm_id *cm_id, const void *data, size_t data_len) {
@@ -990,7 +992,8 @@ static valkeyContextFuncs valkeyContextRdmaFuncs = {
     .free_privctx = valkeyRdmaFree,
     .async_read = valkeyRdmaAsyncRead,
     .async_write = valkeyRdmaAsyncWrite,
-    .read = valkeyRdmaRead,
+    .read_zc = valkeyRdmaReadZC,
+    .read_zc_done = valkeyRdmaReadZCDone,
     .write = valkeyRdmaWrite,
     .set_timeout = valkeyRdmaSetTimeout};
 
