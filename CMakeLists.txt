@@ -136,7 +136,12 @@ endif()
 install(DIRECTORY include/valkey
         DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
         PATTERN "tls.h" EXCLUDE
-        PATTERN "rdma.h" EXCLUDE)
+        PATTERN "rdma.h" EXCLUDE
+        PATTERN "adapters/macosx.h" EXCLUDE)
+if(APPLE)
+  install(FILES include/valkey/adapters/macosx.h
+          DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/valkey/adapters)
+endif()
 
 INSTALL(FILES ${CMAKE_CURRENT_BINARY_DIR}/valkey.pc
     DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig)
