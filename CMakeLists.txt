@@ -70,10 +70,10 @@ set_target_properties(valkey PROPERTIES
   SOVERSION "${VERSION_MAJOR}"
   VERSION "${VERSION}")
 
-IF(MSVC)
-    SET_TARGET_PROPERTIES(valkey
-        PROPERTIES COMPILE_FLAGS /Z7)
-ENDIF()
+if(MSVC)
+  # Produce object files that contain debug info.
+  target_compile_options(valkey PRIVATE /Z7)
+endif()
 IF(WIN32)
     TARGET_LINK_LIBRARIES(valkey PUBLIC ws2_32 crypt32)
 ELSEIF(CMAKE_SYSTEM_NAME MATCHES "FreeBSD")
@@ -125,10 +125,11 @@ INSTALL(TARGETS valkey
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
 
-if (MSVC AND BUILD_SHARED_LIBS)
-    INSTALL(FILES $<TARGET_PDB_FILE:valkey>
-        DESTINATION ${CMAKE_INSTALL_BINDIR}
-        CONFIGURATIONS Debug RelWithDebInfo)
+if(MSVC AND BUILD_SHARED_LIBS)
+  # Install linker generated program database file.
+  install(FILES $<TARGET_PDB_FILE:valkey>
+          DESTINATION ${CMAKE_INSTALL_BINDIR}
+          CONFIGURATIONS Debug RelWithDebInfo)
 endif()
 
 # Install public headers
@@ -196,10 +197,10 @@ IF(ENABLE_TLS)
       WINDOWS_EXPORT_ALL_SYMBOLS TRUE
       SOVERSION "${VERSION_MAJOR}"
       VERSION "${VERSION}")
-    IF(MSVC)
-        SET_TARGET_PROPERTIES(valkey_tls
-            PROPERTIES COMPILE_FLAGS /Z7)
-    ENDIF()
+    if(MSVC)
+      # Produce object files that contain debug info.
+      target_compile_options(valkey_tls PRIVATE /Z7)
+    endif()
     TARGET_LINK_LIBRARIES(valkey_tls PRIVATE OpenSSL::SSL)
     if(WIN32 OR CYGWIN)
         target_link_libraries(valkey_tls PRIVATE valkey)
@@ -216,10 +217,11 @@ IF(ENABLE_TLS)
     install(FILES include/valkey/tls.h
             DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/valkey)
 
-    if (MSVC AND BUILD_SHARED_LIBS)
-        INSTALL(FILES $<TARGET_PDB_FILE:valkey_tls>
-            DESTINATION ${CMAKE_INSTALL_BINDIR}
-            CONFIGURATIONS Debug RelWithDebInfo)
+    if(MSVC AND BUILD_SHARED_LIBS)
+      # Install linker generated program database file.
+      install(FILES $<TARGET_PDB_FILE:valkey_tls>
+              DESTINATION ${CMAKE_INSTALL_BINDIR}
+              CONFIGURATIONS Debug RelWithDebInfo)
     endif()
 
     INSTALL(FILES ${CMAKE_CURRENT_BINARY_DIR}/valkey_tls.pc
