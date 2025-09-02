@@ -221,7 +221,7 @@ jobs:
       - name: Build and install using CMake
         run: |
           mkdir build && cd build
-          cmake .. -G Ninja -DCMAKE_BUILD_TYPE=Release -DENABLE_TLS=ON
+          cmake .. -G Ninja -DCMAKE_BUILD_TYPE=Release -DENABLE_TLS=ON -DENABLE_EXAMPLES=ON
           sudo ninja -v install
       - name: Build using Makefile
         run: USE_TLS=1 make
