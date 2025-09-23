@@ -270,6 +270,12 @@ typedef struct valkeyContextFuncs {
      * these functions shall return a value < 0.  In the event of a
      * recoverable error, they should return 0. */
     ssize_t (*read)(struct valkeyContext *, char *, size_t);
+    /* ZC means zero copy, it provides underlay transport layer buffer directly,
+     * so it has better performance than generic read. After consuming the read
+     * buffer, it's necessary to notify the underlay transport to advance the
+     * read buffer by read_zc_done. */
+    ssize_t (*read_zc)(struct valkeyContext *, char **);
+    void (*read_zc_done)(struct valkeyContext *);
     ssize_t (*write)(struct valkeyContext *);
     int (*set_timeout)(struct valkeyContext *, const struct timeval);
 } valkeyContextFuncs;
