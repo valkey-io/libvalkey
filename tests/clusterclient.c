@@ -73,6 +73,7 @@ int main(int argc, char **argv) {
     int use_cluster_nodes = 0;
     int send_to_all = 0;
     int show_connection_events = 0;
+    int select_db = 0;
 
     int argindex;
     for (argindex = 1; argindex < argc && argv[argindex][0] == '-';
@@ -83,6 +84,13 @@ int main(int argc, char **argv) {
             show_connection_events = 1;
         } else if (strcmp(argv[argindex], "--use-cluster-nodes") == 0) {
             use_cluster_nodes = 1;
+        } else if (strcmp(argv[argindex], "--select-db") == 0) {
+            if (++argindex < argc) /* Need an additional argument */
+                select_db = atoi(argv[argindex]);
+            if (select_db == 0) {
+                fprintf(stderr, "Missing or faulty argument for --select-db\n");
+                exit(1);
+            }
         } else {
             fprintf(stderr, "Unknown argument: '%s'\n", argv[argindex]);
             exit(1);
@@ -91,7 +99,7 @@ int main(int argc, char **argv) {
 
     if (argindex >= argc) {
         fprintf(stderr, "Usage: clusterclient [--events] [--connection-events] "
-                        "[--use-cluster-nodes] HOST:PORT\n");
+                        "[--use-cluster-nodes] [--select-db NUM] HOST:PORT\n");
         exit(1);
     }
     const char *initnode = argv[argindex];
@@ -109,6 +117,9 @@ int main(int argc, char **argv) {
     }
     if (show_connection_events) {
         options.connect_callback = connectCallback;
+    }
+    if (select_db > 0) {
+        options.select_db = select_db;
     }
 
     valkeyClusterContext *cc = valkeyClusterConnectWithOptions(&options);
