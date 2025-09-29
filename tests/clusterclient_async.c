@@ -260,7 +260,8 @@ int main(int argc, char **argv) {
 
     if (optind >= argc) {
         fprintf(stderr,
-                "Usage: clusterclient_async [--use-cluster-nodes] HOST:PORT\n");
+                "Usage: clusterclient_async [--events] [--connection-events] "
+                "[--use-cluster-nodes] HOST:PORT\n");
         exit(1);
     }
     const char *initnode = argv[optind];
