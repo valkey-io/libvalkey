@@ -540,6 +540,46 @@ pollcq:
     }
 }
 
+static ssize_t valkeyRdmaReadZC(valkeyContext *c, char **buf) {
+    RdmaContext *ctx = c->privctx;
+    long timed, end;
+    uint32_t remained;
+
+    if (valkeyCommandTimeoutMsec(c, &timed)) {
+        return VALKEY_ERR;
+    }
+
+    end = vk_msec_now() + timed;
+
+pollcq:
+    /* try to poll a CQ first */
+    if (connRdmaHandleCq(c) == VALKEY_ERR) {
+        return VALKEY_ERR;
+    }
+
+    if (ctx->recv_offset < ctx->rx_offset) {
+        remained = ctx->rx_offset - ctx->recv_offset;
+        *buf = ctx->recv_buf + ctx->recv_offset;
+        ctx->recv_offset = ctx->rx_offset;
+        return remained;
+    }
+
+    if (valkeyRdmaPollCqCm(c, end) == VALKEY_OK) {
+        goto pollcq;
+    } else {
+        return VALKEY_ERR;
+    }
+}
+
+static void valkeyRdmaReadZCDone(valkeyContext *c) {
+    RdmaContext *ctx = c->privctx;
+    struct rdma_cm_id *cm_id = ctx->cm_id;
+
+    if (ctx->recv_offset == ctx->recv_length) {
+        connRdmaRegisterRx(c, cm_id);
+    }
+}
+
 static size_t connRdmaSend(RdmaContext *ctx, struct rdma_cm_id *cm_id, const void *data, size_t data_len) {
     struct ibv_send_wr send_wr, *bad_wr;
     struct ibv_sge sge;
@@ -991,6 +1031,8 @@ static valkeyContextFuncs valkeyContextRdmaFuncs = {
     .async_read = valkeyRdmaAsyncRead,
     .async_write = valkeyRdmaAsyncWrite,
     .read = valkeyRdmaRead,
+    .read_zc = valkeyRdmaReadZC,
+    .read_zc_done = valkeyRdmaReadZCDone,
     .write = valkeyRdmaWrite,
     .set_timeout = valkeyRdmaSetTimeout};
 
