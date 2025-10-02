@@ -1921,6 +1921,14 @@ void test_async_command_parsing(struct config config) {
     assert(VALKEY_OK == valkeyAsyncFormattedCommand(ac, NULL, NULL, "*2\r\n$9\r\nSUBSCRIBE\r\n$7\r\nCHANNEL\r\n", 32));
     assert(VALKEY_OK == valkeyAsyncFormattedCommand(ac, NULL, NULL, "*1\r\n$11\r\nUNSUBSCRIBE\r\n", 22));
 
+    // Heap allocate command without NULL terminator.
+    const char ping[] = "*1\r\n$4\r\nPING\r\n";
+    size_t len = sizeof(ping) - 1;
+    char *buf = vk_malloc_safe(len);
+    memcpy(buf, ping, len);
+    assert(VALKEY_OK == valkeyAsyncFormattedCommand(ac, NULL, NULL, buf, len));
+    free(buf);
+
     valkeyAsyncFree(ac);
 }
 

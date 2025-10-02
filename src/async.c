@@ -829,22 +829,26 @@ static const char *nextArgument(const char *buf, size_t buflen, const char **str
     }
     p++; /* Skip found '$' */
 
-    /* Get length and the following separator.
-     * Fail if negative value or an empty string. */
+    /* Get length and next separator, fail if negative value or empty string. */
     long int len;
     char *sep;
     if ((len = strtol(p, &sep, 10)) < 1)
         goto error;
+    /* Calculate end ptr, includes length and two separators (`\r\n`). */
+    const char *end = sep + 2 + len + 2;
 
-    /* Validate the parsed length and field separators (`\r\n`). */
-    if ((size_t)((sep + 2 + len + 2) - buf) > buflen ||
+    /* Validate the parsed length and field separators. */
+    if ((size_t)(end - buf) > buflen ||
         sep[0] != '\r' || sep[len + 2] != '\r')
         goto error;
 
     /* Return pointer to the string, length, and pointer to next element. */
     *str = sep + 2;
     *strlen = len;
-    return sep + 2 + len + 2;
+
+    if ((size_t)(end - buf) == buflen) /* No more data in buffer? */
+        return NULL;
+    return end;
 
 error:
     *str = NULL;
@@ -874,7 +878,7 @@ void valkeySsubscribeCallback(struct valkeyAsyncContext *ac, void *reply, void *
     if (r->type == VALKEY_REPLY_ERROR) {
         /*/ On CROSSSLOT, MOVED and other errors */
         p = nextArgument(data->command, data->len, &cstr, &clen);
-        while ((p = nextArgument(p, data->len - (p - data->command), &astr, &alen)) != NULL) {
+        while ((p = nextArgument(p, data->len - (p - data->command), &astr, &alen)) != NULL || astr != NULL) {
             sname = sdsnewlen(astr, alen);
             if (sname == NULL)
                 goto oom;
@@ -893,7 +897,7 @@ void valkeySsubscribeCallback(struct valkeyAsyncContext *ac, void *reply, void *
     } else {
         if ((r->type == VALKEY_REPLY_ARRAY || r->type == VALKEY_REPLY_PUSH) && strncasecmp(r->element[0]->str, "ssubscribe", 10) == 0) {
             p = nextArgument(data->command, data->len, &cstr, &clen);
-            while ((p = nextArgument(p, data->len - (p - data->command), &astr, &alen)) != NULL) {
+            while ((p = nextArgument(p, data->len - (p - data->command), &astr, &alen)) != NULL || astr != NULL) {
                 sname = sdsnewlen(astr, alen);
                 if (sname == NULL)
                     goto oom;
@@ -972,7 +976,7 @@ static int valkeyAsyncAppendCmdLen(valkeyAsyncContext *ac, valkeyCallbackFn *fn,
         c->flags |= VALKEY_SUBSCRIBED;
 
         /* Add every channel/pattern to the list of subscription callbacks. */
-        while ((p = nextArgument(p, len - (p - cmd), &astr, &alen)) != NULL) {
+        while ((p = nextArgument(p, len - (p - cmd), &astr, &alen)) != NULL || astr != NULL) {
             sname = sdsnewlen(astr, alen);
             if (sname == NULL)
                 goto oom;
@@ -1041,7 +1045,7 @@ static int valkeyAsyncAppendCmdLen(valkeyAsyncContext *ac, valkeyCallbackFn *fn,
         if (hasnext) {
             /* Send an unsubscribe with specific channels/patterns.
              * Bookkeeping the number of expected replies */
-            while ((p = nextArgument(p, len - (p - cmd), &astr, &alen)) != NULL) {
+            while ((p = nextArgument(p, len - (p - cmd), &astr, &alen)) != NULL || astr != NULL) {
                 sname = sdsnewlen(astr, alen);
                 if (sname == NULL)
                     goto oom;
