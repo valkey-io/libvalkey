@@ -1900,7 +1900,7 @@ void test_async_command_parsing(struct config config) {
     assert(VALKEY_ERR == valkeyAsyncFormattedCommand(ac, NULL, NULL, "*1\r\n$0\r\n\r\n", 10));
     assert(VALKEY_ERR == valkeyAsyncFormattedCommand(ac, NULL, NULL, "*1\r\n$-1\r\n", 9));
     assert(VALKEY_ERR == valkeyAsyncFormattedCommand(ac, NULL, NULL, "*1\r\n$-1\r\nUNSUBSCRIBE\r\n", 22));
-    /* Protocol error: errenous bulkstring length and data*/
+    /* Protocol error: erroneous bulkstring length and data. */
     assert(VALKEY_ERR == valkeyAsyncFormattedCommand(ac, NULL, NULL, "*1\r\n$100000", 11));
     assert(VALKEY_ERR == valkeyAsyncFormattedCommand(ac, NULL, NULL, "*1\r\n$100000\r", 12));
     assert(VALKEY_ERR == valkeyAsyncFormattedCommand(ac, NULL, NULL, "*1\r\n$100000\r\n", 13));
