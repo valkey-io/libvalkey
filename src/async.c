@@ -46,6 +46,7 @@
 #include "async_private.h"
 #include "net.h"
 #include "valkey_private.h"
+#include "vkutil.h"
 
 #include <dict.h>
 #include <sds.h>
@@ -809,14 +810,43 @@ void valkeyAsyncHandleTimeout(valkeyAsyncContext *ac) {
     valkeyAsyncDisconnectInternal(ac);
 }
 
+static inline int vk_isdigit_ascii(char c) {
+    return (unsigned)(c - '0') < 10;
+}
+
+#define MAX_BULK_LEN (512ULL * 1024ULL * 1024ULL)
+vk_static_assert(MAX_BULK_LEN < (UINT64_MAX - 9U) / 10);
+static const char *parseBulkLen(const char *p, const char *end, uint64_t *len) {
+    uint64_t acc = 0;
+
+    assert(p != NULL && end != NULL && end - p >= 0 && len != NULL);
+
+    if (end == p || !vk_isdigit_ascii(*p))
+        return NULL;
+
+    while (p < end && vk_isdigit_ascii(*p)) {
+        unsigned d = *p - '0';
+
+        acc = acc * 10 + d;
+        if (acc > (uint64_t)MAX_BULK_LEN)
+            return NULL;
+
+        p++;
+    }
+
+    *len = acc;
+    return p;
+}
+
 /* Find the next argument in a command buffer, i.e. find the next bulkstring
  * in an array of bulkstrings.
  * Returns a pointer to the end of a found argument, which can be used when
  * finding following arguments, or NULL when an argument is not found.
  * The found string is returned by pointer via `str` and length in `strlen`. */
 static const char *nextArgument(const char *buf, size_t buflen, const char **str, size_t *strlen) {
-    const size_t minlen = 7; /* '$1\r\n \r\n'*/
-    if (buf == NULL || buflen < minlen)
+    #define MIN_BULK_LEN ((size_t)6) /* '$0\r\n\r\n' */
+
+    if (buf == NULL || buflen < MIN_BULK_LEN)
         goto error;
 
     const char *p = buf;
@@ -825,35 +855,39 @@ static const char *nextArgument(const char *buf, size_t buflen, const char **str
     if (p[0] != '$') {
         p = memchr(p, '$', buflen);
         /* Fail if not found, or if buffer can't contain a complete bulkstring. */
-        if (p == NULL || (buflen - (p - buf)) < minlen)
+        if (p == NULL || (buflen - (p - buf)) < MIN_BULK_LEN)
             goto error;
     }
     p++; /* Skip found '$' */
 
-    /* Get length and next separator, fail if negative value or empty string. */
-    long int len;
-    char *sep;
-    if ((len = strtol(p, &sep, 10)) < 1)
+    uint64_t len;
+
+    p = parseBulkLen(p, buf + buflen, &len);
+    if (p == NULL)
         goto error;
-    /* Calculate end ptr, includes length and two separators (`\r\n`). */
-    const char *end = sep + 2 + len + 2;
+
+    /* Calculate end pointer for \r\n<payload>\r\n */
+    const char *end = p + 2 + len + 2;
 
     /* Validate the parsed length and field separators. */
-    if ((size_t)(end - buf) > buflen || sep[0] != '\r' || sep[len + 2] != '\r')
+    if ((size_t)(end - buf) > buflen || p[0] != '\r' || p[len + 2] != '\r')
         goto error;
 
     /* Return pointer to the string, length, and pointer to next element. */
-    *str = sep + 2;
+    *str = p + 2;
     *strlen = len;
 
     if ((size_t)(end - buf) == buflen) /* No more data in buffer? */
         return NULL;
+
     return end;
 
 error:
     *str = NULL;
     *strlen = 0;
     return NULL;
+
+    #undef MIN_BULK_LEN
 }
 
 void valkeySsubscribeCallback(struct valkeyAsyncContext *ac, void *reply, void *privdata) {
