@@ -844,18 +844,14 @@ static const char *parseBulkLen(const char *p, const char *end, uint64_t *len) {
  * finding following arguments, or NULL when an argument is not found.
  * The found string is returned by pointer via `str` and length in `strlen`. */
 static const char *nextArgument(const char *buf, size_t buflen, const char **str, size_t *strlen) {
-    #define MIN_BULK_LEN ((size_t)6) /* '$0\r\n\r\n' */
-
-    if (buf == NULL || buflen < MIN_BULK_LEN)
+    if (buf == NULL)
         goto error;
 
     const char *p = buf;
 
     /* Find a bulkstring identifier. */
     if (p[0] != '$') {
-        p = memchr(p, '$', buflen);
-        /* Fail if not found, or if buffer can't contain a complete bulkstring. */
-        if (p == NULL || (buflen - (p - buf)) < MIN_BULK_LEN)
+        if ((p = memchr(p, '$', buflen)) == NULL)
             goto error;
     }
     p++; /* Skip found '$' */
@@ -886,8 +882,6 @@ error:
     *str = NULL;
     *strlen = 0;
     return NULL;
-
-    #undef MIN_BULK_LEN
 }
 
 void valkeySsubscribeCallback(struct valkeyAsyncContext *ac, void *reply, void *privdata) {
