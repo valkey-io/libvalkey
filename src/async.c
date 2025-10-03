@@ -815,14 +815,15 @@ void valkeyAsyncHandleTimeout(valkeyAsyncContext *ac) {
  * finding following arguments, or NULL when an argument is not found.
  * The found string is returned by pointer via `str` and length in `strlen`. */
 static const char *nextArgument(const char *buf, size_t buflen, const char **str, size_t *strlen) {
-    const char *p = buf;
     const size_t minlen = 7; /* '$1\r\n \r\n'*/
     if (buf == NULL || buflen < minlen)
         goto error;
 
+    const char *p = buf;
+
     /* Find a bulkstring identifier. */
     if (p[0] != '$') {
-        p = strchr(p, '$');
+        p = memchr(p, '$', buflen);
         /* Fail if not found, or if buffer can't contain a complete bulkstring. */
         if (p == NULL || (buflen - (p - buf)) < minlen)
             goto error;
@@ -838,8 +839,7 @@ static const char *nextArgument(const char *buf, size_t buflen, const char **str
     const char *end = sep + 2 + len + 2;
 
     /* Validate the parsed length and field separators. */
-    if ((size_t)(end - buf) > buflen ||
-        sep[0] != '\r' || sep[len + 2] != '\r')
+    if ((size_t)(end - buf) > buflen || sep[0] != '\r' || sep[len + 2] != '\r')
         goto error;
 
     /* Return pointer to the string, length, and pointer to next element. */
