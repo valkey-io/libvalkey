@@ -844,7 +844,7 @@ static const char *parseBulkLen(const char *p, const char *end, uint64_t *len) {
  * finding following arguments, or NULL when an argument is not found.
  * The found string is returned by pointer via `str` and length in `strlen`. */
 static const char *nextArgument(const char *buf, size_t buflen, const char **str, size_t *strlen) {
-    if (buf == NULL)
+    if (buf == NULL || buflen == 0)
         goto error;
 
     const char *p = buf;
