@@ -206,7 +206,7 @@ IF(ENABLE_TLS)
       # Produce object files that contain debug info.
       target_compile_options(valkey_tls PRIVATE /Z7)
     endif()
-    TARGET_LINK_LIBRARIES(valkey_tls PRIVATE OpenSSL::SSL)
+    TARGET_LINK_LIBRARIES(valkey_tls PRIVATE valkey OpenSSL::SSL)
     if(WIN32 OR CYGWIN)
         target_link_libraries(valkey_tls PRIVATE valkey)
     endif()
