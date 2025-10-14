@@ -326,7 +326,6 @@ if(NOT DISABLE_TESTS)
   endif()
 
   # Make sure ctest prints the output when a test fails.
-  # Must be set before including CTest.
   set(CMAKE_CTEST_ARGUMENTS "--output-on-failure")
   include(CTest)
   add_subdirectory(tests)

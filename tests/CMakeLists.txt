@@ -63,9 +63,6 @@ else()
   add_compile_options("-UNDEBUG")
 endif()
 
-# Make sure ctest gives the output when tests fail
-list(APPEND CMAKE_CTEST_ARGUMENTS "--output-on-failure")
-
 # Add the non-cluster test binary.
 # Some tests are unit tests which require us to include private headers.
 add_executable(client_test client_test.c)
