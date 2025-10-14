@@ -258,7 +258,7 @@ if(ENABLE_RDMA)
     add_library(valkey_rdma ${valkey_rdma_sources})
     add_library(valkey::valkey_rdma ALIAS valkey_rdma)
 
-    target_link_libraries(valkey_rdma LINK_PRIVATE ${RDMACM_LIBRARIES} ${IBVERBS_LIBRARIES})
+    target_link_libraries(valkey_rdma PRIVATE valkey::valkey ${RDMACM_LIBRARIES} ${IBVERBS_LIBRARIES})
     target_include_directories(valkey_rdma
         PRIVATE
             $<INSTALL_INTERFACE:include>
