@@ -47,6 +47,7 @@
 #include <netdb.h>
 #include <poll.h>
 #include <rdma/rdma_cma.h>
+#include <stdint.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <unistd.h>
@@ -129,6 +130,9 @@ typedef struct RdmaContext {
     struct ibv_mr *cmd_mr;
 } RdmaContext;
 
+/* Apparently CHERI uintptr_t can be 128 bits */
+vk_static_assert(sizeof(uintptr_t) <= sizeof(uint64_t));
+
 static int valkeyRdmaCM(valkeyContext *c, long timeout);
 
 static int valkeyRdmaSetFdBlocking(valkeyContext *c, int fd, int blocking) {
@@ -161,7 +165,7 @@ static int rdmaPostRecv(RdmaContext *ctx, struct rdma_cm_id *cm_id, valkeyRdmaCm
     sge.length = length;
     sge.lkey = ctx->cmd_mr->lkey;
 
-    recv_wr.wr_id = (uint64_t)cmd;
+    recv_wr.wr_id = (uint64_t)(uintptr_t)cmd;
     recv_wr.sg_list = &sge;
     recv_wr.num_sge = 1;
     recv_wr.next = NULL;
@@ -302,7 +306,7 @@ static int rdmaSendCommand(valkeyContext *c, struct rdma_cm_id *cm_id, valkeyRdm
 
     send_wr.sg_list = &sge;
     send_wr.num_sge = 1;
-    send_wr.wr_id = (uint64_t)_cmd;
+    send_wr.wr_id = (uint64_t)(uintptr_t)_cmd;
     send_wr.opcode = IBV_WR_SEND;
     send_wr.send_flags = IBV_SEND_SIGNALED;
     send_wr.next = NULL;
@@ -320,7 +324,7 @@ static int connRdmaRegisterRx(valkeyContext *c, struct rdma_cm_id *cm_id) {
     valkeyRdmaCmd cmd = {0};
 
     cmd.memory.opcode = htons(RegisterXferMemory);
-    cmd.memory.addr = htobe64((uint64_t)ctx->recv_buf);
+    cmd.memory.addr = htobe64((uint64_t)(uintptr_t)ctx->recv_buf);
     cmd.memory.length = htonl(ctx->recv_length);
     cmd.memory.key = htonl(ctx->recv_mr->rkey);
 
@@ -338,7 +342,7 @@ static int connRdmaHandleRecv(valkeyContext *c, RdmaContext *ctx, struct rdma_cm
 
     switch (ntohs(cmd->keepalive.opcode)) {
     case RegisterXferMemory:
-        ctx->tx_addr = (char *)be64toh(cmd->memory.addr);
+        ctx->tx_addr = (char *)(uintptr_t)be64toh(cmd->memory.addr);
         ctx->tx_length = ntohl(cmd->memory.length);
         ctx->tx_key = ntohl(cmd->memory.key);
         ctx->tx_offset = 0;
