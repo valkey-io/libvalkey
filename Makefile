@@ -184,7 +184,7 @@ endif
 
 ifeq ($(uname_S),FreeBSD)
   LDFLAGS += -lm
-else ifeq ($(UNAME_S),SunOS)
+else ifeq ($(uname_S),SunOS)
   ifeq ($(shell $(CC) -V 2>&1 | grep -iq 'sun\|studio' && echo true),true)
     SUN_SHARED_FLAG = -G
   else
