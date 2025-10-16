@@ -206,10 +206,7 @@ IF(ENABLE_TLS)
       # Produce object files that contain debug info.
       target_compile_options(valkey_tls PRIVATE /Z7)
     endif()
-    TARGET_LINK_LIBRARIES(valkey_tls PRIVATE OpenSSL::SSL)
-    if(WIN32 OR CYGWIN)
-        target_link_libraries(valkey_tls PRIVATE valkey)
-    endif()
+    target_link_libraries(valkey_tls PRIVATE valkey::valkey OpenSSL::SSL)
     CONFIGURE_FILE(valkey_tls.pc.in valkey_tls.pc @ONLY)
 
     INSTALL(TARGETS valkey_tls
@@ -261,7 +258,7 @@ if(ENABLE_RDMA)
     add_library(valkey_rdma ${valkey_rdma_sources})
     add_library(valkey::valkey_rdma ALIAS valkey_rdma)
 
-    target_link_libraries(valkey_rdma LINK_PRIVATE ${RDMACM_LIBRARIES} ${IBVERBS_LIBRARIES})
+    target_link_libraries(valkey_rdma PRIVATE valkey::valkey ${RDMACM_LIBRARIES} ${IBVERBS_LIBRARIES})
     target_include_directories(valkey_rdma
         PRIVATE
             $<INSTALL_INTERFACE:include>
@@ -310,26 +307,31 @@ endif()
 
 # Add tests
 if(NOT DISABLE_TESTS)
-  if(BUILD_SHARED_LIBS)
-    # Test using a static library since symbols are not hidden then.
-    # Use same source, include dirs and dependencies as the shared library.
-    add_library(valkey_unittest STATIC ${valkey_sources})
-    get_target_property(include_directories valkey::valkey INCLUDE_DIRECTORIES)
-    target_include_directories(valkey_unittest PUBLIC ${include_directories})
-    get_target_property(link_libraries valkey::valkey LINK_LIBRARIES)
-    if(link_libraries)
-      target_link_libraries(valkey_unittest PUBLIC ${link_libraries})
-    endif()
-    # Create libvalkey_unittest.a in the tests directory.
-    set_target_properties(valkey_unittest PROPERTIES
-      ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/tests")
-  else()
-    # Target is an alias for the static library.
-    add_library(valkey_unittest ALIAS valkey)
+  # Unit tests uses a static library to ensure all symbols are visible.
+  # This single library also bundles TLS and RDMA when enabled.
+  add_library(valkey_unittest STATIC ${valkey_sources} ${valkey_tls_sources} ${valkey_rdma_sources})
+
+  # Mirror the include directories.
+  get_target_property(include_directories valkey::valkey INCLUDE_DIRECTORIES)
+  target_include_directories(valkey_unittest PUBLIC ${include_directories})
+
+  # Mirror the link libraries.
+  get_target_property(link_libraries valkey::valkey LINK_LIBRARIES)
+  if(link_libraries)
+    target_link_libraries(valkey_unittest PUBLIC ${link_libraries})
+  endif()
+  if(ENABLE_TLS)
+    target_link_libraries(valkey_unittest PRIVATE OpenSSL::SSL)
+  endif()
+  if(ENABLE_RDMA)
+    target_link_libraries(valkey_unittest PRIVATE ${RDMACM_LIBRARIES} ${IBVERBS_LIBRARIES})
   endif()
 
+  # Create libvalkey_unittest.a in the tests directory.
+  set_target_properties(valkey_unittest PROPERTIES
+                        ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/tests")
+
   # Make sure ctest prints the output when a test fails.
-  # Must be set before including CTest.
   set(CMAKE_CTEST_ARGUMENTS "--output-on-failure")
   include(CTest)
   add_subdirectory(tests)
