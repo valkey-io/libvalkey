@@ -193,10 +193,6 @@ IF(ENABLE_TLS)
             $<BUILD_INTERFACE:${SDS_INCLUDE_DIR}>
     )
 
-    IF (APPLE AND BUILD_SHARED_LIBS)
-        SET_PROPERTY(TARGET valkey_tls PROPERTY LINK_FLAGS "-Wl,-undefined -Wl,dynamic_lookup")
-    ENDIF()
-
     set_target_properties(valkey_tls PROPERTIES
       C_VISIBILITY_PRESET hidden
       WINDOWS_EXPORT_ALL_SYMBOLS TRUE
