@@ -91,7 +91,7 @@ jobs:
           packages: libevent-dev valgrind valkey-server
           version: 1.0
       - name: Build
-        run: USE_TLS=1 TEST_ASYNC=1 make
+        run: USE_TLS=1 TEST_ASYNC=1 make -j$(nproc)
       - name: Run tests
         working-directory: tests
         env:
