@@ -11,9 +11,9 @@ getDefinedVersion(VERSION_MAJOR)
 getDefinedVersion(VERSION_MINOR)
 getDefinedVersion(VERSION_PATCH)
 set(VERSION "${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}")
-MESSAGE("Detected version: ${VERSION}")
+message("Detected libvalkey version: ${VERSION}")
 
-PROJECT(valkey LANGUAGES "C" VERSION "${VERSION}")
+project(libvalkey LANGUAGES "C" VERSION "${VERSION}")
 INCLUDE(GNUInstallDirs)
 
 OPTION(BUILD_SHARED_LIBS "Build shared libraries" ON)
@@ -94,8 +94,9 @@ TARGET_INCLUDE_DIRECTORIES(valkey
 CONFIGURE_FILE(valkey.pc.in valkey.pc @ONLY)
 
 set(CPACK_PACKAGE_VENDOR "Valkey")
+set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Minimalistic C client library for Valkey")
 set(CPACK_PACKAGE_DESCRIPTION "\
-Libvalkey is a minimalistic C client library for the Valkey, KeyDB, and Redis databases
+Libvalkey is a minimalistic C client library for the Valkey, KeyDB, and Redis databases.
 
 It is minimalistic because it just adds minimal support for the protocol, \
 but at the same time it uses a high level printf-alike API in order to make \
@@ -107,7 +108,7 @@ reply parser that is decoupled from the I/O layer. It is a stream parser designe
 for easy reusability, which can for instance be used in higher level language bindings \
 for efficient reply parsing.
 
-valkey only supports the binary-safe RESP protocol, so you can use it with any Redis \
+Libvalkey only supports the binary-safe RESP protocol, so you can use it with any Redis \
 compatible server >= 1.2.0.
 
 The library comes with multiple APIs. There is the synchronous API, the asynchronous API \
@@ -116,7 +117,9 @@ set(CPACK_PACKAGE_HOMEPAGE_URL "https://github.com/valkey-io/libvalkey")
 set(CPACK_PACKAGE_CONTACT "michael dot grunder at gmail dot com")
 set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON)
 set(CPACK_RPM_PACKAGE_AUTOREQPROV ON)
-
+set(CPACK_RPM_PACKAGE_DESCRIPTION "${CPACK_PACKAGE_DESCRIPTION}")
+set(CPACK_RPM_PACKAGE_GROUP "Productivity/Databases/Clients")
+set(CPACK_RPM_PACKAGE_LICENSE "BSD-3-Clause")
 include(CPack)
 
 INSTALL(TARGETS valkey
