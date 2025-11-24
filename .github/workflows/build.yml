@@ -36,23 +36,20 @@ jobs:
     container: rockylinux:8
     steps:
       - uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
-
       - name: Install dependencies
         run: |
           dnf -y upgrade --refresh
           dnf -y install https://rpms.remirepo.net/enterprise/remi-release-8.rpm
-          dnf -y module install redis:remi-6.0
           dnf -y group install "Development Tools"
           dnf -y install openssl-devel cmake libevent-devel valkey
-
-      - name: Build using cmake
+      - name: Build using CMake
         env:
           EXTRA_CMAKE_OPTS: -DENABLE_EXAMPLES:BOOL=ON -DENABLE_TLS:BOOL=ON
-        run: mkdir build && cd build && cmake .. && make
-
+        run: |
+          mkdir build && cd build && cmake .. && make
+          cpack -G RPM
       - name: Build using Makefile
         run: USE_TLS=1 TEST_ASYNC=1 make
-
       - name: Run tests
         working-directory: tests
         env:
