@@ -8,7 +8,7 @@ jobs:
     runs-on: ubuntu-latest
     container: almalinux:8
     steps:
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
 
       - name: Install dependencies
         run: |
@@ -35,7 +35,7 @@ jobs:
     runs-on: ubuntu-latest
     container: rockylinux:8
     steps:
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
 
       - name: Install dependencies
         run: |
@@ -64,10 +64,10 @@ jobs:
     runs-on: ubuntu-latest
     name:  FreeBSD
     steps:
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
 
       - name: Build in FreeBSD
-        uses: vmactions/freebsd-vm@487ce35b96fae3e60d45b521735f5aa436ecfade # v1.2.4
+        uses: vmactions/freebsd-vm@b9c3f24600acdef618ef1c9e2d3c6eeda4dce712 # v1.2.7
         with:
           prepare: pkg install -y gmake cmake
           run: |
@@ -78,9 +78,9 @@ jobs:
     runs-on: ubuntu-latest
     name:  Solaris
     steps:
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
       - name: Build on Solaris
-        uses: vmactions/solaris-vm@58cbd70c6e051860f9b8f65908cc582938fbbdba # v1.1.5
+        uses: vmactions/solaris-vm@f700ee5be83ffc08d416557506be1a46b7d3f079 # v1.1.6
         with:
           prepare: pkgutil -y -i gmake gcc5core openssl_utils
           run: USE_TLS=1 gmake
@@ -105,7 +105,7 @@ jobs:
           - {target: mipsel,   host: mipsel-linux-gnu,        qemu: mipsel,   gccver: 10 }
           - {target: mips64el, host: mips64el-linux-gnuabi64, qemu: mips64el, gccver: 10 }
     steps:
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
       - name: Prepare
         uses: awalsh128/cache-apt-pkgs-action@acb598e5ddbc6f68a970c5da0688d2f3a9f04d05 # v1.6.0
         with:
