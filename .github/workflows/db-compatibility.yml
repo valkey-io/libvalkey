@@ -26,7 +26,7 @@ jobs:
         run: |
           git clone --depth 1 --branch ${{ matrix.valkey-version }} https://github.com/valkey-io/valkey.git
           cd valkey && BUILD_TLS=yes make install
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
       - name: Create build folder
         run: cmake -E make_directory build
       - name: Generate makefiles
@@ -74,7 +74,7 @@ jobs:
         run: |
           git clone --depth 1 --branch ${{ matrix.redis-version }} https://github.com/redis/redis.git
           cd redis && BUILD_TLS=yes make install
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
 
       - name: Create build folder
         run: cmake -E make_directory build
