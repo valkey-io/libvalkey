@@ -921,7 +921,7 @@ static dict *parse_cluster_nodes(valkeyClusterContext *cc, valkeyContext *c, val
     int add_replicas = cc->flags & VALKEY_FLAG_PARSE_REPLICAS;
     dict *replicas = NULL;
 
-    if (reply->type != VALKEY_REPLY_STRING) {
+    if (reply->type != VALKEY_REPLY_STRING && reply->type != VALKEY_REPLY_VERB) {
         valkeyClusterSetError(cc, VALKEY_ERR_OTHER, "Unexpected reply type");
         goto error;
     }
