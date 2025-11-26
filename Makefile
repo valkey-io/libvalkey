@@ -182,26 +182,54 @@ ifeq ($(USE_TLS),1)
   TLS_LDFLAGS+=-lssl -lcrypto
 endif
 
-ifeq ($(uname_S),FreeBSD)
+USE_THREADS?=1
+ifeq ($(USE_THREADS),1)
+  CFLAGS+=-DVALKEY_USE_THREADS
+endif
+
+PTHREAD_FLAGS :=
+
+ifeq ($(uname_S),Linux)
+  ifeq ($(USE_THREADS),1)
+    PTHREAD_FLAGS += -pthread
+  endif
+else ifeq ($(uname_S),FreeBSD)
   REAL_LDFLAGS += -lm
+  ifeq ($(USE_THREADS),1)
+    PTHREAD_FLAGS += -pthread
+  endif
 else ifeq ($(uname_S),SunOS)
-  ifeq ($(shell $(CC) -V 2>&1 | grep -iq 'sun\|studio' && echo true),true)
+  ifeq ($(shell $(CC) -V 2>&1 grep -iq 'sun\|studio' && echo true),true)
     SUN_SHARED_FLAG = -G
+    REAL_CFLAGS    += -mt
+    ifeq ($(USE_THREADS),1)
+      PTHREAD_FLAGS  += -mt
+    endif
   else
     SUN_SHARED_FLAG = -shared
+    ifeq ($(USE_THREADS),1)
+      PTHREAD_FLAGS  += -pthread
+    endif
   endif
   REAL_LDFLAGS += -ldl -lnsl -lsocket
   DYLIB_MAKE_CMD = $(CC) $(SUN_SHARED_FLAG) -h $(DYLIB_PATCH_NAME)
   TLS_DYLIB_MAKE_CMD = $(CC) $(SUN_SHARED_FLAG) -h $(TLS_DYLIB_PATCH_NAME)
 else ifeq ($(uname_S),Darwin)
+  ifeq ($(USE_THREADS),1)
+    PTHREAD_FLAGS += -pthread
+  endif
   DYLIBSUFFIX=dylib
   DYLIB_PATCH_NAME=$(LIBNAME).$(LIBVALKEY_MAJOR).$(LIBVALKEY_MINOR).$(LIBVALKEY_PATCH).$(DYLIBSUFFIX)
   DYLIB_MAJOR_NAME=$(LIBNAME).$(LIBVALKEY_MAJOR).$(DYLIBSUFFIX)
-  DYLIB_MAKE_CMD=$(CC) -dynamiclib -Wl,-install_name,$(PREFIX)/$(LIBRARY_PATH)/$(DYLIB_PATCH_NAME)
+  DYLIB_MAKE_CMD=$(CC) -dynamiclib \
+    -Wl,-install_name,$(PREFIX)/$(LIBRARY_PATH)/$(DYLIB_PATCH_NAME)
   TLS_DYLIB_PATCH_NAME=$(TLS_LIBNAME).$(LIBVALKEY_MAJOR).$(LIBVALKEY_MINOR).$(LIBVALKEY_PATCH).$(DYLIBSUFFIX)
   TLS_DYLIB_MAJOR_NAME=$(TLS_LIBNAME).$(LIBVALKEY_MAJOR).$(DYLIBSUFFIX)
-  TLS_DYLIB_MAKE_CMD=$(CC) -dynamiclib -Wl,-install_name,$(PREFIX)/$(LIBRARY_PATH)/$(TLS_DYLIB_PATCH_NAME)
+  TLS_DYLIB_MAKE_CMD=$(CC) -dynamiclib \
+    -Wl,-install_name,$(PREFIX)/$(LIBRARY_PATH)/$(TLS_DYLIB_PATCH_NAME)
 endif
+
+REAL_LDFLAGS += $(PTHREAD_FLAGS)
 
 all: dynamic static pkgconfig tests
 
@@ -250,7 +278,10 @@ pkgconfig: $(PKGCONFNAME) $(TLS_PKGCONF) $(RDMA_PKGCONF)
 
 TEST_LDFLAGS = $(TLS_LDFLAGS) $(RDMA_LDFLAGS)
 ifeq ($(USE_TLS),1)
-  TEST_LDFLAGS += -pthread
+  # Tests need pthreads if TLS is enabled, but only add it once
+  ifeq (,$(findstring -pthread,$(REAL_LDFLAGS) $(TEST_LDFLAGS)))
+    TEST_LDFLAGS += -pthread
+  endif
 endif
 ifeq ($(TEST_ASYNC),1)
     TEST_LDFLAGS += -levent
