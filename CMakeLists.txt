@@ -16,6 +16,7 @@ message("Detected libvalkey version: ${VERSION}")
 project(libvalkey LANGUAGES "C" VERSION "${VERSION}")
 INCLUDE(GNUInstallDirs)
 
+option(ENABLE_THREADS "Enable thread-safe initialization" ON)
 OPTION(BUILD_SHARED_LIBS "Build shared libraries" ON)
 OPTION(ENABLE_TLS "Build valkey_tls for TLS support" OFF)
 OPTION(DISABLE_TESTS "If tests should be compiled or not" OFF)
@@ -74,13 +75,31 @@ if(MSVC)
   # Produce object files that contain debug info.
   target_compile_options(valkey PRIVATE /Z7)
 endif()
+
+set(valkey_link_libraries)
+set(valkey_compile_definitions)
+
 IF(WIN32)
-    TARGET_LINK_LIBRARIES(valkey PUBLIC ws2_32 crypt32)
+    list(APPEND valkey_link_libraries ws2_32 crypt32)
 ELSEIF(CMAKE_SYSTEM_NAME MATCHES "FreeBSD")
-    TARGET_LINK_LIBRARIES(valkey PUBLIC m)
+    list(APPEND valkey_link_libraries m)
 ELSEIF(CMAKE_SYSTEM_NAME MATCHES "SunOS")
-    TARGET_LINK_LIBRARIES(valkey PUBLIC socket)
+    list(APPEND valkey_link_libraries socket)
 ENDIF()
+
+if(ENABLE_THREADS)
+    find_package(Threads REQUIRED)
+    list(APPEND valkey_link_libraries Threads::Threads)
+    list(APPEND valkey_compile_definitions VALKEY_USE_THREADS)
+endif()
+
+if(valkey_link_libraries)
+    target_link_libraries(valkey PUBLIC ${valkey_link_libraries})
+endif()
+
+if(valkey_compile_definitions)
+    target_compile_definitions(valkey PRIVATE ${valkey_compile_definitions})
+endif()
 
 TARGET_INCLUDE_DIRECTORIES(valkey
     PUBLIC
@@ -314,10 +333,11 @@ if(NOT DISABLE_TESTS)
   get_target_property(include_directories valkey::valkey INCLUDE_DIRECTORIES)
   target_include_directories(valkey_unittest PUBLIC ${include_directories})
 
-  # Mirror the link libraries.
-  get_target_property(link_libraries valkey::valkey LINK_LIBRARIES)
-  if(link_libraries)
-    target_link_libraries(valkey_unittest PUBLIC ${link_libraries})
+  if(valkey_compile_definitions)
+    target_compile_definitions(valkey_unittest PRIVATE ${valkey_compile_definitions})
+  endif()
+  if(valkey_link_libraries)
+    target_link_libraries(valkey_unittest PUBLIC ${valkey_link_libraries})
   endif()
   if(ENABLE_TLS)
     target_link_libraries(valkey_unittest PRIVATE OpenSSL::SSL)
