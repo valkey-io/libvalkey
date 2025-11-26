@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.7.0)
 project(examples LANGUAGES C)
 
+find_package(Threads REQUIRED)
+
 if(CMAKE_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR)
   # This CMakeLists.txt is used standalone to build the examples.
   # Find required valkey package to get include paths.
