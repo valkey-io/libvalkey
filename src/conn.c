@@ -32,6 +32,57 @@
 
 #include <assert.h>
 
+#ifndef VALKEY_PTHREADS_ONCE
+#if defined(__unix__) || defined(__APPLE__)
+#define VALKEY_PTHREADS_ONCE 1
+#endif
+#endif
+
+#ifndef VALKEY_WINDOWS_ONCE
+#if defined(_WIN32)
+#define VALKEY_WINDOWS_ONCE 1
+#endif
+#endif
+
+#if !defined(VALKEY_PTHREADS_ONCE) && !defined(VALKEY_WINDOWS_ONCE)
+#error "No call-once implementation available on this platform"
+#endif
+
+static void vkRegisterFuncs(void) {
+    valkeyContextRegisterTcpFuncs();
+    valkeyContextRegisterUnixFuncs();
+    valkeyContextRegisterUserfdFuncs();
+}
+
+#if VALKEY_PTHREADS_ONCE
+#include <pthread.h>
+
+static void vkRegisterFuncsOnce(void) {
+    static pthread_once_t flag = PTHREAD_ONCE_INIT;
+    pthread_once(&flag, vkRegisterFuncs);
+}
+
+#else
+
+#include <windows.h>
+
+/* Windows uses a different signature for the init function */
+static BOOL CALLBACK
+vkRegisterFuncsWrapper(PINIT_ONCE once, PVOID param, PVOID *ctx) {
+    (void)once;
+    (void)param;
+    (void)ctx;
+    vkRegisterFuncs();
+    return TRUE;
+}
+
+static void vkRegisterFuncsOnce(void) {
+    static INIT_ONCE flag = INIT_ONCE_STATIC_INIT;
+    InitOnceExecuteOnce(&flag, vkRegisterFuncsWrapper, NULL, NULL);
+}
+
+#endif
+
 static valkeyContextFuncs *valkeyContextFuncsArray[VALKEY_CONN_MAX];
 
 int valkeyContextRegisterFuncs(valkeyContextFuncs *funcs, enum valkeyConnectionType type) {
@@ -43,14 +94,7 @@ int valkeyContextRegisterFuncs(valkeyContextFuncs *funcs, enum valkeyConnectionT
 }
 
 void valkeyContextSetFuncs(valkeyContext *c) {
-    static int initialized;
-
-    if (!initialized) {
-        initialized = 1;
-        valkeyContextRegisterTcpFuncs();
-        valkeyContextRegisterUnixFuncs();
-        valkeyContextRegisterUserfdFuncs();
-    }
+    vkRegisterFuncsOnce();
 
     assert(c->connection_type < VALKEY_CONN_MAX);
     assert(!c->funcs);
