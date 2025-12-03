@@ -34,7 +34,7 @@
 
 #ifdef VALKEY_USE_THREADS
 
-#if defined(__unix__) || defined(__APPLE__)
+#if defined(__unix__) || defined(__APPLE__) || defined(__sun)
 #define VALKEY_PTHREADS_ONCE 1
 #elif defined(_WIN32)
 #define VALKEY_WINDOWS_ONCE 1

@@ -199,7 +199,15 @@ else ifeq ($(uname_S),FreeBSD)
     PTHREAD_FLAGS += -pthread
   endif
 else ifeq ($(uname_S),SunOS)
-  ifeq ($(shell $(CC) -V 2>&1 grep -iq 'sun\|studio' && echo true),true)
+  # Solaris' default grep doesn't have -E so we need two checks
+  CC_VERSION := $(shell $(CC) -V 2>&1 || echo unknown)
+  ifneq (,$(findstring Sun C,$(CC_VERSION)))
+    HAVE_SUN_CC := 1
+  else ifneq (,$(findstring Studio,$(CC_VERSION)))
+    HAVE_SUN_CC := 1
+  endif
+
+  ifeq ($(HAVE_SUN_CC),1)
     SUN_SHARED_FLAG = -G
     REAL_CFLAGS    += -mt
     ifeq ($(USE_THREADS),1)
