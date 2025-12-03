@@ -453,7 +453,7 @@ static uint32_t digits10(uint64_t v) {
         return 2;
     if (v < 1000)
         return 3;
-    if (v < 1000000000000UL) {
+    if (v < 1000000000000ULL) {
         if (v < 100000000UL) {
             if (v < 1000000) {
                 if (v < 10000)
@@ -462,12 +462,12 @@ static uint32_t digits10(uint64_t v) {
             }
             return 7 + (v >= 10000000UL);
         }
-        if (v < 10000000000UL) {
+        if (v < 10000000000ULL) {
             return 9 + (v >= 1000000000UL);
         }
-        return 11 + (v >= 100000000000UL);
+        return 11 + (v >= 100000000000ULL);
     }
-    return 12 + digits10(v / 1000000000000UL);
+    return 12 + digits10(v / 1000000000000ULL);
 }
 
 /* Convert a unsigned long long into a string. Returns the number of
