@@ -267,7 +267,7 @@ $(OBJ_DIR)/%.o: $(SRC_DIR)/%.c | $(OBJ_DIR)
 $(OBJ_DIR)/%.o: $(TEST_DIR)/%.c | $(OBJ_DIR)
 	$(CC) -std=c99 -pedantic $(REAL_CFLAGS) -I$(INCLUDE_DIR) -I$(SDS_INCLUDE_DIR) -I$(DICT_INCLUDE_DIR) -I$(SRC_DIR) -MMD -MP -c $< -o $@
 
-$(TEST_DIR)/%: $(OBJ_DIR)/%.o $(STLIBNAME)
+$(TEST_DIR)/%: $(OBJ_DIR)/%.o $(STLIBNAME) $(TLS_STLIB)
 	$(CC) -o $@ $< $(RDMA_STLIB) $(STLIBNAME) $(TLS_STLIB) $(REAL_LDFLAGS) $(TEST_LDFLAGS)
 
 $(OBJ_DIR):
@@ -287,7 +287,9 @@ pkgconfig: $(PKGCONFNAME) $(TLS_PKGCONF) $(RDMA_PKGCONF)
 TEST_LDFLAGS = $(TLS_LDFLAGS) $(RDMA_LDFLAGS)
 ifeq ($(USE_TLS),1)
   # Tests need pthreads if TLS is enabled, but only add it once
-  ifeq (,$(findstring -pthread,$(REAL_LDFLAGS) $(TEST_LDFLAGS)))
+  ifeq ($(HAVE_SUN_CC),1)
+    TEST_LDFLAGS += -mt
+  else ifeq (,$(findstring -pthread,$(REAL_LDFLAGS) $(TEST_LDFLAGS)))
     TEST_LDFLAGS += -pthread
   endif
 endif
