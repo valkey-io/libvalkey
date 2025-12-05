@@ -1979,8 +1979,6 @@ ask_retry:
             }
 
             goto moved_retry;
-
-            break;
         case CLUSTER_ERR_ASK:
             node = getNodeFromRedirectReply(cc, c, reply, NULL);
             if (node == NULL) {
@@ -2008,15 +2006,12 @@ ask_retry:
             reply = NULL;
 
             goto ask_retry;
-
-            break;
         case CLUSTER_ERR_TRYAGAIN:
         case CLUSTER_ERR_CLUSTERDOWN:
             freeReplyObject(reply);
             reply = NULL;
             goto retry;
 
-            break;
         default:
 
             break;
@@ -3045,7 +3040,6 @@ static void valkeyClusterAsyncCallback(valkeyAsyncContext *ac, void *r,
         default:
 
             goto done;
-            break;
         }
 
         goto retry;
