@@ -82,6 +82,56 @@ jobs:
           prepare: pkgutil -y -i gmake gcc5core openssl_utils
           run: USE_TLS=1 gmake
 
+  solaris-developer-studio:
+     name: Oracle DeveloperStudio
+     runs-on: ubuntu-24.04
+
+     strategy:
+       fail-fast: false
+
+     env:
+       PKG_ORACLE_CERT: ${{ secrets.PKG_ORACLE_CERT }}
+       PKG_ORACLE_KEY: ${{ secrets.PKG_ORACLE_KEY }}
+
+     steps:
+       - name: Checkout
+         uses: actions/checkout@v4
+
+       - name: Transfer Oracle Studio certificates
+         run: |
+           set -e
+           printf '%s\n' "$PKG_ORACLE_CERT" \
+             > pkg.oracle.com.certificate.pem
+           printf '%s\n' "$PKG_ORACLE_KEY" \
+             > pkg.oracle.com.key.pem
+
+       - name: Build on Solaris
+         uses: vmactions/solaris-vm@v1.1.8
+         with:
+           usesh: true
+           prepare: |
+             set -e
+
+             cp "$GITHUB_WORKSPACE/pkg.oracle.com.key.pem" \
+               /root/pkg.oracle.com.key.pem
+             cp "$GITHUB_WORKSPACE/pkg.oracle.com.certificate.pem" \
+               /root/pkg.oracle.com.certificate.pem
+
+             sudo pkg set-publisher \
+               -k /root/pkg.oracle.com.key.pem \
+               -c /root/pkg.oracle.com.certificate.pem \
+               -G "*" \
+               -g https://pkg.oracle.com/solarisstudio/release \
+               solarisstudio
+
+             sudo pkg install --accept developerstudio-126/cc
+
+           run: |
+             set -e
+             PATH=/opt/developerstudio12.6/bin:"$PATH"
+             export PATH
+
+             gmake USE_THREADS=1 USE_TLS=1 -j"$(psrinfo -p)"
   build-cross:
     name: Cross-compile ${{ matrix.config.target }}
     runs-on: ubuntu-22.04
