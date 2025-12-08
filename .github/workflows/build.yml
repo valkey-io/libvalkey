@@ -111,6 +111,23 @@ jobs:
            printf '%s\n' "$PKG_ORACLE_KEY" \
              > pkg.oracle.com.key.pem
 
+           ls -l pkg.oracle.com.certificate.pem pkg.oracle.com.key.pem || true
+           wc -c pkg.oracle.com.certificate.pem pkg.oracle.com.key.pem || true
+
+           openssl x509 -in pkg.oracle.com.certificate.pem \
+              -noout -subject -issuer -dates
+
+           openssl pkey -in pkg.oracle.com.key.pem \
+              -check -noout
+
+           openssl x509 -in pkg.oracle.com.certificate.pem \
+             -noout -pubkey > cert.pub
+           openssl pkey -in pkg.oracle.com.key.pem \
+             -pubout > key.pub
+           diff -u cert.pub key.pub
+
+           rm cert.pub key.pub
+
        - name: Build on Solaris
          uses: vmactions/solaris-vm@v1.1.8
          env:
