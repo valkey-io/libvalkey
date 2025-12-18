@@ -47,6 +47,21 @@ void test_valkey_parse_error_nonresp(void) {
     command_destroy(c);
 }
 
+/* Create a 65 bytes command string while limit is 64 bytes */
+void test_valkey_parse_too_long_cmd(void) {
+    char str[66];
+    memset(str, 'A', 65);
+    str[65] = '\0';
+    struct cmd *c = command_get();
+    int len = valkeyFormatCommand(&c->cmd, str);
+    ASSERT_MSG(len >= 0, "Format command error");
+    c->clen = len;
+    valkey_parse_cmd(c);
+    ASSERT_MSG(c->result == CMD_PARSE_ERROR, "Unexpected parse success");
+    ASSERT_MSG(!strncmp(c->errstr, "Unknown command AAAA", 20), c->errstr);
+    command_destroy(c);
+}
+
 void test_valkey_parse_unknown_cmd(void) {
     struct cmd *c = command_get();
     int len = valkeyFormatCommand(&c->cmd, "OIOIOI");
@@ -210,6 +225,7 @@ void test_valkey_parse_cmd_georadius_ro_ok(void) {
 
 int main(void) {
     test_valkey_parse_error_nonresp();
+    test_valkey_parse_too_long_cmd();
     test_valkey_parse_unknown_cmd();
     test_valkey_parse_cmd_get();
     test_valkey_parse_cmd_mset();
