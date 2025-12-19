@@ -85,17 +85,15 @@ jobs:
   solaris-developer-studio:
      name: Oracle DeveloperStudio
      runs-on: ubuntu-24.04
-
-     strategy:
-       fail-fast: false
-
+     # Secrets containing certificates are not available in forks.
+     if: github.repository == 'valkey-io/libvalkey'
      env:
        PKG_ORACLE_CERT: ${{ secrets.PKG_ORACLE_CERT }}
        PKG_ORACLE_KEY: ${{ secrets.PKG_ORACLE_KEY }}
 
      steps:
        - name: Checkout
-         uses: actions/checkout@v4
+         uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
 
        - name: Transfer Oracle Studio certificates
          run: |
@@ -106,7 +104,7 @@ jobs:
              > pkg.oracle.com.key.pem
 
        - name: Build on Solaris
-         uses: vmactions/solaris-vm@v1.1.8
+         uses: vmactions/solaris-vm@47bea106d03acaf91084e52548ee460556011602 # v1.1.8
          with:
            usesh: true
            prepare: |
@@ -130,8 +128,8 @@ jobs:
              set -e
              PATH=/opt/developerstudio12.6/bin:"$PATH"
              export PATH
-
              gmake USE_THREADS=1 USE_TLS=1 -j"$(psrinfo -p)"
+
   build-cross:
     name: Cross-compile ${{ matrix.config.target }}
     runs-on: ubuntu-22.04
