@@ -85,8 +85,10 @@ jobs:
   solaris-developer-studio:
      name: Oracle DeveloperStudio
      runs-on: ubuntu-24.04
-     # Secrets containing certificates are not available in forks.
-     if: github.repository == 'valkey-io/libvalkey'
+     # Secrets containing certificates are not available in forks or for external PRs.
+     if: |
+       github.repository == 'valkey-io/libvalkey' &&
+       (github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository)
      env:
        PKG_ORACLE_CERT: ${{ secrets.PKG_ORACLE_CERT }}
        PKG_ORACLE_KEY: ${{ secrets.PKG_ORACLE_KEY }}
