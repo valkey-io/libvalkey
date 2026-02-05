@@ -487,13 +487,15 @@ static int ull2string(char *dst, size_t dstlen, unsigned long long value) {
 
     /* Check length. */
     uint32_t length = digits10(value);
-    if (length >= dstlen)
+    if (length == 0 || length >= dstlen)
         goto err;
 
     /* Null term. */
-    uint32_t next = length - 1;
+    int next = length - 1;
     dst[next + 1] = '\0';
-    while (value >= 100) {
+    while (next >= 1) {
+        if (value == 0) // value should not be 0 while next >= 1
+            goto err;
         int const i = (value % 100) * 2;
         value /= 100;
         dst[next] = digits[i + 1];
@@ -501,13 +503,12 @@ static int ull2string(char *dst, size_t dstlen, unsigned long long value) {
         next -= 2;
     }
 
-    /* Handle last 1-2 digits. */
-    if (value < 10) {
+    if (value > 0 && next < 0) // still have digits to process, but out of room
+        goto err;
+    if (value >= 10) // even number of digits should have been processed in the loop
+        goto err;
+    if (next == 0) { // if value is 1 digit, next must be 0
         dst[next] = '0' + (uint32_t)value;
-    } else {
-        int i = (uint32_t)value * 2;
-        dst[next] = digits[i + 1];
-        dst[next - 1] = digits[i];
     }
     return length;
 err:
