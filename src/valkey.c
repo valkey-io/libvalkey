@@ -1116,7 +1116,7 @@ int valkeyGetReply(valkeyContext *c, void **reply) {
         return VALKEY_ERR;
 
     /* For the blocking context, flush output buffer and read reply */
-    if (aux == NULL && c->flags & VALKEY_BLOCK) {
+    if (aux == NULL && (c->flags & VALKEY_BLOCK)) {
         /* Write until done */
         do {
             if (valkeyBufferWrite(c, &wdone) == VALKEY_ERR)
