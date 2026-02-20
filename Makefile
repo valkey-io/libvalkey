@@ -133,11 +133,17 @@ RDMA_STLIBNAME=$(LIB_DIR)/$(RDMA_LIBNAME).$(STLIBSUFFIX)
 RDMA_DYLIB_MAKE_CMD=$(CC) $(PLATFORM_FLAGS) -shared -Wl,-soname,$(RDMA_DYLIB_MAJOR_NAME)
 
 USE_RDMA?=0
+USE_DLOPEN_RDMA?=0
 
 ifeq ($(USE_RDMA),1)
   RDMA_SOURCES=$(SRC_DIR)/rdma.c
   RDMA_OBJS=$(patsubst $(SRC_DIR)/%.c,$(OBJ_DIR)/%.o,$(RDMA_SOURCES))
-  RDMA_LDFLAGS=-lrdmacm -libverbs
+  ifeq ($(USE_DLOPEN_RDMA),1)
+      CFLAGS += -DDLOPEN_RDMA
+      RDMA_LDFLAGS=
+  else
+      RDMA_LDFLAGS=-lrdmacm -libverbs
+  endif
   # This is required for test.c only
   CFLAGS+=-DVALKEY_TEST_RDMA
   RDMA_STLIB=$(RDMA_STLIBNAME)
