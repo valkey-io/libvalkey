@@ -31,11 +31,11 @@ jobs:
       matrix:
         include:
           # New compilers
-          - compiler: 'clang-20'
-            cmake-version: '4.0'
+          - compiler: 'clang-21'
+            cmake-version: '4.2'
             cmake-build-type: Release
-          - compiler: 'gcc-14'
-            cmake-version: '4.0'
+          - compiler: 'gcc-15'
+            cmake-version: '4.2'
             cmake-build-type: Release
           # Old compilers
           - compiler: 'clang-14'
@@ -45,10 +45,12 @@ jobs:
             cmake-version: '3.13'
             cmake-build-type: Release
         # Sanitizers enabled
-        compiler: ['gcc-14', 'clang-20']
-        cmake-version: ['4.0']
+        compiler: ['clang-21', 'gcc-15']
+        cmake-version: ['4.2']
         cmake-build-type: [RelWithDebInfo]
         sanitizer: [thread, undefined, leak, address]
+    env:
+      CC: ${{ matrix.compiler }}
     steps:
     - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
     - name: Prepare
@@ -57,9 +59,21 @@ jobs:
         packages: libevent-dev libuv1-dev libev-dev libglib2.0-dev valkey-server
         version: 1.0
     - name: Setup compiler
-      uses: aminya/setup-cpp@1f17f92d6a52bfcb1a25348e2c526c2e5cbb1134 # v1.8.0
-      with:
-        compiler: ${{ matrix.compiler }}
+      run: |
+        COMP="${{ matrix.compiler }}"
+        TYPE="${COMP%%-*}"
+        VERSION="${COMP##*-}"
+        echo "Installing $TYPE version $VERSION"
+
+        if [ "$TYPE" = "clang" ]; then
+          wget https://apt.llvm.org/llvm.sh
+          chmod +x llvm.sh
+          sudo apt-get install -y "${{ matrix.compiler }}" || sudo ./llvm.sh "$VERSION"
+        else
+          sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test
+          sudo apt-get update
+          sudo apt-get install -y "${{ matrix.compiler }}"
+        fi
     - name: Setup CMake
       uses: jwlawson/actions-setup-cmake@3a6cbe35ba64df7ca70c51365c4aff65db9a9037 # v2.1.1
       with:
