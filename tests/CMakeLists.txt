@@ -279,6 +279,13 @@ endif()
 
 if(GLIB_LIBRARY_FOUND)
   add_executable(ct_async_glib ct_async_glib.c)
+  # From clang-22 and https://github.com/llvm/llvm-project/pull/162662 the
+  # use of `__COUNTER__` in glib-2.0 causes warnings, e.g. in glib/gmacros.h:1243.
+  # Disabling the c2y-extensions warning until corrected in GLib.
+  if(CMAKE_C_COMPILER_ID MATCHES "Clang" AND
+     CMAKE_C_COMPILER_VERSION VERSION_GREATER_EQUAL 22)
+    target_compile_options(ct_async_glib PRIVATE -Wno-c2y-extensions)
+  endif()
   target_link_libraries(ct_async_glib valkey ${TLS_LIBRARY} PkgConfig::GLIB_LIBRARY)
   add_test(NAME ct_async_glib COMMAND "$<TARGET_FILE:ct_async_glib>")
 else()

@@ -31,7 +31,7 @@ jobs:
       matrix:
         include:
           # New compilers
-          - compiler: 'clang-21'
+          - compiler: 'clang-22'
             cmake-version: '4.2'
             cmake-build-type: Release
           - compiler: 'gcc-15'
@@ -45,7 +45,7 @@ jobs:
             cmake-version: '3.13'
             cmake-build-type: Release
         # Sanitizers enabled
-        compiler: ['clang-21', 'gcc-15']
+        compiler: ['clang-22', 'gcc-15']
         cmake-version: ['4.2']
         cmake-build-type: [RelWithDebInfo]
         sanitizer: [thread, undefined, leak, address]
@@ -68,6 +68,8 @@ jobs:
         if [ "$TYPE" = "clang" ]; then
           wget https://apt.llvm.org/llvm.sh
           chmod +x llvm.sh
+          # Temporary fix to install clang-22
+          sed -i 's/LLVM_VERSION_PATTERNS\[22\]=\"\"/LLVM_VERSION_PATTERNS[22]=\"-22\"/' llvm.sh
           sudo apt-get install -y "${{ matrix.compiler }}" || sudo ./llvm.sh "$VERSION"
         else
           sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test
