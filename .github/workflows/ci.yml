@@ -77,9 +77,9 @@ jobs:
           sudo apt-get install -y "${{ matrix.compiler }}"
         fi
     - name: Setup CMake
-      uses: jwlawson/actions-setup-cmake@3a6cbe35ba64df7ca70c51365c4aff65db9a9037 # v2.1.1
+      uses: lukka/get-cmake@f176ccd3f28bda569c43aae4894f06b2435a3375 # v4.2.3
       with:
-        cmake-version: ${{ matrix.cmake-version }}
+        cmakeVersion: ${{ matrix.cmake-version }}
     - name: Generate makefiles
       run: |
         if [ -n "${{ matrix.sanitizer }}" ]; then
@@ -223,9 +223,9 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - name: Setup CMake
-        uses: jwlawson/actions-setup-cmake@3a6cbe35ba64df7ca70c51365c4aff65db9a9037 # v2.1.1
+        uses: lukka/get-cmake@f176ccd3f28bda569c43aae4894f06b2435a3375 # v4.2.3
         with:
-          cmake-version: '3.7.0'
+          cmakeVersion: '3.7.0'
       - name: Generate makefiles
         run: |
           mkdir build && cd build
