@@ -40,6 +40,11 @@
 #include "win32.h"
 
 #include "alloc.h"
+#ifndef DISABLE_FFC_IMPL
+#define FFC_IMPL
+#endif
+#define FFC_DEBUG 0
+#include "ffc.h"
 #include "read.h"
 
 #include <sds.h>
@@ -308,40 +313,30 @@ static int processLineItem(valkeyReader *r) {
                 obj = (void *)VALKEY_REPLY_INTEGER;
             }
         } else if (cur->type == VALKEY_REPLY_DOUBLE) {
-            char buf[326], *eptr;
+            static const ffc_parse_options options = {
+                FFC_FORMAT_FLAG_NO_INFNAN | FFC_PRESET_GENERAL | FFC_FORMAT_FLAG_ALLOW_LEADING_PLUS,
+                '.'};
+
+            ffc_result res;
             double d;
 
-            if ((size_t)len >= sizeof(buf)) {
-                valkeyReaderSetError(r, VALKEY_ERR_PROTOCOL,
-                                     "Double value is too large");
-                return VALKEY_ERR;
-            }
-
-            memcpy(buf, p, len);
-            buf[len] = '\0';
-
-            if (len == 3 && strcasecmp(buf, "inf") == 0) {
+            if (len == 3 && strncasecmp(p, "inf", 3) == 0) {
                 d = INFINITY; /* Positive infinite. */
-            } else if (len == 4 && strcasecmp(buf, "-inf") == 0) {
+            } else if (len == 4 && strncasecmp(p, "-inf", 4) == 0) {
                 d = -INFINITY; /* Negative infinite. */
-            } else if ((len == 3 && strcasecmp(buf, "nan") == 0) ||
-                       (len == 4 && strcasecmp(buf, "-nan") == 0)) {
+            } else if ((len == 3 && strncasecmp(p, "nan", 3) == 0) ||
+                       (len == 4 && strncasecmp(p, "-nan", 4) == 0)) {
                 d = NAN; /* nan. */
             } else {
-                d = strtod((char *)buf, &eptr);
-                /* RESP3 only allows "inf", "-inf", and finite values, while
-                 * strtod() allows other variations on infinity,
-                 * etc. We explicitly handle our two allowed infinite cases and NaN
-                 * above, so strtod() should only result in finite values. */
-                if (buf[0] == '\0' || eptr != &buf[len] || !isfinite(d)) {
-                    valkeyReaderSetError(r, VALKEY_ERR_PROTOCOL,
-                                         "Bad double value");
+                res = ffc_from_chars_double_options(p, p + len, &d, options);
+                if (res.outcome != FFC_OUTCOME_OK || res.ptr != p + len || !isfinite(d)) {
+                    valkeyReaderSetError(r, VALKEY_ERR_PROTOCOL, "Bad double value");
                     return VALKEY_ERR;
                 }
             }
 
             if (r->fn && r->fn->createDouble) {
-                obj = r->fn->createDouble(cur, d, buf, len);
+                obj = r->fn->createDouble(cur, d, p, len);
             } else {
                 obj = (void *)VALKEY_REPLY_DOUBLE;
             }
