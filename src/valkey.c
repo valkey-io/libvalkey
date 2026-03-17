@@ -1002,7 +1002,6 @@ valkeyPushFn *valkeySetPushCallback(valkeyContext *c, valkeyPushFn *fn) {
  * After this function is called, you may use valkeyGetReplyFromReader to
  * see if there is a reply available. */
 int valkeyBufferRead(valkeyContext *c) {
-    char buf[1024 * 16];
     int nread;
 
     /* Return early when the context has seen an error. */
@@ -1021,13 +1020,20 @@ int valkeyBufferRead(valkeyContext *c) {
         }
         return c->funcs->read_zc_done(c);
     }
-    nread = c->funcs->read(c, buf, sizeof(buf));
+
+    /* Read directly into the reader's buffer to avoid a memcpy. */
+    char *buf;
+    size_t cap;
+    if (valkeyReaderGetReadBuf(c->reader, &buf, &cap, 1024 * 16) != VALKEY_OK) {
+        valkeySetError(c, c->reader->err, c->reader->errstr);
+        return VALKEY_ERR;
+    }
+    nread = c->funcs->read(c, buf, cap);
     if (nread < 0) {
         return VALKEY_ERR;
     }
-    if (nread > 0 && valkeyReaderFeed(c->reader, buf, nread) != VALKEY_OK) {
-        valkeySetError(c, c->reader->err, c->reader->errstr);
-        return VALKEY_ERR;
+    if (nread > 0) {
+        valkeyReaderCommitRead(c->reader, nread);
     }
     return VALKEY_OK;
 }

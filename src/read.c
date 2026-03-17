@@ -790,6 +790,57 @@ oom:
     return VALKEY_ERR;
 }
 
+/* Prepare the reader's internal buffer for a direct read. This compacts
+ * consumed data, ensures at least 'minbytes' of writable space, and returns
+ * a pointer and available capacity. The caller can then read() directly into
+ * *buf and call valkeyReaderCommitRead() with the number of bytes read.
+ * Returns VALKEY_OK on success, VALKEY_ERR on allocation failure. */
+int valkeyReaderGetReadBuf(valkeyReader *r, char **buf, size_t *cap, size_t minbytes) {
+    if (r->err)
+        return VALKEY_ERR;
+
+    /* Destroy internal buffer when it is empty and is quite large. */
+    if (r->len == 0 && r->maxbuf != 0 && sdsavail(r->buf) > r->maxbuf) {
+        sdsfree(r->buf);
+        r->buf = sdsempty();
+        if (r->buf == NULL)
+            goto oom;
+        r->pos = 0;
+    }
+
+    /* Compact consumed data. */
+    if (r->pos > 0) {
+        if (sdslen(r->buf) > SSIZE_MAX)
+            goto oom;
+        sdsrange(r->buf, r->pos, -1);
+        r->pos = 0;
+        r->len = sdslen(r->buf);
+    }
+
+    /* Ensure enough writable space. */
+    if (sdsavail(r->buf) < minbytes) {
+        sds newbuf = sdsMakeRoomFor(r->buf, minbytes);
+        if (newbuf == NULL)
+            goto oom;
+        r->buf = newbuf;
+    }
+
+    *buf = r->buf + sdslen(r->buf);
+    *cap = sdsavail(r->buf);
+    return VALKEY_OK;
+
+oom:
+    valkeyReaderSetErrorOOM(r);
+    return VALKEY_ERR;
+}
+
+/* Commit bytes that were written directly into the buffer obtained from
+ * valkeyReaderGetReadBuf(). */
+void valkeyReaderCommitRead(valkeyReader *r, size_t nread) {
+    sdsIncrLen(r->buf, (int)nread);
+    r->len = sdslen(r->buf);
+}
+
 int valkeyReaderGetReply(valkeyReader *r, void **reply) {
     /* Default target pointer to NULL. */
     if (reply != NULL)
