@@ -765,6 +765,17 @@ int valkeyReaderFeed(valkeyReader *r, const char *buf, size_t len) {
             r->pos = 0;
         }
 
+        /* Discard consumed data before appending, to avoid unbounded growth.
+         * This replaces the per-reply sdsrange() in valkeyReaderGetReply(),
+         * so the memmove happens at most once per feed call. */
+        if (r->pos > 0) {
+            if (sdslen(r->buf) > SSIZE_MAX)
+                goto oom;
+            sdsrange(r->buf, r->pos, -1);
+            r->pos = 0;
+            r->len = sdslen(r->buf);
+        }
+
         newbuf = sdscatlen(r->buf, buf, len);
         if (newbuf == NULL)
             goto oom;
@@ -811,17 +822,6 @@ int valkeyReaderGetReply(valkeyReader *r, void **reply) {
     /* Return ASAP when an error occurred. */
     if (r->err)
         return VALKEY_ERR;
-
-    /* Discard part of the buffer when we've consumed at least 1k, to avoid
-     * doing unnecessary calls to memmove() in sds.c. */
-    if (r->pos >= 1024) {
-        /* No length check in Valkeys sdsrange() */
-        if (sdslen(r->buf) > SSIZE_MAX)
-            return VALKEY_ERR;
-        sdsrange(r->buf, r->pos, -1);
-        r->pos = 0;
-        r->len = sdslen(r->buf);
-    }
 
     /* Emit a reply when there is one. */
     if (r->ridx == -1) {
