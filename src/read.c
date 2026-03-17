@@ -747,47 +747,20 @@ void valkeyReaderFree(valkeyReader *r) {
 }
 
 int valkeyReaderFeed(valkeyReader *r, const char *buf, size_t len) {
-    sds newbuf;
-
     /* Return early when this reader is in an erroneous state. */
     if (r->err)
         return VALKEY_ERR;
 
-    /* Copy the provided buffer. */
     if (buf != NULL && len >= 1) {
-        /* Destroy internal buffer when it is empty and is quite large. */
-        if (r->len == 0 && r->maxbuf != 0 && sdsavail(r->buf) > r->maxbuf) {
-            sdsfree(r->buf);
-            r->buf = sdsempty();
-            if (r->buf == 0)
-                goto oom;
-
-            r->pos = 0;
-        }
-
-        /* Discard consumed data before appending, to avoid unbounded growth.
-         * This replaces the per-reply sdsrange() in valkeyReaderGetReply(),
-         * so the memmove happens at most once per feed call. */
-        if (r->pos > 0) {
-            if (sdslen(r->buf) > SSIZE_MAX)
-                goto oom;
-            sdsrange(r->buf, r->pos, -1);
-            r->pos = 0;
-            r->len = sdslen(r->buf);
-        }
-
-        newbuf = sdscatlen(r->buf, buf, len);
-        if (newbuf == NULL)
-            goto oom;
-
-        r->buf = newbuf;
-        r->len = sdslen(r->buf);
+        char *dest;
+        size_t cap;
+        if (valkeyReaderGetReadBuf(r, &dest, &cap, len) != VALKEY_OK)
+            return VALKEY_ERR;
+        memcpy(dest, buf, len);
+        valkeyReaderCommitRead(r, len);
     }
 
     return VALKEY_OK;
-oom:
-    valkeyReaderSetErrorOOM(r);
-    return VALKEY_ERR;
 }
 
 /* Prepare the reader's internal buffer for a direct read. This compacts
@@ -798,6 +771,12 @@ oom:
 int valkeyReaderGetReadBuf(valkeyReader *r, char **buf, size_t *cap, size_t minbytes) {
     if (r->err)
         return VALKEY_ERR;
+
+    if (minbytes > SSIZE_MAX) {
+        valkeyReaderSetError(r, VALKEY_ERR_PROTOCOL,
+                             "Requested buffer size too large");
+        return VALKEY_ERR;
+    }
 
     /* Destroy internal buffer when it is empty and is quite large. */
     if (r->len == 0 && r->maxbuf != 0 && sdsavail(r->buf) > r->maxbuf) {
@@ -810,8 +789,11 @@ int valkeyReaderGetReadBuf(valkeyReader *r, char **buf, size_t *cap, size_t minb
 
     /* Compact consumed data. */
     if (r->pos > 0) {
-        if (sdslen(r->buf) > SSIZE_MAX)
-            goto oom;
+        if (sdslen(r->buf) > SSIZE_MAX) {
+            valkeyReaderSetError(r, VALKEY_ERR_PROTOCOL,
+                                 "Reader buffer is too large");
+            return VALKEY_ERR;
+        }
         sdsrange(r->buf, r->pos, -1);
         r->pos = 0;
         r->len = sdslen(r->buf);
@@ -827,6 +809,8 @@ int valkeyReaderGetReadBuf(valkeyReader *r, char **buf, size_t *cap, size_t minb
 
     *buf = r->buf + sdslen(r->buf);
     *cap = sdsavail(r->buf);
+    if (*cap > SSIZE_MAX)
+        *cap = SSIZE_MAX;
     return VALKEY_OK;
 
 oom:
@@ -837,7 +821,8 @@ oom:
 /* Commit bytes that were written directly into the buffer obtained from
  * valkeyReaderGetReadBuf(). */
 void valkeyReaderCommitRead(valkeyReader *r, size_t nread) {
-    sdsIncrLen(r->buf, (int)nread);
+    assert(nread <= SSIZE_MAX);
+    sdsIncrLen(r->buf, (ssize_t)nread);
     r->len = sdslen(r->buf);
 }
 

@@ -1002,7 +1002,7 @@ valkeyPushFn *valkeySetPushCallback(valkeyContext *c, valkeyPushFn *fn) {
  * After this function is called, you may use valkeyGetReplyFromReader to
  * see if there is a reply available. */
 int valkeyBufferRead(valkeyContext *c) {
-    int nread;
+    ssize_t nread;
 
     /* Return early when the context has seen an error. */
     if (c->err)
