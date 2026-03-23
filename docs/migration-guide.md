@@ -11,7 +11,7 @@ The general actions needed are:
   All `libvalkey` headers are now found under `include/valkey/`.
 * Update used build options, e.g. `USE_TLS` replaces `USE_SSL`.
 
-## Migrating from `hiredis` v1.2.0
+## Migrating from `hiredis` v1.2.0 or v1.3.0
 
 The type `sds` is removed from the public API.
 
@@ -91,6 +91,14 @@ The type `sds` is removed from the public API.
 * `HIRCLUSTER_FLAG_NULL` removed.
 * `HIRCLUSTER_FLAG_ADD_SLAVE` removed, flag can be replaced with an option, see `VALKEY_OPT_USE_REPLICAS`.
 * `HIRCLUSTER_FLAG_ROUTE_USE_SLOTS` removed, the use of `CLUSTER SLOTS` is enabled by default.
+
+### Changed API function signatures
+
+* `valkeyClusterGetSlotByKey` now requires a `keylen` parameter of type `size_t`.
+  Previously the key length was determined using `strlen()`, which gave incorrect
+  results for keys containing embedded null characters.
+* `valkeyClusterGetNodeByKey` now requires a `keylen` parameter of type `size_t`,
+  for the same reason as above.
 
 ### Removed support for splitting multi-key commands per slot
 

@@ -336,9 +336,9 @@ LIBVALKEY_API void valkeyClusterInitNodeIterator(valkeyClusterNodeIterator *iter
 LIBVALKEY_API valkeyClusterNode *valkeyClusterNodeNext(valkeyClusterNodeIterator *iter);
 
 /* Helper functions */
-LIBVALKEY_API unsigned int valkeyClusterGetSlotByKey(char *key);
+LIBVALKEY_API unsigned int valkeyClusterGetSlotByKey(char *key, size_t keylen);
 LIBVALKEY_API valkeyClusterNode *valkeyClusterGetNodeByKey(valkeyClusterContext *cc,
-                                                           char *key);
+                                                           char *key, size_t keylen);
 
 #ifdef __cplusplus
 }

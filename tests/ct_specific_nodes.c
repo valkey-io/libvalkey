@@ -43,7 +43,7 @@ void test_command_to_all_nodes(valkeyClusterContext *cc) {
 
 void test_transaction(valkeyClusterContext *cc) {
 
-    valkeyClusterNode *node = valkeyClusterGetNodeByKey(cc, (char *)"foo");
+    valkeyClusterNode *node = valkeyClusterGetNodeByKey(cc, (char *)"foo", 3);
     assert(node);
 
     valkeyReply *reply;
@@ -71,7 +71,7 @@ void test_streams(valkeyClusterContext *cc) {
     char *id;
 
     /* Get the node that handles given stream */
-    valkeyClusterNode *node = valkeyClusterGetNodeByKey(cc, (char *)"mystream");
+    valkeyClusterNode *node = valkeyClusterGetNodeByKey(cc, (char *)"mystream", 8);
     assert(node);
 
     /* Preparation: remove old stream/key */
@@ -80,7 +80,7 @@ void test_streams(valkeyClusterContext *cc) {
     freeReplyObject(reply);
 
     /* Query wrong node */
-    valkeyClusterNode *wrongNode = valkeyClusterGetNodeByKey(cc, (char *)"otherstream");
+    valkeyClusterNode *wrongNode = valkeyClusterGetNodeByKey(cc, (char *)"otherstream", 11);
     assert(node != wrongNode);
     reply = valkeyClusterCommandToNode(cc, wrongNode, "XLEN mystream");
     CHECK_REPLY_ERROR(cc, reply, "MOVED");
@@ -230,7 +230,7 @@ void test_pipeline_transaction(valkeyClusterContext *cc) {
     int status;
     valkeyReply *reply;
 
-    valkeyClusterNode *node = valkeyClusterGetNodeByKey(cc, (char *)"foo");
+    valkeyClusterNode *node = valkeyClusterGetNodeByKey(cc, (char *)"foo", 3);
     assert(node);
 
     status = valkeyClusterAppendCommandToNode(cc, node, "MULTI");
@@ -466,7 +466,7 @@ void test_async_transaction(void) {
     valkeyClusterAsyncContext *acc = valkeyClusterAsyncConnectWithOptions(&options);
     ASSERT_MSG(acc && acc->err == 0, acc ? acc->errstr : "OOM");
 
-    valkeyClusterNode *node = valkeyClusterGetNodeByKey(&acc->cc, (char *)"foo");
+    valkeyClusterNode *node = valkeyClusterGetNodeByKey(&acc->cc, (char *)"foo", 3);
     assert(node);
 
     int status;
@@ -498,6 +498,22 @@ void test_async_transaction(void) {
     event_base_free(base);
 }
 
+void test_get_node_by_key(valkeyClusterContext *cc) {
+    /* A key with embedded null should use the full length for slot
+     * calculation, not stop at the null byte. */
+    valkeyClusterNode *node_full = valkeyClusterGetNodeByKey(cc, (char *)"ke\0y", 4);
+    valkeyClusterNode *node_truncated = valkeyClusterGetNodeByKey(cc, (char *)"ke", 2);
+    assert(node_full != NULL);
+    assert(node_truncated != NULL);
+    assert(node_full != node_truncated);
+}
+
+void test_get_node_by_key_empty(valkeyClusterContext *cc) {
+    /* An empty string is a valid key. */
+    valkeyClusterNode *node = valkeyClusterGetNodeByKey(cc, (char *)"", 0);
+    assert(node != NULL);
+}
+
 int main(void) {
     valkeyClusterOptions options = {0};
     options.initial_nodes = CLUSTER_NODE;
@@ -512,6 +528,8 @@ int main(void) {
     test_command_to_all_nodes(cc);
     test_transaction(cc);
     test_streams(cc);
+    test_get_node_by_key(cc);
+    test_get_node_by_key_empty(cc);
 
     // Pipeline API
     test_pipeline_to_single_node(cc);
