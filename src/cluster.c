@@ -3426,12 +3426,12 @@ valkeyClusterNode *valkeyClusterNodeNext(valkeyClusterNodeIterator *iter) {
 }
 
 /* Get hash slot for given key string, which can include hash tags */
-unsigned int valkeyClusterGetSlotByKey(char *key) {
-    return keyHashSlot(key, strlen(key));
+unsigned int valkeyClusterGetSlotByKey(char *key, size_t keylen) {
+    return keyHashSlot(key, (int)keylen);
 }
 
 /* Get node that handles given key string, which can include hash tags */
 valkeyClusterNode *valkeyClusterGetNodeByKey(valkeyClusterContext *cc,
-                                             char *key) {
-    return node_get_by_table(cc, keyHashSlot(key, strlen(key)));
+                                             char *key, size_t keylen) {
+    return node_get_by_table(cc, keyHashSlot(key, (int)keylen));
 }
