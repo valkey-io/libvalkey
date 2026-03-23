@@ -22,11 +22,11 @@ int main(void) {
 
     valkeyReply *reply = valkeyClusterCommand(cc, "SET %s %s", "key", "value");
     printf("SET: %s\n", reply->str);
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
 
     valkeyReply *reply2 = valkeyClusterCommand(cc, "GET %s", "key");
     printf("GET: %s\n", reply2->str);
-    freeReplyObject(reply2);
+    valkeyFreeReplyObject(reply2);
 
     valkeyClusterFree(cc);
     return 0;
