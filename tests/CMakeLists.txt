@@ -97,6 +97,10 @@ target_include_directories(ut_slotmap_update PRIVATE "${PROJECT_SOURCE_DIR}/src"
 target_link_libraries(ut_slotmap_update valkey_unittest)
 add_test(NAME ut_slotmap_update COMMAND "$<TARGET_FILE:ut_slotmap_update>")
 
+add_executable(ut_slot_by_key ut_slot_by_key.c)
+target_link_libraries(ut_slot_by_key valkey_unittest)
+add_test(NAME ut_slot_by_key COMMAND "$<TARGET_FILE:ut_slot_by_key>")
+
 # Cluster tests
 add_executable(ct_commands ct_commands.c test_utils.c)
 target_link_libraries(ct_commands valkey ${TLS_LIBRARY})

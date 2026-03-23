@@ -498,6 +498,22 @@ void test_async_transaction(void) {
     event_base_free(base);
 }
 
+void test_get_node_by_key(valkeyClusterContext *cc) {
+    /* A key with embedded null should use the full length for slot
+     * calculation, not stop at the null byte. */
+    valkeyClusterNode *node_full = valkeyClusterGetNodeByKey(cc, (char *)"ke\0y", 4);
+    valkeyClusterNode *node_truncated = valkeyClusterGetNodeByKey(cc, (char *)"ke", 2);
+    assert(node_full != NULL);
+    assert(node_truncated != NULL);
+    assert(node_full != node_truncated);
+}
+
+void test_get_node_by_key_empty(valkeyClusterContext *cc) {
+    /* An empty string is a valid key. */
+    valkeyClusterNode *node = valkeyClusterGetNodeByKey(cc, (char *)"", 0);
+    assert(node != NULL);
+}
+
 int main(void) {
     valkeyClusterOptions options = {0};
     options.initial_nodes = CLUSTER_NODE;
@@ -512,6 +528,8 @@ int main(void) {
     test_command_to_all_nodes(cc);
     test_transaction(cc);
     test_streams(cc);
+    test_get_node_by_key(cc);
+    test_get_node_by_key_empty(cc);
 
     // Pipeline API
     test_pipeline_to_single_node(cc);
