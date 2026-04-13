@@ -534,23 +534,21 @@ int valkeyContextConnectTcp(valkeyContext *c, const valkeyOptions *options) {
 
         if (connect(s, p->ai_addr, p->ai_addrlen) == -1) {
             if (errno == EINPROGRESS) {
-                if (blocking && valkeyContextWaitReady(c, timeout_msec) != VALKEY_OK)
-                    goto error;
+                if (blocking && valkeyContextWaitReady(c, timeout_msec) != VALKEY_OK) {
+                    valkeyNetClose(c);
+                    continue;
+                }
                 /* Non-blocking: EINPROGRESS is expected, continue to success. */
-            } else if (errno == EHOSTUNREACH) {
-                valkeyNetClose(c);
-                continue;
             } else if (errno == EADDRNOTAVAIL && reuseaddr) {
                 valkeyNetClose(c);
                 if (++reuses >= VALKEY_CONNECT_RETRIES) {
-                    goto error;
+                    continue;
                 } else {
                     goto addrretry;
                 }
             } else {
-                valkeySetErrorFromErrno(c, VALKEY_ERR_IO, NULL);
                 valkeyNetClose(c);
-                goto error;
+                continue;
             }
         }
         /* TCP_NODELAY is set here for blocking connections only. For non-blocking,
