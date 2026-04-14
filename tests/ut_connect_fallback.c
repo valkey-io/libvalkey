@@ -22,6 +22,9 @@
 #include <unistd.h>
 
 static int port_listen;
+
+#define PORT_ECONNREFUSED  10000 /* Simulates failed non-blocking connect */
+#define PORT_EHOSTUNREACH 10001 /* Simulates immediate routing failure */
 static struct addrinfo *make_entry(int port, struct addrinfo *next);
 
 /* --- Overridden system calls --- */
@@ -36,8 +39,8 @@ int getaddrinfo(const char *node, const char *service,
     (void)service;
     (void)hints;
     struct addrinfo *third = make_entry(port_listen, NULL);
-    struct addrinfo *second = make_entry(10001, third);
-    struct addrinfo *first = make_entry(10000, second);
+    struct addrinfo *second = make_entry(PORT_EHOSTUNREACH, third);
+    struct addrinfo *first = make_entry(PORT_ECONNREFUSED, second);
     *res = first;
     return 0;
 }
@@ -53,10 +56,13 @@ void freeaddrinfo(struct addrinfo *res) {
 }
 
 /*
- * Override connect(2) to simulate ECONNREFUSED for the fake addresses.
+ * Override connect(2) to simulate connect failures for the fake addresses.
+ * Port 10000 returns EINPROGRESS then ECONNREFUSED (failed non-blocking connect).
+ * Port 10001 returns EHOSTUNREACH (immediate routing failure).
  * Falls through to the real connect via dlsym(RTLD_NEXT) for other addresses.
  */
 int connect(int sockfd, const struct sockaddr *addr, socklen_t addrlen) {
+    static int refused_attempts = 0;
     static int (*real_connect)(int, const struct sockaddr *, socklen_t) = NULL;
     if (!real_connect)
         real_connect = dlsym(RTLD_NEXT, "connect");
@@ -64,8 +70,12 @@ int connect(int sockfd, const struct sockaddr *addr, socklen_t addrlen) {
     assert(addr->sa_family == AF_INET);
     const struct sockaddr_in *sa = (const struct sockaddr_in *)addr;
     int port = ntohs(sa->sin_port);
-    if (port == 10000 || port == 10001) {
-        errno = ECONNREFUSED;
+    if (port == PORT_ECONNREFUSED) {
+        errno = (refused_attempts++ == 0) ? EINPROGRESS : ECONNREFUSED;
+        return -1;
+    }
+    if (port == PORT_EHOSTUNREACH) {
+        errno = EHOSTUNREACH;
         return -1;
     }
     return real_connect(sockfd, addr, addrlen);
@@ -117,6 +127,8 @@ int main(void) {
         close(listen_fd);
         return 1;
     }
+    assert(c->err == 0);
+    assert(c->errstr[0] == '\0');
 
     printf("PASS\n");
     valkeyFree(c);

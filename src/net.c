@@ -561,6 +561,7 @@ int valkeyContextConnectTcp(valkeyContext *c, const valkeyOptions *options) {
 
         c->flags |= VALKEY_CONNECTED;
         rv = VALKEY_OK;
+        valkeyClearError(c);
         goto end;
     }
     if (p == NULL) {
