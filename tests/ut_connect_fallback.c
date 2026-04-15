@@ -23,7 +23,7 @@
 
 static int port_listen;
 
-#define PORT_ECONNREFUSED  10000 /* Simulates failed non-blocking connect */
+#define PORT_ECONNREFUSED 10000 /* Simulates failed non-blocking connect */
 #define PORT_EHOSTUNREACH 10001 /* Simulates immediate routing failure */
 static struct addrinfo *make_entry(int port, struct addrinfo *next);
 
