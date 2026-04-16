@@ -38,8 +38,8 @@
 #include "adlist.h"
 #include "alloc.h"
 #include "command.h"
-#include "vkutil.h"
 #include "dict.h"
+#include "vkutil.h"
 
 #include <sds.h>
 
