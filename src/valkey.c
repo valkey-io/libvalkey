@@ -779,8 +779,7 @@ valkeyFD valkeyFreeKeepFd(valkeyContext *c) {
 int valkeyReconnect(valkeyContext *c) {
     valkeyOptions options = {.connect_timeout = c->connect_timeout};
 
-    c->err = 0;
-    memset(c->errstr, '\0', strlen(c->errstr));
+    valkeyClearError(c);
 
     assert(c->funcs);
     if (c->funcs && c->funcs->close)
