@@ -508,12 +508,11 @@ static ssize_t valkeyTLSRead(valkeyContext *c, char *buf, size_t bufcap) {
              */
             if (errno == EINTR) {
                 return 0;
+            } else if (errno == EAGAIN) {
+                valkeySetError(c, VALKEY_ERR_IO, "Resource temporarily unavailable");
+                return -1;
             } else {
-                const char *msg = NULL;
-                if (errno == EAGAIN) {
-                    msg = "Resource temporarily unavailable";
-                }
-                valkeySetError(c, VALKEY_ERR_IO, msg);
+                valkeySetErrorFromErrno(c, VALKEY_ERR_IO, NULL);
                 return -1;
             }
         }
@@ -524,7 +523,7 @@ static ssize_t valkeyTLSRead(valkeyContext *c, char *buf, size_t bufcap) {
         if (maybeCheckWant(rssl, err)) {
             return 0;
         } else {
-            valkeySetError(c, VALKEY_ERR_IO, NULL);
+            valkeySetErrorFromErrno(c, VALKEY_ERR_IO, NULL);
             return -1;
         }
     }
@@ -545,7 +544,7 @@ static ssize_t valkeyTLSWrite(valkeyContext *c) {
         if ((c->flags & VALKEY_BLOCK) == 0 && maybeCheckWant(rssl, err)) {
             return 0;
         } else {
-            valkeySetError(c, VALKEY_ERR_IO, NULL);
+            valkeySetErrorFromErrno(c, VALKEY_ERR_IO, NULL);
             return -1;
         }
     }
