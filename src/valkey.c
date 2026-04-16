@@ -709,6 +709,11 @@ void valkeySetError(valkeyContext *c, int type, const char *str) {
     }
 }
 
+void valkeyClearError(valkeyContext *c) {
+    c->err = 0;
+    memset(c->errstr, '\0', strlen(c->errstr));
+}
+
 valkeyReader *valkeyReaderCreate(void) {
     return valkeyReaderCreateWithFunctions(&defaultFunctions);
 }
