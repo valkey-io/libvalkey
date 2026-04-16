@@ -72,7 +72,7 @@ static ssize_t valkeyNetRead(valkeyContext *c, char *buf, size_t bufcap) {
             valkeySetError(c, VALKEY_ERR_TIMEOUT, "recv timeout");
             return -1;
         } else {
-            valkeySetError(c, VALKEY_ERR_IO, strerror(errno));
+            valkeySetErrorFromErrno(c, VALKEY_ERR_IO, NULL);
             return -1;
         }
     } else if (nread == 0) {
@@ -92,7 +92,7 @@ static ssize_t valkeyNetWrite(valkeyContext *c) {
             /* Try again */
             return 0;
         } else {
-            valkeySetError(c, VALKEY_ERR_IO, strerror(errno));
+            valkeySetErrorFromErrno(c, VALKEY_ERR_IO, NULL);
             return -1;
         }
     }
@@ -169,7 +169,7 @@ int valkeyKeepAlive(valkeyContext *c, int interval) {
 
 #ifndef _WIN32
     if (setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, &val, sizeof(val)) == -1) {
-        valkeySetError(c, VALKEY_ERR_OTHER, strerror(errno));
+        valkeySetErrorFromErrno(c, VALKEY_ERR_OTHER, NULL);
         return VALKEY_ERR;
     }
 
@@ -177,13 +177,13 @@ int valkeyKeepAlive(valkeyContext *c, int interval) {
 
 #if defined(__APPLE__) && defined(__MACH__)
     if (setsockopt(fd, IPPROTO_TCP, TCP_KEEPALIVE, &val, sizeof(val)) < 0) {
-        valkeySetError(c, VALKEY_ERR_OTHER, strerror(errno));
+        valkeySetErrorFromErrno(c, VALKEY_ERR_OTHER, NULL);
         return VALKEY_ERR;
     }
 #else
 #if defined(__GLIBC__) && !defined(__FreeBSD_kernel__)
     if (setsockopt(fd, IPPROTO_TCP, TCP_KEEPIDLE, &val, sizeof(val)) < 0) {
-        valkeySetError(c, VALKEY_ERR_OTHER, strerror(errno));
+        valkeySetErrorFromErrno(c, VALKEY_ERR_OTHER, NULL);
         return VALKEY_ERR;
     }
 
@@ -191,13 +191,13 @@ int valkeyKeepAlive(valkeyContext *c, int interval) {
     if (val == 0)
         val = 1;
     if (setsockopt(fd, IPPROTO_TCP, TCP_KEEPINTVL, &val, sizeof(val)) < 0) {
-        valkeySetError(c, VALKEY_ERR_OTHER, strerror(errno));
+        valkeySetErrorFromErrno(c, VALKEY_ERR_OTHER, NULL);
         return VALKEY_ERR;
     }
 
     val = 3;
     if (setsockopt(fd, IPPROTO_TCP, TCP_KEEPCNT, &val, sizeof(val)) < 0) {
-        valkeySetError(c, VALKEY_ERR_OTHER, strerror(errno));
+        valkeySetErrorFromErrno(c, VALKEY_ERR_OTHER, NULL);
         return VALKEY_ERR;
     }
 #endif
