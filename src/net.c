@@ -505,9 +505,7 @@ int valkeyContextConnectTcp(valkeyContext *c, const valkeyOptions *options) {
             }
             freeaddrinfo(bservinfo);
             if (!bound) {
-                char buf[128];
-                snprintf(buf, sizeof(buf), "Can't bind socket: %s", strerror(errno));
-                valkeySetError(c, VALKEY_ERR_OTHER, buf);
+                valkeySetErrorFromErrno(c, VALKEY_ERR_OTHER, "Can't bind socket");
                 goto error;
             }
         }

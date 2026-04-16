@@ -392,15 +392,15 @@ static int valkeyTLSConnect(valkeyContext *c, SSL *ssl) {
     }
 
     if (c->err == 0) {
-        char err[512];
         if (rv == SSL_ERROR_SYSCALL)
-            snprintf(err, sizeof(err) - 1, "SSL_connect failed: %s", strerror(errno));
+            valkeySetErrorFromErrno(c, VALKEY_ERR_IO, "SSL_connect failed");
         else {
             unsigned long e = ERR_peek_last_error();
-            snprintf(err, sizeof(err) - 1, "SSL_connect failed: %s",
+            char err[512];
+            snprintf(err, sizeof(err), "SSL_connect failed: %s",
                      ERR_reason_error_string(e));
+            valkeySetError(c, VALKEY_ERR_IO, err);
         }
-        valkeySetError(c, VALKEY_ERR_IO, err);
     }
 
     vk_free(rssl);
