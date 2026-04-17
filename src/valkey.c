@@ -64,7 +64,7 @@ static valkeyReplyObjectFunctions defaultFunctions = {
     createDoubleObject,
     createNilObject,
     createBoolObject,
-    freeReplyObject};
+    valkeyFreeReplyObject};
 
 /* Create a reply object */
 static valkeyReply *createReplyObject(int type) {
@@ -78,7 +78,7 @@ static valkeyReply *createReplyObject(int type) {
 }
 
 /* Free a reply object */
-void freeReplyObject(void *reply) {
+void valkeyFreeReplyObject(void *reply) {
     valkeyReply *r = reply;
     size_t j;
 
@@ -97,7 +97,7 @@ void freeReplyObject(void *reply) {
     case VALKEY_REPLY_PUSH:
         if (r->element != NULL) {
             for (j = 0; j < r->elements; j++)
-                freeReplyObject(r->element[j]);
+                valkeyFreeReplyObject(r->element[j]);
             vk_free(r->element);
         }
         break;
@@ -161,7 +161,7 @@ static void *createStringObject(const valkeyReadTask *task, char *str, size_t le
     return r;
 
 oom:
-    freeReplyObject(r);
+    valkeyFreeReplyObject(r);
     return NULL;
 }
 
@@ -175,7 +175,7 @@ static void *createArrayObject(const valkeyReadTask *task, size_t elements) {
     if (elements > 0) {
         r->element = vk_calloc(elements, sizeof(valkeyReply *));
         if (r->element == NULL) {
-            freeReplyObject(r);
+            valkeyFreeReplyObject(r);
             return NULL;
         }
     }
@@ -228,7 +228,7 @@ static void *createDoubleObject(const valkeyReadTask *task, double value, char *
     r->dval = value;
     r->str = vk_malloc(len + 1);
     if (r->str == NULL) {
-        freeReplyObject(r);
+        valkeyFreeReplyObject(r);
         return NULL;
     }
 
@@ -720,7 +720,7 @@ valkeyReader *valkeyReaderCreate(void) {
 
 static void valkeyPushAutoFree(void *privdata, void *reply) {
     (void)privdata;
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
 }
 
 static valkeyContext *valkeyContextInit(void) {
@@ -871,7 +871,7 @@ valkeyContext *valkeyConnectWithOptions(const valkeyOptions *options) {
         c->flags |= VALKEY_MPTCP;
     }
 
-    /* Set any user supplied RESP3 PUSH handler or use freeReplyObject
+    /* Set any user supplied RESP3 PUSH handler or use valkeyFreeReplyObject
      * as a default unless specifically flagged that we don't want one. */
     if (options->push_cb != NULL)
         valkeySetPushCallback(c, options->push_cb);
@@ -1148,7 +1148,7 @@ int valkeyGetReply(valkeyContext *c, void **reply) {
     if (reply != NULL) {
         *reply = aux;
     } else {
-        freeReplyObject(aux);
+        valkeyFreeReplyObject(aux);
     }
 
     return VALKEY_OK;
