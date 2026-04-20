@@ -77,7 +77,7 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - name: Build on Solaris
-        uses: vmactions/solaris-vm@0a231b94365d1911cf62097ef342f6b30d95598f # v1.3.2
+        uses: vmactions/solaris-vm@c20562b2c69737b06be9e828915761703e487373 # v1.3.3
         with:
           prepare: pkgutil -y -i gmake gcc5core openssl_utils
           run: USE_TLS=1 gmake
@@ -108,7 +108,7 @@ jobs:
              > pkg.oracle.com.key.pem
 
        - name: Build on Solaris
-         uses: vmactions/solaris-vm@0a231b94365d1911cf62097ef342f6b30d95598f # v1.3.2
+         uses: vmactions/solaris-vm@c20562b2c69737b06be9e828915761703e487373 # v1.3.3
          with:
            usesh: true
            prepare: |
