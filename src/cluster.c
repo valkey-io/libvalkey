@@ -2958,9 +2958,6 @@ static void valkeyClusterAsyncCallback(valkeyAsyncContext *ac, void *r,
     }
 
     cc = &acc->cc;
-    if (cc == NULL) {
-        goto error;
-    }
 
     command = cad->command;
     if (command == NULL) {
