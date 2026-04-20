@@ -72,7 +72,7 @@ static ssize_t valkeyNetRead(valkeyContext *c, char *buf, size_t bufcap) {
             valkeySetError(c, VALKEY_ERR_TIMEOUT, "recv timeout");
             return -1;
         } else {
-            valkeySetError(c, VALKEY_ERR_IO, strerror(errno));
+            valkeySetErrorFromErrno(c, VALKEY_ERR_IO, NULL);
             return -1;
         }
     } else if (nread == 0) {
@@ -92,23 +92,12 @@ static ssize_t valkeyNetWrite(valkeyContext *c) {
             /* Try again */
             return 0;
         } else {
-            valkeySetError(c, VALKEY_ERR_IO, strerror(errno));
+            valkeySetErrorFromErrno(c, VALKEY_ERR_IO, NULL);
             return -1;
         }
     }
 
     return nwritten;
-}
-
-static void valkeySetErrorFromErrno(valkeyContext *c, int type, const char *prefix) {
-    int errorno = errno; /* snprintf() may change errno */
-    char buf[128] = {0};
-    size_t len = 0;
-
-    if (prefix != NULL)
-        len = snprintf(buf, sizeof(buf), "%s: ", prefix);
-    strerror_r(errorno, (char *)(buf + len), sizeof(buf) - len);
-    valkeySetError(c, type, buf);
 }
 
 static int valkeySetReuseAddr(valkeyContext *c) {
@@ -180,7 +169,7 @@ int valkeyKeepAlive(valkeyContext *c, int interval) {
 
 #ifndef _WIN32
     if (setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, &val, sizeof(val)) == -1) {
-        valkeySetError(c, VALKEY_ERR_OTHER, strerror(errno));
+        valkeySetErrorFromErrno(c, VALKEY_ERR_OTHER, NULL);
         return VALKEY_ERR;
     }
 
@@ -188,13 +177,13 @@ int valkeyKeepAlive(valkeyContext *c, int interval) {
 
 #if defined(__APPLE__) && defined(__MACH__)
     if (setsockopt(fd, IPPROTO_TCP, TCP_KEEPALIVE, &val, sizeof(val)) < 0) {
-        valkeySetError(c, VALKEY_ERR_OTHER, strerror(errno));
+        valkeySetErrorFromErrno(c, VALKEY_ERR_OTHER, NULL);
         return VALKEY_ERR;
     }
 #else
 #if defined(__GLIBC__) && !defined(__FreeBSD_kernel__)
     if (setsockopt(fd, IPPROTO_TCP, TCP_KEEPIDLE, &val, sizeof(val)) < 0) {
-        valkeySetError(c, VALKEY_ERR_OTHER, strerror(errno));
+        valkeySetErrorFromErrno(c, VALKEY_ERR_OTHER, NULL);
         return VALKEY_ERR;
     }
 
@@ -202,13 +191,13 @@ int valkeyKeepAlive(valkeyContext *c, int interval) {
     if (val == 0)
         val = 1;
     if (setsockopt(fd, IPPROTO_TCP, TCP_KEEPINTVL, &val, sizeof(val)) < 0) {
-        valkeySetError(c, VALKEY_ERR_OTHER, strerror(errno));
+        valkeySetErrorFromErrno(c, VALKEY_ERR_OTHER, NULL);
         return VALKEY_ERR;
     }
 
     val = 3;
     if (setsockopt(fd, IPPROTO_TCP, TCP_KEEPCNT, &val, sizeof(val)) < 0) {
-        valkeySetError(c, VALKEY_ERR_OTHER, strerror(errno));
+        valkeySetErrorFromErrno(c, VALKEY_ERR_OTHER, NULL);
         return VALKEY_ERR;
     }
 #endif
@@ -516,9 +505,7 @@ int valkeyContextConnectTcp(valkeyContext *c, const valkeyOptions *options) {
             }
             freeaddrinfo(bservinfo);
             if (!bound) {
-                char buf[128];
-                snprintf(buf, sizeof(buf), "Can't bind socket: %s", strerror(errno));
-                valkeySetError(c, VALKEY_ERR_OTHER, buf);
+                valkeySetErrorFromErrno(c, VALKEY_ERR_OTHER, "Can't bind socket");
                 goto error;
             }
         }
