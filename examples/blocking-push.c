@@ -54,7 +54,7 @@ static void assertReplyAndFree(valkeyContext *context, valkeyReply *reply, int t
         panicAbort("Expected reply type %d but got type %d", type, reply->type);
     }
 
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
 }
 
 /* Switch to the RESP3 protocol and enable client tracking */
@@ -71,7 +71,7 @@ static void enableClientTracking(valkeyContext *c) {
         exit(-1);
     }
 
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
 
     /* Enable client tracking */
     reply = valkeyCommand(c, "CLIENT TRACKING ON");
@@ -95,7 +95,7 @@ void pushReplyHandler(void *privdata, void *r) {
     printf("pushReplyHandler(): INVALIDATE '%s' (invalidation count: %d)\n",
            reply->element[1]->element[0]->str, *invalidations);
 
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
 }
 
 /* We aren't actually freeing anything here, but it is included to show that we can

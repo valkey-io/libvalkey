@@ -33,23 +33,23 @@ void test_pipeline(void) {
     valkeyReply *reply;
     valkeyClusterGetReply(cc, (void *)&reply); // reply for: SET foo one
     CHECK_REPLY_OK(cc, reply);
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
 
     valkeyClusterGetReply(cc, (void *)&reply); // reply for: SET bar two
     CHECK_REPLY_OK(cc, reply);
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
 
     valkeyClusterGetReply(cc, (void *)&reply); // reply for: GET foo
     CHECK_REPLY_STR(cc, reply, "one");
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
 
     valkeyClusterGetReply(cc, (void *)&reply); // reply for: GET bar
     CHECK_REPLY_STR(cc, reply, "two");
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
 
     valkeyClusterGetReply(cc, (void *)&reply); // reply for: SUNION a b
     CHECK_REPLY_ERROR(cc, reply, "CROSSSLOT");
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
 
     valkeyClusterFree(cc);
 }

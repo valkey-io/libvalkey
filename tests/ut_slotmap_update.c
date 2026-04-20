@@ -156,7 +156,7 @@ void test_parse_cluster_nodes(bool parse_replicas) {
         "824fe116063bc5fcf9f4ffd895bc17aee7731ac3 127.0.0.1:30006@31006,hostname6 slave 292f8b365bb7edb5e285caf0b7e6ddc7265d2f4f 0 1426238317741 6 connected\n"
         "e7d1eecce10fd6bb5eb35b9f99a514335d9ba9ca 127.0.0.1:30001@31001,hostname1 myself,master - 0 0 1 connected 0-5460\n");
     dict *nodes = parse_cluster_nodes(cc, c, reply);
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
 
     assert(nodes);
     assert(dictSize(nodes) == 3); /* 3 masters */
@@ -241,7 +241,7 @@ void test_parse_cluster_nodes_during_failover(void) {
         "8675cd30fdd4efa088634e50fbd5c0675238a35e 10.10.10.124:7000@17000 slave 22de56650b3714c1c42fc0d120f80c66c24d8795 0 1625255655360 3 connected\n"
         "4394d8eb03de1f524b56cb385f0eb9052ce65283 10.10.10.121:7000@17000 myself,master - 0 1625255653000 1 connected 0-5460\n");
     dict *nodes = parse_cluster_nodes(cc, c, reply);
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
 
     assert(nodes);
     assert(dictSize(nodes) == 4); /* 4 masters */
@@ -302,7 +302,7 @@ void test_parse_cluster_nodes_with_noaddr(void) {
         "e839a12fbed631de867016f636d773e644562e72 127.0.0.0:6379@16379 myself,master - 0 1658755601000 1 connected 0-5460\n"
         "87f785c4a51f58c06e4be55de8c112210a811db9 127.0.0.2:6379@16379 master - 0 1658755602418 3 connected 10923-16383\n");
     dict *nodes = parse_cluster_nodes(cc, c, reply);
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
 
     assert(nodes);
     assert(dictSize(nodes) == 2); /* Only 2 primaries since `noaddr` nodes are skipped. */
@@ -334,7 +334,7 @@ void test_parse_cluster_nodes_with_empty_ip(void) {
         "e839a12fbed631de867016f636d773e644562e72 127.0.0.1:6379@16379 master - 0 1658755601000 1 connected 0-5460\n"
         "87f785c4a51f58c06e4be55de8c112210a811db9 127.0.0.2:6379@16379 master - 0 1658755602418 3 connected 10923-16383\n");
     dict *nodes = parse_cluster_nodes(cc, c, reply);
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
 
     assert(nodes);
     assert(dictSize(nodes) == 3);
@@ -369,7 +369,7 @@ void test_parse_cluster_nodes_with_special_slot_entries(void) {
     valkeyReply *reply = create_cluster_nodes_reply(
         "4394d8eb03de1f524b56cb385f0eb9052ce65283 10.10.10.121:7000@17000 myself,master - 0 1625255653000 1 connected 0 2-5460 [0->-e7d1eecce10fd6bb5eb35b9f99a514335d9ba9ca] [1-<-292f8b365bb7edb5e285caf0b7e6ddc7265d2f4f]\n");
     dict *nodes = parse_cluster_nodes(cc, c, reply);
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
 
     assert(nodes);
     assert(dictSize(nodes) == 1); /* 1 master */
@@ -415,7 +415,7 @@ void test_parse_cluster_nodes_with_multiple_replicas(void) {
         "67ed2db8d677e59ec4a4cefb06858cf2a1a89fa1 127.0.0.1:30002@31002,hostname2 slave e7d1eecce10fd6bb5eb35b9f99a514335d9ba9ca 0 1426238316232 2 connected\n"
         "292f8b365bb7edb5e285caf0b7e6ddc7265d2f4f 127.0.0.1:30003@31003,hostname3 slave e7d1eecce10fd6bb5eb35b9f99a514335d9ba9ca 0 1426238318243 3 connected\n");
     dict *nodes = parse_cluster_nodes(cc, c, reply);
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
 
     /* Verify master. */
     assert(nodes);
@@ -473,7 +473,7 @@ void test_parse_cluster_nodes_with_parse_error(void) {
     reply = create_cluster_nodes_reply(
         "e839a12fbed631de867016f636d773e644562e72 127.0.0.0:30001@31001 myself,master - 0 1658755601000 1 \n");
     nodes = parse_cluster_nodes(cc, c, reply);
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
     assert(nodes == NULL);
     assert(cc->err == VALKEY_ERR_OTHER);
     valkeyClusterClearError(cc);
@@ -482,7 +482,7 @@ void test_parse_cluster_nodes_with_parse_error(void) {
     reply = create_cluster_nodes_reply(
         "e839a12fbed631de867016f636d773e644562e72 127.0.0.0@31001 myself,master - 0 1658755601000 1 connected 0-5460\n");
     nodes = parse_cluster_nodes(cc, c, reply);
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
     assert(nodes == NULL);
     assert(cc->err == VALKEY_ERR_OTHER);
     valkeyClusterClearError(cc);
@@ -491,7 +491,7 @@ void test_parse_cluster_nodes_with_parse_error(void) {
     reply = create_cluster_nodes_reply(
         "e839a12fbed631de867016f636d773e644562e72 127.0.0.0 myself,master - 0 1658755601000 1 connected 0-5460\n");
     nodes = parse_cluster_nodes(cc, c, reply);
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
     assert(nodes == NULL);
     assert(cc->err == VALKEY_ERR_OTHER);
     valkeyClusterClearError(cc);
@@ -500,7 +500,7 @@ void test_parse_cluster_nodes_with_parse_error(void) {
     reply = create_cluster_nodes_reply(
         "e839a12fbed631de867016f636d773e644562e72 127.0.0.0:66000@67000 myself,master - 0 1658755601000 1 connected 0-5460\n");
     nodes = parse_cluster_nodes(cc, c, reply);
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
     assert(nodes == NULL);
     assert(cc->err == VALKEY_ERR_OTHER);
     valkeyClusterClearError(cc);
@@ -522,7 +522,7 @@ void test_parse_cluster_nodes_with_legacy_format(void) {
         "e839a12fbed631de867016f636d773e644562e72 127.0.0.0:6379 myself,master - 0 1658755601000 1 connected 0-5460\n"
         "752d150249c157c7cb312b6b056517bbbecb42d2 :0 master,noaddr - 1658754833817 1658754833000 3 disconnected 5461-10922\n");
     dict *nodes = parse_cluster_nodes(cc, c, reply);
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
 
     assert(nodes);
     assert(dictSize(nodes) == 1); /* Only 1 primary since `noaddr` nodes are skipped. */
@@ -549,7 +549,7 @@ void test_parse_cluster_nodes_with_resp3(void) {
         "292f8b365bb7edb5e285caf0b7e6ddc7265d2f4f 127.0.0.1:30003@31003,hostname3 master - 0 1426238318243 3 connected 10923-16383\n"
         "e7d1eecce10fd6bb5eb35b9f99a514335d9ba9ca 127.0.0.1:30001@31001,hostname1 myself,master - 0 0 1 connected 0-5460\n");
     dict *nodes = parse_cluster_nodes(cc, c, reply);
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
 
     assert(nodes);
     assert(dictSize(nodes) == 3); /* 3 primaries */
@@ -593,7 +593,7 @@ void test_parse_cluster_slots(bool parse_replicas) {
         "                ['127.0.0.1', 30006, '824fe116063bc5fcf9f4ffd895bc17aee7731ac3', ['hostname', 'localhost']]]]");
 
     dict *nodes = parse_cluster_slots(cc, c, reply);
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
 
     assert(nodes);
     assert(dictSize(nodes) == 3); /* 3 primaries */
@@ -674,7 +674,7 @@ void test_parse_cluster_slots_with_empty_ip(void) {
         " [10923, 16383, ['127.0.0.2', 6379, '292f8b365bb7edb5e285caf0b7e6ddc7265d2f4f']]]");
 
     dict *nodes = parse_cluster_slots(cc, c, reply);
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
 
     assert(nodes);
     assert(dictSize(nodes) == 3);
@@ -710,7 +710,7 @@ void test_parse_cluster_slots_with_null_ip(void) {
         " [10923, 16383, ['127.0.0.2', 6379, '292f8b365bb7edb5e285caf0b7e6ddc7265d2f4f']]]");
 
     dict *nodes = parse_cluster_slots(cc, c, reply);
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
 
     assert(nodes);
     assert(dictSize(nodes) == 3);
@@ -751,7 +751,7 @@ void test_parse_cluster_slots_with_multiple_replicas(void) {
         "            ['127.0.0.1', 30003, '824fe116063bc5fcf9f4ffd895bc17aee7731ac3']]]");
 
     dict *nodes = parse_cluster_slots(cc, c, reply);
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
 
     /* Verify primary. */
     assert(nodes);
@@ -811,7 +811,7 @@ void test_parse_cluster_slots_with_noncontiguous_slots(void) {
         "           ['127.0.0.1', 30004, '07c37dfeb235213a872192d90877d0cd55635b91']]]");
 
     dict *nodes = parse_cluster_slots(cc, c, reply);
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
 
     /* Verify primary. */
     assert(nodes);

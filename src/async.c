@@ -176,8 +176,8 @@ valkeyAsyncContext *valkeyAsyncConnectWithOptions(const valkeyOptions *options) 
     valkeyContext *c;
     valkeyAsyncContext *ac;
 
-    /* Clear any erroneously set sync callback and flag that we don't want to
-     * use freeReplyObject by default. */
+    /* Clear any erroneously set sync callback, and flag that we don't want to
+     * use valkeyFreeReplyObject by default. */
     myOptions.push_cb = NULL;
     myOptions.options |= VALKEY_OPT_NO_PUSH_AUTOFREE;
 
