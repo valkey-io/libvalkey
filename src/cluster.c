@@ -3009,9 +3009,12 @@ static void valkeyClusterAsyncCallback(valkeyAsyncContext *ac, void *r,
             if (slot >= 0) {
                 cc->table[slot] = node;
             }
-            ac_retry = valkeyClusterGetValkeyAsyncContext(acc, node);
 
+            ac_retry = valkeyClusterGetValkeyAsyncContext(acc, node);
+            if (ac_retry == NULL)
+                goto done;
             break;
+
         case CLUSTER_ERR_ASK:
             node = getNodeFromRedirectReply(cc, &ac->c, reply, NULL);
             if (node == NULL) {
