@@ -2937,6 +2937,11 @@ static void throttledUpdateSlotMapAsync(valkeyClusterAsyncContext *acc,
     }
 }
 
+/* Callback for async cluster commands. Handles redirects (MOVED/ASK),
+ * retries (TRYAGAIN/CLUSTERDOWN), and delivers the final reply to the user.
+ * On success or unrecoverable failure, the user callback is always invoked
+ * with the reply on success, or with NULL when an error occurred (check
+ * acc->err for details). */
 static void valkeyClusterAsyncCallback(valkeyAsyncContext *ac, void *r,
                                        void *privdata) {
     int ret;
@@ -2948,27 +2953,26 @@ static void valkeyClusterAsyncCallback(valkeyAsyncContext *ac, void *r,
     valkeyClusterNode *node;
     struct cmd *command;
 
-    if (cad == NULL) {
-        goto error;
-    }
+    assert(cad != NULL);
+    if (cad == NULL)
+        return;
 
     acc = cad->acc;
+    assert(acc != NULL);
     if (acc == NULL) {
-        goto error;
+        cluster_async_data_free(cad);
+        return;
     }
 
     cc = &acc->cc;
-    if (cc == NULL) {
-        goto error;
-    }
 
     command = cad->command;
-    if (command == NULL) {
-        goto error;
-    }
+    assert(command != NULL);
+    if (command == NULL)
+        goto done;
 
     if (reply == NULL) {
-        /* Copy reply specific error from libvalkey */
+        /* Copy error from the underlying context. */
         valkeyClusterAsyncSetError(acc, ac->err, ac->errstr);
 
         node = (valkeyClusterNode *)ac->data;
@@ -2984,6 +2988,7 @@ static void valkeyClusterAsyncCallback(valkeyAsyncContext *ac, void *r,
     if (cad->retry_count == NO_RETRY || cc->flags & VALKEY_FLAG_DISCONNECTING)
         goto done;
 
+    /* Handle cluster redirect and retry errors. */
     replyErrorType error_type = getReplyErrorType(reply);
     if (error_type > CLUSTER_NO_ERROR && error_type < CLUSTER_ERR_OTHER) {
         cad->retry_count++;
@@ -3009,9 +3014,12 @@ static void valkeyClusterAsyncCallback(valkeyAsyncContext *ac, void *r,
             if (slot >= 0) {
                 cc->table[slot] = node;
             }
-            ac_retry = valkeyClusterGetValkeyAsyncContext(acc, node);
 
+            ac_retry = valkeyClusterGetValkeyAsyncContext(acc, node);
+            if (ac_retry == NULL)
+                goto done;
             break;
+
         case CLUSTER_ERR_ASK:
             node = getNodeFromRedirectReply(cc, &ac->c, reply, NULL);
             if (node == NULL) {
@@ -3020,57 +3028,35 @@ static void valkeyClusterAsyncCallback(valkeyAsyncContext *ac, void *r,
             }
 
             ac_retry = valkeyClusterGetValkeyAsyncContext(acc, node);
-            if (ac_retry == NULL) {
-                /* Specific error already set */
+            if (ac_retry == NULL)
                 goto done;
-            }
 
-            ret =
-                valkeyAsyncCommand(ac_retry, NULL, NULL, VALKEY_COMMAND_ASKING);
-            if (ret != VALKEY_OK) {
-                goto error;
-            }
-
+            ret = valkeyAsyncCommand(ac_retry, NULL, NULL, VALKEY_COMMAND_ASKING);
+            if (ret != VALKEY_OK)
+                goto done;
             break;
+
         case CLUSTER_ERR_TRYAGAIN:
         case CLUSTER_ERR_CLUSTERDOWN:
             ac_retry = ac;
-
             break;
-        default:
 
+        default:
             goto done;
         }
 
-        goto retry;
+        /* Retry the command on the selected connection. */
+        ret = valkeyAsyncFormattedCommand(ac_retry, valkeyClusterAsyncCallback,
+                                          cad, command->cmd, command->clen);
+        if (ret == VALKEY_OK)
+            return; /* Ownership of cad transferred to retry callback. */
+        /* Retry failed, fall through to notify the user. */
     }
 
 done:
-
-    if (acc->err) {
-        cad->callback(acc, NULL, cad->privdata);
-    } else {
-        cad->callback(acc, r, cad->privdata);
-    }
-
+    /* Deliver result to the user callback. */
+    cad->callback(acc, acc->err ? NULL : r, cad->privdata);
     valkeyClusterAsyncClearError(acc);
-
-    cluster_async_data_free(cad);
-
-    return;
-
-retry:
-
-    ret = valkeyAsyncFormattedCommand(ac_retry, valkeyClusterAsyncCallback, cad,
-                                      command->cmd, command->clen);
-    if (ret != VALKEY_OK) {
-        goto error;
-    }
-
-    return;
-
-error:
-
     cluster_async_data_free(cad);
 }
 
