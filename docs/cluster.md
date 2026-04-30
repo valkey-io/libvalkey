@@ -100,7 +100,7 @@ if (reply == NULL) {
 } else {
     // Handle reply..
 }
-freeReplyObject(reply);
+valkeyFreeReplyObject(reply);
 ```
 
 Commands will be sent to the cluster node that the client perceives handling the given key.
@@ -160,14 +160,14 @@ if (valkeyClusterGetReply(cc,&reply) != VALKEY_OK) {
     exit(1);
 }
 // Handle the reply for SET here.
-freeReplyObject(reply);
+valkeyFreeReplyObject(reply);
 
 if (valkeyClusterGetReply(cc,&reply) != VALKEY_OK) {
     fprintf(stderr, "Error reading reply %zu: %s\n", i, c->errstr);
     exit(1);
 }
 // Handle the reply for GET here.
-freeReplyObject(reply);
+valkeyFreeReplyObject(reply);
 ```
 
 ### Events

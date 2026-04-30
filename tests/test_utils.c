@@ -41,11 +41,11 @@ void load_valkey_version(valkeyClusterContext *cc) {
         goto abort;
     server_version_minor = strtol(eptr + 1, NULL, 10);
 
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
     return;
 
 abort:
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
     fprintf(stderr, "Error: Cannot get Valkey version, aborting..\n");
     exit(1);
 }

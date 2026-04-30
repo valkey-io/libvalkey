@@ -142,7 +142,7 @@ typedef struct valkeyReply {
 LIBVALKEY_API valkeyReader *valkeyReaderCreate(void);
 
 /* Function to free the reply objects hivalkey returns by default. */
-LIBVALKEY_API void freeReplyObject(void *reply);
+LIBVALKEY_API void valkeyFreeReplyObject(void *reply);
 
 /* Functions to format a command according to the protocol. */
 LIBVALKEY_API int valkeyvFormatCommand(char **target, const char *format, va_list ap);

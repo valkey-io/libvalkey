@@ -47,7 +47,7 @@ static void example_argv_command(valkeyContext *c, size_t n) {
         printf("%s reply: %lld\n", argv[0], reply->integer);
     }
 
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
 
     /* Clean up */
     for (size_t i = 2; i < (n + 2); i++) {
@@ -93,40 +93,40 @@ int main(int argc, char **argv) {
     /* PING server */
     reply = valkeyCommand(c, "PING");
     printf("PING: %s\n", reply->str);
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
 
     /* Set a key */
     reply = valkeyCommand(c, "SET %s %s", "foo", "hello world");
     printf("SET: %s\n", reply->str);
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
 
     /* Set a key using binary safe API */
     reply = valkeyCommand(c, "SET %b %b", "bar", (size_t)3, "hello", (size_t)5);
     printf("SET (binary API): %s\n", reply->str);
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
 
     /* Try a GET and two INCR */
     reply = valkeyCommand(c, "GET foo");
     printf("GET foo: %s\n", reply->str);
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
 
     reply = valkeyCommand(c, "INCR counter");
     printf("INCR counter: %lld\n", reply->integer);
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
     /* again ... */
     reply = valkeyCommand(c, "INCR counter");
     printf("INCR counter: %lld\n", reply->integer);
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
 
     /* Create a list of numbers, from 0 to 9 */
     reply = valkeyCommand(c, "DEL mylist");
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
     for (j = 0; j < 10; j++) {
         char buf[64];
 
         snprintf(buf, 64, "%u", j);
         reply = valkeyCommand(c, "LPUSH mylist element-%s", buf);
-        freeReplyObject(reply);
+        valkeyFreeReplyObject(reply);
     }
 
     /* Let's check what we have inside the list */
@@ -136,7 +136,7 @@ int main(int argc, char **argv) {
             printf("%u) %s\n", j, reply->element[j]->str);
         }
     }
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
 
     /* See function for an example of valkeyCommandArgv */
     example_argv_command(c, 10);

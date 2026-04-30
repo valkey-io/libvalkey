@@ -22,11 +22,11 @@ void test_successful_ipv6_connection(void) {
     valkeyReply *reply;
     reply = (valkeyReply *)valkeyClusterCommand(cc, "SET key_ipv6 value");
     CHECK_REPLY_OK(cc, reply);
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
 
     reply = (valkeyReply *)valkeyClusterCommand(cc, "GET key_ipv6");
     CHECK_REPLY_STR(cc, reply, "value");
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
 
     valkeyClusterFree(cc);
 }

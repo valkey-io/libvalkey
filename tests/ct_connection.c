@@ -59,7 +59,7 @@ void test_password_ok(void) {
     valkeyReply *reply;
     reply = valkeyClusterCommand(cc, "SET key1 Hello");
     CHECK_REPLY_OK(cc, reply);
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
     valkeyClusterFree(cc);
 
     // Check counters incremented by connect callback
@@ -121,7 +121,7 @@ void test_username_ok(void) {
     // Test connection
     valkeyReply *reply = valkeyClusterCommand(cc, "SET key1 Hello");
     CHECK_REPLY_OK(cc, reply);
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
 
     valkeyClusterFree(cc);
 }
@@ -146,20 +146,20 @@ void test_multicluster(void) {
     // Set keys differently in clusters
     reply = valkeyClusterCommand(cc1, "SET key Hello1");
     CHECK_REPLY_OK(cc1, reply);
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
 
     reply = valkeyClusterCommand(cc2, "SET key Hello2");
     CHECK_REPLY_OK(cc2, reply);
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
 
     // Verify keys in clusters
     reply = valkeyClusterCommand(cc1, "GET key");
     CHECK_REPLY_STR(cc1, reply, "Hello1");
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
 
     reply = valkeyClusterCommand(cc2, "GET key");
     CHECK_REPLY_STR(cc2, reply, "Hello2");
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
 
     // Disconnect from first cluster
     valkeyClusterFree(cc1);
@@ -167,7 +167,7 @@ void test_multicluster(void) {
     // Verify that key is still accessible in connected cluster
     reply = valkeyClusterCommand(cc2, "GET key");
     CHECK_REPLY_STR(cc2, reply, "Hello2");
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
 
     valkeyClusterFree(cc2);
 }
@@ -222,7 +222,7 @@ void test_command_timeout(void) {
             break;
     }
     CHECK_REPLY_OK(cc, reply);
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
 
     valkeyClusterFree(cc);
 }
@@ -240,7 +240,7 @@ void test_command_timeout_set_while_connected(void) {
     valkeyReply *reply;
     reply = valkeyClusterCommandToNode(cc, node, "DEBUG SLEEP 0.2");
     CHECK_REPLY_OK(cc, reply);
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
 
     /* Set command timeout while connected */
     struct timeval timeout = {0, 10000};
@@ -257,7 +257,7 @@ void test_command_timeout_set_while_connected(void) {
             break;
     }
     CHECK_REPLY_OK(cc, reply);
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
 
     valkeyClusterFree(cc);
 }
