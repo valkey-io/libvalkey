@@ -42,7 +42,7 @@ int main(void) {
         exit(-1);
     }
     printf("SET: %s\n", reply->str);
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
 
     valkeyReply *reply2 = valkeyClusterCommand(cc, "GET %s", "key");
     if (!reply2) {
@@ -50,7 +50,7 @@ int main(void) {
         exit(-1);
     }
     printf("GET: %s\n", reply2->str);
-    freeReplyObject(reply2);
+    valkeyFreeReplyObject(reply2);
 
     valkeyClusterFree(cc);
     valkeyFreeTLSContext(tls);

@@ -22,7 +22,7 @@ void test_command_to_single_node(valkeyClusterContext *cc) {
     reply = valkeyClusterCommandToNode(cc, node, "DBSIZE");
     CHECK_REPLY(cc, reply);
     CHECK_REPLY_TYPE(reply, VALKEY_REPLY_INTEGER);
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
 }
 
 void test_command_to_all_nodes(valkeyClusterContext *cc) {
@@ -37,7 +37,7 @@ void test_command_to_all_nodes(valkeyClusterContext *cc) {
         reply = valkeyClusterCommandToNode(cc, node, "DBSIZE");
         CHECK_REPLY(cc, reply);
         CHECK_REPLY_TYPE(reply, VALKEY_REPLY_INTEGER);
-        freeReplyObject(reply);
+        valkeyFreeReplyObject(reply);
     }
 }
 
@@ -49,21 +49,21 @@ void test_transaction(valkeyClusterContext *cc) {
     valkeyReply *reply;
     reply = valkeyClusterCommandToNode(cc, node, "MULTI");
     CHECK_REPLY_OK(cc, reply);
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
 
     reply = valkeyClusterCommandToNode(cc, node, "SET foo 99");
     CHECK_REPLY_QUEUED(cc, reply);
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
 
     reply = valkeyClusterCommandToNode(cc, node, "INCR foo");
     CHECK_REPLY_QUEUED(cc, reply);
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
 
     reply = valkeyClusterCommandToNode(cc, node, "EXEC");
     CHECK_REPLY_ARRAY(cc, reply, 2);
     CHECK_REPLY_OK(cc, reply->element[0]);
     CHECK_REPLY_INT(cc, reply->element[1], 100);
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
 }
 
 void test_streams(valkeyClusterContext *cc) {
@@ -77,45 +77,45 @@ void test_streams(valkeyClusterContext *cc) {
     /* Preparation: remove old stream/key */
     reply = valkeyClusterCommandToNode(cc, node, "DEL mystream");
     CHECK_REPLY_TYPE(reply, VALKEY_REPLY_INTEGER);
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
 
     /* Query wrong node */
     valkeyClusterNode *wrongNode = valkeyClusterGetNodeByKey(cc, (char *)"otherstream");
     assert(node != wrongNode);
     reply = valkeyClusterCommandToNode(cc, wrongNode, "XLEN mystream");
     CHECK_REPLY_ERROR(cc, reply, "MOVED");
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
 
     /* Verify stream length before adding entries */
     reply = valkeyClusterCommandToNode(cc, node, "XLEN mystream");
     CHECK_REPLY_INT(cc, reply, 0);
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
 
     /* Add entries to a created stream */
     reply = valkeyClusterCommandToNode(cc, node, "XADD mystream * name t800");
     CHECK_REPLY_TYPE(reply, VALKEY_REPLY_STRING);
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
 
     reply = valkeyClusterCommandToNode(
         cc, node, "XADD mystream * name Sara surname OConnor");
     CHECK_REPLY_TYPE(reply, VALKEY_REPLY_STRING);
     id = strdup(reply->str); /* Keep this id for later inspections */
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
 
     /* Verify stream length after adding entries */
     reply = valkeyClusterCommandToNode(cc, node, "XLEN mystream");
     CHECK_REPLY_INT(cc, reply, 2);
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
 
     /* Modify the stream */
     reply = valkeyClusterCommandToNode(cc, node, "XTRIM mystream MAXLEN 1");
     CHECK_REPLY_INT(cc, reply, 1);
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
 
     /* Verify stream length after modifying the stream */
     reply = valkeyClusterCommandToNode(cc, node, "XLEN mystream");
     CHECK_REPLY_INT(cc, reply, 1); /* 1 entry left */
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
 
     /* Read from the stream */
     reply = valkeyClusterCommandToNode(cc, node,
@@ -137,31 +137,31 @@ void test_streams(valkeyClusterContext *cc) {
     CHECK_REPLY_STR(cc, entry->element[1]->element[1], "Sara");
     CHECK_REPLY_STR(cc, entry->element[1]->element[2], "surname");
     CHECK_REPLY_STR(cc, entry->element[1]->element[3], "OConnor");
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
 
     /* Delete the entry in stream */
     reply = valkeyClusterCommandToNode(cc, node, "XDEL mystream %s", id);
     CHECK_REPLY_INT(cc, reply, 1);
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
 
     /* Blocking read of stream */
     reply = valkeyClusterCommandToNode(
         cc, node, "XREAD COUNT 2 BLOCK 200 STREAMS mystream 0");
     CHECK_REPLY_NIL(cc, reply);
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
 
     /* Create a consumer group */
     reply = valkeyClusterCommandToNode(cc, node,
                                        "XGROUP CREATE mystream mygroup1 0");
     CHECK_REPLY_OK(cc, reply);
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
 
     if (!valkey_version_less_than(6, 2)) {
         /* Create a consumer */
         reply = valkeyClusterCommandToNode(
             cc, node, "XGROUP CREATECONSUMER mystream mygroup1 myconsumer123");
         CHECK_REPLY_INT(cc, reply, 1);
-        freeReplyObject(reply);
+        valkeyFreeReplyObject(reply);
     }
 
     /* Blocking read of consumer group */
@@ -170,7 +170,7 @@ void test_streams(valkeyClusterContext *cc) {
                                    "XREADGROUP GROUP mygroup1 myconsumer123 "
                                    "COUNT 2 BLOCK 200 STREAMS mystream 0");
     CHECK_REPLY_TYPE(reply, VALKEY_REPLY_ARRAY);
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
 
     free(id);
 }
@@ -191,7 +191,7 @@ void test_pipeline_to_single_node(valkeyClusterContext *cc) {
     valkeyClusterGetReply(cc, (void *)&reply);
     CHECK_REPLY(cc, reply);
     CHECK_REPLY_TYPE(reply, VALKEY_REPLY_INTEGER);
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
 }
 
 void test_pipeline_to_all_nodes(valkeyClusterContext *cc) {
@@ -210,17 +210,17 @@ void test_pipeline_to_all_nodes(valkeyClusterContext *cc) {
     valkeyClusterGetReply(cc, (void *)&reply);
     CHECK_REPLY(cc, reply);
     CHECK_REPLY_TYPE(reply, VALKEY_REPLY_INTEGER);
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
 
     valkeyClusterGetReply(cc, (void *)&reply);
     CHECK_REPLY(cc, reply);
     CHECK_REPLY_TYPE(reply, VALKEY_REPLY_INTEGER);
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
 
     valkeyClusterGetReply(cc, (void *)&reply);
     CHECK_REPLY(cc, reply);
     CHECK_REPLY_TYPE(reply, VALKEY_REPLY_INTEGER);
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
 
     valkeyClusterGetReply(cc, (void *)&reply);
     assert(reply == NULL);
@@ -246,21 +246,21 @@ void test_pipeline_transaction(valkeyClusterContext *cc) {
     {
         valkeyClusterGetReply(cc, (void *)&reply); // MULTI
         CHECK_REPLY_OK(cc, reply);
-        freeReplyObject(reply);
+        valkeyFreeReplyObject(reply);
 
         valkeyClusterGetReply(cc, (void *)&reply); // SET
         CHECK_REPLY_QUEUED(cc, reply);
-        freeReplyObject(reply);
+        valkeyFreeReplyObject(reply);
 
         valkeyClusterGetReply(cc, (void *)&reply); // INCR
         CHECK_REPLY_QUEUED(cc, reply);
-        freeReplyObject(reply);
+        valkeyFreeReplyObject(reply);
 
         valkeyClusterGetReply(cc, (void *)&reply); // EXEC
         CHECK_REPLY_ARRAY(cc, reply, 2);
         CHECK_REPLY_OK(cc, reply->element[0]);
         CHECK_REPLY_INT(cc, reply->element[1], 200);
-        freeReplyObject(reply);
+        valkeyFreeReplyObject(reply);
     }
 }
 

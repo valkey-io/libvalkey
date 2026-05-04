@@ -349,11 +349,11 @@ static int authenticate(valkeyClusterContext *cc, valkeyContext *c) {
         goto error;
     }
 
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
     return VALKEY_OK;
 
 error:
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
 
     return VALKEY_ERR;
 }
@@ -370,10 +370,10 @@ static int select_db(valkeyClusterContext *cc, valkeyContext *c) {
     }
     if (reply->type == VALKEY_REPLY_ERROR) {
         valkeyClusterSetError(cc, VALKEY_ERR_OTHER, reply->str);
-        freeReplyObject(reply);
+        valkeyFreeReplyObject(reply);
         return VALKEY_ERR;
     }
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
     return VALKEY_OK;
 }
 
@@ -1033,7 +1033,7 @@ static int clusterUpdateRouteHandleReply(valkeyClusterContext *cc,
     }
     if (reply->type == VALKEY_REPLY_ERROR) {
         valkeyClusterSetError(cc, VALKEY_ERR_OTHER, reply->str);
-        freeReplyObject(reply);
+        valkeyFreeReplyObject(reply);
         return VALKEY_ERR;
     }
 
@@ -1043,7 +1043,7 @@ static int clusterUpdateRouteHandleReply(valkeyClusterContext *cc,
     } else {
         nodes = parse_cluster_slots(cc, c, reply);
     }
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
     return updateNodesAndSlotmap(cc, nodes);
 }
 
@@ -1943,7 +1943,7 @@ ask_retry:
         switch (error_type) {
         case CLUSTER_ERR_MOVED:
             node = getNodeFromRedirectReply(cc, c, reply, &slot);
-            freeReplyObject(reply);
+            valkeyFreeReplyObject(reply);
             reply = NULL;
 
             if (node == NULL) {
@@ -1985,7 +1985,7 @@ ask_retry:
                 goto error;
             }
 
-            freeReplyObject(reply);
+            valkeyFreeReplyObject(reply);
             reply = NULL;
 
             c = valkeyClusterGetValkeyContext(cc, node);
@@ -2002,13 +2002,13 @@ ask_retry:
                 goto error;
             }
 
-            freeReplyObject(reply);
+            valkeyFreeReplyObject(reply);
             reply = NULL;
 
             goto ask_retry;
         case CLUSTER_ERR_TRYAGAIN:
         case CLUSTER_ERR_CLUSTERDOWN:
-            freeReplyObject(reply);
+            valkeyFreeReplyObject(reply);
             reply = NULL;
             goto retry;
 
@@ -2022,7 +2022,7 @@ ask_retry:
 
 error:
     if (reply) {
-        freeReplyObject(reply);
+        valkeyFreeReplyObject(reply);
         reply = NULL;
     }
 
@@ -2035,7 +2035,7 @@ done:
             valkeyClusterClearError(cc);
             if (valkeyClusterUpdateSlotmap(cc) != VALKEY_OK) {
                 /* Clear the reply to indicate failure. */
-                freeReplyObject(reply);
+                valkeyFreeReplyObject(reply);
                 reply = NULL;
             }
         }
@@ -2543,7 +2543,7 @@ void valkeyClusterReset(valkeyClusterContext *cc) {
         do {
             status = valkeyClusterGetReply(cc, &reply);
             if (status == VALKEY_OK) {
-                freeReplyObject(reply);
+                valkeyFreeReplyObject(reply);
             } else {
                 valkeyClusterClearAll(cc);
                 break;

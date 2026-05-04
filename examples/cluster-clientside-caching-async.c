@@ -139,7 +139,7 @@ void modifyKey(const char *key, const char *value) {
 
     valkeyReply *reply = valkeyClusterCommand(cc, "SET %s %s", key, value);
     assert(reply != NULL);
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
 
     valkeyClusterFree(cc);
 }

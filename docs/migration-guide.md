@@ -18,6 +18,7 @@ The type `sds` is removed from the public API.
 ### Renamed API functions
 
 * `redisAsyncSetConnectCallbackNC` is renamed to `valkeyAsyncSetConnectCallback`.
+* `freeReplyObject` is renamed to `valkeyFreeReplyObject`.
 
 ### Removed API functions
 

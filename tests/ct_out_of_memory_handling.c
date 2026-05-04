@@ -150,7 +150,7 @@ void test_alloc_failure_handling(void) {
         }
         assert(n < 1000);
         CHECK_REPLY_OK(cc, reply);
-        freeReplyObject(reply);
+        valkeyFreeReplyObject(reply);
     }
 
     // Command to node
@@ -171,7 +171,7 @@ void test_alloc_failure_handling(void) {
         }
         assert(n < 1000);
         CHECK_REPLY_OK(cc, reply);
-        freeReplyObject(reply);
+        valkeyFreeReplyObject(reply);
     }
 
     // Append command
@@ -209,7 +209,7 @@ void test_alloc_failure_handling(void) {
         }
         assert(ng < 1000);
         CHECK_REPLY_OK(cc, reply);
-        freeReplyObject(reply);
+        valkeyFreeReplyObject(reply);
     }
 
     // Append command to node
@@ -248,7 +248,7 @@ void test_alloc_failure_handling(void) {
         }
         assert(ng < 1000);
         CHECK_REPLY_OK(cc, reply);
-        freeReplyObject(reply);
+        valkeyFreeReplyObject(reply);
     }
 
     // Redirects
@@ -288,16 +288,16 @@ void test_alloc_failure_handling(void) {
                                            "CLUSTER SETSLOT %d MIGRATING %s",
                                            slot, replyDstId->str);
         CHECK_REPLY_OK(cc, reply);
-        freeReplyObject(reply);
+        valkeyFreeReplyObject(reply);
         reply = valkeyClusterCommandToNode(cc, dstNode,
                                            "CLUSTER SETSLOT %d IMPORTING %s",
                                            slot, replySrcId->str);
         CHECK_REPLY_OK(cc, reply);
-        freeReplyObject(reply);
+        valkeyFreeReplyObject(reply);
         reply = valkeyClusterCommandToNode(
             cc, srcNode, "MIGRATE 127.0.0.1 %d foo 0 5000", dstPort);
         CHECK_REPLY_OK(cc, reply);
-        freeReplyObject(reply);
+        valkeyFreeReplyObject(reply);
 
         /* Test ASK reply handling with OOM */
         {
@@ -311,7 +311,7 @@ void test_alloc_failure_handling(void) {
             }
             assert(n < 1000);
             CHECK_REPLY_STR(cc, reply, "one");
-            freeReplyObject(reply);
+            valkeyFreeReplyObject(reply);
         }
 
         /* Finalize the migration. Skip OOM testing during these steps by
@@ -323,11 +323,11 @@ void test_alloc_failure_handling(void) {
         reply = valkeyClusterCommandToNode(
             cc, srcNode, "CLUSTER SETSLOT %d NODE %s", slot, replyDstId->str);
         CHECK_REPLY_OK(cc, reply);
-        freeReplyObject(reply);
+        valkeyFreeReplyObject(reply);
         reply = valkeyClusterCommandToNode(
             cc, dstNode, "CLUSTER SETSLOT %d NODE %s", slot, replyDstId->str);
         CHECK_REPLY_OK(cc, reply);
-        freeReplyObject(reply);
+        valkeyFreeReplyObject(reply);
 
         /* Test MOVED reply handling with OOM */
         {
@@ -341,7 +341,7 @@ void test_alloc_failure_handling(void) {
             }
             assert(n < 1000);
             CHECK_REPLY_STR(cc, reply, "one");
-            freeReplyObject(reply);
+            valkeyFreeReplyObject(reply);
         }
 
         /* MOVED triggers a slotmap update which currently replaces all cluster_node
@@ -357,27 +357,27 @@ void test_alloc_failure_handling(void) {
                                            "CLUSTER SETSLOT %d MIGRATING %s",
                                            slot, replySrcId->str);
         CHECK_REPLY_OK(cc, reply);
-        freeReplyObject(reply);
+        valkeyFreeReplyObject(reply);
         reply = valkeyClusterCommandToNode(cc, srcNode,
                                            "CLUSTER SETSLOT %d IMPORTING %s",
                                            slot, replyDstId->str);
         CHECK_REPLY_OK(cc, reply);
-        freeReplyObject(reply);
+        valkeyFreeReplyObject(reply);
         reply = valkeyClusterCommandToNode(
             cc, dstNode, "MIGRATE 127.0.0.1 %d foo 0 5000", srcPort);
         CHECK_REPLY_OK(cc, reply);
-        freeReplyObject(reply);
+        valkeyFreeReplyObject(reply);
         reply = valkeyClusterCommandToNode(
             cc, dstNode, "CLUSTER SETSLOT %d NODE %s", slot, replySrcId->str);
         CHECK_REPLY_OK(cc, reply);
-        freeReplyObject(reply);
+        valkeyFreeReplyObject(reply);
         reply = valkeyClusterCommandToNode(
             cc, srcNode, "CLUSTER SETSLOT %d NODE %s", slot, replySrcId->str);
         CHECK_REPLY_OK(cc, reply);
-        freeReplyObject(reply);
+        valkeyFreeReplyObject(reply);
 
-        freeReplyObject(replySrcId);
-        freeReplyObject(replyDstId);
+        valkeyFreeReplyObject(replySrcId);
+        valkeyFreeReplyObject(replyDstId);
     }
 
     valkeyClusterFree(cc);
