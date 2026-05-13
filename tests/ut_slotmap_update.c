@@ -791,6 +791,32 @@ void test_parse_cluster_slots_with_multiple_replicas(void) {
     valkeyClusterFree(cc);
 }
 
+void test_parse_cluster_slots_with_invalid_slot_range(void) {
+    valkeyClusterOptions options = {0};
+    valkeyClusterContext *cc = createClusterContext(&options);
+    valkeyContext *c = valkeyContextInit();
+    dict *nodes;
+
+    /* Slot end larger than max slot. */
+    valkeyReply *reply = create_cluster_slots_reply(
+        "[[0, 16384, ['127.0.0.1', 30001, 'nodeid']]]");
+    nodes = parse_cluster_slots(cc, c, reply);
+    freeReplyObject(reply);
+    assert(nodes == NULL);
+    assert(cc->err == VALKEY_ERR_OTHER);
+
+    /* Slot start bigger than slot end. */
+    reply = create_cluster_slots_reply(
+        "[[100, 50, ['127.0.0.1', 30001, 'nodeid']]]");
+    nodes = parse_cluster_slots(cc, c, reply);
+    freeReplyObject(reply);
+    assert(nodes == NULL);
+    assert(cc->err == VALKEY_ERR_OTHER);
+
+    valkeyFree(c);
+    valkeyClusterFree(cc);
+}
+
 void test_parse_cluster_slots_with_noncontiguous_slots(void) {
     valkeyClusterOptions options = {0};
     options.options |= VALKEY_OPT_USE_REPLICAS;
@@ -863,6 +889,7 @@ int main(void) {
     test_parse_cluster_slots_with_empty_ip();
     test_parse_cluster_slots_with_null_ip();
     test_parse_cluster_slots_with_multiple_replicas();
+    test_parse_cluster_slots_with_invalid_slot_range();
     test_parse_cluster_slots_with_noncontiguous_slots();
     return 0;
 }
