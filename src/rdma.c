@@ -1035,8 +1035,7 @@ static int valkeyRdmaCM(valkeyContext *c, long timeout) {
 
 static int valkeyRdmaWaitConn(valkeyContext *c, long timeout) {
     long now, end;
-    RdmaContext *ctx = c->privctx;
-    struct epoll_event events[1], *event;
+    struct epoll_event events[1];
     int nevent;
 
     assert(timeout >= 0);
@@ -1062,8 +1061,9 @@ static int valkeyRdmaWaitConn(valkeyContext *c, long timeout) {
             return VALKEY_ERR;
         }
 
-        event = &events[0];
-        assert(event->data.fd == ctx->cm_channel->fd); /* CM channel fd wakes up only now */
+        /* Only the CM channel fd is polled here */
+        assert(events[0].data.fd == ((RdmaContext *)c->privctx)->cm_channel->fd);
+
         if (valkeyRdmaCM(c, end - now) == VALKEY_ERR) {
             return VALKEY_ERR;
         }
