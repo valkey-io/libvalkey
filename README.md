@@ -64,6 +64,10 @@ cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo -DENABLE_TLS=1 -DENABLE_RDMA=1 ..
 sudo make install
 ```
 
+### Other build options
+
+`VALKEY_NO_DEPRECATED` — Disable deprecated names (e.g. `freeReplyObject`). Define this to ensure only the new `valkey`-prefixed names are used.
+
 ## Contributing
 
 Please see [`CONTRIBUTING.md`](https://github.com/valkey-io/libvalkey/blob/main/CONTRIBUTING.md).

@@ -160,7 +160,7 @@ int main(int argc, char **argv) {
                 } else {
                     printReply(reply);
                 }
-                freeReplyObject(reply);
+                valkeyFreeReplyObject(reply);
                 if (route_version != cc->route_version) {
                     /* Updated slotmap resets the iterator. Abort iteration. */
                     break;
@@ -173,7 +173,7 @@ int main(int argc, char **argv) {
             } else {
                 printReply(reply);
             }
-            freeReplyObject(reply);
+            valkeyFreeReplyObject(reply);
         }
     }
 

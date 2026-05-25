@@ -186,11 +186,11 @@ void get_server_version(valkeyContext *c, int *majorptr, int *minorptr) {
     if (minorptr)
         *minorptr = minor;
 
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
     return;
 
 abort:
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
     fprintf(stderr, "Error:  Cannot determine server version, aborting\n");
     exit(1);
 }
@@ -201,14 +201,14 @@ static valkeyContext *select_database(valkeyContext *c) {
     /* Switch to DB 9 for testing, now that we know we can chat. */
     reply = valkeyCommand(c, "SELECT 9");
     assert(reply != NULL);
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
 
     /* Make sure the DB is empty */
     reply = valkeyCommand(c, "DBSIZE");
     assert(reply != NULL);
     if (reply->type == VALKEY_REPLY_INTEGER && reply->integer == 0) {
         /* Awesome, DB 9 is empty and we can continue. */
-        freeReplyObject(reply);
+        valkeyFreeReplyObject(reply);
     } else {
         printf("Database #9 is not empty, test cannot continue\n");
         exit(1);
@@ -225,7 +225,7 @@ static void send_hello(valkeyContext *c, int version) {
     reply = valkeyCommand(c, "HELLO %d", version);
     expected = version == 3 ? VALKEY_REPLY_MAP : VALKEY_REPLY_ARRAY;
     assert(reply != NULL && reply->type == expected);
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
 }
 
 /* Toggle client tracking */
@@ -234,7 +234,7 @@ static void send_client_tracking(valkeyContext *c, const char *str) {
 
     reply = valkeyCommand(c, "CLIENT TRACKING %s", str);
     assert(reply != NULL && reply->type == VALKEY_REPLY_STATUS);
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
 }
 
 static int disconnect(valkeyContext *c, int keep_fd) {
@@ -243,10 +243,10 @@ static int disconnect(valkeyContext *c, int keep_fd) {
     /* Make sure we're on DB 9. */
     reply = valkeyCommand(c, "SELECT 9");
     assert(reply != NULL);
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
     reply = valkeyCommand(c, "FLUSHDB");
     assert(reply != NULL);
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
 
     /* Free the context as well, but keep the fd if requested. */
     if (keep_fd)
@@ -484,7 +484,7 @@ static void test_append_formatted_commands(struct config config) {
     assert(valkeyGetReply(c, (void *)&reply) == VALKEY_OK);
 
     vk_free(cmd);
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
 
     disconnect(c, 0);
 }
@@ -521,7 +521,7 @@ static void test_unix_keepalive(struct config cfg) {
     r = valkeyCommand(c, "PING");
     test_cond(r != NULL && r->type == VALKEY_REPLY_STATUS && r->len == 4 &&
               !memcmp(r->str, "PONG", 4));
-    freeReplyObject(r);
+    valkeyFreeReplyObject(r);
 
     valkeyFree(c);
 }
@@ -571,7 +571,7 @@ static void test_reply_reader(void) {
     }
     test_cond(((valkeyReply *)reply)->type == VALKEY_REPLY_STRING &&
               !memcmp(((valkeyReply *)reply)->str, "LOLWUT", 6));
-    freeReplyObject(root);
+    valkeyFreeReplyObject(root);
     valkeyReaderFree(reader);
 
     test("Correctly parses LLONG_MAX: ");
@@ -581,7 +581,7 @@ static void test_reply_reader(void) {
     test_cond(ret == VALKEY_OK &&
               ((valkeyReply *)reply)->type == VALKEY_REPLY_INTEGER &&
               ((valkeyReply *)reply)->integer == LLONG_MAX);
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
     valkeyReaderFree(reader);
 
     test("Set error when > LLONG_MAX: ");
@@ -590,7 +590,7 @@ static void test_reply_reader(void) {
     ret = valkeyReaderGetReply(reader, &reply);
     test_cond(ret == VALKEY_ERR &&
               strcasecmp(reader->errstr, "Bad integer value") == 0);
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
     valkeyReaderFree(reader);
 
     test("Correctly parses LLONG_MIN: ");
@@ -600,7 +600,7 @@ static void test_reply_reader(void) {
     test_cond(ret == VALKEY_OK &&
               ((valkeyReply *)reply)->type == VALKEY_REPLY_INTEGER &&
               ((valkeyReply *)reply)->integer == LLONG_MIN);
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
     valkeyReaderFree(reader);
 
     test("Set error when < LLONG_MIN: ");
@@ -609,7 +609,7 @@ static void test_reply_reader(void) {
     ret = valkeyReaderGetReply(reader, &reply);
     test_cond(ret == VALKEY_ERR &&
               strcasecmp(reader->errstr, "Bad integer value") == 0);
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
     valkeyReaderFree(reader);
 
     test("Set error when array < -1: ");
@@ -618,7 +618,7 @@ static void test_reply_reader(void) {
     ret = valkeyReaderGetReply(reader, &reply);
     test_cond(ret == VALKEY_ERR &&
               strcasecmp(reader->errstr, "Multi-bulk length out of range") == 0);
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
     valkeyReaderFree(reader);
 
     test("Set error when bulk < -1: ");
@@ -627,7 +627,7 @@ static void test_reply_reader(void) {
     ret = valkeyReaderGetReply(reader, &reply);
     test_cond(ret == VALKEY_ERR &&
               strcasecmp(reader->errstr, "Bulk string length out of range") == 0);
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
     valkeyReaderFree(reader);
 
     test("Can configure maximum multi-bulk elements: ");
@@ -637,7 +637,7 @@ static void test_reply_reader(void) {
     ret = valkeyReaderGetReply(reader, &reply);
     test_cond(ret == VALKEY_ERR &&
               strcasecmp(reader->errstr, "Multi-bulk length out of range") == 0);
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
     valkeyReaderFree(reader);
 
     test("Multi-bulk never overflows regardless of maxelements: ");
@@ -651,7 +651,7 @@ static void test_reply_reader(void) {
     valkeyReaderFeed(reader, bad_mbulk_reply, strlen(bad_mbulk_reply));
     ret = valkeyReaderGetReply(reader, &reply);
     test_cond(ret == VALKEY_ERR && strcasecmp(reader->errstr, "Out of memory") == 0);
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
     valkeyReaderFree(reader);
 
 #if LLONG_MAX > SIZE_MAX
@@ -661,7 +661,7 @@ static void test_reply_reader(void) {
     ret = valkeyReaderGetReply(reader, &reply);
     test_cond(ret == VALKEY_ERR &&
               strcasecmp(reader->errstr, "Multi-bulk length out of range") == 0);
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
     valkeyReaderFree(reader);
 
     test("Set error when bulk > SIZE_MAX: ");
@@ -670,7 +670,7 @@ static void test_reply_reader(void) {
     ret = valkeyReaderGetReply(reader, &reply);
     test_cond(ret == VALKEY_ERR &&
               strcasecmp(reader->errstr, "Bulk string length out of range") == 0);
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
     valkeyReaderFree(reader);
 #endif
 
@@ -713,7 +713,7 @@ static void test_reply_reader(void) {
     test_cond(ret == VALKEY_OK &&
               ((valkeyReply *)reply)->type == VALKEY_REPLY_ARRAY &&
               ((valkeyReply *)reply)->elements == 3);
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
     valkeyReaderFree(reader);
 
     /* Regression test for issue #45 on GitHub. */
@@ -724,7 +724,7 @@ static void test_reply_reader(void) {
     test_cond(ret == VALKEY_OK &&
               ((valkeyReply *)reply)->type == VALKEY_REPLY_ARRAY &&
               ((valkeyReply *)reply)->elements == 0);
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
     valkeyReaderFree(reader);
 
     /* RESP3 verbatim strings (GitHub issue #802) */
@@ -735,7 +735,7 @@ static void test_reply_reader(void) {
     test_cond(ret == VALKEY_OK &&
               ((valkeyReply *)reply)->type == VALKEY_REPLY_VERB &&
               !memcmp(((valkeyReply *)reply)->str, "LOLWUT", 6));
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
     valkeyReaderFree(reader);
 
     /* RESP3 push messages (GitHub issue #815) */
@@ -750,7 +750,7 @@ static void test_reply_reader(void) {
               !memcmp(((valkeyReply *)reply)->element[0]->str, "LOLWUT", 6) &&
               ((valkeyReply *)reply)->element[1]->type == VALKEY_REPLY_INTEGER &&
               ((valkeyReply *)reply)->element[1]->integer == 42);
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
     valkeyReaderFree(reader);
 
     test("Can parse RESP3 doubles: ");
@@ -762,7 +762,7 @@ static void test_reply_reader(void) {
               fabs(((valkeyReply *)reply)->dval - 3.14159265358979323846) < 0.00000001 &&
               ((valkeyReply *)reply)->len == 22 &&
               strcmp(((valkeyReply *)reply)->str, "3.14159265358979323846") == 0);
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
     valkeyReaderFree(reader);
 
     test("Set error on invalid RESP3 double: ");
@@ -771,7 +771,7 @@ static void test_reply_reader(void) {
     ret = valkeyReaderGetReply(reader, &reply);
     test_cond(ret == VALKEY_ERR &&
               strcasecmp(reader->errstr, "Bad double value") == 0);
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
     valkeyReaderFree(reader);
 
     test("Correctly parses RESP3 double INFINITY: ");
@@ -782,7 +782,7 @@ static void test_reply_reader(void) {
               ((valkeyReply *)reply)->type == VALKEY_REPLY_DOUBLE &&
               isinf(((valkeyReply *)reply)->dval) &&
               ((valkeyReply *)reply)->dval > 0);
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
     valkeyReaderFree(reader);
 
     test("Correctly parses RESP3 double NaN: ");
@@ -792,7 +792,7 @@ static void test_reply_reader(void) {
     test_cond(ret == VALKEY_OK &&
               ((valkeyReply *)reply)->type == VALKEY_REPLY_DOUBLE &&
               isnan(((valkeyReply *)reply)->dval));
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
     valkeyReaderFree(reader);
 
     test("Correctly parses RESP3 double -Nan: ");
@@ -802,7 +802,7 @@ static void test_reply_reader(void) {
     test_cond(ret == VALKEY_OK &&
               ((valkeyReply *)reply)->type == VALKEY_REPLY_DOUBLE &&
               isnan(((valkeyReply *)reply)->dval));
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
     valkeyReaderFree(reader);
 
     test("Can parse RESP3 nil: ");
@@ -811,7 +811,7 @@ static void test_reply_reader(void) {
     ret = valkeyReaderGetReply(reader, &reply);
     test_cond(ret == VALKEY_OK &&
               ((valkeyReply *)reply)->type == VALKEY_REPLY_NIL);
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
     valkeyReaderFree(reader);
 
     test("Set error on invalid RESP3 nil: ");
@@ -820,7 +820,7 @@ static void test_reply_reader(void) {
     ret = valkeyReaderGetReply(reader, &reply);
     test_cond(ret == VALKEY_ERR &&
               strcasecmp(reader->errstr, "Bad nil value") == 0);
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
     valkeyReaderFree(reader);
 
     test("Can parse RESP3 bool (true): ");
@@ -830,7 +830,7 @@ static void test_reply_reader(void) {
     test_cond(ret == VALKEY_OK &&
               ((valkeyReply *)reply)->type == VALKEY_REPLY_BOOL &&
               ((valkeyReply *)reply)->integer);
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
     valkeyReaderFree(reader);
 
     test("Can parse RESP3 bool (false): ");
@@ -840,7 +840,7 @@ static void test_reply_reader(void) {
     test_cond(ret == VALKEY_OK &&
               ((valkeyReply *)reply)->type == VALKEY_REPLY_BOOL &&
               !((valkeyReply *)reply)->integer);
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
     valkeyReaderFree(reader);
 
     test("Set error on invalid RESP3 bool: ");
@@ -849,7 +849,7 @@ static void test_reply_reader(void) {
     ret = valkeyReaderGetReply(reader, &reply);
     test_cond(ret == VALKEY_ERR &&
               strcasecmp(reader->errstr, "Bad bool value") == 0);
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
     valkeyReaderFree(reader);
 
     test("Can parse RESP3 map: ");
@@ -869,7 +869,7 @@ static void test_reply_reader(void) {
               !strcmp(((valkeyReply *)reply)->element[2]->str, "second") &&
               ((valkeyReply *)reply)->element[3]->type == VALKEY_REPLY_BOOL &&
               ((valkeyReply *)reply)->element[3]->integer);
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
     valkeyReaderFree(reader);
 
     /* RESP3 MAP/ATTR types double the element count being key-value pairs */
@@ -899,7 +899,7 @@ static void test_reply_reader(void) {
               !strcmp(((valkeyReply *)reply)->element[2]->str, "bar") &&
               ((valkeyReply *)reply)->element[3]->type == VALKEY_REPLY_BOOL &&
               ((valkeyReply *)reply)->element[3]->integer);
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
     valkeyReaderFree(reader);
 
     test("Can parse RESP3 set: ");
@@ -921,7 +921,7 @@ static void test_reply_reader(void) {
               ((valkeyReply *)reply)->element[3]->integer == 100 &&
               ((valkeyReply *)reply)->element[4]->type == VALKEY_REPLY_INTEGER &&
               ((valkeyReply *)reply)->element[4]->integer == 999);
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
     valkeyReaderFree(reader);
 
     test("Can parse RESP3 bignum: ");
@@ -932,7 +932,7 @@ static void test_reply_reader(void) {
               ((valkeyReply *)reply)->type == VALKEY_REPLY_BIGNUM &&
               ((valkeyReply *)reply)->len == 43 &&
               !strcmp(((valkeyReply *)reply)->str, "3492890328409238509324850943850943825024385"));
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
     valkeyReaderFree(reader);
 
     test("Can parse RESP3 doubles in an array: ");
@@ -946,7 +946,7 @@ static void test_reply_reader(void) {
               fabs(((valkeyReply *)reply)->element[0]->dval - 3.14159265358979323846) < 0.00000001 &&
               ((valkeyReply *)reply)->element[0]->len == 22 &&
               strcmp(((valkeyReply *)reply)->element[0]->str, "3.14159265358979323846") == 0);
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
     valkeyReaderFree(reader);
 }
 
@@ -958,8 +958,8 @@ static void test_free_null(void) {
     valkeyFree(valkeyCtx);
     test_cond(valkeyCtx == NULL);
 
-    test("Don't fail when freeReplyObject is passed a NULL value: ");
-    freeReplyObject(reply);
+    test("Don't fail when valkeyFreeReplyObject is passed a NULL value: ");
+    valkeyFreeReplyObject(reply);
     test_cond(reply == NULL);
 }
 
@@ -1125,7 +1125,7 @@ void push_handler(void *privdata, void *r) {
         pcounts->nil++;
     }
 
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
 }
 
 /* Dummy function just to test setting a callback with valkeyOptions */
@@ -1148,15 +1148,15 @@ static void test_resp3_push_handler(valkeyContext *c) {
 
     reply = valkeyCommand(c, "GET key:0");
     assert(reply != NULL);
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
 
     test("RESP3 PUSH messages are handled out of band by default: ");
     reply = valkeyCommand(c, "SET key:0 val:0");
     test_cond(reply != NULL && reply->type == VALKEY_REPLY_STATUS);
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
 
     assert((reply = valkeyCommand(c, "GET key:0")) != NULL);
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
 
     old = valkeySetPushCallback(c, push_handler);
     test("We can set a custom RESP3 PUSH handler: ");
@@ -1164,39 +1164,39 @@ static void test_resp3_push_handler(valkeyContext *c) {
     /* We need another command because depending on the server version, the
      * notification may be delivered after the command's reply. */
     assert(reply != NULL);
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
     reply = valkeyCommand(c, "PING");
     test_cond(reply != NULL && reply->type == VALKEY_REPLY_STATUS && pc.str == 1);
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
 
     test("We properly handle a NIL invalidation payload: ");
     reply = valkeyCommand(c, "FLUSHDB");
     assert(reply != NULL);
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
     reply = valkeyCommand(c, "PING");
     test_cond(reply != NULL && reply->type == VALKEY_REPLY_STATUS && pc.nil == 1);
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
 
     /* Unset the push callback and generate an invalidate message making
      * sure it is not handled out of band. */
     test("With no handler, PUSH replies come in-band: ");
     valkeySetPushCallback(c, NULL);
     assert((reply = valkeyCommand(c, "GET key:0")) != NULL);
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
     assert((reply = valkeyCommand(c, "SET key:0 invalid")) != NULL);
     /* Depending on server version, we may receive either push notification or
      * status reply. Both cases are valid. */
     if (reply->type == VALKEY_REPLY_STATUS) {
-        freeReplyObject(reply);
+        valkeyFreeReplyObject(reply);
         reply = valkeyCommand(c, "PING");
     }
     test_cond(reply->type == VALKEY_REPLY_PUSH);
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
 
     test("With no PUSH handler, no replies are lost: ");
     assert(valkeyGetReply(c, (void **)&reply) == VALKEY_OK);
     test_cond(reply != NULL && reply->type == VALKEY_REPLY_STATUS);
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
 
     /* Return to the originally set PUSH handler */
     assert(old != NULL);
@@ -1291,60 +1291,60 @@ static void test_blocking_connection(struct config config) {
     reply = valkeyCommand(c, "PING");
     test_cond(reply->type == VALKEY_REPLY_STATUS &&
               strcasecmp(reply->str, "pong") == 0);
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
 
     test("Is a able to send commands verbatim: ");
     reply = valkeyCommand(c, "SET foo bar");
     test_cond(reply->type == VALKEY_REPLY_STATUS &&
               strcasecmp(reply->str, "ok") == 0);
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
 
     test("%%s String interpolation works: ");
     reply = valkeyCommand(c, "SET %s %s", "foo", "hello world");
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
     reply = valkeyCommand(c, "GET foo");
     test_cond(reply->type == VALKEY_REPLY_STRING &&
               strcmp(reply->str, "hello world") == 0);
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
 
     test("%%b String interpolation works: ");
     reply = valkeyCommand(c, "SET %b %b", "foo", (size_t)3, "hello\x00world", (size_t)11);
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
     reply = valkeyCommand(c, "GET foo");
     test_cond(reply->type == VALKEY_REPLY_STRING &&
               memcmp(reply->str, "hello\x00world", 11) == 0);
 
     test("Binary reply length is correct: ");
     test_cond(reply->len == 11)
-        freeReplyObject(reply);
+        valkeyFreeReplyObject(reply);
 
     test("Can parse nil replies: ");
     reply = valkeyCommand(c, "GET nokey");
     test_cond(reply->type == VALKEY_REPLY_NIL)
-        freeReplyObject(reply);
+        valkeyFreeReplyObject(reply);
 
     /* test 7 */
     test("Can parse integer replies: ");
     reply = valkeyCommand(c, "INCR mycounter");
     test_cond(reply->type == VALKEY_REPLY_INTEGER && reply->integer == 1);
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
 
     test("Can parse multi bulk replies: ");
-    freeReplyObject(valkeyCommand(c, "LPUSH mylist foo"));
-    freeReplyObject(valkeyCommand(c, "LPUSH mylist bar"));
+    valkeyFreeReplyObject(valkeyCommand(c, "LPUSH mylist foo"));
+    valkeyFreeReplyObject(valkeyCommand(c, "LPUSH mylist bar"));
     reply = valkeyCommand(c, "LRANGE mylist 0 -1");
     test_cond(reply->type == VALKEY_REPLY_ARRAY &&
               reply->elements == 2 &&
               !memcmp(reply->element[0]->str, "bar", 3) &&
               !memcmp(reply->element[1]->str, "foo", 3));
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
 
     /* m/e with multi bulk reply *before* other reply.
      * specifically test ordering of reply items to parse. */
     test("Can handle nested multi bulk replies: ");
-    freeReplyObject(valkeyCommand(c, "MULTI"));
-    freeReplyObject(valkeyCommand(c, "LRANGE mylist 0 -1"));
-    freeReplyObject(valkeyCommand(c, "PING"));
+    valkeyFreeReplyObject(valkeyCommand(c, "MULTI"));
+    valkeyFreeReplyObject(valkeyCommand(c, "LRANGE mylist 0 -1"));
+    valkeyFreeReplyObject(valkeyCommand(c, "PING"));
     reply = (valkeyCommand(c, "EXEC"));
     test_cond(reply->type == VALKEY_REPLY_ARRAY &&
               reply->elements == 2 &&
@@ -1354,14 +1354,14 @@ static void test_blocking_connection(struct config config) {
               !memcmp(reply->element[0]->element[1]->str, "foo", 3) &&
               reply->element[1]->type == VALKEY_REPLY_STATUS &&
               strcasecmp(reply->element[1]->str, "pong") == 0);
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
 
     test("Send command by passing argc/argv: ");
     const char *argv[3] = {"SET", "foo", "bar"};
     size_t argvlen[3] = {3, 3, 3};
     reply = valkeyCommandArgv(c, 3, argv, argvlen);
     test_cond(reply->type == VALKEY_REPLY_STATUS);
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
 
     /* Make sure passing NULL to valkeyGetReply is safe */
     test("Can pass NULL to valkeyGetReply: ");
@@ -1390,7 +1390,7 @@ static int detect_debug_sleep(valkeyContext *c) {
     }
 
     detected = reply->type == VALKEY_REPLY_STATUS;
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
 
     return detected;
 }
@@ -1405,11 +1405,11 @@ static void test_blocking_connection_timeouts(struct config config) {
     c = do_connect(config);
     test("Successfully completes a command when the timeout is not exceeded: ");
     reply = valkeyCommand(c, "SET foo fast");
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
     valkeySetTimeout(c, tv);
     reply = valkeyCommand(c, "GET foo");
     test_cond(reply != NULL && reply->type == VALKEY_REPLY_STRING && memcmp(reply->str, "fast", 4) == 0);
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
     disconnect(c, 0);
 
     c = do_connect(config);
@@ -1432,7 +1432,7 @@ static void test_blocking_connection_timeouts(struct config config) {
         test_cond(s > 0 && reply == NULL && c->err == VALKEY_ERR_TIMEOUT &&
                   strcmp(c->errstr, "recv timeout") == 0);
 #endif
-        freeReplyObject(reply);
+        valkeyFreeReplyObject(reply);
 
         // wait for the DEBUG SLEEP to complete so that the server is unblocked for the following tests
         millisleep(1500);
@@ -1444,7 +1444,7 @@ static void test_blocking_connection_timeouts(struct config config) {
     do_reconnect(c, config);
     reply = valkeyCommand(c, "PING");
     test_cond(reply != NULL && reply->type == VALKEY_REPLY_STATUS && strcmp(reply->str, "PONG") == 0);
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
 
     test("Reconnect properly uses owned parameters: ");
     config.tcp.host = "foo";
@@ -1452,7 +1452,7 @@ static void test_blocking_connection_timeouts(struct config config) {
     do_reconnect(c, config);
     reply = valkeyCommand(c, "PING");
     test_cond(reply != NULL && reply->type == VALKEY_REPLY_STATUS && strcmp(reply->str, "PONG") == 0);
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
 
     disconnect(c, 0);
 }
@@ -1474,7 +1474,7 @@ static void test_blocking_io_errors(struct config config) {
          * to know the descriptor is at EOF. */
         test_cond(strcasecmp(reply->str, "OK") == 0 &&
                   valkeyGetReply(c, &_reply) == VALKEY_ERR);
-        freeReplyObject(reply);
+        valkeyFreeReplyObject(reply);
     } else {
         test_cond(reply == NULL);
     }
@@ -1571,7 +1571,7 @@ static void test_throughput(struct config config) {
 
     test("Throughput:\n");
     for (i = 0; i < 500; i++)
-        freeReplyObject(valkeyCommand(c, "LPUSH mylist foo"));
+        valkeyFreeReplyObject(valkeyCommand(c, "LPUSH mylist foo"));
 
     num = 1000;
     replies = vk_malloc_safe(sizeof(valkeyReply *) * num);
@@ -1582,7 +1582,7 @@ static void test_throughput(struct config config) {
     }
     t2 = usec();
     for (i = 0; i < num; i++)
-        freeReplyObject(replies[i]);
+        valkeyFreeReplyObject(replies[i]);
     vk_free(replies);
     printf("\t(%dx PING: %.3fs)\n", num, (t2 - t1) / 1000000.0);
 
@@ -1595,7 +1595,7 @@ static void test_throughput(struct config config) {
     }
     t2 = usec();
     for (i = 0; i < num; i++)
-        freeReplyObject(replies[i]);
+        valkeyFreeReplyObject(replies[i]);
     vk_free(replies);
     printf("\t(%dx LRANGE with 500 elements: %.3fs)\n", num, (t2 - t1) / 1000000.0);
 
@@ -1607,7 +1607,7 @@ static void test_throughput(struct config config) {
     }
     t2 = usec();
     for (i = 0; i < num; i++)
-        freeReplyObject(replies[i]);
+        valkeyFreeReplyObject(replies[i]);
     vk_free(replies);
     printf("\t(%dx INCRBY: %.3fs)\n", num, (t2 - t1) / 1000000.0);
 
@@ -1622,7 +1622,7 @@ static void test_throughput(struct config config) {
     }
     t2 = usec();
     for (i = 0; i < num; i++)
-        freeReplyObject(replies[i]);
+        valkeyFreeReplyObject(replies[i]);
     vk_free(replies);
     printf("\t(%dx PING (pipelined): %.3fs)\n", num, (t2 - t1) / 1000000.0);
 
@@ -1637,7 +1637,7 @@ static void test_throughput(struct config config) {
     }
     t2 = usec();
     for (i = 0; i < num; i++)
-        freeReplyObject(replies[i]);
+        valkeyFreeReplyObject(replies[i]);
     vk_free(replies);
     printf("\t(%dx LRANGE with 500 elements (pipelined): %.3fs)\n", num, (t2 - t1) / 1000000.0);
 
@@ -1651,7 +1651,7 @@ static void test_throughput(struct config config) {
     }
     t2 = usec();
     for (i = 0; i < num; i++)
-        freeReplyObject(replies[i]);
+        valkeyFreeReplyObject(replies[i]);
     vk_free(replies);
     printf("\t(%dx INCRBY (pipelined): %.3fs)\n", num, (t2 - t1) / 1000000.0);
 
@@ -1700,7 +1700,7 @@ void publish_msg(valkeyOptions *options, const char *channel, const char *msg) {
     assert(c != NULL);
     valkeyReply *reply = valkeyCommand(c, "PUBLISH %s %s", channel, msg);
     assert(reply->type == VALKEY_REPLY_INTEGER && reply->integer == 1);
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
     disconnect(c, 0);
 }
 
@@ -1710,7 +1710,7 @@ void spublish_msg(valkeyOptions *options, const char *channel, const char *msg) 
     assert(c != NULL);
     valkeyReply *reply = valkeyCommand(c, "SPUBLISH %s %s", channel, msg);
     assert(reply->type == VALKEY_REPLY_INTEGER && reply->integer == 1);
-    freeReplyObject(reply);
+    valkeyFreeReplyObject(reply);
     disconnect(c, 0);
 }
 
@@ -2365,7 +2365,7 @@ void monitor_cb(valkeyAsyncContext *ac, void *r, void *privdata) {
         assert(c != NULL);
         valkeyReply *reply = valkeyCommand(c, "SET first 1");
         assert(reply->type == VALKEY_REPLY_STATUS);
-        freeReplyObject(reply);
+        valkeyFreeReplyObject(reply);
         valkeyFree(c);
     } else if (state->checkpoint == 2) {
         /* Response for monitored command 'SET first 1' */
@@ -2374,7 +2374,7 @@ void monitor_cb(valkeyAsyncContext *ac, void *r, void *privdata) {
         assert(c != NULL);
         valkeyReply *reply = valkeyCommand(c, "SET second 2");
         assert(reply->type == VALKEY_REPLY_STATUS);
-        freeReplyObject(reply);
+        valkeyFreeReplyObject(reply);
         valkeyFree(c);
     } else if (state->checkpoint == 3) {
         /* Response for monitored command 'SET second 2' */
