@@ -63,9 +63,9 @@ See [include/valkey/cluster.h](../include/valkey/cluster.h) for more details.
 
 ```c
 valkeyClusterOptions opt = {
-   .initial_nodes = "127.0.0.1:6379,127.0.0.1:6380"; // Addresses to initially connect to.
-   .options = VALKEY_OPT_USE_CLUSTER_NODES;          // See available option flags below.
-   .password = "password";                           // Authenticate connections using the `AUTH` command.
+   .initial_nodes = "127.0.0.1:6379,127.0.0.1:6380", // Addresses to initially connect to.
+   .options = VALKEY_OPT_USE_CLUSTER_NODES,          // See available option flags below.
+   .password = "password",                           // Authenticate connections using the `AUTH` command.
 };
 
 valkeyClusterContext *cc = valkeyClusterConnectWithOptions(&opt);
@@ -185,8 +185,8 @@ void event_cb(const valkeyClusterContext *cc, int event, void *privdata) {
 }
 
 valkeyClusterOptions opt = {
-   .event_callback = event_cb;
-   .event_privdata = my_privdata; // User defined data can be provided to the callback.
+   .event_callback = event_cb,
+   .event_privdata = my_privdata, // User defined data can be provided to the callback.
 };
 valkeyClusterContext *cc = valkeyClusterConnectWithOptions(&opt);
 ```
@@ -214,7 +214,7 @@ void connect_cb(const valkeyContext *c, int status) {
 }
 
 valkeyClusterOptions opt = {
-   .connect_callback = connect_cb;
+   .connect_callback = connect_cb,
 };
 valkeyClusterContext *cc = valkeyClusterConnectWithOptions(&opt);
 ```
@@ -239,7 +239,7 @@ but it's also important to configure which event library to use before calling `
 
 ```c
 valkeyClusterOptions options = {
-   .initial_nodes = "127.0.0.1:7000";
+   .initial_nodes = "127.0.0.1:7000",
 };
 
 // Use convenience function to set which event library to use.
@@ -341,9 +341,9 @@ The callbacks can be enabled using the following options when calling `valkeyClu
 
 ```c
 valkeyClusterOptions opt = {
-   .async_connect_callback = connect_cb;
-   .async_disconnect_callback = disconnect_cb;
-}
+   .async_connect_callback = connect_cb,
+   .async_disconnect_callback = disconnect_cb,
+};
 ```
 
 The connect callback function should have the following prototype, aliased to `valkeyConnectCallback`:
@@ -380,8 +380,8 @@ valkeyTLSContext *tls = valkeyCreateTLSContext("ca.crt", NULL, "client.crt",
                                                "client.key", NULL, NULL);
 // Set options to enable TLS on context.
 valkeyClusterOptions opt = {
-   .tls = tls;
-   .tls_init_fn = &valkeyInitiateTLSWithContext;
+   .tls = tls,
+   .tls_init_fn = &valkeyInitiateTLSWithContext,
 };
 
 valkeyClusterContext *cc = valkeyClusterConnectWithOptions(&opt);
@@ -420,7 +420,7 @@ Another way to detect that the slot map has been updated is to [register an even
 
 The list of commands and the position of the first key in the command line is defined in [`src/cmddef.h`](../src/cmddef.h) which is included in this repository.
 It has been generated using the `JSON` files describing the syntax of each command in the Valkey repository, which makes sure we support all commands in Valkey, at least in terms of cluster routing.
-To add support for custom commands defined in modules, you can regenerate `cmddef.h` using the script [`gencommands.py`](../script/gencommands.py).
+To add support for custom commands defined in modules, you can regenerate `cmddef.h` using the script [`gencommands.py`](../scripts/gencommands.py).
 Use the `JSON` files from Valkey and any additional files on the same format as arguments to the script.
 For details, see the comments inside `gencommands.py`.
 
