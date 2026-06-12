@@ -63,12 +63,12 @@ you need to ensure that the contribution is in accordance with the DCO.
 ## Licensing and REUSE compliance
 
 This project follows the [REUSE specification](https://reuse.software/) for licensing.
-Copyright and license information for all files is declared in `.reuse/dep5`.
+Copyright and license information for all files is declared in `REUSE.toml`.
 
 When adding new files:
 
 - If the file is a new contribution by the project (libvalkey contributors), no action is needed — the wildcard entry covers it.
-- If the file originates from another project or has a different copyright holder, add a corresponding entry in `.reuse/dep5`.
+- If the file originates from another project or has a different copyright holder, add a corresponding entry in `REUSE.toml`.
 - If the file uses a license not already in `LICENSES/`, add the license text as `LICENSES/<SPDX-Identifier>.txt`.
 
 The CI runs `reuse lint` to verify compliance on every push and pull request.
