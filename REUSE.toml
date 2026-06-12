@@ -1,0 +1,167 @@
+version = 1
+
+[[annotations]]
+path = "**"
+SPDX-FileCopyrightText = "2024-present libvalkey contributors"
+SPDX-License-Identifier = "BSD-3-Clause"
+
+[[annotations]]
+path = ["src/valkey.c", "include/valkey/valkey.h", "src/net.c", "include/valkey/net.h"]
+SPDX-FileCopyrightText = [
+    "2009-2011 Salvatore Sanfilippo <antirez at gmail dot com>",
+    "2010-2014 Pieter Noordhuis <pcnoordhuis at gmail dot com>",
+    "2015 Matt Stancliff <matt at genges dot com>",
+    "2015 Jan-Erik Rediger <janerik at fnordig dot com>",
+]
+SPDX-License-Identifier = "BSD-3-Clause"
+
+[[annotations]]
+path = ["src/async.c", "include/valkey/async.h", "src/async_private.h", "src/read.c", "include/valkey/read.h"]
+SPDX-FileCopyrightText = [
+    "2009-2011 Salvatore Sanfilippo <antirez at gmail dot com>",
+    "2010-2011 Pieter Noordhuis <pcnoordhuis at gmail dot com>",
+]
+SPDX-License-Identifier = "BSD-3-Clause"
+
+[[annotations]]
+path = "include/valkey/tls.h"
+SPDX-FileCopyrightText = "2019 Redis Labs"
+SPDX-License-Identifier = "BSD-3-Clause"
+
+[[annotations]]
+path = "src/tls.c"
+SPDX-FileCopyrightText = [
+    "2009-2011 Salvatore Sanfilippo <antirez at gmail dot com>",
+    "2010-2011 Pieter Noordhuis <pcnoordhuis at gmail dot com>",
+    "2019 Redis Labs",
+]
+SPDX-License-Identifier = "BSD-3-Clause"
+
+[[annotations]]
+path = ["src/sds.c", "src/sds.h", "src/sdsalloc.h"]
+SPDX-FileCopyrightText = [
+    "2006-2015 Salvatore Sanfilippo <antirez at gmail dot com>",
+    "2015 Oran Agra",
+    "2015 Redis Labs, Inc",
+]
+SPDX-License-Identifier = "BSD-3-Clause"
+
+[[annotations]]
+path = "src/adlist.c"
+SPDX-FileCopyrightText = "2006-2010 Salvatore Sanfilippo <antirez at gmail dot com>"
+SPDX-License-Identifier = "BSD-3-Clause"
+
+[[annotations]]
+path = "src/adlist.h"
+SPDX-FileCopyrightText = "2006-2012 Salvatore Sanfilippo <antirez at gmail dot com>"
+SPDX-License-Identifier = "BSD-3-Clause"
+
+[[annotations]]
+path = ["src/dict.c", "src/dict.h"]
+SPDX-FileCopyrightText = "2006-2010 Salvatore Sanfilippo <antirez at gmail dot com>"
+SPDX-License-Identifier = "BSD-3-Clause"
+
+[[annotations]]
+path = "src/cluster.c"
+SPDX-FileCopyrightText = [
+    "2015-2017 Ieshen Zheng <ieshen.zheng at 163 dot com>",
+    "2020 Nick <heronr1 at gmail dot com>",
+    "2020-2021 Bjorn Svensson <bjorn.a.svensson at est dot tech>",
+    "2020-2021 Viktor Söderqvist <viktor.soderqvist at est dot tech>",
+    "2021 Red Hat",
+]
+SPDX-License-Identifier = "BSD-3-Clause"
+
+[[annotations]]
+path = "include/valkey/cluster.h"
+SPDX-FileCopyrightText = [
+    "2015-2017 Ieshen Zheng <ieshen.zheng at 163 dot com>",
+    "2020 Nick <heronr1 at gmail dot com>",
+    "2020-2021 Bjorn Svensson <bjorn.a.svensson at est dot tech>",
+    "2021 Red Hat",
+]
+SPDX-License-Identifier = "BSD-3-Clause"
+
+[[annotations]]
+path = ["src/vkutil.c", "src/command.c", "src/command.h"]
+SPDX-FileCopyrightText = [
+    "2015-2017 Ieshen Zheng <ieshen.zheng at 163 dot com>",
+    "2020 Nick <heronr1 at gmail dot com>",
+    "2020-2021 Bjorn Svensson <bjorn.a.svensson at est dot tech>",
+]
+SPDX-License-Identifier = "BSD-3-Clause"
+
+[[annotations]]
+path = "src/vkutil.h"
+SPDX-FileCopyrightText = [
+    "2015-2017 Ieshen Zheng <ieshen.zheng at 163 dot com>",
+    "2020 Nick <heronr1 at gmail dot com>",
+    "2020-2021 Bjorn Svensson <bjorn.a.svensson at est dot tech>",
+    "2020-2021 Viktor Söderqvist <viktor.soderqvist at est dot tech>",
+]
+SPDX-License-Identifier = "BSD-3-Clause"
+
+[[annotations]]
+path = "src/win32.h"
+SPDX-FileCopyrightText = [
+    "2015 Ieshen Zheng <ieshen.zheng at 163 dot com>",
+    "2020 Nick <heronr1 at gmail dot com>",
+    "2020 Bjorn Svensson <bjorn.a.svensson at est dot tech>",
+]
+SPDX-License-Identifier = "BSD-3-Clause"
+
+[[annotations]]
+path = ["src/rdma.c", "src/conn.c", "src/valkey_private.h"]
+SPDX-FileCopyrightText = "2024 zhenwei pi <pizhenwei@bytedance.com>"
+SPDX-License-Identifier = "BSD-3-Clause"
+
+[[annotations]]
+path = "include/valkey/rdma.h"
+SPDX-FileCopyrightText = "2021-2024 zhenwei pi <pizhenwei@bytedance.com>"
+SPDX-License-Identifier = "BSD-3-Clause"
+
+[[annotations]]
+path = ["src/alloc.c", "include/valkey/alloc.h", "examples/blocking-push.c"]
+SPDX-FileCopyrightText = "2020 Michael Grunder <michael dot grunder at gmail dot com>"
+SPDX-License-Identifier = "BSD-3-Clause"
+
+[[annotations]]
+path = ["src/sockcompat.c", "include/valkey/sockcompat.h"]
+SPDX-FileCopyrightText = "2019 Marcus Geelnard <m at bitsnbites dot eu>"
+SPDX-License-Identifier = "BSD-3-Clause"
+
+[[annotations]]
+path = "src/crc16.c"
+SPDX-FileCopyrightText = [
+    "2001-2010 Georges Menie (www.menie.org)",
+    "2010-2012 Salvatore Sanfilippo",
+]
+SPDX-License-Identifier = "BSD-3-Clause"
+
+[[annotations]]
+path = "include/valkey/adapters/libuv.h"
+SPDX-FileCopyrightText = [
+    "2013 Erik Dubbelboer",
+    "2021 Red Hat",
+]
+SPDX-License-Identifier = "BSD-3-Clause"
+
+[[annotations]]
+path = ["include/valkey/adapters/ae.h", "include/valkey/adapters/libev.h", "include/valkey/adapters/libevent.h"]
+SPDX-FileCopyrightText = "2010-2011 Pieter Noordhuis <pcnoordhuis at gmail dot com>"
+SPDX-License-Identifier = "BSD-3-Clause"
+
+[[annotations]]
+path = ["include/valkey/adapters/macosx.h", "examples/async-macosx.c"]
+SPDX-FileCopyrightText = "2015 Dmitry Bakhvalov"
+SPDX-License-Identifier = "BSD-3-Clause"
+
+[[annotations]]
+path = "include/valkey/adapters/qt.h"
+SPDX-FileCopyrightText = "2014 Pietro Cerutti <gahr@gahr.ch>"
+SPDX-License-Identifier = "BSD-2-Clause"
+
+[[annotations]]
+path = "tests/scripts/simulated-valkey.pl"
+SPDX-FileCopyrightText = "2020 Ericsson Software Technology <viktor.soderqvist@est.tech>"
+SPDX-License-Identifier = "FSFAP"
