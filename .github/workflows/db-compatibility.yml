@@ -18,7 +18,7 @@ jobs:
           - valkey-version: '7.2.8'
     steps:
       - name: Prepare
-        uses: awalsh128/cache-apt-pkgs-action@acb598e5ddbc6f68a970c5da0688d2f3a9f04d05 # v1.6.0
+        uses: awalsh128/cache-apt-pkgs-action@681749ae568c81c2037cb9185e38b709b261bd2f # v1.6.1
         with:
           packages: libevent-dev
           version: 1.0
@@ -26,7 +26,7 @@ jobs:
         run: |
           git clone --depth 1 --branch ${{ matrix.valkey-version }} https://github.com/valkey-io/valkey.git
           cd valkey && BUILD_TLS=yes make install
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
       - name: Create build folder
         run: cmake -E make_directory build
       - name: Generate makefiles
@@ -66,7 +66,7 @@ jobs:
           - redis-version: '6.2.14'
     steps:
       - name: Prepare
-        uses: awalsh128/cache-apt-pkgs-action@acb598e5ddbc6f68a970c5da0688d2f3a9f04d05 # v1.6.0
+        uses: awalsh128/cache-apt-pkgs-action@681749ae568c81c2037cb9185e38b709b261bd2f # v1.6.1
         with:
           packages: libevent-dev
           version: 1.0
@@ -74,7 +74,7 @@ jobs:
         run: |
           git clone --depth 1 --branch ${{ matrix.redis-version }} https://github.com/redis/redis.git
           cd redis && BUILD_TLS=yes make install
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
 
       - name: Create build folder
         run: cmake -E make_directory build
