@@ -113,7 +113,7 @@ Commands may also be constructed by sending an array of arguments along with an 
 
 ```c
 const char *argv[] = {"SET", "captain", "James Kirk"};
-sonst size_t argvlens[] = {3, 7, 10};
+const size_t argvlens[] = {3, 7, 10};
 
 valkeyReply *reply = valkeyCommandArgv(ctx, 3, argv, argvlens);
 // Handle error conditions similarly to `valkeyCommand`
@@ -146,7 +146,7 @@ When a `valkeyReply` is returned, you should test the `valkeyReply->type` field 
 
 ### Disconnecting/cleanup
 
-When libvalkey returns non-null `valkeyReply` struts you are responsible for freeing them with `freeReplyObject`.  In order to disconnect and free the context simply call `valkeyFree`.
+When libvalkey returns non-null `valkeyReply` structs you are responsible for freeing them with `freeReplyObject`.  In order to disconnect and free the context simply call `valkeyFree`.
 
 ```c
 valkeyReply *reply = valkeyCommand(ctx, "set %s %s", "foo", "bar");

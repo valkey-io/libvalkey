@@ -24,6 +24,7 @@ OPTION(ENABLE_EXAMPLES "Enable building valkey examples" OFF)
 option(ENABLE_IPV6_TESTS "Enable IPv6 tests requiring special prerequisites" OFF)
 OPTION(ENABLE_RDMA "Build valkey_rdma for RDMA support" OFF)
 OPTION(ENABLE_DLOPEN_RDMA "Build valkey_rdma with dynamic loading" OFF)
+OPTION(DISABLE_FFC_IMPL "Disable bundled ffc implementation (use external)" OFF)
 
 # Libvalkey requires C99 (-std=c99)
 SET(CMAKE_C_STANDARD 99)
@@ -89,6 +90,10 @@ if(ENABLE_THREADS)
     find_package(Threads REQUIRED)
     list(APPEND valkey_link_libraries Threads::Threads)
     list(APPEND valkey_compile_definitions VALKEY_USE_THREADS)
+endif()
+
+if(DISABLE_FFC_IMPL)
+    list(APPEND valkey_compile_definitions DISABLE_FFC_IMPL)
 endif()
 
 if(valkey_link_libraries)
