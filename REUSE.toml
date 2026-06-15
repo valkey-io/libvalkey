@@ -162,6 +162,16 @@ SPDX-FileCopyrightText = "2014 Pietro Cerutti <gahr@gahr.ch>"
 SPDX-License-Identifier = "BSD-2-Clause"
 
 [[annotations]]
+path = "src/ffc.h"
+SPDX-FileCopyrightText = "2021 The fast_float authors"
+SPDX-License-Identifier = "MIT"
+
+[[annotations]]
+path = "scripts/gencommands.py"
+SPDX-FileCopyrightText = "2023 Viktor Soderqvist <viktor dot soderqvist at est dot tech>"
+SPDX-License-Identifier = "BSD-3-Clause"
+
+[[annotations]]
 path = "tests/scripts/simulated-valkey.pl"
 SPDX-FileCopyrightText = "2020 Ericsson Software Technology <viktor.soderqvist@est.tech>"
 SPDX-License-Identifier = "FSFAP"
