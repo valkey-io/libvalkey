@@ -48,6 +48,7 @@ set(valkey_sources
     src/conn.c
     src/crc16.c
     src/dict.c
+    src/dns.c
     src/net.c
     src/read.c
     src/sockcompat.c
