@@ -45,6 +45,12 @@ When connecting to a server, libvalkey will return `NULL` in the event that we c
 
 When a hostname resolves to multiple addresses, libvalkey will try each address in order until one succeeds or all have failed. Note that the `connect_timeout` applies per address, so the total connection time may be up to N × timeout when multiple addresses are unreachable.
 
+#### DNS resolution with c-ares
+
+When built with c-ares support (`USE_CARES=1` / `-DENABLE_CARES=1`), DNS resolution uses c-ares instead of `getaddrinfo()`. This provides timeout-bounded DNS resolution using `connect_timeout` (defaulting to 5 seconds if unset), preventing indefinite hangs when DNS servers are slow or unreachable.
+
+c-ares support is available on Linux, macOS, and FreeBSD (not Windows).
+
 ```c
 valkeyContext *ctx = valkeyConnect("localhost", 6379);
 if (ctx == NULL || ctx->err) {
@@ -76,7 +82,7 @@ There are also several flags you can specify when using the `valkeyOptions` help
 | --- | --- |
 | `VALKEY_OPT_NONBLOCK` | Tells libvalkey to make a non-blocking connection. |
 | `VALKEY_OPT_REUSEADDR` | Tells libvalkey to set the [SO_REUSEADDR](https://man7.org/linux/man-pages/man7/socket.7.html) socket option |
-| `VALKEY_OPT_PREFER_IPV4`<br>`VALKEY_OPT_PREFER_IPV6`<br>`VALKEY_OPT_PREFER_IP_UNSPEC` | Informs libvalkey to either prefer IPv4 or IPv6 when invoking [getaddrinfo](https://man7.org/linux/man-pages/man3/gai_strerror.3.html).  `VALKEY_OPT_PREFER_IP_UNSPEC` will cause libvalkey to specify `AF_UNSPEC` in the getaddrinfo call, which means both IPv4 and IPv6 addresses will be searched simultaneously.<br>Libvalkey prefers IPv4 by default. |
+| `VALKEY_OPT_PREFER_IPV4`<br>`VALKEY_OPT_PREFER_IPV6`<br>`VALKEY_OPT_PREFER_IP_UNSPEC` | Informs libvalkey to either prefer IPv4 or IPv6 when performing DNS resolution.  `VALKEY_OPT_PREFER_IP_UNSPEC` will resolve both IPv4 and IPv6 addresses simultaneously.<br>Libvalkey prefers IPv4 by default. |
 | `VALKEY_OPT_NO_PUSH_AUTOFREE` | Tells libvalkey to not install the default RESP3 PUSH handler (which just intercepts and frees the replies).  This is useful in situations where you want to process these messages in-band. |
 | `VALKEY_OPT_NOAUTOFREEREPLIES` | **ASYNC**: tells libvalkey not to automatically invoke `freeReplyObject` after executing the reply callback. |
 | `VALKEY_OPT_NOAUTOFREE` | **ASYNC**: Tells libvalkey not to automatically free the `valkeyAsyncContext` on connection/communication failure, but only if the user makes an explicit call to `valkeyAsyncDisconnect` or `valkeyAsyncFree` |

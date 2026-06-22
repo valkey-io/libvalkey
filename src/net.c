@@ -445,8 +445,12 @@ int valkeyContextConnectTcp(valkeyContext *c, const valkeyOptions *options) {
     }
 
     /* DNS lookup */
-    rv = valkeyResolveSync(c->tcp.host, port, c->flags, &servinfo);
+    /* TODO: Decide if DNS + TCP connect should share a single connect_timeout
+     * budget rather than each getting the full timeout independently. */
+    rv = valkeyResolveSync(c->tcp.host, port, c->flags, timeout_msec, &servinfo);
     if (rv != 0) {
+        if (rv == EAI_MEMORY)
+            goto oom;
         valkeySetError(c, VALKEY_ERR_OTHER, gai_strerror(rv));
         return VALKEY_ERR;
     }
@@ -546,7 +550,7 @@ error:
     rv = VALKEY_ERR;
 end:
     if (servinfo) {
-        freeaddrinfo(servinfo);
+        valkeyFreeAddrInfo(servinfo);
     }
 
     return rv; // Need to return VALKEY_OK if alright

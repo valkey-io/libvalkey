@@ -21,6 +21,7 @@ Libvalkey is the official C client for the [Valkey](https://valkey.io) database.
 - Supports both `RESP2` and `RESP3` protocol versions.
 - Supports both synchronous and asynchronous operation.
 - Optional support for `MPTCP`, `TLS` and `RDMA` connections.
+- Optional timeout-bounded DNS resolution via [c-ares](https://github.com/c-ares/c-ares).
 - Asynchronous API with several event libraries to choose from.
 - Supports both standalone and cluster mode operation.
 - Can be compiled with either `make` or `CMake`.
@@ -42,7 +43,7 @@ We support plain GNU make and CMake. Following is information on how to build th
 sudo make install
 
 # With all options
-sudo USE_TLS=1 USE_RDMA=1 make install
+sudo USE_TLS=1 USE_RDMA=1 USE_CARES=1 make install
 
 # If your openssl is in a non-default location
 sudo USE_TLS=1 OPENSSL_PREFIX=/path/to/openssl make install
@@ -58,9 +59,9 @@ mkdir build && cd build
 cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo ..
 sudo make install
 
-# Build with TLS and RDMA support
+# Build with TLS, RDMA, and c-ares support
 mkdir build && cd build
-cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo -DENABLE_TLS=1 -DENABLE_RDMA=1 ..
+cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo -DENABLE_TLS=1 -DENABLE_RDMA=1 -DENABLE_CARES=1 ..
 sudo make install
 ```
 

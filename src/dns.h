@@ -36,9 +36,18 @@
 /* Resolve hostname synchronously. Returns 0 on success.
  * On failure returns a getaddrinfo error code; the caller can use
  * gai_strerror() to get the error message.
- * The caller must call freeaddrinfo() on the result when done.
- * flags: context flags (VALKEY_PREFER_IPV4, VALKEY_PREFER_IPV6). */
+ * The caller must free the result with valkeyFreeAddrInfo().
+ * flags: context flags (VALKEY_PREFER_IPV4, VALKEY_PREFER_IPV6).
+ * timeout_ms: DNS resolution timeout in milliseconds (used with c-ares). */
 int valkeyResolveSync(const char *host, int port, int flags,
-                      struct addrinfo **result);
+                      long timeout_ms, struct addrinfo **result);
+
+/* Free addrinfo returned by valkeyResolveSync. Safe to call on either
+ * freeaddrinfo-compatible or c-ares-allocated results. */
+#ifdef VALKEY_USE_CARES
+void valkeyFreeAddrInfo(struct addrinfo *ai);
+#else
+#define valkeyFreeAddrInfo(ai) freeaddrinfo(ai)
+#endif
 
 #endif /* VALKEY_DNS_H */

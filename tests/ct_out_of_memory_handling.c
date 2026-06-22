@@ -129,8 +129,17 @@ void test_alloc_failure_handling(void) {
         }
         // Skip iteration 100 to 159 since sdscatfmt give leak warnings during OOM.
 
-        successfulAllocations = 160;
-        cc = valkeyClusterConnectWithOptions(&options);
+        /* Discover the number of allocations required for a successful connect.
+         * Without c-ares this is 160, with c-ares it's ~205. */
+        for (int i = 200; i < 1000; ++i) {
+            successfulAllocations = i;
+            cc = valkeyClusterConnectWithOptions(&options);
+            assert(cc);
+            if (cc->err == 0)
+                break;
+            ASSERT_STR_EQ(cc->errstr, "Out of memory");
+            valkeyClusterFree(cc);
+        }
         assert(cc && cc->err == 0);
     }
 
@@ -457,8 +466,17 @@ void test_alloc_failure_handling_async(void) {
         }
         // Skip iteration 100 to 156 since sdscatfmt give leak warnings during OOM.
 
-        successfulAllocations = 157;
-        acc = valkeyClusterAsyncConnectWithOptions(&options);
+        /* Discover the number of allocations required for a successful async connect.
+         * Without c-ares this is 157, with c-ares it's ~205. */
+        for (int i = 200; i < 1000; ++i) {
+            successfulAllocations = i;
+            acc = valkeyClusterAsyncConnectWithOptions(&options);
+            assert(acc != NULL);
+            if (acc->err == 0)
+                break;
+            ASSERT_STR_EQ(acc->errstr, "Out of memory");
+            valkeyClusterAsyncFree(acc);
+        }
         assert(acc && acc->err == 0);
     }
 
@@ -467,19 +485,15 @@ void test_alloc_failure_handling_async(void) {
     {
         const char *cmd1 = "SET foo one";
 
-        for (int i = 0; i < 36; ++i) {
-            prepare_allocation_test_async(acc, i);
+        for (int n = 0; n < 1000; ++n) {
+            prepare_allocation_test_async(acc, n);
             result = valkeyClusterAsyncCommand(acc, commandCallback, &r1, cmd1);
+            if (result == VALKEY_OK)
+                break;
             assert(result == VALKEY_ERR);
-            if (i != 34) {
-                ASSERT_STR_EQ(acc->errstr, "Out of memory");
-            } else {
-                ASSERT_STR_EQ(acc->errstr, "Failed to attach event adapter");
-            }
+            assert(strcmp(acc->errstr, "Out of memory") == 0 ||
+                   strcmp(acc->errstr, "Failed to attach event adapter") == 0);
         }
-
-        prepare_allocation_test_async(acc, 35);
-        result = valkeyClusterAsyncCommand(acc, commandCallback, &r1, cmd1);
         ASSERT_MSG(result == VALKEY_OK, acc->errstr);
     }
 
@@ -489,17 +503,18 @@ void test_alloc_failure_handling_async(void) {
     {
         const char *cmd2 = "GET foo";
 
-        for (int i = 0; i < 12; ++i) {
-            prepare_allocation_test_async(acc, i);
+        for (int n = 0; n < 1000; ++n) {
+            /* Skip iteration 12, errstr not set by libvalkey when
+             * valkeyFormatSdsCommandArgv() fails. */
+            if (n == 12)
+                continue;
+            prepare_allocation_test_async(acc, n);
             result = valkeyClusterAsyncCommand(acc, commandCallback, &r2, cmd2);
+            if (result == VALKEY_OK)
+                break;
             assert(result == VALKEY_ERR);
             ASSERT_STR_EQ(acc->errstr, "Out of memory");
         }
-
-        /* Skip iteration 12, errstr not set by libvalkey when valkeyFormatSdsCommandArgv() fails. */
-
-        prepare_allocation_test_async(acc, 13);
-        result = valkeyClusterAsyncCommand(acc, commandCallback, &r2, cmd2);
         ASSERT_MSG(result == VALKEY_OK, acc->errstr);
     }
 

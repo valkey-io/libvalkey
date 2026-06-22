@@ -97,11 +97,17 @@ target_include_directories(ut_slotmap_update PRIVATE "${PROJECT_SOURCE_DIR}/src"
 target_link_libraries(ut_slotmap_update valkey_unittest)
 add_test(NAME ut_slotmap_update COMMAND "$<TARGET_FILE:ut_slotmap_update>")
 
-if(NOT WIN32 AND NOT CYGWIN)
+if(NOT WIN32 AND NOT CYGWIN AND NOT ENABLE_CARES)
   add_executable(ut_connect_fallback ut_connect_fallback.c)
   target_compile_options(ut_connect_fallback PRIVATE -Wno-pedantic)
   target_link_libraries(ut_connect_fallback valkey_unittest dl)
   add_test(NAME ut_connect_fallback COMMAND "$<TARGET_FILE:ut_connect_fallback>")
+endif()
+
+if(ENABLE_CARES AND NOT WIN32)
+  add_executable(ut_dns_cares ut_dns_cares.c)
+  target_link_libraries(ut_dns_cares valkey_unittest)
+  add_test(NAME ut_dns_cares COMMAND "$<TARGET_FILE:ut_dns_cares>")
 endif()
 
 # Cluster tests
