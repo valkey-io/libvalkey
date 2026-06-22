@@ -103,6 +103,9 @@ typedef SSIZE_T ssize_t;
 /* Flag specific to use Multipath TCP (MPTCP) */
 #define VALKEY_MPTCP 0x2000
 
+/* Flag indicating async DNS is pending (connection deferred until adapter attached). */
+#define VALKEY_DNS_PENDING 0x4000
+
 #define VALKEY_KEEPALIVE_INTERVAL 15 /* seconds */
 
 /* number of times we retry to connect in the case of EADDRNOTAVAIL and

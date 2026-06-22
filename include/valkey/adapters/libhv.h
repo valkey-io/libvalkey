@@ -95,6 +95,8 @@ static int valkeyLibhvAttach(valkeyAsyncContext *ac, hloop_t *loop) {
         return VALKEY_ERR;
     }
 
+    VALKEY_DNS_BLOCKING_FALLBACK(ac);
+
     /* Create container struct to keep track of our io and any timer */
     events = (valkeyLibhvEvents *)vk_malloc(sizeof(*events));
     if (events == NULL) {

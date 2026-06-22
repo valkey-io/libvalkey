@@ -172,6 +172,8 @@ static int valkeyLibuvAttach(valkeyAsyncContext *ac, uv_loop_t *loop) {
         return VALKEY_ERR;
     }
 
+    VALKEY_DNS_BLOCKING_FALLBACK(ac);
+
     ac->ev.addRead = valkeyLibuvAddRead;
     ac->ev.delRead = valkeyLibuvDelRead;
     ac->ev.addWrite = valkeyLibuvAddWrite;

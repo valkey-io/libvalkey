@@ -94,6 +94,11 @@ typedef struct valkeyAsyncContext {
         void (*delWrite)(void *privdata);
         void (*cleanup)(void *privdata);
         void (*scheduleTimer)(void *privdata, struct timeval tv);
+        /* c-ares async DNS hooks. If addCaresSocket is NULL, the blocking
+         * fallback (valkeyResolveSync with timeout) is used instead. */
+        void (*addCaresSocket)(void *privdata, int fd, int readable, int writable);
+        void (*delCaresSocket)(void *privdata, int fd);
+        void (*scheduleCaresTimer)(void *privdata, struct timeval tv);
     } ev;
 
     /* Called when either the connection is terminated due to an error or per
@@ -121,6 +126,9 @@ typedef struct valkeyAsyncContext {
 
     /* Any configured RESP3 PUSH handler */
     valkeyAsyncPushFn *push_cb;
+
+    /* Async DNS resolution state (used when c-ares is enabled). */
+    void *dns_state;
 } valkeyAsyncContext;
 
 LIBVALKEY_API valkeyAsyncContext *valkeyAsyncConnectWithOptions(const valkeyOptions *options);
@@ -150,6 +158,31 @@ LIBVALKEY_API int valkeyvAsyncCommand(valkeyAsyncContext *ac, valkeyCallbackFn *
 LIBVALKEY_API int valkeyAsyncCommand(valkeyAsyncContext *ac, valkeyCallbackFn *fn, void *privdata, const char *format, ...);
 LIBVALKEY_API int valkeyAsyncCommandArgv(valkeyAsyncContext *ac, valkeyCallbackFn *fn, void *privdata, int argc, const char **argv, const size_t *argvlen);
 LIBVALKEY_API int valkeyAsyncFormattedCommand(valkeyAsyncContext *ac, valkeyCallbackFn *fn, void *privdata, const char *cmd, size_t len);
+
+#ifdef VALKEY_USE_CARES
+/* Async DNS resolution (c-ares integration). Used by event-loop adapters. */
+LIBVALKEY_API int valkeyResolveAsyncStart(valkeyAsyncContext *ac, const char *host, int port);
+LIBVALKEY_API void valkeyResolveAsyncHandleEvent(valkeyAsyncContext *ac, int fd, int readable, int writable);
+LIBVALKEY_API void valkeyResolveAsyncHandleTimer(valkeyAsyncContext *ac);
+LIBVALKEY_API void valkeyResolveAsyncFree(valkeyAsyncContext *ac);
+
+/* Blocking DNS fallback for adapters that don't implement c-ares hooks.
+ * Resolves DNS synchronously, performs connect(), clears DNS_PENDING,
+ * and sets ac->c.fd. Returns VALKEY_OK or VALKEY_ERR. */
+LIBVALKEY_API int valkeyResolveDnsPending(valkeyAsyncContext *ac);
+
+/* Convenience macro for adapters that don't support async DNS.
+ * Place after the "already attached" check in the attach function. */
+#define VALKEY_DNS_BLOCKING_FALLBACK(ac)                  \
+    do {                                                  \
+        if ((ac)->c.flags & VALKEY_DNS_PENDING) {         \
+            if (valkeyResolveDnsPending(ac) != VALKEY_OK) \
+                return VALKEY_ERR;                        \
+        }                                                 \
+    } while (0)
+#else
+#define VALKEY_DNS_BLOCKING_FALLBACK(ac) ((void)0)
+#endif
 
 #ifdef __cplusplus
 }

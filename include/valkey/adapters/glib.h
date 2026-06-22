@@ -146,6 +146,7 @@ valkey_source_new(valkeyAsyncContext *ac) {
 
 /* Internal adapter function with correct function signature. */
 static int valkeyGlibAttachAdapter(valkeyAsyncContext *ac, void *context) {
+    VALKEY_DNS_BLOCKING_FALLBACK(ac);
     if (g_source_attach(valkey_source_new(ac), (GMainContext *)context) > 0) {
         return VALKEY_OK;
     }

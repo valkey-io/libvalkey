@@ -143,6 +143,12 @@ if (LIBEVENT_LIBRARY)
   target_link_libraries(ct_specific_nodes valkey ${TLS_LIBRARY} ${LIBEVENT_LIBRARY})
   add_test(NAME ct_specific_nodes COMMAND "$<TARGET_FILE:ct_specific_nodes>")
 
+  if(ENABLE_CARES AND NOT WIN32)
+    add_executable(ct_async_dns ct_async_dns.c test_utils.c)
+    target_link_libraries(ct_async_dns valkey ${TLS_LIBRARY} ${LIBEVENT_LIBRARY})
+    add_test(NAME ct_async_dns COMMAND "$<TARGET_FILE:ct_async_dns>")
+  endif()
+
   # Tests using simulated Valkey node
   add_executable(clusterclient clusterclient.c)
   target_link_libraries(clusterclient valkey ${TLS_LIBRARY})

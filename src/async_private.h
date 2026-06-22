@@ -33,22 +33,26 @@
 #define VALKEY_ASYNC_PRIVATE_H
 #include "visibility.h"
 
-#define _EL_ADD_READ(ctx)                      \
-    do {                                       \
-        refreshTimeout(ctx);                   \
-        if ((ctx)->ev.addRead)                 \
-            (ctx)->ev.addRead((ctx)->ev.data); \
+#define _EL_ADD_READ(ctx)                        \
+    do {                                         \
+        if ((ctx)->c.flags & VALKEY_DNS_PENDING) \
+            break;                               \
+        refreshTimeout(ctx);                     \
+        if ((ctx)->ev.addRead)                   \
+            (ctx)->ev.addRead((ctx)->ev.data);   \
     } while (0)
 #define _EL_DEL_READ(ctx)                      \
     do {                                       \
         if ((ctx)->ev.delRead)                 \
             (ctx)->ev.delRead((ctx)->ev.data); \
     } while (0)
-#define _EL_ADD_WRITE(ctx)                      \
-    do {                                        \
-        refreshTimeout(ctx);                    \
-        if ((ctx)->ev.addWrite)                 \
-            (ctx)->ev.addWrite((ctx)->ev.data); \
+#define _EL_ADD_WRITE(ctx)                       \
+    do {                                         \
+        if ((ctx)->c.flags & VALKEY_DNS_PENDING) \
+            break;                               \
+        refreshTimeout(ctx);                     \
+        if ((ctx)->ev.addWrite)                  \
+            (ctx)->ev.addWrite((ctx)->ev.data);  \
     } while (0)
 #define _EL_DEL_WRITE(ctx)                      \
     do {                                        \
@@ -81,5 +85,9 @@ static inline void refreshTimeout(valkeyAsyncContext *ctx) {
 /* Visible although private since required by libvalkey_tls.so */
 LIBVALKEY_API void valkeyAsyncDisconnectInternal(valkeyAsyncContext *ac);
 LIBVALKEY_API void valkeyProcessCallbacks(valkeyAsyncContext *ac);
+
+/* Visible although private since required by dns.c (c-ares async connect). */
+void valkeyAsyncCopyError(valkeyAsyncContext *ac);
+void valkeyAsyncHandleConnectFailure(valkeyAsyncContext *ac);
 
 #endif /* VALKEY_ASYNC_PRIVATE_H */

@@ -110,6 +110,8 @@ static int valkeyMacOSAttach(valkeyAsyncContext *valkeyAsyncCtx, CFRunLoopRef ru
     if (valkeyAsyncCtx->ev.data != NULL)
         return VALKEY_ERR;
 
+    VALKEY_DNS_BLOCKING_FALLBACK(valkeyAsyncCtx);
+
     ValkeyRunLoop *valkeyRunLoop = (ValkeyRunLoop *)vk_calloc(1, sizeof(ValkeyRunLoop));
     if (valkeyRunLoop == NULL)
         return VALKEY_ERR;

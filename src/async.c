@@ -45,6 +45,7 @@
 #include "async.h"
 #include "async_private.h"
 #include "dict.h"
+#include "dns.h"
 #include "net.h"
 #include "valkey_private.h"
 #include "vkutil.h"
@@ -152,6 +153,9 @@ static valkeyAsyncContext *valkeyAsyncInitialize(valkeyContext *c) {
     ac->sub.schannels = schannels;
     ac->sub.pending_unsubs = 0;
 
+    ac->push_cb = NULL;
+    ac->dns_state = NULL;
+
     return ac;
 oom:
     dictRelease(channels);
@@ -162,7 +166,7 @@ oom:
 
 /* We want the error field to be accessible directly instead of requiring
  * an indirection to the valkeyContext struct. */
-static void valkeyAsyncCopyError(valkeyAsyncContext *ac) {
+void valkeyAsyncCopyError(valkeyAsyncContext *ac) {
     if (!ac)
         return;
 
@@ -374,6 +378,11 @@ static void valkeyAsyncFreeInternal(valkeyAsyncContext *ac) {
 
         dictRelease(ac->sub.schannels);
     }
+
+    /* Free any in-flight async DNS state before tearing down the event loop. */
+#ifdef VALKEY_USE_CARES
+    valkeyResolveAsyncFree(ac);
+#endif
 
     /* Signal event lib to clean up */
     _EL_CLEANUP(ac);
@@ -659,7 +668,7 @@ void valkeyProcessCallbacks(valkeyAsyncContext *ac) {
         valkeyAsyncDisconnectInternal(ac);
 }
 
-static void valkeyAsyncHandleConnectFailure(valkeyAsyncContext *ac) {
+void valkeyAsyncHandleConnectFailure(valkeyAsyncContext *ac) {
     valkeyRunConnectCallback(ac, VALKEY_ERR);
     valkeyAsyncDisconnectInternal(ac);
 }
