@@ -4,6 +4,7 @@ version = 1
 # See individual files for detailed copyright information.
 [[annotations]]
 path = "**"
+precedence = "aggregate"
 SPDX-FileCopyrightText = "2024-present, libvalkey contributors"
 SPDX-License-Identifier = "BSD-3-Clause"
 
@@ -25,20 +26,24 @@ SPDX-FileCopyrightText = [
     "2020-2021, Bjorn Svensson <bjorn.a.svensson at est dot tech>",
     "2020-2021, Viktor Söderqvist <viktor.soderqvist at est dot tech>",
     "2021, Red Hat",
+    "2024-present, libvalkey contributors",
 ]
 SPDX-License-Identifier = "BSD-3-Clause"
 
 [[annotations]]
 path = "include/valkey/adapters/qt.h"
+precedence = "aggregate"
 SPDX-FileCopyrightText = "2014, Pietro Cerutti <gahr@gahr.ch>"
 SPDX-License-Identifier = "BSD-2-Clause"
 
 [[annotations]]
 path = "src/ffc.h"
+precedence = "aggregate"
 SPDX-FileCopyrightText = "2021, The fast_float authors"
 SPDX-License-Identifier = "MIT"
 
 [[annotations]]
 path = "tests/scripts/simulated-valkey.pl"
+precedence = "aggregate"
 SPDX-FileCopyrightText = "2020, Ericsson Software Technology <viktor.soderqvist@est.tech>"
 SPDX-License-Identifier = "FSFAP"
