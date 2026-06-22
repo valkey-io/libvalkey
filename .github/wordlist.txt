@@ -103,3 +103,6 @@ valkey
 Valkey
 VALKEY
 variadic
+DNS
+FreeBSD
+macOS
