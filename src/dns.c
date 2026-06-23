@@ -39,6 +39,12 @@
 #include "alloc.h"
 
 #include <ares.h>
+
+#if ARES_VERSION < 0x011000
+#error "c-ares >= 1.16.0 is required for ares_getaddrinfo"
+#endif
+
+#include <limits.h>
 #include <poll.h>
 #include <pthread.h>
 #include <time.h>
@@ -201,9 +207,12 @@ static void caresPollLoop(ares_channel_t *channel, struct caresSockState *st,
         maxtv.tv_sec = remaining / 1000;
         maxtv.tv_usec = (remaining % 1000) * 1000;
         struct timeval *tvp = ares_timeout(channel, &maxtv, &tv);
-        int poll_ms = (int)(tvp->tv_sec * 1000 + tvp->tv_usec / 1000);
-        if (poll_ms <= 0)
-            poll_ms = 1;
+        long lval_ms = tvp->tv_sec * 1000 + tvp->tv_usec / 1000;
+        if (lval_ms <= 0)
+            lval_ms = 1;
+        else if (lval_ms > INT_MAX)
+            lval_ms = INT_MAX;
+        int poll_ms = (int)lval_ms;
 
         int ret = poll(st->pfds, (nfds_t)st->nfds, poll_ms);
         if (ret > 0) {
@@ -229,7 +238,9 @@ static int valkeyResolveCares(const char *host, int port, int flags,
     struct caresSockState sockstate = {{{0}}, 0};
     int optmask;
     int rv;
-    long effective_timeout = (timeout_ms > 0) ? timeout_ms : VALKEY_DNS_DEFAULT_TIMEOUT_MS;
+    long effective_timeout = timeout_ms;
+    if (effective_timeout <= 0 || effective_timeout >= INT_MAX)
+        effective_timeout = VALKEY_DNS_DEFAULT_TIMEOUT_MS;
 
     pthread_once(&cares_init_once, valkeyCaresLibraryInit);
 
