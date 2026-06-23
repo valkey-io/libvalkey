@@ -572,9 +572,15 @@ static int valkeyContextConnectUnix(valkeyContext *c, const valkeyOptions *optio
 #ifndef _WIN32
     const struct timeval *timeout = options->connect_timeout;
     const char *path = options->endpoint.unix_socket;
+    size_t pathlen = strlen(path);
     int blocking = (c->flags & VALKEY_BLOCK);
     struct sockaddr_un *sa;
     long timeout_msec = -1;
+
+    if (pathlen >= sizeof(sa->sun_path)) {
+        valkeySetError(c, VALKEY_ERR_OTHER, "Unix socket path too long");
+        return VALKEY_ERR;
+    }
 
     if (valkeyCreateSocket(c, AF_UNIX) < 0)
         return VALKEY_ERR;
@@ -605,13 +611,13 @@ static int valkeyContextConnectUnix(valkeyContext *c, const valkeyOptions *optio
     if (c->saddr)
         vk_free(c->saddr);
 
-    sa = (struct sockaddr_un *)(c->saddr = vk_malloc(sizeof(struct sockaddr_un)));
+    sa = (struct sockaddr_un *)(c->saddr = vk_calloc(1, sizeof(struct sockaddr_un)));
     if (sa == NULL)
         goto oom;
 
     c->addrlen = sizeof(struct sockaddr_un);
     sa->sun_family = AF_UNIX;
-    strncpy(sa->sun_path, path, sizeof(sa->sun_path) - 1);
+    memcpy(sa->sun_path, path, pathlen);
     if (connect(c->fd, (struct sockaddr *)sa, sizeof(*sa)) == -1) {
         if (errno == EINPROGRESS && !blocking) {
             /* This is ok. */

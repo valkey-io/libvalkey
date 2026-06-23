@@ -1104,6 +1104,17 @@ static void test_blocking_connection_errors(void) {
     c = valkeyConnectUnix((char *)"/tmp/nonexistent.sock");
     test_cond(c->err == VALKEY_ERR_IO); /* Don't care about the message... */
     valkeyFree(c);
+
+    test("Returns error when the unix_sock socket path is too long: ");
+    {
+        char long_path[256];
+        memset(long_path, 'a', sizeof(long_path) - 1);
+        long_path[sizeof(long_path) - 1] = '\0';
+        c = valkeyConnectUnix(long_path);
+        test_cond(c->err == VALKEY_ERR_OTHER &&
+                  strcmp(c->errstr, "Unix socket path too long") == 0);
+        valkeyFree(c);
+    }
 #endif
 }
 
