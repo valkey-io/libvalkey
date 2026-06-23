@@ -206,12 +206,12 @@ jobs:
       - name: Build shared libraries using CMake
         run: |
           mkdir build-shared && cd build-shared
-          cmake -DENABLE_RDMA=ON ..
+          cmake -DENABLE_RDMA=ON -DCMAKE_BUILD_TYPE=Release ..
           sudo make install
       - name: Build static libraries using CMake
         run: |
           mkdir build-static && cd build-static
-          cmake -DBUILD_SHARED_LIBS=OFF -DENABLE_RDMA=ON ..
+          cmake -DBUILD_SHARED_LIBS=OFF -DENABLE_RDMA=ON -DCMAKE_BUILD_TYPE=RelWithDebInfo ..
           sudo make install
       - name: Build using Makefile
         run: |
