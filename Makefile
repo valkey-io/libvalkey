@@ -217,6 +217,7 @@ else ifeq ($(uname_S),SunOS)
   ifeq ($(HAVE_SUN_CC),1)
     SUN_SHARED_FLAG = -G
     REAL_CFLAGS    += -mt
+    REAL_CFLAGS    += -erroff=E_CONST_PROMOTED_LONG_LONG,E_CONST_PROMOTED_UNSIGNED_LL
     ifeq ($(USE_THREADS),1)
       PTHREAD_FLAGS  += -mt
     endif
