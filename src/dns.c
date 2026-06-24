@@ -66,6 +66,17 @@ static void valkeyCaresLibraryInit(void) {
     ares_library_init(ARES_LIB_INIT_NONE);
 }
 
+/* Determine address family from context flags and hostname. */
+static int caresHintsFamily(const char *host, int flags) {
+    if ((flags & VALKEY_PREFER_IPV6) && (flags & VALKEY_PREFER_IPV4))
+        return AF_UNSPEC;
+    if (flags & VALKEY_PREFER_IPV6)
+        return AF_INET6;
+    if (strchr(host, ':') != NULL)
+        return AF_INET6; /* IPv6 literal */
+    return AF_INET;
+}
+
 static long valkeyDnsPollMillis(void) {
     struct timespec now;
     clock_gettime(CLOCK_MONOTONIC, &now);
@@ -261,15 +272,7 @@ static int valkeyResolveCares(const char *host, int port, int flags,
 
     memset(&hints, 0, sizeof(hints));
     hints.ai_socktype = SOCK_STREAM;
-
-    if ((flags & VALKEY_PREFER_IPV6) && (flags & VALKEY_PREFER_IPV4))
-        hints.ai_family = AF_UNSPEC;
-    else if (flags & VALKEY_PREFER_IPV6)
-        hints.ai_family = AF_INET6;
-    else if (strchr(host, ':') != NULL)
-        hints.ai_family = AF_INET6; /* IPv6 literal */
-    else
-        hints.ai_family = AF_INET;
+    hints.ai_family = caresHintsFamily(host, flags);
 
     char portstr[6];
     snprintf(portstr, sizeof(portstr), "%d", port);
@@ -459,15 +462,7 @@ int valkeyResolveAsyncStart(struct valkeyAsyncContext *ac, const char *host, int
     dns->port = port;
     dns->flags = c->flags;
 
-    /* Determine family. */
-    if ((c->flags & VALKEY_PREFER_IPV6) && (c->flags & VALKEY_PREFER_IPV4))
-        dns->ai_family = AF_UNSPEC;
-    else if (c->flags & VALKEY_PREFER_IPV6)
-        dns->ai_family = AF_INET6;
-    else if (strchr(host, ':') != NULL)
-        dns->ai_family = AF_INET6; /* IPv6 literal */
-    else
-        dns->ai_family = AF_INET;
+    dns->ai_family = caresHintsFamily(host, c->flags);
 
     struct ares_options opts = {0};
     opts.sock_state_cb = caresAsyncSockStateCb;
