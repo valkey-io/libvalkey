@@ -392,6 +392,80 @@ static int valkeyTcpGetProtocol(int is_mptcp_enabled) {
 }
 #endif /* IPPROTO_MPTCP */
 
+/* Try each address in servinfo, create a non-blocking socket, bind source_addr
+ * if set, and initiate connect(). Returns VALKEY_OK on first successful
+ * connect (or EINPROGRESS), VALKEY_ERR if all addresses fail. Sets c->fd. */
+int valkeyTcpConnectNonBlock(valkeyContext *c, struct addrinfo *servinfo) {
+    struct addrinfo *p, *bservinfo, *b;
+    valkeyFD s;
+    int rv, n;
+    int reuseaddr = (c->flags & VALKEY_REUSEADDR);
+
+    for (p = servinfo; p != NULL; p = p->ai_next) {
+        s = socket(p->ai_family, p->ai_socktype, valkeyTcpGetProtocol(c->flags & VALKEY_MPTCP));
+        if (s == VALKEY_INVALID_FD)
+            continue;
+
+        c->fd = s;
+        if (valkeySetBlocking(c, 0) != VALKEY_OK) {
+            valkeyNetClose(c);
+            continue;
+        }
+
+        if (c->tcp.source_addr) {
+            int bound = 0;
+            struct addrinfo hints = {0};
+            hints.ai_family = p->ai_family;
+            hints.ai_socktype = p->ai_socktype;
+            if ((rv = getaddrinfo(c->tcp.source_addr, NULL, &hints, &bservinfo)) != 0) {
+                char buf[128];
+                snprintf(buf, sizeof(buf), "Can't get addr: %s", gai_strerror(rv));
+                valkeySetError(c, VALKEY_ERR_OTHER, buf);
+                valkeyNetClose(c);
+                return VALKEY_ERR;
+            }
+            if (reuseaddr) {
+                n = 1;
+                if (setsockopt(s, SOL_SOCKET, SO_REUSEADDR, (char *)&n, sizeof(n)) < 0) {
+                    freeaddrinfo(bservinfo);
+                    valkeyNetClose(c);
+                    continue;
+                }
+            }
+            for (b = bservinfo; b != NULL; b = b->ai_next) {
+                if (bind(s, b->ai_addr, b->ai_addrlen) != -1) {
+                    bound = 1;
+                    break;
+                }
+            }
+            freeaddrinfo(bservinfo);
+            if (!bound) {
+                valkeyNetClose(c);
+                continue;
+            }
+        }
+
+        vk_free(c->saddr);
+        c->saddr = vk_malloc(p->ai_addrlen);
+        if (c->saddr == NULL) {
+            valkeyNetClose(c);
+            valkeySetError(c, VALKEY_ERR_OOM, "Out of memory");
+            return VALKEY_ERR;
+        }
+        memcpy(c->saddr, p->ai_addr, p->ai_addrlen);
+        c->addrlen = p->ai_addrlen;
+
+        if (connect(s, p->ai_addr, p->ai_addrlen) == 0 || errno == EINPROGRESS) {
+            return VALKEY_OK;
+        }
+
+        valkeyNetClose(c);
+    }
+
+    valkeySetErrorFromErrno(c, VALKEY_ERR_IO, NULL);
+    return VALKEY_ERR;
+}
+
 int valkeyContextConnectTcp(valkeyContext *c, const valkeyOptions *options) {
     const struct timeval *timeout = options->connect_timeout;
     const char *addr = options->endpoint.tcp.ip;
@@ -443,6 +517,15 @@ int valkeyContextConnectTcp(valkeyContext *c, const valkeyOptions *options) {
         vk_free(c->tcp.source_addr);
         c->tcp.source_addr = vk_strdup(source_addr);
     }
+
+#ifdef VALKEY_USE_CARES
+    /* In async mode, defer DNS to after the adapter is attached so it can
+     * be driven by the event loop (fully non-blocking). */
+    if (!(c->flags & VALKEY_BLOCK)) {
+        c->flags |= VALKEY_DNS_PENDING;
+        return VALKEY_OK;
+    }
+#endif
 
     /* DNS lookup */
     /* TODO: Decide if DNS + TCP connect should share a single connect_timeout

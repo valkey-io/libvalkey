@@ -158,6 +158,8 @@ static int valkeyLibevAttach(EV_P_ valkeyAsyncContext *ac) {
     if (ac->ev.data != NULL)
         return VALKEY_ERR;
 
+    VALKEY_DNS_BLOCKING_FALLBACK(ac);
+
     /* Create container for context and r/w events */
     e = (valkeyLibevEvents *)vk_calloc(1, sizeof(*e));
     if (e == NULL)

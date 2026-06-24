@@ -172,6 +172,8 @@ static int valkeyPollAttach(valkeyAsyncContext *ac) {
     if (ac->ev.data != NULL)
         return VALKEY_ERR;
 
+    VALKEY_DNS_BLOCKING_FALLBACK(ac);
+
     /* Create container for context and r/w events */
     e = (valkeyPollEvents *)vk_malloc(sizeof(*e));
     if (e == NULL)

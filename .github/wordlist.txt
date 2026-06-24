@@ -6,6 +6,7 @@ allocators
 antirez
 api
 APIs
+async
 ASYNC
 asynchronous
 atomicity
@@ -36,6 +37,7 @@ DNS
 ElastiCache
 extensibility
 failover
+fds
 FPM
 FreeBSD
 getaddrinfo

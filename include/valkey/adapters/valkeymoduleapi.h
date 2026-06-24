@@ -117,6 +117,8 @@ static inline int valkeyModuleAttach(valkeyAsyncContext *ac, ValkeyModuleCtx *mo
     if (ac->ev.data != NULL)
         return VALKEY_ERR;
 
+    VALKEY_DNS_BLOCKING_FALLBACK(ac);
+
     /* Create container for context and r/w events */
     e = (valkeyModuleEvents *)vk_malloc(sizeof(*e));
     if (e == NULL)

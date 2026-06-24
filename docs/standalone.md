@@ -49,6 +49,10 @@ When a hostname resolves to multiple addresses, libvalkey will try each address 
 
 When built with c-ares support (`USE_CARES=1` / `-DENABLE_CARES=1`), DNS resolution uses c-ares instead of `getaddrinfo()`. This provides timeout-bounded DNS resolution using `connect_timeout` (defaulting to 5 seconds if unset), preventing indefinite hangs when DNS servers are slow or unreachable.
 
+For the synchronous API, DNS resolution blocks with a `poll()` loop bounded by the timeout.
+For the asynchronous API with the libevent adapter, DNS is fully non-blocking; c-ares fds are registered with the event loop.
+Other adapters use a blocking DNS fallback that is still timeout-bounded.
+
 c-ares support is available on Linux, macOS, and FreeBSD (not Windows).
 
 ```c
@@ -329,6 +333,21 @@ The asynchronous context _should_ hold a connect callback function that is calle
 
 It _can_ also hold a disconnect callback function that is called when the connection is disconnected (either because of an error or per user request).
 The context object is always freed after the disconnect callback fired.
+
+#### Custom adapters and c-ares
+
+When built with c-ares, the async connect defers DNS until the adapter is attached.
+All bundled adapters handle this automatically.
+If you implement a custom adapter, either add `VALKEY_DNS_BLOCKING_FALLBACK(ac)` for a simple blocking fallback, or implement the c-ares hooks (`addCaresSocket`, `delCaresSocket`, `scheduleCaresTimer`) for fully non-blocking DNS; see the libevent adapter for a reference implementation.
+
+```c
+static int myAdapterAttach(valkeyAsyncContext *ac, ...) {
+    if (ac->ev.data != NULL)
+        return VALKEY_ERR;
+    VALKEY_DNS_BLOCKING_FALLBACK(ac);
+    // ... use ac->c.fd normally ...
+}
+```
 
 ### Executing commands
 

@@ -78,6 +78,7 @@ class ValkeyQtAdapter : public QObject {
         if (ac->ev.data != NULL) {
             return VALKEY_ERR;
         }
+        VALKEY_DNS_BLOCKING_FALLBACK(ac);
         m_ctx = ac;
         m_ctx->ev.data = this;
         m_ctx->ev.addRead = ValkeyQtAddRead;
