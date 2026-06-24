@@ -194,9 +194,32 @@ valkeyAsyncContext *valkeyAsyncConnectWithOptions(const valkeyOptions *options) 
         valkeyFree(c);
         return NULL;
     }
+    c = &ac->c; /* c was reallocated by valkeyAsyncInitialize */
 
     /* Set any configured async push handler */
     valkeyAsyncSetPushCallback(ac, myOptions.async_push_cb);
+
+    /* Attach adapter and initiate connect if adapter was provided. */
+    if (myOptions.attach_fn) {
+        if (c->flags & VALKEY_CONNECT_DEFERRED) {
+            c->flags &= ~VALKEY_CONNECT_DEFERRED;
+            c->funcs->connect(c, &myOptions);
+            if (c->err) {
+                valkeyAsyncCopyError(ac);
+                return ac;
+            }
+            /* Non-blocking connect in progress, let the event loop
+             * complete it via valkeyAsyncHandleConnect. */
+            c->flags &= ~VALKEY_CONNECTED;
+        }
+
+        if (myOptions.attach_fn(ac, myOptions.attach_data) != VALKEY_OK) {
+            valkeySetError(c, VALKEY_ERR_OTHER, "Failed to attach event adapter");
+            valkeyAsyncCopyError(ac);
+            return ac;
+        }
+        _EL_ADD_WRITE(ac);
+    }
 
     valkeyAsyncCopyError(ac);
     return ac;
