@@ -32,10 +32,12 @@ dataset
 de
 deallocates
 deallocation
+DNS
 ElastiCache
 extensibility
 failover
 FPM
+FreeBSD
 getaddrinfo
 glibc
 gmail
@@ -56,6 +58,7 @@ libvalkey
 Libvalkey
 localhost
 Lua
+macOS
 michael
 minimalistic
 MPTCP
@@ -103,6 +106,3 @@ valkey
 Valkey
 VALKEY
 variadic
-DNS
-FreeBSD
-macOS
