@@ -38,6 +38,7 @@
 #include "net.h"
 
 #include "async.h"
+#include "dns.h"
 #include "sockcompat.h"
 #include "valkey_private.h"
 
@@ -398,8 +399,7 @@ int valkeyContextConnectTcp(valkeyContext *c, const valkeyOptions *options) {
     int port = options->endpoint.tcp.port;
     valkeyFD s;
     int rv, n;
-    char _port[6]; /* strlen("65535"); */
-    struct addrinfo hints, *servinfo, *bservinfo, *p, *b;
+    struct addrinfo *servinfo, *bservinfo, *p, *b;
     int blocking = (c->flags & VALKEY_BLOCK);
     int reuseaddr = (c->flags & VALKEY_REUSEADDR);
     int reuses = 0;
@@ -444,28 +444,13 @@ int valkeyContextConnectTcp(valkeyContext *c, const valkeyOptions *options) {
         c->tcp.source_addr = vk_strdup(source_addr);
     }
 
-    snprintf(_port, 6, "%d", port);
-    memset(&hints, 0, sizeof(hints));
-    hints.ai_family = AF_INET;
-    hints.ai_socktype = SOCK_STREAM;
-
-    /* DNS lookup. To use dual stack, set both flags to prefer both IPv4 and
-     * IPv6. By default, for historical reasons, we try IPv4 first and then we
-     * try IPv6 only if no IPv4 address was found. */
-    if (c->flags & VALKEY_PREFER_IPV6 && c->flags & VALKEY_PREFER_IPV4)
-        hints.ai_family = AF_UNSPEC;
-    else if (c->flags & VALKEY_PREFER_IPV6)
-        hints.ai_family = AF_INET6;
-    else
-        hints.ai_family = AF_INET;
-
-    rv = getaddrinfo(c->tcp.host, _port, &hints, &servinfo);
-    if (rv != 0 && hints.ai_family != AF_UNSPEC) {
-        /* Try again with the other IP version. */
-        hints.ai_family = (hints.ai_family == AF_INET) ? AF_INET6 : AF_INET;
-        rv = getaddrinfo(c->tcp.host, _port, &hints, &servinfo);
-    }
+    /* DNS lookup */
+    /* TODO: Decide if DNS + TCP connect should share a single connect_timeout
+     * budget rather than each getting the full timeout independently. */
+    rv = valkeyResolveSync(c->tcp.host, port, c->flags, timeout_msec, &servinfo);
     if (rv != 0) {
+        if (rv == EAI_MEMORY)
+            goto oom;
         valkeySetError(c, VALKEY_ERR_OTHER, gai_strerror(rv));
         return VALKEY_ERR;
     }
@@ -480,6 +465,9 @@ int valkeyContextConnectTcp(valkeyContext *c, const valkeyOptions *options) {
             goto error;
         if (c->tcp.source_addr) {
             int bound = 0;
+            struct addrinfo hints = {0};
+            hints.ai_family = p->ai_family;
+            hints.ai_socktype = p->ai_socktype;
             /* Using getaddrinfo saves us from self-determining IPv4 vs IPv6 */
             if ((rv = getaddrinfo(c->tcp.source_addr, NULL, &hints, &bservinfo)) != 0) {
                 char buf[128];
@@ -562,7 +550,7 @@ error:
     rv = VALKEY_ERR;
 end:
     if (servinfo) {
-        freeaddrinfo(servinfo);
+        valkeyFreeAddrInfo(servinfo);
     }
 
     return rv; // Need to return VALKEY_OK if alright

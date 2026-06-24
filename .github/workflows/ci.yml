@@ -217,6 +217,46 @@ jobs:
         run: |
           sudo USE_RDMA=1 make install
 
+  cares:
+    name: Build with c-ares ${{ matrix.sanitizer && format('({0})', matrix.sanitizer) || '' }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        sanitizer: ['', 'thread', 'undefined', 'leak', 'address']
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Prepare
+        uses: awalsh128/cache-apt-pkgs-action@acb598e5ddbc6f68a970c5da0688d2f3a9f04d05 # v1.6.0
+        with:
+          packages: libc-ares-dev libevent-dev valkey-server
+          version: 1.0
+      - name: Build with make
+        run: USE_CARES=1 make
+      - name: Build with CMake
+        run: |
+          CFLAGS=""
+          if [ -n "${{ matrix.sanitizer }}" ]; then
+            CFLAGS="-fno-omit-frame-pointer -fsanitize=${{ matrix.sanitizer }}"
+          fi
+          cmake -B build -S . -DCMAKE_BUILD_TYPE=RelWithDebInfo -DENABLE_CARES=ON -DENABLE_IPV6_TESTS=ON -DCMAKE_C_FLAGS="$CFLAGS"
+      - name: Build
+        working-directory: build
+        run: make
+      - name: Setup clusters
+        working-directory: build
+        run: make start
+      - name: Wait for clusters to start..
+        uses: kibertoad/wait-action@99f6f101c5be7b88bb9b41c0d3b810722491b8e5 # 1.0.1
+        with:
+          time: '20s'
+      - name: Run tests
+        working-directory: build
+        run: make test
+      - name: Teardown clusters
+        working-directory: build
+        run: make stop
+
   cmake-minimum-required:
     name: CMake 3.7.0 (min. required)
     runs-on: ubuntu-latest

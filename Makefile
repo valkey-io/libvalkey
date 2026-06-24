@@ -159,6 +159,17 @@ else
 endif
 ##################### RDMA variables end #####################
 
+#################### c-ares variables start ####################
+USE_CARES?=0
+
+ifeq ($(USE_CARES),1)
+  CFLAGS+=-DVALKEY_USE_CARES
+  CARES_LDFLAGS=-lcares
+else
+  CARES_LDFLAGS=
+endif
+##################### c-ares variables end #####################
+
 # Platform-specific overrides
 uname_S := $(shell uname -s 2>/dev/null || echo not)
 
@@ -245,7 +256,7 @@ else ifeq ($(uname_S),Darwin)
     -Wl,-install_name,$(PREFIX)/$(LIBRARY_PATH)/$(TLS_DYLIB_PATCH_NAME)
 endif
 
-REAL_LDFLAGS += $(PTHREAD_FLAGS)
+REAL_LDFLAGS += $(PTHREAD_FLAGS) $(CARES_LDFLAGS)
 
 all: dynamic static pkgconfig tests
 

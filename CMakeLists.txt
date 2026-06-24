@@ -24,6 +24,7 @@ OPTION(ENABLE_EXAMPLES "Enable building valkey examples" OFF)
 option(ENABLE_IPV6_TESTS "Enable IPv6 tests requiring special prerequisites" OFF)
 OPTION(ENABLE_RDMA "Build valkey_rdma for RDMA support" OFF)
 OPTION(ENABLE_DLOPEN_RDMA "Build valkey_rdma with dynamic loading" OFF)
+OPTION(ENABLE_CARES "Build with c-ares for non-blocking DNS" OFF)
 OPTION(DISABLE_FFC_IMPL "Disable bundled ffc implementation (use external)" OFF)
 
 # Libvalkey requires C99 (-std=c99)
@@ -48,6 +49,7 @@ set(valkey_sources
     src/conn.c
     src/crc16.c
     src/dict.c
+    src/dns.c
     src/net.c
     src/read.c
     src/sockcompat.c
@@ -96,12 +98,35 @@ if(DISABLE_FFC_IMPL)
     list(APPEND valkey_compile_definitions DISABLE_FFC_IMPL)
 endif()
 
+if(ENABLE_CARES AND NOT WIN32)
+    find_package(PkgConfig QUIET)
+    if(PkgConfig_FOUND)
+        pkg_check_modules(CARES IMPORTED_TARGET libcares)
+    endif()
+    if(CARES_FOUND)
+        list(APPEND valkey_link_libraries PkgConfig::CARES)
+    else()
+        find_library(CARES_LIBRARY NAMES cares)
+        find_path(CARES_INCLUDE_DIR ares.h)
+        if(CARES_LIBRARY AND CARES_INCLUDE_DIR)
+            list(APPEND valkey_link_libraries ${CARES_LIBRARY})
+            include_directories(${CARES_INCLUDE_DIR})
+        else()
+            message(FATAL_ERROR "c-ares not found. Install libcares or disable ENABLE_CARES.")
+        endif()
+    endif()
+endif()
+
 if(valkey_link_libraries)
     target_link_libraries(valkey PUBLIC ${valkey_link_libraries})
 endif()
 
 if(valkey_compile_definitions)
     target_compile_definitions(valkey PRIVATE ${valkey_compile_definitions})
+endif()
+
+if(ENABLE_CARES AND NOT WIN32)
+    target_compile_definitions(valkey PUBLIC VALKEY_USE_CARES)
 endif()
 
 TARGET_INCLUDE_DIRECTORIES(valkey
@@ -342,6 +367,9 @@ if(NOT DISABLE_TESTS)
 
   if(valkey_compile_definitions)
     target_compile_definitions(valkey_unittest PRIVATE ${valkey_compile_definitions})
+  endif()
+  if(ENABLE_CARES AND NOT WIN32)
+    target_compile_definitions(valkey_unittest PRIVATE VALKEY_USE_CARES)
   endif()
   if(valkey_link_libraries)
     target_link_libraries(valkey_unittest PUBLIC ${valkey_link_libraries})
