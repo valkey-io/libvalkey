@@ -2209,12 +2209,123 @@ void subscribe_with_timeout_cb(valkeyAsyncContext *ac, void *r, void *privdata) 
         state->checkpoint++;
 
         /* Send a command that will trigger a timeout */
-        valkeyAsyncCommand(ac, null_cb, state, "DEBUG SLEEP 3");
+        valkeyAsyncCommand(ac, null_cb, state, "DEBUG SLEEP 5");
         valkeyAsyncCommand(ac, null_cb, state, "LPUSH mylist foo");
     } else {
         printf("Unexpected pubsub command: %s\n", reply->element[0]->str);
         exit(1);
     }
+}
+
+static void async_ping_pong_cb(valkeyAsyncContext *ac, void *reply, void *privdata) {
+    int *count = (int *)privdata;
+    valkeyReply *r = reply;
+    assert(r != NULL && r->type == VALKEY_REPLY_STATUS);
+    assert(strcmp(r->str, "PONG") == 0);
+    (*count)++;
+    if (*count == 3) {
+        valkeyAsyncDisconnect(ac);
+        event_base_loopbreak(base);
+    }
+}
+
+static void test_command_timeout_not_fired_on_reply(struct config config) {
+    test("Command timeout does not fire when server responds: ");
+    base = event_base_new();
+    struct event *timeout = evtimer_new(base, timeout_cb, NULL);
+    struct timeval timeout_tv = {.tv_sec = 10};
+    evtimer_add(timeout, &timeout_tv);
+
+    valkeyOptions options = get_server_tcp_options(config);
+    valkeyAsyncContext *ac = valkeyAsyncConnectWithOptions(&options);
+    assert(ac != NULL && ac->err == 0);
+    valkeyLibeventAttach(ac, base);
+
+    struct timeval command_timeout = {.tv_sec = 1};
+    valkeyAsyncSetTimeout(ac, command_timeout);
+
+    /* Send multiple commands, server will reply to all of them quickly. */
+    int count = 0;
+    valkeyAsyncCommand(ac, async_ping_pong_cb, &count, "PING");
+    valkeyAsyncCommand(ac, async_ping_pong_cb, &count, "PING");
+    valkeyAsyncCommand(ac, async_ping_pong_cb, &count, "PING");
+
+    event_base_dispatch(base);
+    event_free(timeout);
+    event_base_free(base);
+
+    /* All 3 replies received, no timeout. */
+    test_cond(count == 3);
+}
+
+struct continuous_write_state {
+    valkeyAsyncContext *ac;
+    struct event *write_ev;
+    int timed_out;
+};
+
+static void write_timer_cb(evutil_socket_t fd, short event, void *arg) {
+    (void)fd;
+    (void)event;
+    struct continuous_write_state *state = arg;
+    /* Send a command every tick, previously this would reset the timeout. */
+    valkeyAsyncCommand(state->ac, NULL, NULL, "PING");
+}
+
+static void continuous_timeout_cb(valkeyAsyncContext *ac, void *reply, void *privdata) {
+    (void)ac;
+    struct continuous_write_state *state = privdata;
+    if (reply == NULL) {
+        state->timed_out = 1;
+        event_del(state->write_ev);
+        event_base_loopbreak(base);
+    }
+}
+
+static void test_command_timeout_with_continuous_writes(struct config config) {
+    test("Command timeout fires despite continuous writes: ");
+
+    /* This test requires DEBUG SLEEP which may not be available. */
+    valkeyContext *c = valkeyConnect(config.tcp.host, config.tcp.port);
+    assert(c != NULL);
+    if (!detect_debug_sleep(c)) {
+        valkeyFree(c);
+        test_skipped();
+        return;
+    }
+    valkeyFree(c);
+
+    base = event_base_new();
+    struct event *timeout = evtimer_new(base, timeout_cb, NULL);
+    struct timeval timeout_tv = {.tv_sec = 10};
+    evtimer_add(timeout, &timeout_tv);
+
+    valkeyOptions options = get_server_tcp_options(config);
+    valkeyAsyncContext *ac = valkeyAsyncConnectWithOptions(&options);
+    assert(ac != NULL && ac->err == 0);
+    valkeyLibeventAttach(ac, base);
+
+    struct timeval command_timeout = {.tv_sec = 1};
+    valkeyAsyncSetTimeout(ac, command_timeout);
+
+    /* DEBUG SLEEP blocks the server for 3s. Our timeout is 1s. */
+    valkeyAsyncCommand(ac, NULL, NULL, "DEBUG SLEEP 3");
+
+    struct continuous_write_state state = {.ac = ac, .timed_out = 0};
+
+    /* Write a command every 200ms, this used to reset the timer each time. */
+    state.write_ev = event_new(base, -1, EV_PERSIST, write_timer_cb, &state);
+    struct timeval write_interval = {.tv_sec = 0, .tv_usec = 200000};
+    event_add(state.write_ev, &write_interval);
+
+    valkeyAsyncCommand(ac, continuous_timeout_cb, &state, "PING");
+
+    event_base_dispatch(base);
+    event_free(state.write_ev);
+    event_free(timeout);
+    event_base_free(base);
+
+    test_cond(state.timed_out == 1);
 }
 
 static void test_command_timeout_during_pubsub(struct config config) {
@@ -2893,6 +3004,8 @@ int main(int argc, char **argv) {
         test_pubsub_handling_resp3(cfg);
         test_command_timeout_during_pubsub(cfg);
     }
+    test_command_timeout_not_fired_on_reply(cfg);
+    test_command_timeout_with_continuous_writes(cfg);
 
     if (enable_cluster_tests) {
         sharded_pubsub_test(cfg);

@@ -69,6 +69,8 @@ typedef void(valkeyDisconnectCallback)(const struct valkeyAsyncContext *, int st
 typedef void(valkeyConnectCallback)(struct valkeyAsyncContext *, int status);
 typedef void(valkeyTimerCallback)(void *timer, void *privdata);
 
+#define VALKEY_TIMEOUT_INACTIVE -1
+
 /* Context for an async connection to Valkey */
 typedef struct valkeyAsyncContext {
     /* Hold the regular context, so it can be realloc'ed. */
@@ -121,6 +123,10 @@ typedef struct valkeyAsyncContext {
 
     /* Any configured RESP3 PUSH handler */
     valkeyAsyncPushFn *push_cb;
+
+    /* Replies received since command timeout timer was started, or
+     * VALKEY_TIMEOUT_INACTIVE when no timer is scheduled. */
+    int timeout_reply_count;
 } valkeyAsyncContext;
 
 LIBVALKEY_API valkeyAsyncContext *valkeyAsyncConnectWithOptions(const valkeyOptions *options);
