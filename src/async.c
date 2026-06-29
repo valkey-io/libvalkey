@@ -152,6 +152,8 @@ static valkeyAsyncContext *valkeyAsyncInitialize(valkeyContext *c) {
     ac->sub.schannels = schannels;
     ac->sub.pending_unsubs = 0;
 
+    ac->timeout_reply_count = VALKEY_TIMEOUT_INACTIVE;
+
     return ac;
 oom:
     dictRelease(channels);
@@ -583,6 +585,10 @@ void valkeyProcessCallbacks(valkeyAsyncContext *ac) {
         if (valkeyIsPushReply(reply))
             c->flags |= VALKEY_SUPPORTS_PUSH;
 
+        /* Any data from the server means it's alive. */
+        if (ac->timeout_reply_count != VALKEY_TIMEOUT_INACTIVE)
+            ac->timeout_reply_count++;
+
         /* Send any non-subscribe related PUSH messages to our PUSH handler
          * while allowing subscribe related PUSH messages to pass through.
          * This allows existing code to be backward compatible and work in
@@ -780,12 +786,21 @@ void valkeyAsyncHandleTimeout(valkeyAsyncContext *ac) {
     if ((c->flags & VALKEY_CONNECTED)) {
         if (ac->replies.head == NULL && ac->sub.replies.head == NULL) {
             /* Nothing to do - just an idle timeout */
+            ac->timeout_reply_count = VALKEY_TIMEOUT_INACTIVE;
             return;
         }
 
         if (!ac->c.command_timeout ||
             (!ac->c.command_timeout->tv_sec && !ac->c.command_timeout->tv_usec)) {
             /* A belated connect timeout arriving, ignore */
+            return;
+        }
+
+        /* If replies were received since the timer started, the server is
+         * alive. Restart the timer rather than timing out. */
+        if (ac->timeout_reply_count > 0) {
+            ac->timeout_reply_count = VALKEY_TIMEOUT_INACTIVE;
+            refreshTimeout(ac);
             return;
         }
     }

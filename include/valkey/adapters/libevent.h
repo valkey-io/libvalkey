@@ -42,6 +42,7 @@
 typedef struct valkeyLibeventEvents {
     valkeyAsyncContext *context;
     struct event *ev;
+    struct event *timer;
     struct event_base *base;
     struct timeval tv;
     short flags;
@@ -63,11 +64,6 @@ static void valkeyLibeventHandler(evutil_socket_t fd, short event, void *arg) {
         return;                               \
     }
 
-    if ((event & EV_TIMEOUT) && (e->state & VALKEY_LIBEVENT_DELETED) == 0) {
-        valkeyAsyncHandleTimeout(e->context);
-        CHECK_DELETED();
-    }
-
     if ((event & EV_READ) && e->context && (e->state & VALKEY_LIBEVENT_DELETED) == 0) {
         valkeyAsyncHandleRead(e->context);
         CHECK_DELETED();
@@ -82,9 +78,15 @@ static void valkeyLibeventHandler(evutil_socket_t fd, short event, void *arg) {
 #undef CHECK_DELETED
 }
 
+static void valkeyLibeventTimeoutHandler(evutil_socket_t fd, short event, void *arg) {
+    (void)fd;
+    (void)event;
+    valkeyLibeventEvents *e = (valkeyLibeventEvents *)arg;
+    valkeyAsyncHandleTimeout(e->context);
+}
+
 static void valkeyLibeventUpdate(void *privdata, short flag, int isRemove) {
     valkeyLibeventEvents *e = (valkeyLibeventEvents *)privdata;
-    const struct timeval *tv = e->tv.tv_sec || e->tv.tv_usec ? &e->tv : NULL;
 
     if (isRemove) {
         if ((e->flags & flag) == 0) {
@@ -103,7 +105,7 @@ static void valkeyLibeventUpdate(void *privdata, short flag, int isRemove) {
     event_del(e->ev);
     event_assign(e->ev, e->base, e->context->c.fd, e->flags | EV_PERSIST,
                  valkeyLibeventHandler, privdata);
-    event_add(e->ev, tv);
+    event_add(e->ev, NULL);
 }
 
 static void valkeyLibeventAddRead(void *privdata) {
@@ -130,6 +132,10 @@ static void valkeyLibeventCleanup(void *privdata) {
     event_del(e->ev);
     event_free(e->ev);
     e->ev = NULL;
+    if (e->timer) {
+        event_free(e->timer);
+        e->timer = NULL;
+    }
 
     if (e->state & VALKEY_LIBEVENT_ENTERED) {
         e->state |= VALKEY_LIBEVENT_DELETED;
@@ -140,10 +146,12 @@ static void valkeyLibeventCleanup(void *privdata) {
 
 static void valkeyLibeventSetTimeout(void *privdata, struct timeval tv) {
     valkeyLibeventEvents *e = (valkeyLibeventEvents *)privdata;
-    short flags = e->flags;
-    e->flags = 0;
-    e->tv = tv;
-    valkeyLibeventUpdate(e, flags, 0);
+    if (e->timer == NULL)
+        e->timer = evtimer_new(e->base, valkeyLibeventTimeoutHandler, e);
+    else
+        evtimer_del(e->timer);
+    if (tv.tv_sec || tv.tv_usec)
+        evtimer_add(e->timer, &tv);
 }
 
 static int valkeyLibeventAttach(valkeyAsyncContext *ac, struct event_base *base) {

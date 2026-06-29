@@ -66,15 +66,19 @@ static inline void refreshTimeout(valkeyAsyncContext *ctx) {
 #define VALKEY_TIMER_ISSET(tvp) \
     (tvp && ((tvp)->tv_sec || (tvp)->tv_usec))
 
-#define VALKEY_EL_TIMER(ac, tvp)                             \
-    if ((ac)->ev.scheduleTimer && VALKEY_TIMER_ISSET(tvp)) { \
-        (ac)->ev.scheduleTimer((ac)->ev.data, *(tvp));       \
-    }
-
     if (ctx->c.flags & VALKEY_CONNECTED) {
-        VALKEY_EL_TIMER(ctx, ctx->c.command_timeout);
+        /* Don't reset the timer if already active, prevents the timeout from
+         * never firing when commands are written continuously. */
+        if (ctx->timeout_reply_count != VALKEY_TIMEOUT_INACTIVE)
+            return;
+        if (ctx->ev.scheduleTimer && VALKEY_TIMER_ISSET(ctx->c.command_timeout)) {
+            ctx->ev.scheduleTimer(ctx->ev.data, *ctx->c.command_timeout);
+            ctx->timeout_reply_count = 0;
+        }
     } else {
-        VALKEY_EL_TIMER(ctx, ctx->c.connect_timeout);
+        if (ctx->ev.scheduleTimer && VALKEY_TIMER_ISSET(ctx->c.connect_timeout)) {
+            ctx->ev.scheduleTimer(ctx->ev.data, *ctx->c.connect_timeout);
+        }
     }
 }
 
