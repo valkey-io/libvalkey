@@ -551,8 +551,7 @@ static dict *parse_cluster_slots(valkeyClusterContext *cc, valkeyContext *c,
         uint32_t slot_start = (uint32_t)elem_slots->element[0]->integer;
         uint32_t slot_end = (uint32_t)elem_slots->element[1]->integer;
         if (slot_start > slot_end || slot_end >= VALKEYCLUSTER_SLOTS) {
-            valkeyClusterSetError(cc, VALKEY_ERR_OTHER,
-                                  "Invalid slot range");
+            valkeyClusterSetError(cc, VALKEY_ERR_OTHER, "Invalid slot range");
             goto error;
         }
 
@@ -592,7 +591,7 @@ static dict *parse_cluster_slots(valkeyClusterContext *cc, valkeyContext *c,
                 goto oom;
             }
 
-            /* Parse replica nodes (elements 3+) only for new primaries. */
+            /* Parse replica nodes (elements 3+). */
             if (cc->flags & VALKEY_FLAG_PARSE_REPLICAS) {
                 for (uint32_t idx = 3; idx < elem_slots->elements; idx++) {
                     if (parseClusterSlotsNodeEntry(cc, c, elem_slots->element[idx], &host, &port) != VALKEY_OK)
