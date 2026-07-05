@@ -38,12 +38,18 @@
 #include "valkey.h"
 #include "visibility.h"
 
+#include <sys/types.h>
+struct addrinfo;
+
 LIBVALKEY_API void valkeyNetClose(valkeyContext *c);
 
 LIBVALKEY_API int valkeyHasMptcp(void);
 LIBVALKEY_API int valkeyCheckSocketError(valkeyContext *c);
 LIBVALKEY_API int valkeyTcpSetTimeout(valkeyContext *c, const struct timeval tv);
 LIBVALKEY_API int valkeyContextConnectTcp(valkeyContext *c, const valkeyOptions *options);
+#ifdef VALKEY_USE_CARES
+LIBVALKEY_API int valkeyTcpConnectNonBlock(valkeyContext *c, struct addrinfo *servinfo);
+#endif
 LIBVALKEY_API int valkeyKeepAlive(valkeyContext *c, int interval);
 LIBVALKEY_API int valkeyCheckConnectDone(valkeyContext *c, int *completed);
 

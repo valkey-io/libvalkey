@@ -50,6 +50,10 @@ When a hostname resolves to multiple addresses, libvalkey will try each address 
 
 When built with c-ares support (`USE_CARES=1` / `-DENABLE_CARES=1`), DNS resolution uses c-ares instead of `getaddrinfo()`. This provides timeout-bounded DNS resolution using `connect_timeout` (defaulting to 5 seconds if unset), preventing indefinite hangs when DNS servers are slow or unreachable.
 
+For the synchronous API, DNS resolution blocks with a `poll()` loop bounded by the timeout.
+For the asynchronous API, DNS is fully non-blocking when the connection is set up via the options path (`valkeyAsyncConnectWithOptions` with `attach_fn`) using an adapter that implements the c-ares hooks; the libevent adapter does this and drives the c-ares file descriptors from the event loop.
+All other cases, the legacy connect-then-attach path and adapters without the hooks, use the blocking, timeout-bounded resolution.
+
 c-ares support is available on Linux, macOS, and FreeBSD (not Windows).
 
 ```c
@@ -365,6 +369,37 @@ Unix socket connections connect immediately.
 
 The legacy pattern of attaching the adapter after connecting (as shown in the example above) remains fully supported; all of these option fields are optional.
 The callbacks can still be set afterwards with `valkeyAsyncSetConnectCallback` / `valkeyAsyncSetDisconnectCallback`, but doing so via the options is race-free when the loop is already running.
+
+#### Custom adapters and c-ares
+
+When built with c-ares, the asynchronous connect defers DNS resolution until the adapter is attached (this only happens on the options path, when `attach_fn` is set).
+Custom adapters need no special handling for this: if the adapter does not implement the c-ares hooks, `valkeyAsyncConnectWithOptions` resolves DNS synchronously (timeout-bounded) and connects before returning, so the adapter always sees a valid `ac->c.fd`.
+
+To support fully non-blocking DNS, an adapter implements the c-ares socket hooks and initiates the asynchronous resolution from its attach function:
+
+```c
+static int myAdapterAttach(valkeyAsyncContext *ac, void *loopdata) {
+    if (ac->ev.data != NULL)
+        return VALKEY_ERR;
+
+    /* ... register addRead/addWrite/etc. hooks ... */
+#ifdef VALKEY_USE_CARES
+    ac->ev.addCaresSocket = myAdapterAddCaresSocket; /* register a c-ares fd */
+    ac->ev.delCaresSocket = myAdapterDelCaresSocket; /* deregister a c-ares fd */
+
+    if (ac->c.flags & VALKEY_CONNECT_DEFERRED) {
+        /* No fd yet, drive DNS via the event loop. On completion the
+         * connect proceeds and the fd is registered automatically. */
+        return valkeyResolveAsyncStart(ac, ac->c.tcp.host, ac->c.tcp.port);
+    }
+#endif
+    /* ... otherwise register ac->c.fd normally ... */
+    return VALKEY_OK;
+}
+```
+
+The adapter's c-ares `fd` callbacks forward activity to `valkeyResolveAsyncHandleEvent(ac, fd, readable, writable)`.
+See the libevent adapter for a complete reference implementation.
 
 ### Executing commands
 

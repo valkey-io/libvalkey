@@ -46,6 +46,20 @@ int valkeyResolveSync(const char *host, int port, int flags,
  * freeaddrinfo-compatible or c-ares-allocated results. */
 #ifdef VALKEY_USE_CARES
 void valkeyFreeAddrInfo(struct addrinfo *ai);
+
+struct valkeyAsyncContext;
+
+/* Initiate async DNS resolution. Returns VALKEY_OK if the query was started
+ * (completion is via the event loop), or VALKEY_ERR on immediate failure.
+ * When DNS completes, the connect flow continues on the event loop. */
+int valkeyResolveAsyncStart(struct valkeyAsyncContext *ac, const char *host, int port);
+
+/* Called by the adapter when a c-ares fd is readable/writable. */
+void valkeyResolveAsyncHandleEvent(struct valkeyAsyncContext *ac, int fd, int readable, int writable);
+
+/* Free async DNS state. Called during context cleanup. */
+void valkeyResolveAsyncFree(struct valkeyAsyncContext *ac);
+
 #else
 #define valkeyFreeAddrInfo(ai) freeaddrinfo(ai)
 #endif
