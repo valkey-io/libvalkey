@@ -24,6 +24,9 @@ target_link_libraries(example-blocking valkey::valkey)
 add_executable(example-blocking-push blocking-push.c)
 target_link_libraries(example-blocking-push valkey::valkey)
 
+add_executable(example-async-disable-timeout async-disable-timeout.c)
+target_link_libraries(example-async-disable-timeout valkey::valkey)
+
 add_executable(example-cluster-simple cluster-simple.c)
 target_link_libraries(example-cluster-simple valkey::valkey)
 
