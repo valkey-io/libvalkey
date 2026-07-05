@@ -94,6 +94,10 @@ typedef struct valkeyAsyncContext {
         void (*delWrite)(void *privdata);
         void (*cleanup)(void *privdata);
         void (*scheduleTimer)(void *privdata, struct timeval tv);
+        /* c-ares async DNS hooks. If addCaresSocket is NULL, the blocking
+         * fallback (valkeyResolveSync with timeout) is used instead. */
+        void (*addCaresSocket)(void *privdata, int fd, int readable, int writable);
+        void (*delCaresSocket)(void *privdata, int fd);
     } ev;
 
     /* Called when either the connection is terminated due to an error or per
@@ -129,6 +133,9 @@ typedef struct valkeyAsyncContext {
 
     /* Replies received since command timeout timer was started. */
     int timeout_reply_count;
+
+    /* Async DNS resolution state (used when c-ares is enabled). */
+    void *dns_state;
 } valkeyAsyncContext;
 
 LIBVALKEY_API valkeyAsyncContext *valkeyAsyncConnectWithOptions(const valkeyOptions *options);
@@ -158,6 +165,20 @@ LIBVALKEY_API int valkeyvAsyncCommand(valkeyAsyncContext *ac, valkeyCallbackFn *
 LIBVALKEY_API int valkeyAsyncCommand(valkeyAsyncContext *ac, valkeyCallbackFn *fn, void *privdata, const char *format, ...);
 LIBVALKEY_API int valkeyAsyncCommandArgv(valkeyAsyncContext *ac, valkeyCallbackFn *fn, void *privdata, int argc, const char **argv, const size_t *argvlen);
 LIBVALKEY_API int valkeyAsyncFormattedCommand(valkeyAsyncContext *ac, valkeyCallbackFn *fn, void *privdata, const char *cmd, size_t len);
+
+#ifdef VALKEY_USE_CARES
+/* Async DNS resolution (c-ares integration). Exported for event adapters, which
+ * are header-only and so compiled outside the library, rather than for
+ * application use.
+ *
+ * An adapter that implements the addCaresSocket/delCaresSocket hooks calls
+ * valkeyResolveAsyncStart() from its attach function to begin resolving; it
+ * returns VALKEY_OK once the query is under way, with completion reported
+ * through the event loop, or VALKEY_ERR if it could not be started. The adapter
+ * then forwards c-ares socket activity to valkeyResolveAsyncHandleEvent(). */
+LIBVALKEY_API int valkeyResolveAsyncStart(valkeyAsyncContext *ac, const char *host, int port);
+LIBVALKEY_API void valkeyResolveAsyncHandleEvent(valkeyAsyncContext *ac, int fd, int readable, int writable);
+#endif
 
 #ifdef __cplusplus
 }
