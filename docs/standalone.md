@@ -21,6 +21,7 @@ This document describes using `libvalkey` in standalone (non-cluster) mode, incl
     - [Allocator injection](#allocator-injection)
 - [Asynchronous API](#asynchronous-api)
   - [Connecting](#connecting-1)
+    - [Attaching an adapter via connection options](#attaching-an-adapter-via-connection-options)
   - [Executing commands](#executing-commands-1)
   - [Disconnecting/cleanup](#disconnecting-cleanup-1)
 - [TLS support](#tls-support)
@@ -329,6 +330,37 @@ The asynchronous context _should_ hold a connect callback function that is calle
 
 It _can_ also hold a disconnect callback function that is called when the connection is disconnected (either because of an error or per user request).
 The context object is always freed after the disconnect callback fired.
+
+#### Attaching an adapter via connection options
+
+The example above uses the two-step pattern: create the context, then attach an event-loop adapter separately.
+As an alternative, you can specify the adapter as part of the `valkeyOptions` using the `attach_fn` and `attach_data` fields.
+When set, `valkeyAsyncConnectWithOptions()` attaches the adapter and registers the file descriptor with the event loop for you, in a single call.
+
+```c
+valkeyOptions options = {0};
+VALKEY_OPTIONS_SET_TCP(&options, "localhost", 6379);
+
+// Specify the event-loop adapter as part of the options.
+options.attach_fn = valkeyLibevAttachAdapter;
+options.attach_data = EV_DEFAULT; // the default libev loop; or a `struct ev_loop *`
+
+valkeyAsyncContext *ac = valkeyAsyncConnectWithOptions(&options);
+if (ac == NULL || ac->err) {
+    fprintf(stderr, "Error: %s\n", ac ? ac->errstr : "OOM");
+    // ... handle error / cleanup ...
+}
+
+valkeySetConnectCallback(ac, my_connect_callback);
+valkeySetDisconnectCallback(ac, my_disconnect_callback);
+
+ev_run(EV_DEFAULT_ 0);
+```
+
+For TCP connections, the actual connect is deferred until after the context is fully initialized, so the adapter always receives a valid file descriptor and works without modification.
+Unix socket connections connect immediately.
+
+The legacy pattern of attaching the adapter after connecting (as shown in the example above) remains fully supported; the `attach_fn` field is optional.
 
 ### Executing commands
 

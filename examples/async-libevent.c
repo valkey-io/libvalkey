@@ -49,6 +49,8 @@ int main(int argc, char **argv) {
     struct timeval tv = {0};
     tv.tv_sec = 1;
     options.connect_timeout = &tv;
+    options.attach_fn = valkeyLibeventAttachAdapter;
+    options.attach_data = base;
 
     valkeyAsyncContext *c = valkeyAsyncConnectWithOptions(&options);
     if (c->err) {
@@ -57,7 +59,6 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    valkeyLibeventAttach(c, base);
     valkeyAsyncSetConnectCallback(c, connectCallback);
     valkeyAsyncSetDisconnectCallback(c, disconnectCallback);
     valkeyAsyncCommand(
