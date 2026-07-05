@@ -844,6 +844,9 @@ static void valkeyAsyncCommandTimeoutCallback(void *privdata) {
 
     ac->command_timer = NULL;
 
+    if (!VALKEY_TIMER_ISSET(ac->c.command_timeout))
+        return;
+
     if (ac->replies.head == NULL && ac->sub.replies.head == NULL) {
         /* Nothing to do - just an idle timeout */
         return;
@@ -1307,6 +1310,12 @@ int valkeyAsyncSetTimeout(valkeyAsyncContext *ac, struct timeval tv) {
     if (tv.tv_sec != ac->c.command_timeout->tv_sec ||
         tv.tv_usec != ac->c.command_timeout->tv_usec) {
         *ac->c.command_timeout = tv;
+    }
+
+    if (tv.tv_sec == 0 && tv.tv_usec == 0 && ac->command_timer != NULL) {
+        valkeyTimerDel(ac->timer_list, ac->command_timer);
+        ac->command_timer = NULL;
+        ac->timeout_reply_count = 0;
     }
 
     return VALKEY_OK;
