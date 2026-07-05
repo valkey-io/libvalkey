@@ -234,6 +234,14 @@ typedef struct {
      * attaches the adapter automatically. */
     int (*attach_fn)(struct valkeyAsyncContext *ac, void *attach_data);
     void *attach_data;
+
+    /* Optional async connect/disconnect callbacks. When set,
+     * valkeyAsyncConnectWithOptions registers them on the context before the
+     * connect is initiated, so no connect event can be missed even when the
+     * event loop is already running. Equivalent to calling
+     * valkeyAsyncSetConnectCallback / valkeyAsyncSetDisconnectCallback. */
+    void (*async_connect_callback)(struct valkeyAsyncContext *ac, int status);
+    void (*async_disconnect_callback)(const struct valkeyAsyncContext *ac, int status);
 } valkeyOptions;
 
 /**

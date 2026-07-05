@@ -199,6 +199,12 @@ valkeyAsyncContext *valkeyAsyncConnectWithOptions(const valkeyOptions *options) 
     /* Set any configured async push handler */
     valkeyAsyncSetPushCallback(ac, myOptions.async_push_cb);
 
+    /* Register connect/disconnect callbacks before connect is initiated. */
+    if (myOptions.async_connect_callback)
+        valkeyAsyncSetConnectCallback(ac, myOptions.async_connect_callback);
+    if (myOptions.async_disconnect_callback)
+        valkeyAsyncSetDisconnectCallback(ac, myOptions.async_disconnect_callback);
+
     /* Attach adapter and initiate connect if adapter was provided. */
     if (myOptions.attach_fn) {
         if (c->flags & VALKEY_CONNECT_DEFERRED) {
