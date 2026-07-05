@@ -2626,6 +2626,8 @@ valkeyClusterGetValkeyAsyncContext(valkeyClusterAsyncContext *acc,
     options.connect_timeout = acc->cc.connect_timeout;
     options.command_timeout = acc->cc.command_timeout;
     options.options = acc->cc.options;
+    options.async_connect_callback = acc->onConnect;
+    options.async_disconnect_callback = acc->onDisconnect;
 
     node->lastConnectionAttempt = vk_usec_now();
 
@@ -2682,14 +2684,6 @@ valkeyClusterGetValkeyAsyncContext(valkeyClusterAsyncContext *acc,
             valkeyAsyncFree(ac);
             return NULL;
         }
-    }
-
-    if (acc->onConnect) {
-        valkeyAsyncSetConnectCallback(ac, acc->onConnect);
-    }
-
-    if (acc->onDisconnect) {
-        valkeyAsyncSetDisconnectCallback(ac, acc->onDisconnect);
     }
 
     ac->data = node;
