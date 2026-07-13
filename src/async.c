@@ -903,6 +903,7 @@ void valkeyAsyncHandleTimeout(valkeyAsyncContext *ac) {
     struct timeval remaining;
     /* must not be called from a callback */
     assert(!(c->flags & VALKEY_IN_CALLBACK));
+    (void)c;
 
     /* Process internal timers. */
     if (ac->timer_list == NULL)
