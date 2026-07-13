@@ -49,9 +49,10 @@ static void valkeyTimerGetMonotonic(struct timeval *tv) {
     LARGE_INTEGER counter, frequency;
     QueryPerformanceCounter(&counter);
     QueryPerformanceFrequency(&frequency);
-    int64_t usec = counter.QuadPart * 1000000 / frequency.QuadPart;
-    tv->tv_sec = (long)(usec / 1000000);
-    tv->tv_usec = (long)(usec % 1000000);
+    int64_t sec = counter.QuadPart / frequency.QuadPart;
+    int64_t rem = counter.QuadPart % frequency.QuadPart;
+    tv->tv_sec = (long)sec;
+    tv->tv_usec = (long)(rem * 1000000 / frequency.QuadPart);
 #endif
 }
 
