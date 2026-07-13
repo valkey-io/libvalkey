@@ -49,6 +49,10 @@ int main(int argc, char **argv) {
     struct timeval tv = {0};
     tv.tv_sec = 1;
     options.connect_timeout = &tv;
+    options.attach_fn = valkeyLibeventAttachAdapter;
+    options.attach_data = base;
+    options.async_connect_callback = connectCallback;
+    options.async_disconnect_callback = disconnectCallback;
 
     valkeyAsyncContext *c = valkeyAsyncConnectWithOptions(&options);
     if (c->err) {
@@ -57,9 +61,6 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    valkeyLibeventAttach(c, base);
-    valkeyAsyncSetConnectCallback(c, connectCallback);
-    valkeyAsyncSetDisconnectCallback(c, disconnectCallback);
     valkeyAsyncCommand(
         c, NULL, NULL, "SET key %b", argv[argc - 1], strlen(argv[argc - 1]));
     valkeyAsyncCommand(c, getCallback, (char *)"end-1", "GET key");

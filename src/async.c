@@ -46,6 +46,7 @@
 #include "async_private.h"
 #include "dict.h"
 #include "net.h"
+#include "timer.h"
 #include "valkey_private.h"
 #include "vkutil.h"
 
@@ -139,6 +140,8 @@ static valkeyAsyncContext *valkeyAsyncInitialize(valkeyContext *c) {
     ac->ev.delWrite = NULL;
     ac->ev.cleanup = NULL;
     ac->ev.scheduleTimer = NULL;
+    ac->ev.addCaresSocket = NULL;
+    ac->ev.delCaresSocket = NULL;
 
     ac->onConnect = NULL;
     ac->onDisconnect = NULL;
@@ -152,7 +155,11 @@ static valkeyAsyncContext *valkeyAsyncInitialize(valkeyContext *c) {
     ac->sub.schannels = schannels;
     ac->sub.pending_unsubs = 0;
 
-    ac->timeout_reply_count = VALKEY_TIMEOUT_INACTIVE;
+    ac->timer_list = NULL;
+    ac->connect_timer = NULL;
+    ac->command_timer = NULL;
+    ac->timeout_reply_count = 0;
+    ac->dns_state = NULL;
 
     return ac;
 oom:
@@ -164,7 +171,7 @@ oom:
 
 /* We want the error field to be accessible directly instead of requiring
  * an indirection to the valkeyContext struct. */
-static void valkeyAsyncCopyError(valkeyAsyncContext *ac) {
+void valkeyAsyncCopyError(valkeyAsyncContext *ac) {
     if (!ac)
         return;
 
@@ -194,9 +201,55 @@ valkeyAsyncContext *valkeyAsyncConnectWithOptions(const valkeyOptions *options) 
         valkeyFree(c);
         return NULL;
     }
+    c = &ac->c; /* c was reallocated by valkeyAsyncInitialize */
 
     /* Set any configured async push handler */
     valkeyAsyncSetPushCallback(ac, myOptions.async_push_cb);
+
+    /* Register connect/disconnect callbacks before connect is initiated. */
+    if (myOptions.async_connect_callback)
+        valkeyAsyncSetConnectCallback(ac, myOptions.async_connect_callback);
+    if (myOptions.async_disconnect_callback)
+        valkeyAsyncSetDisconnectCallback(ac, myOptions.async_disconnect_callback);
+
+    /* Attach adapter and initiate connect if adapter was provided. */
+    if (myOptions.attach_fn) {
+        /* Attach the adapter first so its hooks (including any c-ares async
+         * DNS hooks) are registered before the connect is initiated. While
+         * VALKEY_CONNECT_DEFERRED is set, the adapter installs its hooks but
+         * does not register the (not-yet-valid) fd; a c-ares aware adapter
+         * initiates async DNS from within its attach function. */
+        if (myOptions.attach_fn(ac, myOptions.attach_data) != VALKEY_OK) {
+            valkeySetError(c, VALKEY_ERR_OTHER, "Failed to attach event adapter");
+            valkeyAsyncCopyError(ac);
+            return ac;
+        }
+
+        if (c->flags & VALKEY_CONNECT_DEFERRED) {
+            /* When the adapter started async DNS it leaves dns_state set and
+             * keeps the deferred flag; the connect flow then continues from
+             * the DNS callback, which adds the write watch once the fd is
+             * valid. There is no valid fd yet, so return without registering
+             * read/write interest. */
+            if (ac->dns_state != NULL) {
+                valkeyAsyncCopyError(ac);
+                return ac;
+            }
+            /* Otherwise the adapter has no async DNS support. Perform the
+             * deferred DNS + connect synchronously now. */
+            c->flags &= ~VALKEY_CONNECT_DEFERRED;
+            c->funcs->connect(c, &myOptions);
+            if (c->err) {
+                valkeyAsyncCopyError(ac);
+                return ac;
+            }
+            /* Non-blocking connect in progress, let the event loop
+             * complete it via valkeyAsyncHandleConnect. */
+            c->flags &= ~VALKEY_CONNECTED;
+        }
+
+        _EL_ADD_WRITE(ac);
+    }
 
     valkeyAsyncCopyError(ac);
     return ac;
@@ -240,8 +293,13 @@ int valkeyAsyncSetConnectCallback(valkeyAsyncContext *ac, valkeyConnectCallback 
 
     /* The common way to detect an established connection is to wait for
      * the first write event to be fired. This assumes the related event
-     * library functions are already set. */
-    _EL_ADD_WRITE(ac);
+     * library functions are already set.
+     *
+     * While the connect is deferred (async DNS in progress via the options
+     * path) there is no valid fd yet, so skip registering write interest.
+     * The write watch is added once the connection is initiated. */
+    if (!(ac->c.flags & VALKEY_CONNECT_DEFERRED))
+        _EL_ADD_WRITE(ac);
 
     return VALKEY_OK;
 }
@@ -376,6 +434,18 @@ static void valkeyAsyncFreeInternal(valkeyAsyncContext *ac) {
 
         dictRelease(ac->sub.schannels);
     }
+
+    /* Free internal timers. */
+    if (ac->timer_list) {
+        valkeyTimerListFree(ac->timer_list);
+        vk_free(ac->timer_list);
+        ac->timer_list = NULL;
+    }
+
+    /* Free any in-flight async DNS state before tearing down the event loop. */
+#ifdef VALKEY_USE_CARES
+    valkeyResolveAsyncFree(ac);
+#endif
 
     /* Signal event lib to clean up */
     _EL_CLEANUP(ac);
@@ -586,7 +656,7 @@ void valkeyProcessCallbacks(valkeyAsyncContext *ac) {
             c->flags |= VALKEY_SUPPORTS_PUSH;
 
         /* Any data from the server means it's alive. */
-        if (ac->timeout_reply_count != VALKEY_TIMEOUT_INACTIVE)
+        if (ac->command_timer != NULL)
             ac->timeout_reply_count++;
 
         /* Send any non-subscribe related PUSH messages to our PUSH handler
@@ -665,7 +735,7 @@ void valkeyProcessCallbacks(valkeyAsyncContext *ac) {
         valkeyAsyncDisconnectInternal(ac);
 }
 
-static void valkeyAsyncHandleConnectFailure(valkeyAsyncContext *ac) {
+void valkeyAsyncHandleConnectFailure(valkeyAsyncContext *ac) {
     valkeyRunConnectCallback(ac, VALKEY_ERR);
     valkeyAsyncDisconnectInternal(ac);
 }
@@ -695,6 +765,10 @@ static int valkeyAsyncHandleConnect(valkeyAsyncContext *ac) {
          * to disconnect.  For that reason, permit the function
          * to delete the context here after callback return.
          */
+        if (ac->connect_timer) {
+            valkeyTimerDel(ac->timer_list, ac->connect_timer);
+            ac->connect_timer = NULL;
+        }
         c->flags |= VALKEY_CONNECTED;
         valkeyRunConnectCallback(ac, VALKEY_OK);
         if ((ac->c.flags & VALKEY_DISCONNECTING)) {
@@ -777,32 +851,69 @@ void valkeyAsyncHandleWrite(valkeyAsyncContext *ac) {
     c->funcs->async_write(ac);
 }
 
-void valkeyAsyncHandleTimeout(valkeyAsyncContext *ac) {
+/* Add a timer and notify the adapter if rescheduling is needed. */
+valkeyTimer *valkeyAsyncAddTimer(valkeyAsyncContext *ac, struct timeval timeout,
+                                 valkeyTimerProc proc, void *privdata) {
+    if (ac->timer_list == NULL) {
+        ac->timer_list = vk_malloc(sizeof(valkeyTimerList));
+        if (ac->timer_list == NULL)
+            return NULL;
+        valkeyTimerListInit(ac->timer_list);
+    }
+    valkeyTimerList *list = ac->timer_list;
+    valkeyTimer *old_head = list->head;
+    valkeyTimer *t = valkeyTimerAdd(list, timeout, proc, privdata);
+    if (t == NULL)
+        return NULL;
+
+    /* New timer has the earliest deadline, tell the adapter to wake sooner. */
+    if (list->head != old_head && ac->ev.scheduleTimer)
+        ac->ev.scheduleTimer(ac->ev.data, timeout);
+
+    return t;
+}
+
+#define VALKEY_TIMER_ISSET(tvp) \
+    (tvp && ((tvp)->tv_sec || (tvp)->tv_usec))
+
+/* Timer callback for connect timeout. */
+static void valkeyAsyncConnectTimeoutCallback(void *privdata) {
+    valkeyAsyncContext *ac = (valkeyAsyncContext *)privdata;
+    valkeyContext *c = &(ac->c);
+
+    ac->connect_timer = NULL;
+
+    if (c->flags & VALKEY_CONNECTED)
+        return; /* Connect completed before timer fired, ignore. */
+
+    if (!c->err) {
+        valkeySetError(c, VALKEY_ERR_TIMEOUT, "Timeout");
+        valkeyAsyncCopyError(ac);
+    }
+
+    valkeyRunConnectCallback(ac, VALKEY_ERR);
+    valkeyAsyncDisconnectInternal(ac);
+}
+
+/* Timer callback for command timeout. */
+static void valkeyAsyncCommandTimeoutCallback(void *privdata) {
+    valkeyAsyncContext *ac = (valkeyAsyncContext *)privdata;
     valkeyContext *c = &(ac->c);
     valkeyCallback cb;
-    /* must not be called from a callback */
-    assert(!(c->flags & VALKEY_IN_CALLBACK));
 
-    if ((c->flags & VALKEY_CONNECTED)) {
-        if (ac->replies.head == NULL && ac->sub.replies.head == NULL) {
-            /* Nothing to do - just an idle timeout */
-            ac->timeout_reply_count = VALKEY_TIMEOUT_INACTIVE;
-            return;
-        }
+    ac->command_timer = NULL;
 
-        if (!ac->c.command_timeout ||
-            (!ac->c.command_timeout->tv_sec && !ac->c.command_timeout->tv_usec)) {
-            /* A belated connect timeout arriving, ignore */
-            return;
-        }
+    if (ac->replies.head == NULL && ac->sub.replies.head == NULL) {
+        /* Nothing to do - just an idle timeout */
+        return;
+    }
 
-        /* If replies were received since the timer started, the server is
-         * alive. Restart the timer rather than timing out. */
-        if (ac->timeout_reply_count > 0) {
-            ac->timeout_reply_count = VALKEY_TIMEOUT_INACTIVE;
-            refreshTimeout(ac);
-            return;
-        }
+    /* If replies were received since the timer started, the server is
+     * alive. Restart the timer rather than timing out. */
+    if (ac->timeout_reply_count > 0) {
+        ac->timeout_reply_count = 0;
+        refreshTimeout(ac);
+        return;
     }
 
     if (!c->err) {
@@ -810,19 +921,54 @@ void valkeyAsyncHandleTimeout(valkeyAsyncContext *ac) {
         valkeyAsyncCopyError(ac);
     }
 
-    if (!(c->flags & VALKEY_CONNECTED)) {
-        valkeyRunConnectCallback(ac, VALKEY_ERR);
-    }
-
     while (valkeyShiftCallback(&ac->replies, &cb) == VALKEY_OK) {
         valkeyRunCallback(ac, &cb, NULL);
     }
 
-    /**
-     * TODO: Don't automatically sever the connection,
-     * rather, allow to ignore <x> responses before the queue is clear
-     */
     valkeyAsyncDisconnectInternal(ac);
+}
+
+void refreshTimeout(valkeyAsyncContext *ac) {
+    if (ac->c.flags & VALKEY_CONNECTED) {
+        struct timeval *tvp = ac->c.command_timeout;
+        if (!VALKEY_TIMER_ISSET(tvp))
+            return;
+
+        /* Don't reset the timer if already active, prevents the timeout from
+         * never firing when commands are written continuously. */
+        if (ac->command_timer != NULL)
+            return;
+
+        ac->command_timer = valkeyAsyncAddTimer(ac, *tvp,
+                                                valkeyAsyncCommandTimeoutCallback, ac);
+        ac->timeout_reply_count = 0;
+    } else {
+        struct timeval *tvp = ac->c.connect_timeout;
+        if (!VALKEY_TIMER_ISSET(tvp))
+            return;
+
+        if (ac->connect_timer != NULL)
+            return;
+
+        ac->connect_timer = valkeyAsyncAddTimer(ac, *tvp,
+                                                valkeyAsyncConnectTimeoutCallback, ac);
+    }
+}
+
+/* Called by adapters when the scheduled timer expires. Dispatches internal
+ * timers and reschedules the adapter if more timers are pending. */
+void valkeyAsyncHandleTimeout(valkeyAsyncContext *ac) {
+    valkeyContext *c = &(ac->c);
+    struct timeval remaining;
+    /* must not be called from a callback */
+    assert(!(c->flags & VALKEY_IN_CALLBACK));
+
+    /* Process internal timers. */
+    if (ac->timer_list == NULL)
+        return;
+    struct timeval *tv = valkeyProcessTimers(ac->timer_list, &remaining);
+    if (tv && ac->ev.scheduleTimer)
+        ac->ev.scheduleTimer(ac->ev.data, *tv);
 }
 
 static inline int vk_isdigit_ascii(char c) {

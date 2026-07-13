@@ -1952,6 +1952,100 @@ void test_async_command_parsing(struct config config) {
     valkeyAsyncFree(ac);
 }
 
+static void async_ping_cb(valkeyAsyncContext *ac, void *reply, void *privdata) {
+    int *count = (int *)privdata;
+    valkeyReply *r = reply;
+    assert(r != NULL && r->type == VALKEY_REPLY_STATUS);
+    assert(strcmp(r->str, "PONG") == 0);
+    (*count)++;
+    if (*count == 2) {
+        valkeyAsyncDisconnect(ac);
+        event_base_loopbreak(base);
+    }
+}
+
+static void test_async_connect_with_attach_in_options(struct config config) {
+    test("Async connect with adapter in options (deferred connect): ");
+    base = event_base_new();
+    struct event *timeout = evtimer_new(base, timeout_cb, NULL);
+    struct timeval timeout_tv = {.tv_sec = 3};
+    evtimer_add(timeout, &timeout_tv);
+
+    valkeyOptions options = get_server_tcp_options(config);
+    options.attach_fn = valkeyLibeventAttachAdapter;
+    options.attach_data = base;
+    valkeyAsyncContext *ac = valkeyAsyncConnectWithOptions(&options);
+    assert(ac != NULL && ac->err == 0);
+
+    int count = 0;
+    valkeyAsyncCommand(ac, async_ping_cb, &count, "PING");
+    valkeyAsyncCommand(ac, async_ping_cb, &count, "PING");
+    event_base_dispatch(base);
+
+    event_free(timeout);
+    event_base_free(base);
+    test_cond(count == 2);
+}
+
+static void test_async_connect_with_attach_in_options_dns_fail(void) {
+    test("Async connect with adapter in options (DNS failure): ");
+    struct event_base *b = event_base_new();
+    valkeyOptions options = {0};
+    VALKEY_OPTIONS_SET_TCP(&options, "this.host.does.not.exist.invalid", 6379);
+    options.attach_fn = valkeyLibeventAttachAdapter;
+    options.attach_data = b;
+    valkeyAsyncContext *ac = valkeyAsyncConnectWithOptions(&options);
+    assert(ac != NULL);
+    test_cond(ac->err != 0);
+    valkeyAsyncFree(ac);
+    event_base_free(b);
+}
+
+static void test_async_connect_unix(struct config config) {
+    test("Async Unix connect: ");
+    base = event_base_new();
+    struct event *timeout = evtimer_new(base, timeout_cb, NULL);
+    struct timeval timeout_tv = {.tv_sec = 3};
+    evtimer_add(timeout, &timeout_tv);
+
+    valkeyAsyncContext *ac = valkeyAsyncConnectUnix(config.unix_sock.path);
+    assert(ac != NULL && ac->err == 0);
+    valkeyLibeventAttach(ac, base);
+
+    int count = 0;
+    valkeyAsyncCommand(ac, async_ping_cb, &count, "PING");
+    valkeyAsyncCommand(ac, async_ping_cb, &count, "PING");
+    event_base_dispatch(base);
+
+    event_free(timeout);
+    event_base_free(base);
+    test_cond(count == 2);
+}
+
+static void test_async_connect_unix_with_attach_in_options(struct config config) {
+    test("Async Unix connect with adapter in options: ");
+    base = event_base_new();
+    struct event *timeout = evtimer_new(base, timeout_cb, NULL);
+    struct timeval timeout_tv = {.tv_sec = 3};
+    evtimer_add(timeout, &timeout_tv);
+
+    valkeyOptions options = {0};
+    VALKEY_OPTIONS_SET_UNIX(&options, config.unix_sock.path);
+    options.attach_fn = valkeyLibeventAttachAdapter;
+    options.attach_data = base;
+    valkeyAsyncContext *ac = valkeyAsyncConnectWithOptions(&options);
+    assert(ac != NULL && ac->err == 0);
+
+    int count = 0;
+    valkeyAsyncCommand(ac, async_ping_cb, &count, "PING");
+    valkeyAsyncCommand(ac, async_ping_cb, &count, "PING");
+    event_base_dispatch(base);
+
+    event_free(timeout);
+    event_base_free(base);
+    test_cond(count == 2);
+}
+
 static void test_pubsub_handling(struct config config) {
     test("Subscribe, handle published message and unsubscribe: ");
     /* Setup event dispatcher with a testcase timeout */
@@ -2997,6 +3091,8 @@ int main(int argc, char **argv) {
     disconnect(c, 0);
 
     test_async_command_parsing(cfg);
+    test_async_connect_with_attach_in_options(cfg);
+    test_async_connect_with_attach_in_options_dns_fail();
     test_pubsub_handling(cfg);
     test_pubsub_multiple_channels(cfg);
     test_monitor(cfg);
@@ -3027,6 +3123,13 @@ int main(int argc, char **argv) {
         test_command_timeout_during_pubsub(cfg);
     }
 #endif /* IPPROTO_MPTCP */
+
+    if (test_unix_socket) {
+        printf("\nTesting asynchronous API against Unix socket (%s):\n", cfg.unix_sock.path);
+        cfg.type = CONN_UNIX;
+        test_async_connect_unix(cfg);
+        test_async_connect_unix_with_attach_in_options(cfg);
+    }
 
 #endif /* VALKEY_TEST_ASYNC */
 

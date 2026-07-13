@@ -27,41 +27,46 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef VALKEY_DNS_H
-#define VALKEY_DNS_H
+#ifndef VALKEY_TIMER_H
+#define VALKEY_TIMER_H
 
-#include "sockcompat.h"
-#include "valkey.h"
-
-/* Resolve hostname synchronously. Returns 0 on success.
- * On failure returns a getaddrinfo error code; the caller can use
- * gai_strerror() to get the error message.
- * The caller must free the result with valkeyFreeAddrInfo().
- * flags: context flags (VALKEY_PREFER_IPV4, VALKEY_PREFER_IPV6).
- * timeout_ms: DNS resolution timeout in milliseconds (used with c-ares). */
-int valkeyResolveSync(const char *host, int port, int flags,
-                      long timeout_ms, struct addrinfo **result);
-
-/* Free addrinfo returned by valkeyResolveSync. Safe to call on either
- * freeaddrinfo-compatible or c-ares-allocated results. */
-#ifdef VALKEY_USE_CARES
-void valkeyFreeAddrInfo(struct addrinfo *ai);
-
-struct valkeyAsyncContext;
-
-/* Initiate async DNS resolution. Returns VALKEY_OK if the query was started
- * (completion is via the event loop), or VALKEY_ERR on immediate failure.
- * When DNS completes, the connect flow continues on the event loop. */
-int valkeyResolveAsyncStart(struct valkeyAsyncContext *ac, const char *host, int port);
-
-/* Called by the adapter when a c-ares fd is readable/writable. */
-void valkeyResolveAsyncHandleEvent(struct valkeyAsyncContext *ac, int fd, int readable, int writable);
-
-/* Free async DNS state. Called during context cleanup. */
-void valkeyResolveAsyncFree(struct valkeyAsyncContext *ac);
-
+#ifndef _MSC_VER
+#include <sys/time.h>
 #else
-#define valkeyFreeAddrInfo(ai) freeaddrinfo(ai)
+#include <stdint.h>
+#include <winsock2.h>
 #endif
 
-#endif /* VALKEY_DNS_H */
+#define VALKEY_MAX_TIMERS 4
+
+typedef void (*valkeyTimerProc)(void *privdata);
+
+typedef struct valkeyTimer {
+    struct timeval deadline;
+    valkeyTimerProc proc; /* NULL = slot is free */
+    void *privdata;
+    struct valkeyTimer *next; /* sorted active list link */
+} valkeyTimer;
+
+typedef struct valkeyTimerList {
+    valkeyTimer timers[VALKEY_MAX_TIMERS];
+    valkeyTimer *head;
+} valkeyTimerList;
+
+/* Initialize a timer list (all slots free). */
+void valkeyTimerListInit(valkeyTimerList *list);
+
+/* Activate a timer. Returns handle or NULL if pool exhausted. */
+valkeyTimer *valkeyTimerAdd(valkeyTimerList *list, struct timeval timeout,
+                            valkeyTimerProc proc, void *privdata);
+
+/* Deactivate a timer. */
+void valkeyTimerDel(valkeyTimerList *list, valkeyTimer *timer);
+
+/* Process expired timers. Returns time until next deadline, or NULL if none. */
+struct timeval *valkeyProcessTimers(valkeyTimerList *list, struct timeval *remaining);
+
+/* Deactivate all timers. */
+void valkeyTimerListFree(valkeyTimerList *list);
+
+#endif /* VALKEY_TIMER_H */

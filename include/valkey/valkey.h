@@ -103,6 +103,9 @@ typedef SSIZE_T ssize_t;
 /* Flag specific to use Multipath TCP (MPTCP) */
 #define VALKEY_MPTCP 0x2000
 
+/* Flag indicating connect is deferred (endpoint info stored, connect later). */
+#define VALKEY_CONNECT_DEFERRED 0x4000
+
 #define VALKEY_KEEPALIVE_INTERVAL 15 /* seconds */
 
 /* number of times we retry to connect in the case of EADDRNOTAVAIL and
@@ -226,6 +229,19 @@ typedef struct {
     /* A user defined PUSH message callback */
     valkeyPushFn *push_cb;
     valkeyAsyncPushFn *async_push_cb;
+
+    /* Optional event-loop adapter. When set, valkeyAsyncConnectWithOptions
+     * attaches the adapter automatically. */
+    int (*attach_fn)(struct valkeyAsyncContext *ac, void *attach_data);
+    void *attach_data;
+
+    /* Optional async connect/disconnect callbacks. When set,
+     * valkeyAsyncConnectWithOptions registers them on the context before the
+     * connect is initiated, so no connect event can be missed even when the
+     * event loop is already running. Equivalent to calling
+     * valkeyAsyncSetConnectCallback / valkeyAsyncSetDisconnectCallback. */
+    void (*async_connect_callback)(struct valkeyAsyncContext *ac, int status);
+    void (*async_disconnect_callback)(const struct valkeyAsyncContext *ac, int status);
 } valkeyOptions;
 
 /**
