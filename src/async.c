@@ -104,6 +104,7 @@ static dictType callbackDict = {
 static valkeyAsyncContext *valkeyAsyncInitialize(valkeyContext *c) {
     valkeyAsyncContext *ac;
     dict *channels = NULL, *patterns = NULL, *schannels = NULL;
+    valkeyTimerList *timer_list = NULL;
 
     channels = dictCreate(&callbackDict);
     if (channels == NULL)
@@ -116,6 +117,11 @@ static valkeyAsyncContext *valkeyAsyncInitialize(valkeyContext *c) {
     schannels = dictCreate(&callbackDict);
     if (schannels == NULL)
         goto oom;
+
+    timer_list = vk_malloc(sizeof(*timer_list));
+    if (timer_list == NULL)
+        goto oom;
+    valkeyTimerListInit(timer_list);
 
     ac = vk_realloc(c, sizeof(valkeyAsyncContext));
     if (ac == NULL)
@@ -153,7 +159,7 @@ static valkeyAsyncContext *valkeyAsyncInitialize(valkeyContext *c) {
     ac->sub.schannels = schannels;
     ac->sub.pending_unsubs = 0;
 
-    ac->timer_list = NULL;
+    ac->timer_list = timer_list;
     ac->connect_timer = NULL;
     ac->command_timer = NULL;
     ac->timeout_reply_count = 0;
@@ -163,6 +169,7 @@ oom:
     dictRelease(channels);
     dictRelease(patterns);
     dictRelease(schannels);
+    vk_free(timer_list);
     return NULL;
 }
 
@@ -795,12 +802,6 @@ void valkeyAsyncHandleWrite(valkeyAsyncContext *ac) {
 /* Add a timer and notify the adapter if rescheduling is needed. */
 valkeyTimer *valkeyAsyncAddTimer(valkeyAsyncContext *ac, struct timeval timeout,
                                  valkeyTimerProc proc, void *privdata) {
-    if (ac->timer_list == NULL) {
-        ac->timer_list = vk_malloc(sizeof(valkeyTimerList));
-        if (ac->timer_list == NULL)
-            return NULL;
-        valkeyTimerListInit(ac->timer_list);
-    }
     valkeyTimerList *list = ac->timer_list;
     valkeyTimer *old_head = list->head;
     valkeyTimer *t = valkeyTimerAdd(list, timeout, proc, privdata);
@@ -909,8 +910,6 @@ void valkeyAsyncHandleTimeout(valkeyAsyncContext *ac) {
     (void)c;
 
     /* Process internal timers. */
-    if (ac->timer_list == NULL)
-        return;
     struct timeval *tv = valkeyProcessTimers(ac->timer_list, &remaining);
     if (tv && ac->ev.scheduleTimer)
         ac->ev.scheduleTimer(ac->ev.data, *tv);
