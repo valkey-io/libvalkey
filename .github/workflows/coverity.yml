@@ -12,7 +12,7 @@ jobs:
     if: github.repository == 'valkey-io/libvalkey'
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
     - name: Install dependencies
       uses: awalsh128/cache-apt-pkgs-action@553a35bb8ebd9fcabcb1c9451aa4c98e1b4ca8a9 # v1.6.3
       with:
@@ -23,7 +23,7 @@ jobs:
         mkdir build; cd build
         cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo -DENABLE_TLS=ON ..
     - name: Build, scan and report
-      uses: vapier/coverity-scan-action@2068473c7bdf8c2fb984a6a40ae76ee7facd7a85 # v1.8.0
+      uses: vapier/coverity-scan-action@1b6fd4eaba6651aa354c9ea7f48caa1710b4e12e # v1.9.0
       with:
         project: libvalkey
         token: ${{ secrets.COVERITY_TOKEN }}
