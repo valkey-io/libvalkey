@@ -47,6 +47,7 @@
 #include <limits.h>
 #include <poll.h>
 #include <pthread.h>
+#include <stdint.h>
 #include <time.h>
 
 /* Default DNS timeout when no connect_timeout is set (5 seconds). */
@@ -62,10 +63,10 @@ static void valkeyCaresLibraryInit(void) {
     ares_library_init(ARES_LIB_INIT_NONE);
 }
 
-static long valkeyDnsPollMillis(void) {
+static uint64_t valkeyDnsPollMillis(void) {
     struct timespec now;
     clock_gettime(CLOCK_MONOTONIC, &now);
-    return (now.tv_sec * 1000) + now.tv_nsec / 1000000;
+    return ((uint64_t)now.tv_sec * 1000) + now.tv_nsec / 1000000;
 }
 
 /* Callback state for synchronous ares_getaddrinfo. */
@@ -189,19 +190,20 @@ static int caresStatusToEai(int status) {
     }
 }
 
-/* Drive c-ares poll loop until res->done or deadline exceeded. */
+/* Drive c-ares poll loop until res->done or timeout_ms has elapsed since
+ * start.  timeout_ms is in (0, INT_MAX). */
 static void caresPollLoop(ares_channel_t *channel, struct caresSockState *st,
-                          struct caresResult *res, long deadline) {
+                          struct caresResult *res, uint64_t start, long timeout_ms) {
     while (!res->done) {
         if (st->nfds == 0)
             break;
 
-        long now = valkeyDnsPollMillis();
-        long remaining = deadline - now;
-        if (remaining <= 0) {
+        uint64_t elapsed = valkeyDnsPollMillis() - start;
+        if (elapsed >= (uint64_t)timeout_ms) {
             ares_cancel(channel);
             break;
         }
+        long remaining = timeout_ms - (long)elapsed;
 
         struct timeval maxtv, tv;
         maxtv.tv_sec = remaining / 1000;
@@ -272,8 +274,8 @@ static int valkeyResolveCares(const char *host, int port, int flags,
 
     ares_getaddrinfo(channel, host, portstr, &hints, caresCallback, &res);
 
-    long deadline = valkeyDnsPollMillis() + effective_timeout;
-    caresPollLoop(channel, &sockstate, &res, deadline);
+    uint64_t start = valkeyDnsPollMillis();
+    caresPollLoop(channel, &sockstate, &res, start, effective_timeout);
 
     rv = EAI_FAIL;
     if (res.done && res.status == ARES_SUCCESS && res.ai) {
@@ -295,8 +297,8 @@ static int valkeyResolveCares(const char *host, int port, int flags,
         res.status = 0;
 
         ares_getaddrinfo(channel, host, portstr, &hints, caresCallback, &res);
-        deadline = valkeyDnsPollMillis() + effective_timeout;
-        caresPollLoop(channel, &sockstate, &res, deadline);
+        start = valkeyDnsPollMillis();
+        caresPollLoop(channel, &sockstate, &res, start, effective_timeout);
 
         if (res.done && res.status == ARES_SUCCESS && res.ai) {
             if (caresAddrInfoToAddrInfo(res.ai, result) == 0)

@@ -32,6 +32,8 @@
 #include "sockcompat.h"
 
 #ifdef _WIN32
+#include <stdint.h>
+
 static int _wsaErrorToErrno(int err) {
     switch (err) {
     case WSAEWOULDBLOCK:
@@ -230,7 +232,7 @@ int win32_getsockopt(SOCKET sockfd, int level, int optname, void *optval, sockle
             socklen_t dwlen = 0;
             ret = getsockopt(sockfd, level, optname, (char *)&timeout, &dwlen);
             tv->tv_sec = timeout / 1000;
-            tv->tv_usec = (timeout * 1000) % 1000000;
+            tv->tv_usec = (timeout % 1000) * 1000;
         } else {
             ret = WSAEFAULT;
         }
@@ -254,8 +256,19 @@ int win32_setsockopt(SOCKET sockfd, int level, int optname, const void *optval, 
     int ret = 0;
     if ((level == SOL_SOCKET) && ((optname == SO_RCVTIMEO) || (optname == SO_SNDTIMEO))) {
         const struct timeval *tv = optval;
-        DWORD timeout = tv->tv_sec * 1000 + tv->tv_usec / 1000;
-        ret = setsockopt(sockfd, level, optname, (const char *)&timeout, sizeof(DWORD));
+        DWORD timeout;
+        uint64_t timeout_msec;
+        if (tv->tv_sec < 0 || tv->tv_usec < 0 || tv->tv_usec > 1000000) {
+            errno = EINVAL;
+            return -1;
+        }
+        timeout_msec = (uint64_t)tv->tv_sec * 1000 + (uint64_t)tv->tv_usec / 1000;
+        if (timeout_msec > MAXDWORD) {
+            errno = EINVAL;
+            return -1;
+        }
+        timeout = timeout_msec;
+        ret = setsockopt(sockfd, level, optname, (const char *)&timeout, sizeof(timeout));
     } else {
         ret = setsockopt(sockfd, level, optname, (const char *)optval, optlen);
     }

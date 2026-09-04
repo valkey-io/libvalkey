@@ -242,21 +242,19 @@ int valkeyContextSetTcpUserTimeout(valkeyContext *c, unsigned int timeout) {
     return VALKEY_OK;
 }
 
-static long valkeyPollMillis(void) {
-#ifndef _MSC_VER
+static uint64_t valkeyPollMillis(void) {
+#ifndef _WIN32
     struct timespec now;
     clock_gettime(CLOCK_MONOTONIC, &now);
-    return (now.tv_sec * 1000) + now.tv_nsec / 1000000;
+    return ((uint64_t)now.tv_sec * 1000) + now.tv_nsec / 1000000;
 #else
-    FILETIME ft;
-    GetSystemTimeAsFileTime(&ft);
-    return (((long long)ft.dwHighDateTime << 32) | ft.dwLowDateTime) / 10;
+    return GetTickCount64();
 #endif
 }
 
 static int valkeyContextWaitReady(valkeyContext *c, long msec) {
     struct pollfd wfd;
-    long end;
+    uint64_t start;
     int res;
 
     if (errno != EINPROGRESS) {
@@ -267,14 +265,15 @@ static int valkeyContextWaitReady(valkeyContext *c, long msec) {
 
     wfd.fd = c->fd;
     wfd.events = POLLOUT;
-    end = msec >= 0 ? valkeyPollMillis() + msec : 0;
+    start = msec >= 0 ? valkeyPollMillis() : 0;
 
     while ((res = poll(&wfd, 1, msec)) <= 0) {
         if (res < 0 && errno != EINTR) {
             valkeySetErrorFromErrno(c, VALKEY_ERR_IO, "poll(2)");
             valkeyNetClose(c);
             return VALKEY_ERR;
-        } else if (res == 0 || (msec >= 0 && valkeyPollMillis() >= end)) {
+        } else if (res == 0 ||
+                   (msec >= 0 && valkeyPollMillis() - start >= (uint64_t)msec)) {
             errno = ETIMEDOUT;
             valkeySetErrorFromErrno(c, VALKEY_ERR_IO, NULL);
             valkeyNetClose(c);

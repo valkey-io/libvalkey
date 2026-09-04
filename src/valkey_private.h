@@ -52,7 +52,8 @@ static inline int valkeyContextTimeoutMsec(const struct timeval *timeout, long *
 
     /* Only use timeout when not NULL. */
     if (timeout != NULL) {
-        if (timeout->tv_usec > 1000000 || timeout->tv_sec > max_msec) {
+        if (timeout->tv_sec < 0 || timeout->tv_sec > max_msec || timeout->tv_usec < 0 ||
+            timeout->tv_usec >= 1000000) {
             *result = msec;
             return VALKEY_ERR;
         }
