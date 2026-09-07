@@ -259,11 +259,13 @@ int win32_setsockopt(SOCKET sockfd, int level, int optname, const void *optval, 
         DWORD timeout;
         uint64_t timeout_msec;
         if (tv->tv_sec < 0 || tv->tv_usec < 0 || tv->tv_usec >= 1000000) {
+            WSASetLastError(WSAEINVAL);
             errno = EINVAL;
             return -1;
         }
         timeout_msec = (uint64_t)tv->tv_sec * 1000 + (uint64_t)tv->tv_usec / 1000;
         if (timeout_msec > MAXDWORD) {
+            WSASetLastError(WSAEINVAL);
             errno = EINVAL;
             return -1;
         }
