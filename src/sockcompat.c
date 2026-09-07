@@ -258,7 +258,7 @@ int win32_setsockopt(SOCKET sockfd, int level, int optname, const void *optval, 
         const struct timeval *tv = optval;
         DWORD timeout;
         uint64_t timeout_msec;
-        if (tv->tv_sec < 0 || tv->tv_usec < 0 || tv->tv_usec > 1000000) {
+        if (tv->tv_sec < 0 || tv->tv_usec < 0 || tv->tv_usec >= 1000000) {
             errno = EINVAL;
             return -1;
         }
