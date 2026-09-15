@@ -68,7 +68,7 @@
 #define VALKEY_READER_MAX_BUF (1024 * 16)
 
 /* Default multi-bulk element limit */
-#define VALKEY_READER_MAX_ARRAY_ELEMENTS ((1LL << 32) - 1)
+#define VALKEY_READER_MAX_ARRAY_ELEMENTS (1LL << 26)
 
 /* Default maximum depth of nested aggregate replies. */
 #define VALKEY_READER_MAX_REPLY_DEPTH 1024

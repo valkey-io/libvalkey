@@ -236,7 +236,9 @@ context->reader->maxbuf = 0;
 
 #### Maximum array elements
 
-By default, libvalkey will refuse to parse array-like replies if they have more than 2^32-1 or 4,294,967,295 elements. This value can be set to any arbitrary 64-bit value or zero which just means "no limit".
+By default, libvalkey will refuse to parse array-like replies if they have more than 2^26 or 67,108,864 elements. For maps and attributes, this limit counts key-value pairs. This value can be increased for larger replies or set to zero to disable the configured limit; size and overflow checks still apply.
+
+The default reply builder initially allocates space for at most 1,024 element pointers per aggregate, then doubles the vector as elements arrive, up to the declared size. While a reply is incomplete, its `elements` field counts allocated slots; once complete, it contains the declared element count (twice the pair count for maps and attributes).
 
 ```c
 context->reader->maxelements = 0;
