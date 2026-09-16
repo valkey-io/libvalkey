@@ -498,7 +498,7 @@ static int valkeyGetSubscribeCallback(valkeyAsyncContext *ac, valkeyReply *reply
      * The type and number of elements (3 to 4) are specified at:
      * https://valkey.io/docs/topics/pubsub/#format-of-pushed-messages */
     if ((reply->type == VALKEY_REPLY_ARRAY && !(c->flags & VALKEY_SUPPORTS_PUSH) && reply->elements >= 3) ||
-        reply->type == VALKEY_REPLY_PUSH) {
+        (reply->type == VALKEY_REPLY_PUSH && reply->elements >= 3)) {
         assert(reply->element[0]->type == VALKEY_REPLY_STRING);
         stype = reply->element[0]->str;
         pvariant = (tolower(stype[0]) == 'p') ? 1 : 0;
@@ -570,8 +570,10 @@ static int valkeyIsSubscribeReply(valkeyReply *reply) {
     char *str;
     size_t len, off;
 
-    /* We will always have at least one string with the subscribe/message type */
-    if (reply->elements < 1 || reply->element[0]->type != VALKEY_REPLY_STRING ||
+    /* A subscribe reply (RESP2 ARRAY or RESP3 PUSH) has at least three elements,
+     * the first being a string with the subscribe/message type:
+     * https://valkey.io/docs/topics/pubsub/#format-of-pushed-messages */
+    if (reply->elements < 3 || reply->element[0]->type != VALKEY_REPLY_STRING ||
         reply->element[0]->len < sizeof("message") - 1) {
         return 0;
     }
@@ -961,7 +963,8 @@ void valkeySsubscribeCallback(struct valkeyAsyncContext *ac, void *reply, void *
             sdsfree(sname);
         }
     } else {
-        if ((r->type == VALKEY_REPLY_ARRAY || r->type == VALKEY_REPLY_PUSH) && strncasecmp(r->element[0]->str, "ssubscribe", 10) == 0) {
+        if ((r->type == VALKEY_REPLY_ARRAY || r->type == VALKEY_REPLY_PUSH) && r->elements >= 1 &&
+            r->element[0]->type == VALKEY_REPLY_STRING && strncasecmp(r->element[0]->str, "ssubscribe", 10) == 0) {
             p = nextArgument(data->command, data->len, &cstr, &clen);
             while ((p = nextArgument(p, data->len - (p - data->command), &astr, &alen)) != NULL || astr != NULL) {
                 sname = sdsnewlen(astr, alen);
