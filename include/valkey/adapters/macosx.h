@@ -114,16 +114,6 @@ static int valkeyMacOSAttach(valkeyAsyncContext *valkeyAsyncCtx, CFRunLoopRef ru
     if (valkeyRunLoop == NULL)
         return VALKEY_ERR;
 
-    /* Setup valkey stuff */
-    valkeyRunLoop->context = valkeyAsyncCtx;
-
-    valkeyAsyncCtx->ev.addRead = valkeyMacOSAddRead;
-    valkeyAsyncCtx->ev.delRead = valkeyMacOSDelRead;
-    valkeyAsyncCtx->ev.addWrite = valkeyMacOSAddWrite;
-    valkeyAsyncCtx->ev.delWrite = valkeyMacOSDelWrite;
-    valkeyAsyncCtx->ev.cleanup = valkeyMacOSCleanup;
-    valkeyAsyncCtx->ev.data = valkeyRunLoop;
-
     /* Initialize and install read/write events */
     CFSocketContext socketCtx = {0, valkeyAsyncCtx, NULL, NULL, NULL};
 
@@ -137,6 +127,16 @@ static int valkeyMacOSAttach(valkeyAsyncContext *valkeyAsyncCtx, CFRunLoopRef ru
     valkeyRunLoop->sourceRef = CFSocketCreateRunLoopSource(NULL, valkeyRunLoop->socketRef, 0);
     if (!valkeyRunLoop->sourceRef)
         return freeValkeyRunLoop(valkeyRunLoop);
+
+    /* Install hooks only after initialization succeeds. */
+    valkeyRunLoop->context = valkeyAsyncCtx;
+
+    valkeyAsyncCtx->ev.addRead = valkeyMacOSAddRead;
+    valkeyAsyncCtx->ev.delRead = valkeyMacOSDelRead;
+    valkeyAsyncCtx->ev.addWrite = valkeyMacOSAddWrite;
+    valkeyAsyncCtx->ev.delWrite = valkeyMacOSDelWrite;
+    valkeyAsyncCtx->ev.cleanup = valkeyMacOSCleanup;
+    valkeyAsyncCtx->ev.data = valkeyRunLoop;
 
     CFRunLoopAddSource(runLoop, valkeyRunLoop->sourceRef, kCFRunLoopDefaultMode);
 
