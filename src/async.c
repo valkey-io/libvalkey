@@ -522,7 +522,8 @@ static int valkeyGetSubscribeCallback(valkeyAsyncContext *ac, valkeyReply *reply
 
         /* If this is a subscribe reply decrease pending counter. */
         if (strcasecmp(stype + pvariant + svariant, "subscribe") == 0) {
-            assert(cb != NULL);
+            if (cb == NULL)
+                goto unknown_callback;
             cb->pending_subs -= 1;
             cb->subscribed = 1;
         } else if (strcasecmp(stype + pvariant + svariant, "unsubscribe") == 0) {
@@ -557,6 +558,11 @@ static int valkeyGetSubscribeCallback(valkeyAsyncContext *ac, valkeyReply *reply
         valkeyShiftCallback(&ac->sub.replies, dstcb);
     }
     return VALKEY_OK;
+unknown_callback:
+    sdsfree(sname);
+    valkeySetError(c, VALKEY_ERR_PROTOCOL, "Subscribe reply for an unknown subscription");
+    valkeyAsyncCopyError(ac);
+    return VALKEY_ERR;
 oom:
     valkeySetError(&(ac->c), VALKEY_ERR_OOM, "Out of memory");
     valkeyAsyncCopyError(ac);
