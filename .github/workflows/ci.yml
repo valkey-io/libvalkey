@@ -53,7 +53,9 @@ jobs:
       CC: ${{ matrix.compiler }}
     steps:
     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-    - name: Prepare
+    - name: Refresh apt index
+      run: sudo apt-get update
+    - name: Install dependencies
       uses: awalsh128/cache-apt-pkgs-action@553a35bb8ebd9fcabcb1c9451aa4c98e1b4ca8a9 # v1.6.3
       with:
         packages: libevent-dev libuv1-dev libev-dev libglib2.0-dev valkey-server
@@ -108,7 +110,9 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Prepare
+      - name: Refresh apt index
+        run: sudo apt-get update
+      - name: Install dependencies
         uses: awalsh128/cache-apt-pkgs-action@553a35bb8ebd9fcabcb1c9451aa4c98e1b4ca8a9 # v1.6.3
         with:
           packages: libevent-dev valgrind valkey-server
@@ -134,7 +138,9 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Prepare
+      - name: Refresh apt index
+        run: sudo apt-get update
+      - name: Install dependencies
         uses: awalsh128/cache-apt-pkgs-action@553a35bb8ebd9fcabcb1c9451aa4c98e1b4ca8a9 # v1.6.3
         with:
           packages: gcc-multilib valkey-server
@@ -152,7 +158,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-    - name: Prepare
+    - name: Refresh apt index
+      run: sudo apt-get update
+    - name: Install dependencies
       uses: awalsh128/cache-apt-pkgs-action@553a35bb8ebd9fcabcb1c9451aa4c98e1b4ca8a9 # v1.6.3
       with:
         packages: libevent-dev libuv1-dev libev-dev libglib2.0-dev
@@ -198,7 +206,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Prepare
+      - name: Refresh apt index
+        run: sudo apt-get update
+      - name: Install dependencies
         uses: awalsh128/cache-apt-pkgs-action@553a35bb8ebd9fcabcb1c9451aa4c98e1b4ca8a9 # v1.6.3
         with:
           packages: librdmacm-dev libibverbs-dev
@@ -226,7 +236,9 @@ jobs:
         sanitizer: ['', 'thread', 'undefined', 'leak', 'address']
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Prepare
+      - name: Refresh apt index
+        run: sudo apt-get update
+      - name: Install dependencies
         uses: awalsh128/cache-apt-pkgs-action@553a35bb8ebd9fcabcb1c9451aa4c98e1b4ca8a9 # v1.6.3
         with:
           packages: libc-ares-dev libevent-dev valkey-server
