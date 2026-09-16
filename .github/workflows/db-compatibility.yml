@@ -17,7 +17,9 @@ jobs:
           - valkey-version: '8.0.2'
           - valkey-version: '7.2.8'
     steps:
-      - name: Prepare
+      - name: Refresh apt index
+        run: sudo apt-get update
+      - name: Install dependencies
         uses: awalsh128/cache-apt-pkgs-action@553a35bb8ebd9fcabcb1c9451aa4c98e1b4ca8a9 # v1.6.3
         with:
           packages: libevent-dev
@@ -65,7 +67,9 @@ jobs:
           - redis-version: '7.0.15'
           - redis-version: '6.2.14'
     steps:
-      - name: Prepare
+      - name: Refresh apt index
+        run: sudo apt-get update
+      - name: Install dependencies
         uses: awalsh128/cache-apt-pkgs-action@553a35bb8ebd9fcabcb1c9451aa4c98e1b4ca8a9 # v1.6.3
         with:
           packages: libevent-dev
