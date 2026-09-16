@@ -376,7 +376,25 @@ static int valkeyTLSConnect(valkeyContext *c, SSL *ssl) {
 
     ERR_clear_error();
 
+    /* Apply connect_timeout to the TLS handshake. */
+    if ((c->flags & VALKEY_BLOCK) && c->connect_timeout != NULL &&
+        c->funcs && c->funcs->set_timeout) {
+        c->funcs->set_timeout(c, *c->connect_timeout);
+    }
+
     int rv = SSL_connect(rssl->ssl);
+
+    /* Restore the command_timeout. */
+    if ((c->flags & VALKEY_BLOCK) && c->connect_timeout != NULL &&
+        c->funcs && c->funcs->set_timeout) {
+        if (c->command_timeout != NULL) {
+            c->funcs->set_timeout(c, *c->command_timeout);
+        } else {
+            struct timeval tv_zero = {0, 0};
+            c->funcs->set_timeout(c, tv_zero);
+        }
+    }
+
     if (rv == 1) {
         c->funcs = &valkeyContextTLSFuncs;
         c->privctx = rssl;
