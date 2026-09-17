@@ -497,9 +497,9 @@ static int valkeyGetSubscribeCallback(valkeyAsyncContext *ac, valkeyReply *reply
     /* Match reply with the expected format of a pushed message.
      * The type and number of elements (3 to 4) are specified at:
      * https://valkey.io/docs/topics/pubsub/#format-of-pushed-messages */
-    if ((reply->type == VALKEY_REPLY_ARRAY && !(c->flags & VALKEY_SUPPORTS_PUSH) && reply->elements >= 3) ||
-        (reply->type == VALKEY_REPLY_PUSH && reply->elements >= 3)) {
-        assert(reply->element[0]->type == VALKEY_REPLY_STRING);
+    if ((reply->type == VALKEY_REPLY_PUSH ||
+         (reply->type == VALKEY_REPLY_ARRAY && !(c->flags & VALKEY_SUPPORTS_PUSH))) &&
+        reply->elements >= 3 && reply->element[0]->type == VALKEY_REPLY_STRING) {
         stype = reply->element[0]->str;
         pvariant = (tolower(stype[0]) == 'p') ? 1 : 0;
         svariant = valkeyIsShardedVariant(stype);
@@ -527,14 +527,14 @@ static int valkeyGetSubscribeCallback(valkeyAsyncContext *ac, valkeyReply *reply
             cb->pending_subs -= 1;
             cb->subscribed = 1;
         } else if (strcasecmp(stype + pvariant + svariant, "unsubscribe") == 0) {
+            /* The third element is the number of remaining subscriptions. */
+            if (reply->element[2]->type != VALKEY_REPLY_INTEGER)
+                goto malformed_reply;
+
             if (cb == NULL)
                 ac->sub.pending_unsubs -= 1;
             else if (cb->pending_subs == 0)
                 dictDelete(callbacks, sname);
-
-            /* If this was the last unsubscribe message, revert to
-             * non-subscribe mode. */
-            assert(reply->element[2]->type == VALKEY_REPLY_INTEGER);
 
             /* Unset subscribed flag only when no pipelined pending subscribe
              * or pending unsubscribe replies. */
@@ -561,6 +561,11 @@ static int valkeyGetSubscribeCallback(valkeyAsyncContext *ac, valkeyReply *reply
 unknown_callback:
     sdsfree(sname);
     valkeySetError(c, VALKEY_ERR_PROTOCOL, "Subscribe reply for an unknown subscription");
+    valkeyAsyncCopyError(ac);
+    return VALKEY_ERR;
+malformed_reply:
+    sdsfree(sname);
+    valkeySetError(c, VALKEY_ERR_PROTOCOL, "Malformed unsubscribe reply");
     valkeyAsyncCopyError(ac);
     return VALKEY_ERR;
 oom:
