@@ -287,7 +287,7 @@ valkeyTLSContext *valkeyCreateTLSContextWithOptions(valkeyTLSOptions *options, v
 
     if (capath || cacert_filename) {
 #ifdef _WIN32
-        if (0 == strcmp(cacert_filename, "wincert")) {
+        if (cacert_filename && 0 == strcmp(cacert_filename, "wincert")) {
             win_store = CertOpenSystemStore(NULL, "Root");
             if (!win_store) {
                 if (error)
