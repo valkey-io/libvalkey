@@ -561,8 +561,13 @@ static int connRdmaHandleRecv(valkeyContext *c, RdmaContext *ctx, struct rdma_cm
     return rdmaPostRecv(ctx, cm_id, cmd);
 }
 
-static int connRdmaHandleRecvImm(RdmaContext *ctx, struct rdma_cm_id *cm_id, valkeyRdmaCmd *cmd, uint32_t byte_len) {
-    assert(byte_len + ctx->rx_offset <= ctx->recv_length);
+static int connRdmaHandleRecvImm(valkeyContext *c, RdmaContext *ctx, struct rdma_cm_id *cm_id,
+                                 valkeyRdmaCmd *cmd, uint32_t byte_len) {
+    if (byte_len > ctx->recv_length - ctx->rx_offset) {
+        valkeySetError(c, VALKEY_ERR_OTHER, "RDMA: FATAL error, recv length out of bounds");
+        return VALKEY_ERR;
+    }
+
     ctx->rx_offset += byte_len;
 
     return rdmaPostRecv(ctx, cm_id, cmd);
@@ -630,7 +635,7 @@ pollcq:
 
     case IBV_WC_RECV_RDMA_WITH_IMM:
         cmd = (valkeyRdmaCmd *)(uintptr_t)wc.wr_id;
-        if (connRdmaHandleRecvImm(ctx, cm_id, cmd, ntohl(wc.imm_data)) == VALKEY_ERR) {
+        if (connRdmaHandleRecvImm(c, ctx, cm_id, cmd, ntohl(wc.imm_data)) == VALKEY_ERR) {
             return VALKEY_ERR;
         }
 
