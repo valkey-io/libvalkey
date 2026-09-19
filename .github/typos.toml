@@ -8,6 +8,7 @@ extend-exclude = [
 # Source files
 [type.c.extend-identifiers]
 clen = "clen"
+msg_controllen = "msg_controllen"
 [type.c.extend-words]
 cpy = "cpy"
 fo = "fo" # Used in sds.c testcase.

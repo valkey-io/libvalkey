@@ -55,6 +55,28 @@
 #include <sys/types.h>
 #include <time.h>
 
+#ifdef __linux__
+/* Some kernels queue transient ICMP errors even without IP_RECVERR. These
+ * keep reporting readiness until drained, including after connect succeeds. */
+static void valkeyDrainSocketErrorQueue(valkeyFD fd) {
+    int prev_errno = errno;
+
+    for (;;) {
+        char buf[1];
+        struct iovec iov = {.iov_base = buf, .iov_len = sizeof(buf)};
+        struct msghdr msg = {.msg_iov = &iov, .msg_iovlen = 1};
+
+        if (recvmsg(fd, &msg, MSG_ERRQUEUE | MSG_DONTWAIT) >= 0)
+            continue;
+        if (errno == EINTR)
+            continue;
+        break;
+    }
+
+    errno = prev_errno;
+}
+#endif
+
 void valkeyNetClose(valkeyContext *c) {
     if (c && c->fd != VALKEY_INVALID_FD) {
         close(c->fd);
@@ -293,10 +315,8 @@ static int valkeyContextWaitReady(valkeyContext *c, long msec) {
 
 int valkeyCheckConnectDone(valkeyContext *c, int *completed) {
     int rc = connect(c->fd, (const struct sockaddr *)c->saddr, c->addrlen);
-    if (rc == 0) {
-        *completed = 1;
-        return VALKEY_OK;
-    }
+    if (rc == 0)
+        goto connected;
     int error = errno;
     if (error == EINPROGRESS) {
         /* must check error to see if connect failed.  Get the socket error */
@@ -306,8 +326,7 @@ int valkeyCheckConnectDone(valkeyContext *c, int *completed) {
         if (fail == 0) {
             if (so_error == 0) {
                 /* Socket is connected! */
-                *completed = 1;
-                return VALKEY_OK;
+                goto connected;
             }
             /* connection error; */
             errno = so_error;
@@ -316,15 +335,23 @@ int valkeyCheckConnectDone(valkeyContext *c, int *completed) {
     }
     switch (error) {
     case EISCONN:
-        *completed = 1;
-        return VALKEY_OK;
+        goto connected;
     case EALREADY:
     case EWOULDBLOCK:
         *completed = 0;
-        return VALKEY_OK;
+        goto done;
     default:
         return VALKEY_ERR;
     }
+
+connected:
+    *completed = 1;
+done:
+#ifdef __linux__
+    if (c->connection_type == VALKEY_CONN_TCP)
+        valkeyDrainSocketErrorQueue(c->fd);
+#endif
+    return VALKEY_OK;
 }
 
 int valkeyCheckSocketError(valkeyContext *c) {
