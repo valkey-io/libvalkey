@@ -97,6 +97,11 @@ target_include_directories(ut_slotmap_update PRIVATE "${PROJECT_SOURCE_DIR}/src"
 target_link_libraries(ut_slotmap_update valkey_unittest)
 add_test(NAME ut_slotmap_update COMMAND "$<TARGET_FILE:ut_slotmap_update>")
 
+add_executable(ut_timer ut_timer.c)
+target_include_directories(ut_timer PRIVATE "${PROJECT_SOURCE_DIR}/src")
+target_link_libraries(ut_timer valkey_unittest)
+add_test(NAME ut_timer COMMAND "$<TARGET_FILE:ut_timer>")
+
 if(NOT WIN32 AND NOT CYGWIN AND NOT ENABLE_CARES)
   add_executable(ut_connect_fallback ut_connect_fallback.c)
   target_compile_options(ut_connect_fallback PRIVATE -Wno-pedantic)
