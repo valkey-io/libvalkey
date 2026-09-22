@@ -417,14 +417,14 @@ static int processBulkItem(valkeyReader *r) {
     void *obj = NULL;
     char *p, *s;
     long long len;
-    unsigned long bytelen;
+    size_t bytelen, itemlen;
     int success = 0;
 
     p = r->buf + r->pos;
     s = seekNewline(p, r->len - r->pos);
     if (s != NULL) {
         p = r->buf + r->pos;
-        bytelen = s - (r->buf + r->pos) + 2; /* include \r\n */
+        bytelen = (size_t)(s - p) + 2; /* include \r\n */
 
         if (string2ll(p, bytelen - 2, &len) == VALKEY_ERR) {
             valkeyReaderSetError(r, VALKEY_ERR_PROTOCOL,
@@ -444,11 +444,19 @@ static int processBulkItem(valkeyReader *r) {
                 obj = r->fn->createNil(cur);
             else
                 obj = (void *)VALKEY_REPLY_NIL;
+            itemlen = bytelen;
             success = 1;
         } else {
+            /* Protect against overflow when computing itemlen. */
+            if ((size_t)len > SIZE_MAX - bytelen - 2) {
+                valkeyReaderSetError(r, VALKEY_ERR_PROTOCOL,
+                                     "Bulk string length out of range");
+                return VALKEY_ERR;
+            }
+            itemlen = bytelen + (size_t)len + 2;
+
             /* Only continue when the buffer contains the entire bulk item. */
-            bytelen += len + 2; /* include \r\n */
-            if (r->pos + bytelen <= r->len) {
+            if (itemlen <= SIZE_MAX - r->pos && r->pos + itemlen <= r->len) {
                 if ((cur->type == VALKEY_REPLY_VERB && len < 4) ||
                     (cur->type == VALKEY_REPLY_VERB && s[5] != ':')) {
                     valkeyReaderSetError(r, VALKEY_ERR_PROTOCOL,
@@ -471,7 +479,7 @@ static int processBulkItem(valkeyReader *r) {
                 return VALKEY_ERR;
             }
 
-            r->pos += bytelen;
+            r->pos += itemlen;
 
             /* Set reply if this is the root object. */
             if (r->ridx == 0)
@@ -516,6 +524,12 @@ static int processAggregateItem(valkeyReader *r) {
     char *p;
     long long elements;
     int root = 0, len;
+
+    if (r->maxdepth > 0 && r->ridx >= r->maxdepth) {
+        valkeyReaderSetError(r, VALKEY_ERR_PROTOCOL,
+                             "Max nesting depth exceeded");
+        return VALKEY_ERR;
+    }
 
     if (r->ridx == r->tasks - 1) {
         if (valkeyReaderGrow(r) == VALKEY_ERR)
@@ -713,6 +727,7 @@ valkeyReader *valkeyReaderCreateWithFunctions(valkeyReplyObjectFunctions *fn) {
     r->fn = fn;
     r->maxbuf = VALKEY_READER_MAX_BUF;
     r->maxelements = VALKEY_READER_MAX_ARRAY_ELEMENTS;
+    r->maxdepth = VALKEY_READER_MAX_REPLY_DEPTH;
     r->ridx = -1;
 
     return r;

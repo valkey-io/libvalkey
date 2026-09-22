@@ -39,14 +39,18 @@ int main(int argc, char **argv) {
     signal(SIGPIPE, SIG_IGN);
 #endif
 
-    valkeyAsyncContext *c = valkeyAsyncConnect("127.0.0.1", 6379);
+    valkeyOptions options = {0};
+    VALKEY_OPTIONS_SET_TCP(&options, "127.0.0.1", 6379);
+    options.attach_fn = valkeyLibevAttachAdapter;
+    options.attach_data = EV_DEFAULT;
+
+    valkeyAsyncContext *c = valkeyAsyncConnectWithOptions(&options);
     if (c->err) {
         /* Let *c leak for now... */
         printf("Error: %s\n", c->errstr);
         return 1;
     }
 
-    valkeyLibevAttach(EV_DEFAULT_ c);
     valkeyAsyncSetConnectCallback(c, connectCallback);
     valkeyAsyncSetDisconnectCallback(c, disconnectCallback);
     valkeyAsyncCommand(

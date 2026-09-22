@@ -168,8 +168,19 @@ static int valkeyLibeventAttach(valkeyAsyncContext *ac, struct event_base *base)
         return VALKEY_ERR;
 
     e->context = ac;
+    e->base = base;
 
-    /* Register functions to start/stop listening for events */
+    /* Create the read/write event. On failure nothing has been stored in
+     * ac->ev, so freeing e here cannot leave a dangling cleanup hook. */
+    e->ev = event_new(base, c->fd, EV_READ | EV_WRITE, valkeyLibeventHandler, e);
+    if (e->ev == NULL) {
+        valkeyLibeventDestroy(e);
+        return VALKEY_ERR;
+    }
+
+    /* Install hooks only after all fallible setup succeeds. ac->ev.cleanup
+     * runs valkeyLibeventCleanup(ac->ev.data) on teardown, so ac->ev.data
+     * must not be set while e is only partially initialized. */
     ac->ev.addRead = valkeyLibeventAddRead;
     ac->ev.delRead = valkeyLibeventDelRead;
     ac->ev.addWrite = valkeyLibeventAddWrite;
@@ -178,9 +189,6 @@ static int valkeyLibeventAttach(valkeyAsyncContext *ac, struct event_base *base)
     ac->ev.scheduleTimer = valkeyLibeventSetTimeout;
     ac->ev.data = e;
 
-    /* Initialize and install read/write events */
-    e->ev = event_new(base, c->fd, EV_READ | EV_WRITE, valkeyLibeventHandler, e);
-    e->base = base;
     return VALKEY_OK;
 }
 

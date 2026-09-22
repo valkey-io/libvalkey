@@ -47,6 +47,9 @@
 #include <stdlib.h>
 #include <string.h>
 
+/* Maximum number of element pointers allocated from an aggregate header alone. */
+#define VALKEY_REPLY_INITIAL_ELEMENTS 1024
+
 static valkeyReply *createReplyObject(int type);
 static void *createStringObject(const valkeyReadTask *task, char *str, size_t len);
 static void *createArrayObject(const valkeyReadTask *task, size_t elements);
@@ -113,8 +116,54 @@ void freeReplyObject(void *reply) {
     vk_free(r);
 }
 
+/* Attach a child to its parent aggregate, growing the parent's element vector
+ * on demand. While an aggregate is being parsed, parent->elements holds the
+ * allocated capacity (not the declared count) and unused slots are zeroed, so
+ * freeReplyObject() can safely walk a partially built reply. The capacity is
+ * doubled until the declared count is reached, so a complete aggregate always
+ * has elements == declared count and no excess capacity. */
+static int attachReplyObject(const valkeyReadTask *task, valkeyReply *r) {
+    valkeyReply *parent;
+    size_t idx, capacity, total;
+
+    if (task->parent == NULL)
+        return VALKEY_OK;
+
+    parent = task->parent->obj;
+    assert(parent->type == VALKEY_REPLY_ARRAY ||
+           parent->type == VALKEY_REPLY_MAP ||
+           parent->type == VALKEY_REPLY_ATTR ||
+           parent->type == VALKEY_REPLY_SET ||
+           parent->type == VALKEY_REPLY_PUSH);
+    assert(task->idx >= 0 && (size_t)task->idx <= parent->elements);
+
+    idx = task->idx;
+    capacity = parent->elements;
+
+    if (idx == capacity) {
+        valkeyReply **element;
+
+        /* task->parent->elements is the declared element count. Clamp before
+         * doubling: createArrayObject() already verified that a vector of
+         * `total` pointers is representable, so neither expression overflows. */
+        total = task->parent->elements;
+        capacity = capacity > total / 2 ? total : capacity * 2;
+
+        element = vk_realloc(parent->element, capacity * sizeof(*element));
+        if (element == NULL)
+            return VALKEY_ERR;
+
+        memset(element + idx, 0, (capacity - idx) * sizeof(*element));
+        parent->element = element;
+        parent->elements = capacity;
+    }
+
+    parent->element[idx] = r;
+    return VALKEY_OK;
+}
+
 static void *createStringObject(const valkeyReadTask *task, char *str, size_t len) {
-    valkeyReply *r, *parent;
+    valkeyReply *r;
     char *buf;
 
     r = createReplyObject(task->type);
@@ -149,15 +198,8 @@ static void *createStringObject(const valkeyReadTask *task, char *str, size_t le
     }
     r->str = buf;
 
-    if (task->parent) {
-        parent = task->parent->obj;
-        assert(parent->type == VALKEY_REPLY_ARRAY ||
-               parent->type == VALKEY_REPLY_MAP ||
-               parent->type == VALKEY_REPLY_ATTR ||
-               parent->type == VALKEY_REPLY_SET ||
-               parent->type == VALKEY_REPLY_PUSH);
-        parent->element[task->idx] = r;
-    }
+    if (attachReplyObject(task, r) != VALKEY_OK)
+        goto oom;
     return r;
 
 oom:
@@ -166,36 +208,40 @@ oom:
 }
 
 static void *createArrayObject(const valkeyReadTask *task, size_t elements) {
-    valkeyReply *r, *parent;
+    valkeyReply *r;
+    size_t capacity;
+
+    /* The element vector is allocated lazily (see attachReplyObject()), so a
+     * huge declared count costs nothing up front. Still reject counts whose
+     * full vector could never be represented, so later growth cannot overflow. */
+    if (elements > SIZE_MAX / sizeof(valkeyReply *))
+        return NULL;
+
+    capacity = elements > VALKEY_REPLY_INITIAL_ELEMENTS ? VALKEY_REPLY_INITIAL_ELEMENTS : elements;
 
     r = createReplyObject(task->type);
     if (r == NULL)
         return NULL;
 
-    if (elements > 0) {
-        r->element = vk_calloc(elements, sizeof(valkeyReply *));
+    if (capacity > 0) {
+        r->element = vk_calloc(capacity, sizeof(valkeyReply *));
         if (r->element == NULL) {
             freeReplyObject(r);
             return NULL;
         }
     }
 
-    r->elements = elements;
+    r->elements = capacity;
 
-    if (task->parent) {
-        parent = task->parent->obj;
-        assert(parent->type == VALKEY_REPLY_ARRAY ||
-               parent->type == VALKEY_REPLY_MAP ||
-               parent->type == VALKEY_REPLY_ATTR ||
-               parent->type == VALKEY_REPLY_SET ||
-               parent->type == VALKEY_REPLY_PUSH);
-        parent->element[task->idx] = r;
+    if (attachReplyObject(task, r) != VALKEY_OK) {
+        freeReplyObject(r);
+        return NULL;
     }
     return r;
 }
 
 static void *createIntegerObject(const valkeyReadTask *task, long long value) {
-    valkeyReply *r, *parent;
+    valkeyReply *r;
 
     r = createReplyObject(VALKEY_REPLY_INTEGER);
     if (r == NULL)
@@ -203,20 +249,15 @@ static void *createIntegerObject(const valkeyReadTask *task, long long value) {
 
     r->integer = value;
 
-    if (task->parent) {
-        parent = task->parent->obj;
-        assert(parent->type == VALKEY_REPLY_ARRAY ||
-               parent->type == VALKEY_REPLY_MAP ||
-               parent->type == VALKEY_REPLY_ATTR ||
-               parent->type == VALKEY_REPLY_SET ||
-               parent->type == VALKEY_REPLY_PUSH);
-        parent->element[task->idx] = r;
+    if (attachReplyObject(task, r) != VALKEY_OK) {
+        freeReplyObject(r);
+        return NULL;
     }
     return r;
 }
 
 static void *createDoubleObject(const valkeyReadTask *task, double value, char *str, size_t len) {
-    valkeyReply *r, *parent;
+    valkeyReply *r;
 
     if (len == SIZE_MAX) // Prevents vk_malloc(0) if len equals SIZE_MAX
         return NULL;
@@ -241,39 +282,29 @@ static void *createDoubleObject(const valkeyReadTask *task, double value, char *
     r->str[len] = '\0';
     r->len = len;
 
-    if (task->parent) {
-        parent = task->parent->obj;
-        assert(parent->type == VALKEY_REPLY_ARRAY ||
-               parent->type == VALKEY_REPLY_MAP ||
-               parent->type == VALKEY_REPLY_ATTR ||
-               parent->type == VALKEY_REPLY_SET ||
-               parent->type == VALKEY_REPLY_PUSH);
-        parent->element[task->idx] = r;
+    if (attachReplyObject(task, r) != VALKEY_OK) {
+        freeReplyObject(r);
+        return NULL;
     }
     return r;
 }
 
 static void *createNilObject(const valkeyReadTask *task) {
-    valkeyReply *r, *parent;
+    valkeyReply *r;
 
     r = createReplyObject(VALKEY_REPLY_NIL);
     if (r == NULL)
         return NULL;
 
-    if (task->parent) {
-        parent = task->parent->obj;
-        assert(parent->type == VALKEY_REPLY_ARRAY ||
-               parent->type == VALKEY_REPLY_MAP ||
-               parent->type == VALKEY_REPLY_ATTR ||
-               parent->type == VALKEY_REPLY_SET ||
-               parent->type == VALKEY_REPLY_PUSH);
-        parent->element[task->idx] = r;
+    if (attachReplyObject(task, r) != VALKEY_OK) {
+        freeReplyObject(r);
+        return NULL;
     }
     return r;
 }
 
 static void *createBoolObject(const valkeyReadTask *task, int bval) {
-    valkeyReply *r, *parent;
+    valkeyReply *r;
 
     r = createReplyObject(VALKEY_REPLY_BOOL);
     if (r == NULL)
@@ -281,14 +312,9 @@ static void *createBoolObject(const valkeyReadTask *task, int bval) {
 
     r->integer = bval != 0;
 
-    if (task->parent) {
-        parent = task->parent->obj;
-        assert(parent->type == VALKEY_REPLY_ARRAY ||
-               parent->type == VALKEY_REPLY_MAP ||
-               parent->type == VALKEY_REPLY_ATTR ||
-               parent->type == VALKEY_REPLY_SET ||
-               parent->type == VALKEY_REPLY_PUSH);
-        parent->element[task->idx] = r;
+    if (attachReplyObject(task, r) != VALKEY_OK) {
+        freeReplyObject(r);
+        return NULL;
     }
     return r;
 }
@@ -893,6 +919,9 @@ valkeyContext *valkeyConnectWithOptions(const valkeyOptions *options) {
         valkeySetError(c, VALKEY_ERR_OOM, "Out of memory");
         return c;
     }
+
+    if (options->attach_fn && options->type == VALKEY_CONN_TCP)
+        c->flags |= VALKEY_CONNECT_DEFERRED;
 
     c->funcs->connect(c, options);
     if (c->err == 0 && c->fd != VALKEY_INVALID_FD &&

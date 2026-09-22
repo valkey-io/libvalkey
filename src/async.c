@@ -205,9 +205,32 @@ valkeyAsyncContext *valkeyAsyncConnectWithOptions(const valkeyOptions *options) 
         valkeyFree(c);
         return NULL;
     }
+    c = &ac->c; /* c was reallocated by valkeyAsyncInitialize */
 
     /* Set any configured async push handler */
     valkeyAsyncSetPushCallback(ac, myOptions.async_push_cb);
+
+    /* Attach adapter and initiate connect if adapter was provided. */
+    if (myOptions.attach_fn) {
+        if (c->flags & VALKEY_CONNECT_DEFERRED) {
+            c->flags &= ~VALKEY_CONNECT_DEFERRED;
+            c->funcs->connect(c, &myOptions);
+            if (c->err) {
+                valkeyAsyncCopyError(ac);
+                return ac;
+            }
+            /* Non-blocking connect in progress, let the event loop
+             * complete it via valkeyAsyncHandleConnect. */
+            c->flags &= ~VALKEY_CONNECTED;
+        }
+
+        if (myOptions.attach_fn(ac, myOptions.attach_data) != VALKEY_OK) {
+            valkeySetError(c, VALKEY_ERR_OTHER, "Failed to attach event adapter");
+            valkeyAsyncCopyError(ac);
+            return ac;
+        }
+        _EL_ADD_WRITE(ac);
+    }
 
     valkeyAsyncCopyError(ac);
     return ac;
@@ -492,9 +515,9 @@ static int valkeyGetSubscribeCallback(valkeyAsyncContext *ac, valkeyReply *reply
     /* Match reply with the expected format of a pushed message.
      * The type and number of elements (3 to 4) are specified at:
      * https://valkey.io/docs/topics/pubsub/#format-of-pushed-messages */
-    if ((reply->type == VALKEY_REPLY_ARRAY && !(c->flags & VALKEY_SUPPORTS_PUSH) && reply->elements >= 3) ||
-        reply->type == VALKEY_REPLY_PUSH) {
-        assert(reply->element[0]->type == VALKEY_REPLY_STRING);
+    if ((reply->type == VALKEY_REPLY_PUSH ||
+         (reply->type == VALKEY_REPLY_ARRAY && !(c->flags & VALKEY_SUPPORTS_PUSH))) &&
+        reply->elements >= 3 && reply->element[0]->type == VALKEY_REPLY_STRING) {
         stype = reply->element[0]->str;
         pvariant = (tolower(stype[0]) == 'p') ? 1 : 0;
         svariant = valkeyIsShardedVariant(stype);
@@ -517,18 +540,19 @@ static int valkeyGetSubscribeCallback(valkeyAsyncContext *ac, valkeyReply *reply
 
         /* If this is a subscribe reply decrease pending counter. */
         if (strcasecmp(stype + pvariant + svariant, "subscribe") == 0) {
-            assert(cb != NULL);
+            if (cb == NULL)
+                goto unknown_callback;
             cb->pending_subs -= 1;
             cb->subscribed = 1;
         } else if (strcasecmp(stype + pvariant + svariant, "unsubscribe") == 0) {
+            /* The third element is the number of remaining subscriptions. */
+            if (reply->element[2]->type != VALKEY_REPLY_INTEGER)
+                goto malformed_reply;
+
             if (cb == NULL)
                 ac->sub.pending_unsubs -= 1;
             else if (cb->pending_subs == 0)
                 dictDelete(callbacks, sname);
-
-            /* If this was the last unsubscribe message, revert to
-             * non-subscribe mode. */
-            assert(reply->element[2]->type == VALKEY_REPLY_INTEGER);
 
             /* Unset subscribed flag only when no pipelined pending subscribe
              * or pending unsubscribe replies. */
@@ -552,6 +576,16 @@ static int valkeyGetSubscribeCallback(valkeyAsyncContext *ac, valkeyReply *reply
         valkeyShiftCallback(&ac->sub.replies, dstcb);
     }
     return VALKEY_OK;
+unknown_callback:
+    sdsfree(sname);
+    valkeySetError(c, VALKEY_ERR_PROTOCOL, "Subscribe reply for an unknown subscription");
+    valkeyAsyncCopyError(ac);
+    return VALKEY_ERR;
+malformed_reply:
+    sdsfree(sname);
+    valkeySetError(c, VALKEY_ERR_PROTOCOL, "Malformed unsubscribe reply");
+    valkeyAsyncCopyError(ac);
+    return VALKEY_ERR;
 oom:
     valkeySetError(&(ac->c), VALKEY_ERR_OOM, "Out of memory");
     valkeyAsyncCopyError(ac);
@@ -565,8 +599,10 @@ static int valkeyIsSubscribeReply(valkeyReply *reply) {
     char *str;
     size_t len, off;
 
-    /* We will always have at least one string with the subscribe/message type */
-    if (reply->elements < 1 || reply->element[0]->type != VALKEY_REPLY_STRING ||
+    /* A subscribe reply (RESP2 ARRAY or RESP3 PUSH) has at least three elements,
+     * the first being a string with the subscribe/message type:
+     * https://valkey.io/docs/topics/pubsub/#format-of-pushed-messages */
+    if (reply->elements < 3 || reply->element[0]->type != VALKEY_REPLY_STRING ||
         reply->element[0]->len < sizeof("message") - 1) {
         return 0;
     }
@@ -1028,7 +1064,8 @@ void valkeySsubscribeCallback(struct valkeyAsyncContext *ac, void *reply, void *
             sdsfree(sname);
         }
     } else {
-        if ((r->type == VALKEY_REPLY_ARRAY || r->type == VALKEY_REPLY_PUSH) && strncasecmp(r->element[0]->str, "ssubscribe", 10) == 0) {
+        if ((r->type == VALKEY_REPLY_ARRAY || r->type == VALKEY_REPLY_PUSH) && r->elements >= 1 &&
+            r->element[0]->type == VALKEY_REPLY_STRING && strncasecmp(r->element[0]->str, "ssubscribe", 10) == 0) {
             p = nextArgument(data->command, data->len, &cstr, &clen);
             while ((p = nextArgument(p, data->len - (p - data->command), &astr, &alen)) != NULL || astr != NULL) {
                 sname = sdsnewlen(astr, alen);

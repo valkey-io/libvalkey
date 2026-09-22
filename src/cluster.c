@@ -909,7 +909,7 @@ static dict *parse_cluster_nodes(valkeyClusterContext *cc, valkeyContext *c, val
         line = lines;
         lines = p + 1; /* Start of next line. */
 
-        char *primary_id;
+        char *primary_id = NULL;
         valkeyClusterNode *node;
         if (parse_cluster_nodes_line(cc, c, line, &node, add_replicas ? &primary_id : NULL) != VALKEY_OK)
             goto error;

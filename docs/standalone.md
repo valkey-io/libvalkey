@@ -17,10 +17,12 @@ This document describes using `libvalkey` in standalone (non-cluster) mode, incl
   - [Reader configuration](#reader-configuration)
     - [Input buffer size](#maximum-input-buffer-size)
     - [Maximum array elements](#maximum-array-elements)
+    - [Maximum reply nesting depth](#maximum-reply-nesting-depth)
     - [RESP3 Push Replies](#resp3-push-replies)
     - [Allocator injection](#allocator-injection)
 - [Asynchronous API](#asynchronous-api)
   - [Connecting](#connecting-1)
+    - [Attaching an adapter via connection options](#attaching-an-adapter-via-connection-options)
   - [Executing commands](#executing-commands-1)
   - [Disconnecting/cleanup](#disconnecting-cleanup-1)
 - [TLS support](#tls-support)
@@ -234,10 +236,20 @@ context->reader->maxbuf = 0;
 
 #### Maximum array elements
 
-By default, libvalkey will refuse to parse array-like replies if they have more than 2^32-1 or 4,294,967,295 elements. This value can be set to any arbitrary 64-bit value or zero which just means "no limit".
+By default, libvalkey will refuse to parse array-like replies if they have more than 2^26 or 67,108,864 elements. For maps and attributes, this limit counts key-value pairs. This value can be increased for larger replies or set to zero to disable the configured limit; size and overflow checks still apply.
+
+The default reply builder initially allocates space for at most 1,024 element pointers per aggregate, then doubles the vector as elements arrive, up to the declared size. While a reply is incomplete, its `elements` field counts allocated slots; once complete, it contains the declared element count (twice the pair count for maps and attributes).
 
 ```c
 context->reader->maxelements = 0;
+```
+
+#### Maximum reply nesting depth
+
+By default, the libvalkey reply parser limits nested aggregate replies to a depth of `VALKEY_READER_MAX_REPLY_DEPTH` (currently 1024). If you need to process replies nested more deeply, you can increase the value or set it to zero, meaning unlimited.
+
+```c
+context->reader->maxdepth = 0;
 ```
 
 #### RESP3 Push Replies
@@ -329,6 +341,37 @@ The asynchronous context _should_ hold a connect callback function that is calle
 
 It _can_ also hold a disconnect callback function that is called when the connection is disconnected (either because of an error or per user request).
 The context object is always freed after the disconnect callback fired.
+
+#### Attaching an adapter via connection options
+
+The example above uses the two-step pattern: create the context, then attach an event-loop adapter separately.
+As an alternative, you can specify the adapter as part of the `valkeyOptions` using the `attach_fn` and `attach_data` fields.
+When set, `valkeyAsyncConnectWithOptions()` attaches the adapter and registers the file descriptor with the event loop for you, in a single call.
+
+```c
+valkeyOptions options = {0};
+VALKEY_OPTIONS_SET_TCP(&options, "localhost", 6379);
+
+// Specify the event-loop adapter as part of the options.
+options.attach_fn = valkeyLibevAttachAdapter;
+options.attach_data = EV_DEFAULT; // the default libev loop; or a `struct ev_loop *`
+
+valkeyAsyncContext *ac = valkeyAsyncConnectWithOptions(&options);
+if (ac == NULL || ac->err) {
+    fprintf(stderr, "Error: %s\n", ac ? ac->errstr : "OOM");
+    // ... handle error / cleanup ...
+}
+
+valkeySetConnectCallback(ac, my_connect_callback);
+valkeySetDisconnectCallback(ac, my_disconnect_callback);
+
+ev_run(EV_DEFAULT_ 0);
+```
+
+For TCP connections, the actual connect is deferred until after the context is fully initialized, so the adapter always receives a valid file descriptor and works without modification.
+Unix socket connections connect immediately.
+
+The legacy pattern of attaching the adapter after connecting (as shown in the example above) remains fully supported; the `attach_fn` field is optional.
 
 ### Executing commands
 

@@ -68,7 +68,10 @@
 #define VALKEY_READER_MAX_BUF (1024 * 16)
 
 /* Default multi-bulk element limit */
-#define VALKEY_READER_MAX_ARRAY_ELEMENTS ((1LL << 32) - 1)
+#define VALKEY_READER_MAX_ARRAY_ELEMENTS (1LL << 26)
+
+/* Default maximum depth of nested aggregate replies. */
+#define VALKEY_READER_MAX_REPLY_DEPTH 1024
 
 #ifdef __cplusplus
 extern "C" {
@@ -102,6 +105,7 @@ typedef struct valkeyReader {
     size_t len;            /* Buffer length */
     size_t maxbuf;         /* Max length of unused buffer */
     long long maxelements; /* Max multi-bulk elements */
+    int maxdepth;          /* Max nested aggregate reply depth */
 
     valkeyReadTask **task;
     int tasks;
