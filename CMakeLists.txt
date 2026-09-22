@@ -53,6 +53,7 @@ set(valkey_sources
     src/net.c
     src/read.c
     src/sockcompat.c
+    src/timer.c
     src/valkey.c
     src/vkutil.c)
 

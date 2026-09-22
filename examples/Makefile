@@ -16,6 +16,7 @@ endif
 # Define examples
 EXAMPLES=example-blocking example-blocking-push example-async-libevent \
 	 example-async-libev example-async-glib example-async-poll \
+	 example-async-disable-timeout \
 	 example-cluster-async example-cluster-clientside-caching-async \
 	 example-cluster-simple
 
@@ -69,6 +70,9 @@ example-async-macosx: async-macosx.c $(STLIBNAME)
 	$(CC) -o $@ $(CFLAGS) $< -framework CoreFoundation $(STLIBNAME)
 
 example-async-poll: async-poll.c $(STLIBNAME)
+	$(CC) -o $@ $(CFLAGS) $< $(STLIBNAME)
+
+example-async-disable-timeout: async-disable-timeout.c $(STLIBNAME)
 	$(CC) -o $@ $(CFLAGS) $< $(STLIBNAME)
 
 ifndef AE_DIR

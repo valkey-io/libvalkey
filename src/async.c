@@ -46,6 +46,7 @@
 #include "async_private.h"
 #include "dict.h"
 #include "net.h"
+#include "timer.h"
 #include "valkey_private.h"
 #include "vkutil.h"
 
@@ -103,6 +104,7 @@ static dictType callbackDict = {
 static valkeyAsyncContext *valkeyAsyncInitialize(valkeyContext *c) {
     valkeyAsyncContext *ac;
     dict *channels = NULL, *patterns = NULL, *schannels = NULL;
+    valkeyTimerList *timer_list = NULL;
 
     channels = dictCreate(&callbackDict);
     if (channels == NULL)
@@ -115,6 +117,11 @@ static valkeyAsyncContext *valkeyAsyncInitialize(valkeyContext *c) {
     schannels = dictCreate(&callbackDict);
     if (schannels == NULL)
         goto oom;
+
+    timer_list = vk_malloc(sizeof(*timer_list));
+    if (timer_list == NULL)
+        goto oom;
+    valkeyTimerListInit(timer_list);
 
     ac = vk_realloc(c, sizeof(valkeyAsyncContext));
     if (ac == NULL)
@@ -152,13 +159,17 @@ static valkeyAsyncContext *valkeyAsyncInitialize(valkeyContext *c) {
     ac->sub.schannels = schannels;
     ac->sub.pending_unsubs = 0;
 
-    ac->timeout_reply_count = VALKEY_TIMEOUT_INACTIVE;
+    ac->timer_list = timer_list;
+    ac->connect_timer = NULL;
+    ac->command_timer = NULL;
+    ac->timeout_reply_count = 0;
 
     return ac;
 oom:
     dictRelease(channels);
     dictRelease(patterns);
     dictRelease(schannels);
+    vk_free(timer_list);
     return NULL;
 }
 
@@ -400,6 +411,13 @@ static void valkeyAsyncFreeInternal(valkeyAsyncContext *ac) {
         dictRelease(ac->sub.schannels);
     }
 
+    /* Free internal timers. */
+    if (ac->timer_list) {
+        valkeyTimerListFree(ac->timer_list);
+        vk_free(ac->timer_list);
+        ac->timer_list = NULL;
+    }
+
     /* Signal event lib to clean up */
     _EL_CLEANUP(ac);
 
@@ -622,7 +640,7 @@ void valkeyProcessCallbacks(valkeyAsyncContext *ac) {
             c->flags |= VALKEY_SUPPORTS_PUSH;
 
         /* Any data from the server means it's alive. */
-        if (ac->timeout_reply_count != VALKEY_TIMEOUT_INACTIVE)
+        if (ac->command_timer != NULL)
             ac->timeout_reply_count++;
 
         /* Send any non-subscribe related PUSH messages to our PUSH handler
@@ -731,6 +749,10 @@ static int valkeyAsyncHandleConnect(valkeyAsyncContext *ac) {
          * to disconnect.  For that reason, permit the function
          * to delete the context here after callback return.
          */
+        if (ac->connect_timer) {
+            valkeyTimerDel(ac->timer_list, ac->connect_timer);
+            ac->connect_timer = NULL;
+        }
         c->flags |= VALKEY_CONNECTED;
         valkeyRunConnectCallback(ac, VALKEY_OK);
         if ((ac->c.flags & VALKEY_DISCONNECTING)) {
@@ -813,32 +835,66 @@ void valkeyAsyncHandleWrite(valkeyAsyncContext *ac) {
     c->funcs->async_write(ac);
 }
 
-void valkeyAsyncHandleTimeout(valkeyAsyncContext *ac) {
+/* Add a timer and notify the adapter if rescheduling is needed. */
+valkeyTimer *valkeyAsyncAddTimer(valkeyAsyncContext *ac, struct timeval timeout,
+                                 valkeyTimerProc proc, void *privdata) {
+    valkeyTimerList *list = ac->timer_list;
+    valkeyTimer *old_head = list->head;
+    valkeyTimer *t = valkeyTimerAdd(list, timeout, proc, privdata);
+    if (t == NULL)
+        return NULL;
+
+    /* New timer has the earliest deadline, tell the adapter to wake sooner. */
+    if (list->head != old_head && ac->ev.scheduleTimer)
+        ac->ev.scheduleTimer(ac->ev.data, timeout);
+
+    return t;
+}
+
+#define VALKEY_TIMER_ISSET(tvp) \
+    (tvp && ((tvp)->tv_sec || (tvp)->tv_usec))
+
+/* Timer callback for connect timeout. */
+static void valkeyAsyncConnectTimeoutCallback(void *privdata) {
+    valkeyAsyncContext *ac = (valkeyAsyncContext *)privdata;
+    valkeyContext *c = &(ac->c);
+
+    ac->connect_timer = NULL;
+
+    if (c->flags & VALKEY_CONNECTED)
+        return; /* Connect completed before timer fired, ignore. */
+
+    if (!c->err) {
+        valkeySetError(c, VALKEY_ERR_TIMEOUT, "Timeout");
+        valkeyAsyncCopyError(ac);
+    }
+
+    valkeyRunConnectCallback(ac, VALKEY_ERR);
+    valkeyAsyncDisconnectInternal(ac);
+}
+
+/* Timer callback for command timeout. */
+static void valkeyAsyncCommandTimeoutCallback(void *privdata) {
+    valkeyAsyncContext *ac = (valkeyAsyncContext *)privdata;
     valkeyContext *c = &(ac->c);
     valkeyCallback cb;
-    /* must not be called from a callback */
-    assert(!(c->flags & VALKEY_IN_CALLBACK));
 
-    if ((c->flags & VALKEY_CONNECTED)) {
-        if (ac->replies.head == NULL && ac->sub.replies.head == NULL) {
-            /* Nothing to do - just an idle timeout */
-            ac->timeout_reply_count = VALKEY_TIMEOUT_INACTIVE;
-            return;
-        }
+    ac->command_timer = NULL;
 
-        if (!ac->c.command_timeout ||
-            (!ac->c.command_timeout->tv_sec && !ac->c.command_timeout->tv_usec)) {
-            /* A belated connect timeout arriving, ignore */
-            return;
-        }
+    if (!VALKEY_TIMER_ISSET(ac->c.command_timeout))
+        return;
 
-        /* If replies were received since the timer started, the server is
-         * alive. Restart the timer rather than timing out. */
-        if (ac->timeout_reply_count > 0) {
-            ac->timeout_reply_count = VALKEY_TIMEOUT_INACTIVE;
-            refreshTimeout(ac);
-            return;
-        }
+    if (ac->replies.head == NULL && ac->sub.replies.head == NULL) {
+        /* Nothing to do - just an idle timeout */
+        return;
+    }
+
+    /* If replies were received since the timer started, the server is
+     * alive. Restart the timer rather than timing out. */
+    if (ac->timeout_reply_count > 0) {
+        ac->timeout_reply_count = 0;
+        refreshTimeout(ac);
+        return;
     }
 
     if (!c->err) {
@@ -846,19 +902,49 @@ void valkeyAsyncHandleTimeout(valkeyAsyncContext *ac) {
         valkeyAsyncCopyError(ac);
     }
 
-    if (!(c->flags & VALKEY_CONNECTED)) {
-        valkeyRunConnectCallback(ac, VALKEY_ERR);
-    }
-
     while (valkeyShiftCallback(&ac->replies, &cb) == VALKEY_OK) {
         valkeyRunCallback(ac, &cb, NULL);
     }
 
-    /**
-     * TODO: Don't automatically sever the connection,
-     * rather, allow to ignore <x> responses before the queue is clear
-     */
     valkeyAsyncDisconnectInternal(ac);
+}
+
+void refreshTimeout(valkeyAsyncContext *ac) {
+    if (ac->c.flags & VALKEY_CONNECTED) {
+        struct timeval *tvp = ac->c.command_timeout;
+        if (!VALKEY_TIMER_ISSET(tvp))
+            return;
+
+        /* Don't reset the timer if already active, prevents the timeout from
+         * never firing when commands are written continuously. */
+        if (ac->command_timer != NULL)
+            return;
+
+        ac->command_timer = valkeyAsyncAddTimer(ac, *tvp,
+                                                valkeyAsyncCommandTimeoutCallback, ac);
+        ac->timeout_reply_count = 0;
+    } else {
+        struct timeval *tvp = ac->c.connect_timeout;
+        if (!VALKEY_TIMER_ISSET(tvp))
+            return;
+
+        if (ac->connect_timer != NULL)
+            return;
+
+        ac->connect_timer = valkeyAsyncAddTimer(ac, *tvp,
+                                                valkeyAsyncConnectTimeoutCallback, ac);
+    }
+}
+
+/* Called by adapters when the scheduled timer expires. Dispatches one internal
+ * timer and reschedules the adapter if more timers are pending. */
+void valkeyAsyncHandleTimeout(valkeyAsyncContext *ac) {
+    valkeyContext *c = &(ac->c);
+    /* must not be called from a callback */
+    assert(!(c->flags & VALKEY_IN_CALLBACK));
+    (void)c;
+
+    valkeyProcessTimers(ac->timer_list, ac->ev.scheduleTimer, ac->ev.data);
 }
 
 static inline int vk_isdigit_ascii(char c) {
@@ -1256,6 +1342,12 @@ int valkeyAsyncSetTimeout(valkeyAsyncContext *ac, struct timeval tv) {
     if (tv.tv_sec != ac->c.command_timeout->tv_sec ||
         tv.tv_usec != ac->c.command_timeout->tv_usec) {
         *ac->c.command_timeout = tv;
+    }
+
+    if (tv.tv_sec == 0 && tv.tv_usec == 0 && ac->command_timer != NULL) {
+        valkeyTimerDel(ac->timer_list, ac->command_timer);
+        ac->command_timer = NULL;
+        ac->timeout_reply_count = 0;
     }
 
     return VALKEY_OK;
