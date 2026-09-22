@@ -63,8 +63,16 @@ valkeyTimer *valkeyTimerAdd(valkeyTimerList *list, struct timeval timeout,
 /* Deactivate a timer. */
 void valkeyTimerDel(valkeyTimerList *list, valkeyTimer *timer);
 
-/* Process expired timers. Returns time until next deadline, or NULL if none. */
-struct timeval *valkeyProcessTimers(valkeyTimerList *list, struct timeval *remaining);
+typedef void (*valkeyTimerRescheduleProc)(void *privdata, struct timeval tv);
+
+/* Dispatch at most one expired timer, then reschedule with the time until the
+ * next deadline. Nothing is rescheduled when no timer remains.
+ *
+ * This happens before the timer callback runs, since the callback is allowed to
+ * free the context that owns this list, and cannot signal whether it did so.
+ * Rescheduling afterwards would read freed memory. */
+void valkeyProcessTimers(valkeyTimerList *list, valkeyTimerRescheduleProc reschedule,
+                         void *rsdata);
 
 /* Deactivate all timers. */
 void valkeyTimerListFree(valkeyTimerList *list);

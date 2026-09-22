@@ -936,19 +936,15 @@ void refreshTimeout(valkeyAsyncContext *ac) {
     }
 }
 
-/* Called by adapters when the scheduled timer expires. Dispatches internal
- * timers and reschedules the adapter if more timers are pending. */
+/* Called by adapters when the scheduled timer expires. Dispatches one internal
+ * timer and reschedules the adapter if more timers are pending. */
 void valkeyAsyncHandleTimeout(valkeyAsyncContext *ac) {
     valkeyContext *c = &(ac->c);
-    struct timeval remaining;
     /* must not be called from a callback */
     assert(!(c->flags & VALKEY_IN_CALLBACK));
     (void)c;
 
-    /* Process internal timers. */
-    struct timeval *tv = valkeyProcessTimers(ac->timer_list, &remaining);
-    if (tv && ac->ev.scheduleTimer)
-        ac->ev.scheduleTimer(ac->ev.data, *tv);
+    valkeyProcessTimers(ac->timer_list, ac->ev.scheduleTimer, ac->ev.data);
 }
 
 static inline int vk_isdigit_ascii(char c) {

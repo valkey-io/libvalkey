@@ -126,7 +126,27 @@ void valkeyTimerDel(valkeyTimerList *list, valkeyTimer *timer) {
     timer->next = NULL;
 }
 
-struct timeval *valkeyProcessTimers(valkeyTimerList *list, struct timeval *remaining) {
+/* Reschedule with the time until the earliest deadline, so the adapter wakes up
+ * for it. Does nothing when no timer is active. */
+static void timerReschedule(valkeyTimerList *list, const struct timeval *now,
+                            valkeyTimerRescheduleProc reschedule, void *rsdata) {
+    struct timeval next;
+    long long diff_us;
+
+    if (reschedule == NULL || list->head == NULL)
+        return;
+
+    diff_us = tvdiff_us(&list->head->deadline, now);
+    if (diff_us < 1)
+        diff_us = 1; /* Adapters take an all-zero timeval as cancel the timer. */
+
+    next.tv_sec = (long)(diff_us / 1000000);
+    next.tv_usec = (long)(diff_us % 1000000);
+    reschedule(rsdata, next);
+}
+
+void valkeyProcessTimers(valkeyTimerList *list, valkeyTimerRescheduleProc reschedule,
+                         void *rsdata) {
     struct timeval now;
     valkeyTimerGetMonotonic(&now);
 
@@ -142,18 +162,15 @@ struct timeval *valkeyProcessTimers(valkeyTimerList *list, struct timeval *remai
 
         t->proc = NULL;
 
+        /* Reschedule before dispatching, while the list is still reachable. */
+        timerReschedule(list, &now, reschedule, rsdata);
+
         proc(privdata);
         /* Context may be freed here, caller must not access list. */
-        return NULL;
+        return;
     }
 
-    if (list->head == NULL)
-        return NULL;
-
-    long long diff_us = tvdiff_us(&list->head->deadline, &now);
-    remaining->tv_sec = (long)(diff_us / 1000000);
-    remaining->tv_usec = (long)(diff_us % 1000000);
-    return remaining;
+    timerReschedule(list, &now, reschedule, rsdata);
 }
 
 void valkeyTimerListFree(valkeyTimerList *list) {

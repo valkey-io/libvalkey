@@ -17,6 +17,14 @@
 
 static int fired_count;
 static void *fired_data;
+static int reschedule_count;
+static struct timeval reschedule_tv;
+
+static void test_reschedule_cb(void *privdata, struct timeval tv) {
+    (void)privdata;
+    reschedule_count++;
+    reschedule_tv = tv;
+}
 
 static void test_cb(void *privdata) {
     fired_count++;
@@ -37,13 +45,12 @@ static void test_add_and_fire(void) {
     assert(list.head == t);
 
     /* Not yet expired. */
-    struct timeval next;
-    valkeyProcessTimers(&list, &next);
+    valkeyProcessTimers(&list, NULL, NULL);
     assert(fired_count == 0);
 
     /* Wait for timer to expire. */
     usleep(15000); /* 15ms */
-    valkeyProcessTimers(&list, &next);
+    valkeyProcessTimers(&list, NULL, NULL);
     assert(fired_count == 1);
     assert(fired_data == &data);
 
@@ -91,9 +98,9 @@ static void test_cancel(void) {
     assert(list.head == NULL);
 
     usleep(15000);
-    struct timeval next;
-    struct timeval *ret = valkeyProcessTimers(&list, &next);
-    assert(ret == NULL); /* No timers */
+    reschedule_count = 0;
+    valkeyProcessTimers(&list, test_reschedule_cb, NULL);
+    assert(reschedule_count == 0); /* No timers */
     assert(fired_count == 0);
 
     printf("PASSED\n");
@@ -107,12 +114,85 @@ static void test_next_deadline(void) {
     struct timeval iv = {.tv_sec = 1, .tv_usec = 0}; /* 1s */
     valkeyTimerAdd(&list, iv, test_cb, NULL);
 
-    struct timeval next;
-    struct timeval *ret = valkeyProcessTimers(&list, &next);
-    /* Should be close to 1s remaining. */
-    assert(ret != NULL);
-    long remaining_us = next.tv_sec * 1000000 + next.tv_usec;
+    /* Nothing has expired, so the pending deadline is reported as is. */
+    reschedule_count = 0;
+    valkeyProcessTimers(&list, test_reschedule_cb, NULL);
+    assert(reschedule_count == 1);
+    long remaining_us = reschedule_tv.tv_sec * 1000000 + reschedule_tv.tv_usec;
     assert(remaining_us > 900000 && remaining_us <= 1000000);
+
+    valkeyTimerListFree(&list);
+    printf("PASSED\n");
+}
+
+/* A timer firing while another is queued must report the next deadline,
+ * otherwise an event-driven adapter never wakes up for it. */
+static void test_reschedule_when_more_pending(void) {
+    printf("  test_reschedule_when_more_pending: ");
+    valkeyTimerList list;
+    valkeyTimerListInit(&list);
+
+    fired_count = 0;
+    reschedule_count = 0;
+    struct timeval expired = {.tv_sec = 0, .tv_usec = 0};
+    struct timeval pending = {.tv_sec = 0, .tv_usec = 200000}; /* 200ms */
+    valkeyTimerAdd(&list, expired, test_cb, NULL);
+    valkeyTimer *t2 = valkeyTimerAdd(&list, pending, test_cb, NULL);
+
+    valkeyProcessTimers(&list, test_reschedule_cb, NULL);
+
+    assert(fired_count == 1);
+
+    /* The queued timer was reported once, with time still remaining. */
+    assert(reschedule_count == 1);
+    long remaining_us = reschedule_tv.tv_sec * 1000000 + reschedule_tv.tv_usec;
+    assert(remaining_us > 100000 && remaining_us <= 200000);
+    assert(list.head == t2);
+
+    valkeyTimerListFree(&list);
+    printf("PASSED\n");
+}
+
+/* The last timer firing leaves nothing to wake for. */
+static void test_no_reschedule_when_last(void) {
+    printf("  test_no_reschedule_when_last: ");
+    valkeyTimerList list;
+    valkeyTimerListInit(&list);
+
+    fired_count = 0;
+    reschedule_count = 0;
+    struct timeval expired = {.tv_sec = 0, .tv_usec = 0};
+    valkeyTimerAdd(&list, expired, test_cb, NULL);
+
+    valkeyProcessTimers(&list, test_reschedule_cb, NULL);
+
+    assert(fired_count == 1);
+    assert(reschedule_count == 0);
+    assert(list.head == NULL);
+
+    valkeyTimerListFree(&list);
+    printf("PASSED\n");
+}
+
+/* An already due timer must still get a non-zero delay: adapters take an
+ * all-zero timeval as a request to cancel the timer. */
+static void test_reschedule_when_already_due(void) {
+    printf("  test_reschedule_when_already_due: ");
+    valkeyTimerList list;
+    valkeyTimerListInit(&list);
+
+    fired_count = 0;
+    reschedule_count = 0;
+    struct timeval expired = {.tv_sec = 0, .tv_usec = 0};
+    valkeyTimerAdd(&list, expired, test_cb, NULL);
+    valkeyTimerAdd(&list, expired, test_cb, NULL);
+    usleep(2000); /* Let both deadlines pass. */
+
+    valkeyProcessTimers(&list, test_reschedule_cb, NULL);
+
+    assert(fired_count == 1);
+    assert(reschedule_count == 1);
+    assert(reschedule_tv.tv_sec > 0 || reschedule_tv.tv_usec > 0);
 
     valkeyTimerListFree(&list);
     printf("PASSED\n");
@@ -124,6 +204,9 @@ int main(void) {
     test_ordering();
     test_cancel();
     test_next_deadline();
+    test_reschedule_when_more_pending();
+    test_no_reschedule_when_last();
+    test_reschedule_when_already_due();
     printf("All timer tests passed.\n");
     return 0;
 }
