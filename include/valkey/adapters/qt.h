@@ -120,6 +120,8 @@ class ValkeyQtAdapter : public QObject {
     void cleanup() {
         delRead();
         delWrite();
+        /* The context may be freed before the adapter is destroyed. */
+        m_ctx = 0;
     }
 
   private slots:
