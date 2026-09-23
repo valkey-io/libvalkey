@@ -38,6 +38,7 @@
 
 #include <sds.h>
 
+#include <assert.h>
 #include <limits.h>
 #include <string.h>
 
@@ -99,6 +100,9 @@ static inline int valkeyContextUpdateConnectTimeout(valkeyContext *c,
     if (c->connect_timeout == timeout)
         return VALKEY_OK;
 
+    /* A NULL timeout is only valid when the context has no timeout either. */
+    assert(timeout != NULL);
+
     /* Allocate context timeval if we need to */
     if (c->connect_timeout == NULL) {
         c->connect_timeout = vk_malloc(sizeof(*c->connect_timeout));
@@ -115,6 +119,9 @@ static inline int valkeyContextUpdateCommandTimeout(valkeyContext *c,
     /* Same timeval struct, short circuit */
     if (c->command_timeout == timeout)
         return VALKEY_OK;
+
+    /* A NULL timeout is only valid when the context has no timeout either. */
+    assert(timeout != NULL);
 
     /* Allocate context timeval if we need to */
     if (c->command_timeout == NULL) {
