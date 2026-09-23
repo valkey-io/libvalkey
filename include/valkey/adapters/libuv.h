@@ -172,13 +172,6 @@ static int valkeyLibuvAttach(valkeyAsyncContext *ac, uv_loop_t *loop) {
         return VALKEY_ERR;
     }
 
-    ac->ev.addRead = valkeyLibuvAddRead;
-    ac->ev.delRead = valkeyLibuvDelRead;
-    ac->ev.addWrite = valkeyLibuvAddWrite;
-    ac->ev.delWrite = valkeyLibuvDelWrite;
-    ac->ev.cleanup = valkeyLibuvCleanup;
-    ac->ev.scheduleTimer = valkeyLibuvSetTimeout;
-
     valkeyLibuvEvents *p = (valkeyLibuvEvents *)vk_malloc(sizeof(*p));
     if (p == NULL)
         return VALKEY_ERR;
@@ -190,9 +183,17 @@ static int valkeyLibuvAttach(valkeyAsyncContext *ac, uv_loop_t *loop) {
         return VALKEY_ERR;
     }
 
-    ac->ev.data = p;
     p->handle.data = p;
     p->context = ac;
+
+    /* Install hooks only after initialization succeeds. */
+    ac->ev.data = p;
+    ac->ev.addRead = valkeyLibuvAddRead;
+    ac->ev.delRead = valkeyLibuvDelRead;
+    ac->ev.addWrite = valkeyLibuvAddWrite;
+    ac->ev.delWrite = valkeyLibuvDelWrite;
+    ac->ev.cleanup = valkeyLibuvCleanup;
+    ac->ev.scheduleTimer = valkeyLibuvSetTimeout;
 
     return VALKEY_OK;
 }
