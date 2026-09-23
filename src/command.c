@@ -260,7 +260,7 @@ void valkey_parse_cmd(struct cmd *r) {
                 continue; /* Keyword can't appear in a position before 'startfrom' */
             if (!strncasecmp(keyword, arg, arglen)) {
                 /* Keyword found. Now the first key is the next arg. */
-                if ((p = valkey_parse_bulk(p, end, &arg, &arglen)) == NULL)
+                if (valkey_parse_bulk(p, end, &arg, &arglen) == NULL)
                     goto error;
                 /* Keep found key. */
                 r->key.start = arg;
@@ -289,7 +289,7 @@ void valkey_parse_cmd(struct cmd *r) {
         if (!strncmp("0", arg, arglen))
             goto done; /* No args. */
         /* One or more args. The first key is the arg after the 'numkeys' arg. */
-        if ((p = valkey_parse_bulk(p, end, &arg, &arglen)) == NULL)
+        if (valkey_parse_bulk(p, end, &arg, &arglen) == NULL)
             goto error;
         argidx++;
     }

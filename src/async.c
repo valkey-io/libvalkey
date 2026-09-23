@@ -1043,7 +1043,7 @@ void valkeySsubscribeCallback(struct valkeyAsyncContext *ac, void *reply, void *
     if (r->type == VALKEY_REPLY_ERROR) {
         /*/ On CROSSSLOT, MOVED and other errors */
         p = nextArgument(data->command, data->len, &cstr, &clen);
-        while ((p = nextArgument(p, data->len - (p - data->command), &astr, &alen)) != NULL || astr != NULL) {
+        while (p != NULL && ((p = nextArgument(p, data->len - (p - data->command), &astr, &alen)) != NULL || astr != NULL)) {
             sname = sdsnewlen(astr, alen);
             if (sname == NULL)
                 goto oom;
@@ -1063,7 +1063,7 @@ void valkeySsubscribeCallback(struct valkeyAsyncContext *ac, void *reply, void *
         if ((r->type == VALKEY_REPLY_ARRAY || r->type == VALKEY_REPLY_PUSH) && r->elements >= 1 &&
             r->element[0]->type == VALKEY_REPLY_STRING && strncasecmp(r->element[0]->str, "ssubscribe", 10) == 0) {
             p = nextArgument(data->command, data->len, &cstr, &clen);
-            while ((p = nextArgument(p, data->len - (p - data->command), &astr, &alen)) != NULL || astr != NULL) {
+            while (p != NULL && ((p = nextArgument(p, data->len - (p - data->command), &astr, &alen)) != NULL || astr != NULL)) {
                 sname = sdsnewlen(astr, alen);
                 if (sname == NULL)
                     goto oom;
@@ -1142,7 +1142,7 @@ static int valkeyAsyncAppendCmdLen(valkeyAsyncContext *ac, valkeyCallbackFn *fn,
         c->flags |= VALKEY_SUBSCRIBED;
 
         /* Add every channel/pattern to the list of subscription callbacks. */
-        while ((p = nextArgument(p, len - (p - cmd), &astr, &alen)) != NULL || astr != NULL) {
+        while (p != NULL && ((p = nextArgument(p, len - (p - cmd), &astr, &alen)) != NULL || astr != NULL)) {
             sname = sdsnewlen(astr, alen);
             if (sname == NULL)
                 goto oom;
@@ -1211,7 +1211,7 @@ static int valkeyAsyncAppendCmdLen(valkeyAsyncContext *ac, valkeyCallbackFn *fn,
         if (hasnext) {
             /* Send an unsubscribe with specific channels/patterns.
              * Bookkeeping the number of expected replies */
-            while ((p = nextArgument(p, len - (p - cmd), &astr, &alen)) != NULL || astr != NULL) {
+            while (p != NULL && ((p = nextArgument(p, len - (p - cmd), &astr, &alen)) != NULL || astr != NULL)) {
                 sname = sdsnewlen(astr, alen);
                 if (sname == NULL)
                     goto oom;
