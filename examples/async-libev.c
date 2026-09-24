@@ -43,6 +43,8 @@ int main(int argc, char **argv) {
     VALKEY_OPTIONS_SET_TCP(&options, "127.0.0.1", 6379);
     options.attach_fn = valkeyLibevAttachAdapter;
     options.attach_data = EV_DEFAULT;
+    options.async_connect_callback = connectCallback;
+    options.async_disconnect_callback = disconnectCallback;
 
     valkeyAsyncContext *c = valkeyAsyncConnectWithOptions(&options);
     if (c->err) {
@@ -51,8 +53,6 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    valkeyAsyncSetConnectCallback(c, connectCallback);
-    valkeyAsyncSetDisconnectCallback(c, disconnectCallback);
     valkeyAsyncCommand(
         c, NULL, NULL, "SET key %b", argv[argc - 1], strlen(argv[argc - 1]));
     valkeyAsyncCommand(c, getCallback, (char *)"end-1", "GET key");

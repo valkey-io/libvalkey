@@ -331,8 +331,8 @@ if (ac == NULL) {
 // If we're using libev
 valkeyLibevAttach(EV_DEFAULT_ ac);
 
-valkeySetConnectCallback(ac, my_connect_callback);
-valkeySetDisconnectCallback(ac, my_disconnect_callback);
+valkeyAsyncSetConnectCallback(ac, my_connect_callback);
+valkeyAsyncSetDisconnectCallback(ac, my_disconnect_callback);
 
 ev_run(EV_DEFAULT_ 0);
 ```
@@ -347,6 +347,8 @@ The context object is always freed after the disconnect callback fired.
 The example above uses the two-step pattern: create the context, then attach an event-loop adapter separately.
 As an alternative, you can specify the adapter as part of the `valkeyOptions` using the `attach_fn` and `attach_data` fields.
 When set, `valkeyAsyncConnectWithOptions()` attaches the adapter and registers the file descriptor with the event loop for you, in a single call.
+You can also supply the connect and disconnect callbacks via `async_connect_callback` and `async_disconnect_callback`.
+These are registered before the connect is initiated, so no connect event is missed even if the event loop is already running.
 
 ```c
 valkeyOptions options = {0};
@@ -356,14 +358,15 @@ VALKEY_OPTIONS_SET_TCP(&options, "localhost", 6379);
 options.attach_fn = valkeyLibevAttachAdapter;
 options.attach_data = EV_DEFAULT; // the default libev loop; or a `struct ev_loop *`
 
+// Optionally supply the connect/disconnect callbacks too.
+options.async_connect_callback = my_connect_callback;
+options.async_disconnect_callback = my_disconnect_callback;
+
 valkeyAsyncContext *ac = valkeyAsyncConnectWithOptions(&options);
 if (ac == NULL || ac->err) {
     fprintf(stderr, "Error: %s\n", ac ? ac->errstr : "OOM");
     // ... handle error / cleanup ...
 }
-
-valkeySetConnectCallback(ac, my_connect_callback);
-valkeySetDisconnectCallback(ac, my_disconnect_callback);
 
 ev_run(EV_DEFAULT_ 0);
 ```
@@ -371,7 +374,8 @@ ev_run(EV_DEFAULT_ 0);
 For TCP connections, the actual connect is deferred until after the context is fully initialized, so the adapter always receives a valid file descriptor and works without modification.
 Unix socket connections connect immediately.
 
-The legacy pattern of attaching the adapter after connecting (as shown in the example above) remains fully supported; the `attach_fn` field is optional.
+The legacy pattern of attaching the adapter after connecting (as shown in the example above) remains fully supported; all of these option fields are optional.
+The callbacks can still be set afterwards with `valkeyAsyncSetConnectCallback` / `valkeyAsyncSetDisconnectCallback`, but doing so via the options is race-free when the event loop is already running.
 
 ### Executing commands
 
