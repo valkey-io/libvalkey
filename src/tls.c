@@ -491,6 +491,8 @@ static void valkeyTLSFree(void *privctx) {
 static ssize_t valkeyTLSRead(valkeyContext *c, char *buf, size_t bufcap) {
     valkeyTLS *rssl = c->privctx;
 
+    ERR_clear_error();
+
     int nread = SSL_read(rssl->ssl, buf, bufcap);
     if (nread > 0) {
         return nread;
@@ -533,6 +535,9 @@ static ssize_t valkeyTLSWrite(valkeyContext *c) {
     valkeyTLS *rssl = c->privctx;
 
     size_t len = rssl->lastLen ? rssl->lastLen : sdslen(c->obuf);
+
+    ERR_clear_error();
+
     int rv = SSL_write(rssl->ssl, c->obuf, len);
 
     if (rv > 0) {
