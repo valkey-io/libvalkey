@@ -87,8 +87,22 @@ void valkeyNetClose(valkeyContext *c) {
 static ssize_t valkeyNetRead(valkeyContext *c, char *buf, size_t bufcap) {
     ssize_t nread = recv(c->fd, buf, bufcap, 0);
     if (nread == -1) {
-        if ((errno == EWOULDBLOCK && !(c->flags & VALKEY_BLOCK)) || (errno == EINTR)) {
+        if (errno == EINTR) {
             /* Try again later */
+            return 0;
+        } else if (errno == EWOULDBLOCK && !(c->flags & VALKEY_BLOCK)) {
+            int so_error = 0;
+            socklen_t len = sizeof(so_error);
+
+            if (getsockopt(c->fd, SOL_SOCKET, SO_ERROR, &so_error, &len) == -1) {
+                valkeySetErrorFromErrno(c, VALKEY_ERR_IO, "getsockopt(SO_ERROR)");
+                return -1;
+            }
+            if (so_error) {
+                errno = so_error;
+                valkeySetErrorFromErrno(c, VALKEY_ERR_IO, NULL);
+                return -1;
+            }
             return 0;
         } else if (errno == ETIMEDOUT && (c->flags & VALKEY_BLOCK)) {
             /* especially in windows */
