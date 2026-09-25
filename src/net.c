@@ -432,6 +432,88 @@ static int valkeyTcpGetProtocol(int is_mptcp_enabled) {
 }
 #endif /* IPPROTO_MPTCP */
 
+#ifdef VALKEY_USE_CARES
+/* Try each address in servinfo, create a non-blocking socket, bind source_addr
+ * if set, and initiate connect(). Returns VALKEY_OK on first successful
+ * connect (or EINPROGRESS), VALKEY_ERR if all addresses fail. Sets c->fd.
+ *
+ * Error handling mirrors valkeyContextConnectTcp(): a local setup failure is
+ * fatal, only a failed socket() or connect() moves on to the next address. */
+int valkeyTcpConnectNonBlock(valkeyContext *c, struct addrinfo *servinfo) {
+    struct addrinfo *p, *bservinfo, *b;
+    valkeyFD s;
+    int rv, n;
+    int reuseaddr = (c->flags & VALKEY_REUSEADDR);
+
+    for (p = servinfo; p != NULL; p = p->ai_next) {
+        s = socket(p->ai_family, p->ai_socktype, valkeyTcpGetProtocol(c->flags & VALKEY_MPTCP));
+        if (s == VALKEY_INVALID_FD)
+            continue;
+
+        c->fd = s;
+        if (valkeySetBlocking(c, 0) != VALKEY_OK)
+            goto error;
+
+        if (c->tcp.source_addr) {
+            int bound = 0;
+            struct addrinfo hints = {0};
+            hints.ai_family = p->ai_family;
+            hints.ai_socktype = p->ai_socktype;
+            /* Using getaddrinfo saves us from self-determining IPv4 vs IPv6 */
+            if ((rv = getaddrinfo(c->tcp.source_addr, NULL, &hints, &bservinfo)) != 0) {
+                char buf[128];
+                snprintf(buf, sizeof(buf), "Can't get addr: %s", gai_strerror(rv));
+                valkeySetError(c, VALKEY_ERR_OTHER, buf);
+                goto error;
+            }
+
+            if (reuseaddr) {
+                n = 1;
+                if (setsockopt(s, SOL_SOCKET, SO_REUSEADDR, (char *)&n, sizeof(n)) < 0) {
+                    freeaddrinfo(bservinfo);
+                    goto error;
+                }
+            }
+
+            for (b = bservinfo; b != NULL; b = b->ai_next) {
+                if (bind(s, b->ai_addr, b->ai_addrlen) != -1) {
+                    bound = 1;
+                    break;
+                }
+            }
+            freeaddrinfo(bservinfo);
+            if (!bound) {
+                valkeySetErrorFromErrno(c, VALKEY_ERR_OTHER, "Can't bind socket");
+                goto error;
+            }
+        }
+
+        /* For repeat connection */
+        vk_free(c->saddr);
+        c->saddr = vk_malloc(p->ai_addrlen);
+        if (c->saddr == NULL) {
+            valkeySetError(c, VALKEY_ERR_OOM, "Out of memory");
+            goto error;
+        }
+
+        memcpy(c->saddr, p->ai_addr, p->ai_addrlen);
+        c->addrlen = p->ai_addrlen;
+
+        if (connect(s, p->ai_addr, p->ai_addrlen) == 0 || errno == EINPROGRESS)
+            return VALKEY_OK;
+
+        valkeyNetClose(c);
+    }
+
+    valkeySetErrorFromErrno(c, VALKEY_ERR_IO, NULL);
+    return VALKEY_ERR;
+
+error:
+    valkeyNetClose(c);
+    return VALKEY_ERR;
+}
+#endif /* VALKEY_USE_CARES */
+
 int valkeyContextConnectTcp(valkeyContext *c, const valkeyOptions *options) {
     const struct timeval *timeout = options->connect_timeout;
     const char *addr = options->endpoint.tcp.ip;
