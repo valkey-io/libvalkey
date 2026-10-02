@@ -1746,6 +1746,17 @@ static valkeyClusterNode *getNodeFromRedirectReply(valkeyClusterContext *cc,
         valkeyClusterSetError(cc, VALKEY_ERR_OTHER, "Failed to parse redirect");
         return NULL;
     }
+
+    /* Parse and validate the slot. */
+    int slot_num = 0;
+    if (slotptr != NULL) {
+        slot_num = vk_atoi(slot, strlen(slot));
+        if (slot_num < 0 || slot_num >= VALKEYCLUSTER_SLOTS) {
+            valkeyClusterSetError(cc, VALKEY_ERR_OTHER, "Invalid slot in redirect");
+            return NULL;
+        }
+    }
+
     /* Find the last occurrence of the port separator since
      * IPv6 addresses can contain ':' */
     if ((p = strrchr(addr, ':')) == NULL) {
@@ -1790,9 +1801,9 @@ static valkeyClusterNode *getNodeFromRedirectReply(valkeyClusterContext *cc,
         }
     }
 
-    /* Parse slot if requested. */
+    /* Return the slot when requested. */
     if (slotptr != NULL) {
-        *slotptr = vk_atoi(slot, strlen(slot));
+        *slotptr = slot_num;
     }
 
     /* Get the node if already known. */

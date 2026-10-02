@@ -872,6 +872,159 @@ void test_parse_cluster_slots_with_noncontiguous_slots(void) {
     valkeyClusterFree(cc);
 }
 
+/* Parse a MOVED/ASK redirect reply into a node and, for MOVED, a slot. */
+void test_get_node_from_redirect_reply(void) {
+    valkeyClusterOptions options = {0};
+    valkeyClusterContext *cc = createClusterContext(&options);
+    valkeyContext *c = valkeyContextInit();
+    valkeyClusterNode *node;
+
+    /* Valid MOVED redirect with a slot within range. */
+    int slot = -1;
+    valkeyReply *reply = create_reply("-MOVED 12182 127.0.0.1:7404\r\n", 29);
+    node = getNodeFromRedirectReply(cc, c, reply, &slot);
+    freeReplyObject(reply);
+    assert(node != NULL);
+    assert(slot == 12182);
+    assert(strcmp(node->addr, "127.0.0.1:7404") == 0);
+    assert(strcmp(node->host, "127.0.0.1") == 0);
+    assert(node->port == 7404);
+
+    /* A hostname endpoint is used verbatim as the node address. The server
+     * emits this when cluster-preferred-endpoint-type is 'hostname'. */
+    slot = -1;
+    reply = create_reply("-MOVED 866 example.com:6379\r\n", 29);
+    node = getNodeFromRedirectReply(cc, c, reply, &slot);
+    freeReplyObject(reply);
+    assert(node != NULL);
+    assert(slot == 866);
+    assert(strcmp(node->addr, "example.com:6379") == 0);
+    assert(strcmp(node->host, "example.com") == 0);
+    assert(node->port == 6379);
+
+    /* An IPv6 endpoint is emitted unbracketed by the server, so the port
+     * separator is the last ':'. The host keeps the embedded colons. */
+    slot = -1;
+    reply = create_reply("-MOVED 1000 2001:db8::1:6379\r\n", 30);
+    node = getNodeFromRedirectReply(cc, c, reply, &slot);
+    freeReplyObject(reply);
+    assert(node != NULL);
+    assert(slot == 1000);
+    assert(strcmp(node->addr, "2001:db8::1:6379") == 0);
+    assert(strcmp(node->host, "2001:db8::1") == 0);
+    assert(node->port == 6379);
+
+    valkeyFree(c);
+    valkeyClusterFree(cc);
+}
+
+/* A MOVED redirect with an empty endpoint means the same address the reply
+ * was received from, with the provided port. */
+void test_get_node_from_redirect_reply_empty_endpoint(void) {
+    valkeyClusterOptions options = {0};
+    valkeyClusterContext *cc = createClusterContext(&options);
+    valkeyClusterNode *node;
+
+    /* Set the address the reply is received from. */
+    valkeyContext *c = valkeyContextInit();
+    c->tcp.host = strdup("127.0.0.99");
+
+    int slot = -1;
+    valkeyReply *reply = create_reply("-MOVED 9718 :7403\r\n", 19);
+    node = getNodeFromRedirectReply(cc, c, reply, &slot);
+    freeReplyObject(reply);
+    assert(node != NULL);
+    assert(slot == 9718);
+    assert(strcmp(node->addr, "127.0.0.99:7403") == 0);
+    assert(strcmp(node->host, "127.0.0.99") == 0);
+    assert(node->port == 7403);
+
+    valkeyFree(c);
+    valkeyClusterFree(cc);
+}
+
+/* Reject a MOVED redirect that is malformed. */
+void test_get_node_from_redirect_reply_invalid(void) {
+    valkeyClusterOptions options = {0};
+    valkeyClusterContext *cc = createClusterContext(&options);
+    valkeyContext *c = valkeyContextInit();
+    valkeyClusterNode *node;
+
+    /* Missing endpoint field. */
+    int slot = -1;
+    valkeyReply *reply = create_reply("-MOVED 12182\r\n", 14);
+    node = getNodeFromRedirectReply(cc, c, reply, &slot);
+    freeReplyObject(reply);
+    assert(node == NULL);
+    assert(slot == -1);
+    assert(cc->err == VALKEY_ERR_OTHER);
+    valkeyClusterClearError(cc);
+
+    /* Endpoint without a port separator. */
+    slot = -1;
+    reply = create_reply("-MOVED 12182 127.0.0.1\r\n", 24);
+    node = getNodeFromRedirectReply(cc, c, reply, &slot);
+    freeReplyObject(reply);
+    assert(node == NULL);
+    assert(slot == -1);
+    assert(cc->err == VALKEY_ERR_OTHER);
+    valkeyClusterClearError(cc);
+
+    /* Port out of range. */
+    slot = -1;
+    reply = create_reply("-MOVED 12182 127.0.0.1:70000\r\n", 30);
+    node = getNodeFromRedirectReply(cc, c, reply, &slot);
+    freeReplyObject(reply);
+    assert(node == NULL);
+    assert(slot == -1);
+    assert(cc->err == VALKEY_ERR_OTHER);
+    valkeyClusterClearError(cc);
+
+    /* Empty port, i.e. a trailing port separator. */
+    slot = -1;
+    reply = create_reply("-MOVED 12182 127.0.0.1:\r\n", 25);
+    node = getNodeFromRedirectReply(cc, c, reply, &slot);
+    freeReplyObject(reply);
+    assert(node == NULL);
+    assert(slot == -1);
+    assert(cc->err == VALKEY_ERR_OTHER);
+    valkeyClusterClearError(cc);
+
+    /* Non-numeric slot. */
+    slot = -1;
+    reply = create_reply("-MOVED x 127.0.0.1:7404\r\n", 25);
+    node = getNodeFromRedirectReply(cc, c, reply, &slot);
+    freeReplyObject(reply);
+    assert(node == NULL);
+    assert(slot == -1);
+    assert(cc->err == VALKEY_ERR_OTHER);
+    valkeyClusterClearError(cc);
+
+    /* Slot equal to the number of slots is out of range since valid slots
+     * are 0-16383. */
+    slot = -1;
+    reply = create_reply("-MOVED 16384 127.0.0.1:7404\r\n", 29);
+    node = getNodeFromRedirectReply(cc, c, reply, &slot);
+    freeReplyObject(reply);
+    assert(node == NULL);
+    assert(slot == -1);
+    assert(cc->err == VALKEY_ERR_OTHER);
+    valkeyClusterClearError(cc);
+
+    /* A negative slot is also rejected. */
+    slot = -1;
+    reply = create_reply("-MOVED -5 127.0.0.1:7404\r\n", 26);
+    node = getNodeFromRedirectReply(cc, c, reply, &slot);
+    freeReplyObject(reply);
+    assert(node == NULL);
+    assert(slot == -1);
+    assert(cc->err == VALKEY_ERR_OTHER);
+    valkeyClusterClearError(cc);
+
+    valkeyFree(c);
+    valkeyClusterFree(cc);
+}
+
 int main(void) {
     test_parse_cluster_nodes(false /* replicas not parsed */);
     test_parse_cluster_nodes(true /* replicas parsed */);
@@ -891,5 +1044,9 @@ int main(void) {
     test_parse_cluster_slots_with_multiple_replicas();
     test_parse_cluster_slots_with_invalid_slot_range();
     test_parse_cluster_slots_with_noncontiguous_slots();
+
+    test_get_node_from_redirect_reply();
+    test_get_node_from_redirect_reply_empty_endpoint();
+    test_get_node_from_redirect_reply_invalid();
     return 0;
 }
