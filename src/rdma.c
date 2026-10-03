@@ -109,6 +109,7 @@ static struct rdma_dyn_syms {
     int (*ibv_get_cq_event)(struct ibv_comp_channel *channel, struct ibv_cq **cq, void **cq_context);
     void (*ibv_ack_cq_events)(struct ibv_cq *cq, unsigned int nevents);
     int (*ibv_destroy_qp)(struct ibv_qp *qp);
+    int (*ibv_query_device)(struct ibv_context *context, struct ibv_device_attr *device_attr);
 } rdma_syms;
 
 static void *rdmacm_handle = NULL;
@@ -168,6 +169,7 @@ static int rdma_dyn_load_libs(void) {
     LOAD_SYM(ibverbs_handle, ibv_get_cq_event);
     LOAD_SYM(ibverbs_handle, ibv_ack_cq_events);
     LOAD_SYM(ibverbs_handle, ibv_destroy_qp);
+    LOAD_SYM(ibverbs_handle, ibv_query_device);
 
     return 0;
 }
@@ -203,6 +205,7 @@ static int rdma_dyn_load_libs(void) {
 #define ibv_get_cq_event rdma_syms.ibv_get_cq_event
 #define ibv_ack_cq_events rdma_syms.ibv_ack_cq_events
 #define ibv_destroy_qp rdma_syms.ibv_destroy_qp
+#define ibv_query_device rdma_syms.ibv_query_device
 
 #endif /* DLOPEN_RDMA */
 
@@ -256,6 +259,30 @@ typedef enum valkeyRdmaOpcode {
 /* XXX: MLX5(16 + 16 + 4)/RXE(0) adapted */
 #define VALKEY_RDMA_VENDOR_INLINE_DATA (36)
 #define VALKEY_RDMA_MAX_INLINE_DATA (256 - VALKEY_RDMA_VENDOR_INLINE_DATA)
+#define VALKEY_RDMA_INLINE_DATA_STEP (16)
+/* The verbs API cannot report the inline data limit. Devices whose kernel driver has a fixed limit
+ * try it first: Intel irdma 216, 101 or 48 depending on the generation (101 on the E810, 48 on the
+ * X722; drivers/infiniband/hw/irdma/ig3rdma_hw.h, user.h, i40iw_hw.h), Alibaba erdma 96
+ * (drivers/infiniband/hw/erdma/erdma_verbs.h). Other devices start at VALKEY_RDMA_MAX_INLINE_DATA,
+ * and any refused size steps down by VALKEY_RDMA_INLINE_DATA_STEP until one is accepted.
+ * libfabric's verbs provider also probes the limit (vrb_find_max_inline()). */
+static const struct {
+    uint32_t vendor_id;
+    uint32_t max_inline;
+} rdmaInlineLimits[] = {{0x8086, 216}, {0x8086, 101}, {0x8086, 48}, {0x1ded, 96}};
+
+/* Inline size to request: on the first try, size capped at the vendor's first known limit; after a
+ * refusal, the vendor's next smaller known limit, else one step smaller. */
+static uint32_t rdmaInlineData(uint32_t vendor_id, uint32_t size, int refused) {
+    for (size_t i = 0; i < sizeof(rdmaInlineLimits) / sizeof(rdmaInlineLimits[0]); i++) {
+        uint32_t limit = rdmaInlineLimits[i].max_inline;
+        if (rdmaInlineLimits[i].vendor_id == vendor_id && (!refused || limit < size))
+            return limit < size ? limit : size;
+    }
+    if (refused)
+        size = size > VALKEY_RDMA_INLINE_DATA_STEP ? size - VALKEY_RDMA_INLINE_DATA_STEP : 0;
+    return size;
+}
 
 typedef struct RdmaContext {
     struct rdma_cm_id *cm_id;
@@ -908,6 +935,8 @@ static int valkeyRdmaConnect(valkeyContext *c, struct rdma_cm_id *cm_id) {
     struct ibv_pd *pd = NULL;
     struct ibv_qp_init_attr init_attr = {0};
     struct rdma_conn_param conn_param = {0};
+    struct ibv_device_attr device_attr;
+    uint32_t vendor_id, max_inline;
 
     pd = ibv_alloc_pd(cm_id->verbs);
     if (!pd) {
@@ -942,22 +971,25 @@ static int valkeyRdmaConnect(valkeyContext *c, struct rdma_cm_id *cm_id) {
         goto error;
     }
 
+    vendor_id = ibv_query_device(cm_id->verbs, &device_attr) ? 0 : device_attr.vendor_id;
+    max_inline = rdmaInlineData(vendor_id, VALKEY_RDMA_MAX_INLINE_DATA, 0);
+
     /* create qp with attr */
     init_attr.cap.max_send_wr = VALKEY_RDMA_MAX_WQE;
     init_attr.cap.max_recv_wr = VALKEY_RDMA_MAX_WQE;
     init_attr.cap.max_send_sge = 1;
     init_attr.cap.max_recv_sge = 1;
-    init_attr.cap.max_inline_data = VALKEY_RDMA_MAX_INLINE_DATA;
+    init_attr.cap.max_inline_data = max_inline;
     init_attr.qp_type = IBV_QPT_RC;
     init_attr.send_cq = cq;
     init_attr.recv_cq = cq;
-    if (rdma_create_qp(cm_id, pd, &init_attr)) {
-        /* the device may not support inline data, try again without it */
-        init_attr.cap.max_inline_data = 0;
-        if (rdma_create_qp(cm_id, pd, &init_attr)) {
+    while (rdma_create_qp(cm_id, pd, &init_attr)) {
+        if (!max_inline) {
             valkeySetError(c, VALKEY_ERR_OTHER, "RDMA: create qp failed");
             goto error;
         }
+        max_inline = rdmaInlineData(vendor_id, max_inline, 1);
+        init_attr.cap.max_inline_data = max_inline;
     }
 
     /* rdma_create_qp() writes the granted inline data size back into init_attr */
