@@ -789,7 +789,6 @@ static size_t connRdmaSend(RdmaContext *ctx, struct rdma_cm_id *cm_id, const voi
     int ret;
 
     assert(data_len <= ctx->tx_length);
-    memcpy(addr, data, data_len);
 
     sge.addr = (uint64_t)(uintptr_t)addr;
     sge.lkey = ctx->send_mr->lkey;
@@ -799,8 +798,13 @@ static size_t connRdmaSend(RdmaContext *ctx, struct rdma_cm_id *cm_id, const voi
     send_wr.num_sge = 1;
     send_wr.opcode = IBV_WR_RDMA_WRITE_WITH_IMM;
     send_wr.send_flags = (++ctx->send_ops % VALKEY_RDMA_MAX_WQE) ? 0 : IBV_SEND_SIGNALED;
-    if (data_len <= ctx->send_inline)
+    if (data_len <= ctx->send_inline) {
+        /* ibv_post_send() copies inline data into the WQE and ignores the lkey, so skip the transfer buffer */
         send_wr.send_flags |= IBV_SEND_INLINE;
+        sge.addr = (uint64_t)(uintptr_t)data;
+    } else {
+        memcpy(addr, data, data_len);
+    }
     send_wr.imm_data = htonl(data_len);
     send_wr.wr.rdma.remote_addr = (uint64_t)(uintptr_t)remote_addr;
     send_wr.wr.rdma.rkey = ctx->tx_key;
