@@ -253,6 +253,11 @@ typedef enum valkeyRdmaOpcode {
 #define VALKEY_RDMA_MAX_WQE 1024
 #define VALKEY_RDMA_DEFAULT_RX_LEN (1024 * 1024)
 #define VALKEY_RDMA_INVALID_OPCODE 0xffff
+/* XXX: MLX5(16 + 16 + 4)/RXE(0) adapted */
+#define VALKEY_RDMA_VENDOR_INLINE_DATA (36)
+#define VALKEY_RDMA_MAX_INLINE_DATA (256 - VALKEY_RDMA_VENDOR_INLINE_DATA)
+/* XXX: some devices take less, e.g. Intel E810 (irdma) accepts at most 101 */
+#define VALKEY_RDMA_MIN_INLINE_DATA (64)
 
 typedef struct RdmaContext {
     struct rdma_cm_id *cm_id;
@@ -270,6 +275,7 @@ typedef struct RdmaContext {
     char *send_buf;
     uint32_t send_length;
     uint32_t send_ops;
+    uint32_t send_inline; /* largest payload to post inline */
     struct ibv_mr *send_mr;
 
     /* RX */
@@ -510,6 +516,8 @@ static int rdmaSendCommand(valkeyContext *c, struct rdma_cm_id *cm_id, valkeyRdm
     send_wr.wr_id = (uint64_t)(uintptr_t)_cmd;
     send_wr.opcode = IBV_WR_SEND;
     send_wr.send_flags = IBV_SEND_SIGNALED;
+    if (sizeof(valkeyRdmaCmd) <= ctx->send_inline)
+        send_wr.send_flags |= IBV_SEND_INLINE;
     send_wr.next = NULL;
     ret = ibv_post_send(cm_id->qp, &send_wr, &bad_wr);
     if (ret) {
@@ -781,7 +789,6 @@ static size_t connRdmaSend(RdmaContext *ctx, struct rdma_cm_id *cm_id, const voi
     int ret;
 
     assert(data_len <= ctx->tx_length);
-    memcpy(addr, data, data_len);
 
     sge.addr = (uint64_t)(uintptr_t)addr;
     sge.lkey = ctx->send_mr->lkey;
@@ -791,6 +798,13 @@ static size_t connRdmaSend(RdmaContext *ctx, struct rdma_cm_id *cm_id, const voi
     send_wr.num_sge = 1;
     send_wr.opcode = IBV_WR_RDMA_WRITE_WITH_IMM;
     send_wr.send_flags = (++ctx->send_ops % VALKEY_RDMA_MAX_WQE) ? 0 : IBV_SEND_SIGNALED;
+    if (data_len <= ctx->send_inline) {
+        /* ibv_post_send() copies inline data into the WQE and ignores the lkey, so skip the transfer buffer */
+        send_wr.send_flags |= IBV_SEND_INLINE;
+        sge.addr = (uint64_t)(uintptr_t)data;
+    } else {
+        memcpy(addr, data, data_len);
+    }
     send_wr.imm_data = htonl(data_len);
     send_wr.wr.rdma.remote_addr = (uint64_t)(uintptr_t)remote_addr;
     send_wr.wr.rdma.rkey = ctx->tx_key;
@@ -939,13 +953,27 @@ static int valkeyRdmaConnect(valkeyContext *c, struct rdma_cm_id *cm_id) {
     init_attr.cap.max_recv_wr = VALKEY_RDMA_MAX_WQE;
     init_attr.cap.max_send_sge = 1;
     init_attr.cap.max_recv_sge = 1;
+    init_attr.cap.max_inline_data = VALKEY_RDMA_MAX_INLINE_DATA;
     init_attr.qp_type = IBV_QPT_RC;
     init_attr.send_cq = cq;
     init_attr.recv_cq = cq;
     if (rdma_create_qp(cm_id, pd, &init_attr)) {
-        valkeySetError(c, VALKEY_ERR_OTHER, "RDMA: create qp failed");
-        goto error;
+        /* the device may support less inline data, try a smaller size */
+        init_attr.cap.max_inline_data = VALKEY_RDMA_MIN_INLINE_DATA;
+        if (rdma_create_qp(cm_id, pd, &init_attr)) {
+            /* the device may not support inline data, try again without it */
+            init_attr.cap.max_inline_data = 0;
+            if (rdma_create_qp(cm_id, pd, &init_attr)) {
+                valkeySetError(c, VALKEY_ERR_OTHER, "RDMA: create qp failed");
+                goto error;
+            }
+        }
     }
+
+    /* rdma_create_qp() writes the granted inline data size back into init_attr */
+    ctx->send_inline = init_attr.cap.max_inline_data;
+    if (ctx->send_inline > VALKEY_RDMA_MAX_INLINE_DATA)
+        ctx->send_inline = VALKEY_RDMA_MAX_INLINE_DATA;
 
     ctx->cm_id = cm_id;
     ctx->comp_channel = comp_channel;
