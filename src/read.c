@@ -46,6 +46,7 @@
 #define FFC_DEBUG 0
 #include "ffc.h"
 #include "read.h"
+#include "vkutil.h"
 
 #include <sds.h>
 
@@ -165,6 +166,9 @@ static char *seekNewline(char *s, size_t len) {
     return ret;
 }
 
+/* The 19-digit bound in string2ll relies on a 64-bit long long. */
+vk_static_assert(LLONG_MAX == INT64_MAX);
+
 /* Convert a string into a long long. Returns VALKEY_OK if the string could be
  * parsed into a (non-overflowing) long long, VALKEY_ERR otherwise. The value
  * will be set to the parsed value when appropriate.
@@ -178,12 +182,11 @@ static char *seekNewline(char *s, size_t len) {
  * you can convert a string into a long long, and obtain back the string
  * from the number without any loss in the string representation. */
 static int string2ll(const char *s, size_t slen, long long *value) {
-    const char *p = s;
-    size_t plen = 0;
+    const char *p = s, *end = s + slen;
     int negative = 0;
     unsigned long long v;
 
-    if (plen == slen)
+    if (slen == 0)
         return VALKEY_ERR;
 
     /* Special case: first and only digit is 0. */
@@ -196,41 +199,25 @@ static int string2ll(const char *s, size_t slen, long long *value) {
     if (p[0] == '-') {
         negative = 1;
         p++;
-        plen++;
-
-        /* Abort on only a negative sign. */
-        if (plen == slen)
-            return VALKEY_ERR;
     }
 
-    /* First digit should be 1-9; otherwise, the string should just be 0. */
-    if (p[0] >= '1' && p[0] <= '9') {
-        v = p[0] - '0';
-        p++;
-        plen++;
-    } else if (p[0] == '0' && slen == 1) {
-        *value = 0;
-        return VALKEY_OK;
-    } else {
+    /* A 64-bit long long has at most 19 digits. Bounding the digit count
+     * means the unsigned accumulator cannot overflow. This also rejects
+     * a lone '-'. */
+    if (end - p < 1 || end - p > 19)
         return VALKEY_ERR;
-    }
 
-    while (plen < slen && p[0] >= '0' && p[0] <= '9') {
-        if (v > (ULLONG_MAX / 10)) /* Overflow. */
-            return VALKEY_ERR;
-        v *= 10;
-
-        if (v > (ULLONG_MAX - (p[0] - '0'))) /* Overflow. */
-            return VALKEY_ERR;
-        v += p[0] - '0';
-
-        p++;
-        plen++;
-    }
-
-    /* Return if not all bytes were used. */
-    if (plen < slen)
+    /* First digit should be 1-9; leading zeroes are not allowed. */
+    if (p[0] < '1' || p[0] > '9')
         return VALKEY_ERR;
+
+    v = 0;
+    for (; p < end; p++) {
+        unsigned int d = (unsigned char)*p - '0';
+        if (d > 9)
+            return VALKEY_ERR;
+        v = v * 10 + d;
+    }
 
     if (negative) {
         if (v > ((unsigned long long)(-(LLONG_MIN + 1)) + 1)) /* Overflow. */
