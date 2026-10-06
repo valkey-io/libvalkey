@@ -144,4 +144,12 @@ void valkeyContextSetFuncs(valkeyContext *c);
 
 long long valkeyFormatSdsCommandArgv(sds *target, int argc, const char **argv, const size_t *argvlen);
 
+#ifdef VALKEY_USE_CARES
+struct addrinfo;
+
+/* Create a socket and start a non-blocking connect to one of the resolved
+ * addresses. Used by the async DNS path once resolution completes. */
+int valkeyTcpConnectNonBlock(valkeyContext *c, struct addrinfo *servinfo);
+#endif
+
 #endif /* VALKEY_VK_PRIVATE_H */

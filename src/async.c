@@ -146,6 +146,8 @@ static valkeyAsyncContext *valkeyAsyncInitialize(valkeyContext *c) {
     ac->ev.delWrite = NULL;
     ac->ev.cleanup = NULL;
     ac->ev.scheduleTimer = NULL;
+    ac->ev.addCaresSocket = NULL;
+    ac->ev.delCaresSocket = NULL;
 
     ac->onConnect = NULL;
     ac->onDisconnect = NULL;
@@ -163,6 +165,7 @@ static valkeyAsyncContext *valkeyAsyncInitialize(valkeyContext *c) {
     ac->connect_timer = NULL;
     ac->command_timer = NULL;
     ac->timeout_reply_count = 0;
+    ac->dns_state = NULL;
 
     return ac;
 oom:
@@ -175,7 +178,7 @@ oom:
 
 /* We want the error field to be accessible directly instead of requiring
  * an indirection to the valkeyContext struct. */
-static void valkeyAsyncCopyError(valkeyAsyncContext *ac) {
+void valkeyAsyncCopyError(valkeyAsyncContext *ac) {
     if (!ac)
         return;
 
@@ -218,7 +221,29 @@ valkeyAsyncContext *valkeyAsyncConnectWithOptions(const valkeyOptions *options) 
 
     /* Attach adapter and initiate connect if adapter was provided. */
     if (myOptions.attach_fn) {
+        /* Attach the adapter first so its hooks (including any c-ares async
+         * DNS hooks) are registered before the connect is initiated. While
+         * VALKEY_CONNECT_DEFERRED is set, the adapter installs its hooks but
+         * does not register the (not-yet-valid) fd; a c-ares aware adapter
+         * initiates async DNS from within its attach function. */
+        if (myOptions.attach_fn(ac, myOptions.attach_data) != VALKEY_OK) {
+            valkeySetError(c, VALKEY_ERR_OTHER, "Failed to attach event adapter");
+            valkeyAsyncCopyError(ac);
+            return ac;
+        }
+
         if (c->flags & VALKEY_CONNECT_DEFERRED) {
+            /* When the adapter started async DNS it leaves dns_state set and
+             * keeps the deferred flag; the connect flow then continues from
+             * the DNS callback, which adds the write watch once the fd is
+             * valid. There is no valid fd yet, so return without registering
+             * read/write interest. */
+            if (ac->dns_state != NULL) {
+                valkeyAsyncCopyError(ac);
+                return ac;
+            }
+            /* Otherwise the adapter has no async DNS support. Perform the
+             * deferred DNS + connect synchronously now. */
             c->flags &= ~VALKEY_CONNECT_DEFERRED;
             c->funcs->connect(c, &myOptions);
             if (c->err) {
@@ -230,11 +255,6 @@ valkeyAsyncContext *valkeyAsyncConnectWithOptions(const valkeyOptions *options) 
             c->flags &= ~VALKEY_CONNECTED;
         }
 
-        if (myOptions.attach_fn(ac, myOptions.attach_data) != VALKEY_OK) {
-            valkeySetError(c, VALKEY_ERR_OTHER, "Failed to attach event adapter");
-            valkeyAsyncCopyError(ac);
-            return ac;
-        }
         _EL_ADD_WRITE(ac);
     }
 
@@ -280,8 +300,13 @@ int valkeyAsyncSetConnectCallback(valkeyAsyncContext *ac, valkeyConnectCallback 
 
     /* The common way to detect an established connection is to wait for
      * the first write event to be fired. This assumes the related event
-     * library functions are already set. */
-    _EL_ADD_WRITE(ac);
+     * library functions are already set.
+     *
+     * While the connect is deferred (async DNS in progress via the options
+     * path) there is no valid fd yet, so skip registering write interest.
+     * The write watch is added once the connection is initiated. */
+    if (!(ac->c.flags & VALKEY_CONNECT_DEFERRED))
+        _EL_ADD_WRITE(ac);
 
     return VALKEY_OK;
 }
@@ -416,6 +441,11 @@ static void valkeyAsyncFreeInternal(valkeyAsyncContext *ac) {
 
         dictRelease(ac->sub.schannels);
     }
+
+    /* Free any in-flight async DNS state before tearing down the event loop. */
+#ifdef VALKEY_USE_CARES
+    valkeyResolveAsyncFree(ac);
+#endif
 
     /* Free internal timers. */
     if (ac->timer_list) {
@@ -725,7 +755,7 @@ void valkeyProcessCallbacks(valkeyAsyncContext *ac) {
         valkeyAsyncDisconnectInternal(ac);
 }
 
-static void valkeyAsyncHandleConnectFailure(valkeyAsyncContext *ac) {
+void valkeyAsyncHandleConnectFailure(valkeyAsyncContext *ac) {
     valkeyRunConnectCallback(ac, VALKEY_ERR);
     valkeyAsyncDisconnectInternal(ac);
 }

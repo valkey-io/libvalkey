@@ -38,6 +38,9 @@
 #include "valkey.h"
 #include "visibility.h"
 
+#include <sys/types.h>
+struct addrinfo;
+
 LIBVALKEY_API void valkeyNetClose(valkeyContext *c);
 
 LIBVALKEY_API int valkeyHasMptcp(void);

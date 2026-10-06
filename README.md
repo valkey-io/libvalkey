@@ -21,7 +21,7 @@ Libvalkey is the official C client for the [Valkey](https://valkey.io) database.
 - Supports both `RESP2` and `RESP3` protocol versions.
 - Supports both synchronous and asynchronous operation.
 - Optional support for `MPTCP`, `TLS` and `RDMA` connections.
-- Optional timeout-bounded DNS resolution via [c-ares](https://github.com/c-ares/c-ares).
+- Optional non-blocking DNS resolution via [c-ares](https://github.com/c-ares/c-ares) with timeout support.
 - Asynchronous API with several event libraries to choose from.
 - Supports both standalone and cluster mode operation.
 - Can be compiled with either `make` or `CMake`.

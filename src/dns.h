@@ -46,6 +46,13 @@ int valkeyResolveSync(const char *host, int port, int flags,
  * freeaddrinfo-compatible or c-ares-allocated results. */
 #ifdef VALKEY_USE_CARES
 void valkeyFreeAddrInfo(struct addrinfo *ai);
+
+/* The async DNS entry points used by event adapters are declared in async.h,
+ * since the adapters are header-only and compiled outside the library. */
+
+/* Free async DNS state. Called during context cleanup. */
+void valkeyResolveAsyncFree(struct valkeyAsyncContext *ac);
+
 #else
 #define valkeyFreeAddrInfo(ai) freeaddrinfo(ai)
 #endif

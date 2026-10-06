@@ -31,6 +31,7 @@
 
 #ifndef VALKEY_ASYNC_PRIVATE_H
 #define VALKEY_ASYNC_PRIVATE_H
+#include "timer.h"
 #include "visibility.h"
 
 #define _EL_ADD_READ(ctx)                      \
@@ -66,5 +67,17 @@
 LIBVALKEY_API void refreshTimeout(valkeyAsyncContext *ac);
 LIBVALKEY_API void valkeyAsyncDisconnectInternal(valkeyAsyncContext *ac);
 LIBVALKEY_API void valkeyProcessCallbacks(valkeyAsyncContext *ac);
+
+/* Visible although private since required by dns.c (c-ares async connect). */
+void valkeyAsyncCopyError(valkeyAsyncContext *ac);
+void valkeyAsyncHandleConnectFailure(valkeyAsyncContext *ac);
+valkeyTimer *valkeyAsyncAddTimer(valkeyAsyncContext *ac, struct timeval timeout,
+                                 valkeyTimerProc proc, void *privdata);
+
+#ifdef VALKEY_USE_CARES
+/* Implemented in dns.c. Declared here rather than including dns.h, which pulls
+ * in sockcompat.h and its connect() macro. */
+void valkeyResolveAsyncFree(valkeyAsyncContext *ac);
+#endif
 
 #endif /* VALKEY_ASYNC_PRIVATE_H */

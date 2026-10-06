@@ -2185,6 +2185,31 @@ static void test_async_connect_with_attach_in_options(struct config config) {
     test_cond(count == 2);
 }
 
+static int deferred_connect_status;
+static int deferred_connect_calls;
+static struct event_base *deferred_connect_base;
+
+/* Used where the connect result is the only thing awaited, so the loop is
+ * stopped as soon as it arrives. */
+static void deferred_connect_cb(valkeyAsyncContext *ac, int status) {
+    (void)ac;
+    deferred_connect_status = status;
+    deferred_connect_calls++;
+    /* Stop the loop; any watchdog timer still pending would otherwise keep
+     * event_base_dispatch() running until it fires. */
+    if (deferred_connect_base != NULL)
+        event_base_loopbreak(deferred_connect_base);
+}
+
+/* Used where commands run after connecting, so the loop must keep going. */
+#ifdef VALKEY_USE_CARES
+static void record_connect_cb(valkeyAsyncContext *ac, int status) {
+    (void)ac;
+    deferred_connect_status = status;
+    deferred_connect_calls++;
+}
+#endif
+
 static void test_async_connect_with_attach_in_options_dns_fail(void) {
     test("Async connect with adapter in options (DNS failure): ");
     struct event_base *b = event_base_new();
@@ -2192,12 +2217,109 @@ static void test_async_connect_with_attach_in_options_dns_fail(void) {
     VALKEY_OPTIONS_SET_TCP(&options, "this.host.does.not.exist.invalid", 6379);
     options.attach_fn = valkeyLibeventAttachAdapter;
     options.attach_data = b;
+
+    /* Registered through the options so the callback is in place before DNS can
+     * complete; setting it afterwards would race with resolution. */
+    deferred_connect_status = VALKEY_OK;
+    deferred_connect_calls = 0;
+    deferred_connect_base = b;
+    options.async_connect_callback = deferred_connect_cb;
+
     valkeyAsyncContext *ac = valkeyAsyncConnectWithOptions(&options);
     assert(ac != NULL);
-    test_cond(ac->err != 0);
-    valkeyAsyncFree(ac);
+
+    if (ac->err != 0) {
+        /* Resolution failed before the call returned. */
+        deferred_connect_base = NULL;
+        test_cond(1);
+        valkeyAsyncFree(ac);
+        event_base_free(b);
+        return;
+    }
+
+    /* Async DNS is still in flight, so the failure arrives from the event loop.
+     * Bound the wait so a lost callback fails rather than hangs. */
+    struct event *timeout = evtimer_new(b, timeout_cb, NULL);
+    struct timeval timeout_tv = {.tv_sec = 30};
+    evtimer_add(timeout, &timeout_tv);
+
+    event_base_dispatch(b);
+
+    event_free(timeout);
+    deferred_connect_base = NULL;
+    test_cond(deferred_connect_calls == 1 &&
+              deferred_connect_status == VALKEY_ERR);
     event_base_free(b);
 }
+
+#ifdef VALKEY_USE_CARES
+/* With c-ares and an adapter implementing the c-ares hooks, the options path
+ * resolves DNS through the event loop. Connecting by hostname must therefore
+ * work end to end: the deferred connect is completed from the DNS result and
+ * queued commands are sent once the socket exists.
+ *
+ * The deferred flag is not asserted here since a name in /etc/hosts resolves
+ * inline, which clears it before this function returns. */
+static void test_async_connect_deferred_dns(struct config config) {
+    test("Async connect by hostname resolves via the event loop: ");
+    base = event_base_new();
+    struct event *timeout = evtimer_new(base, timeout_cb, NULL);
+    struct timeval timeout_tv = {.tv_sec = 5};
+    evtimer_add(timeout, &timeout_tv);
+
+    deferred_connect_status = -1;
+    deferred_connect_calls = 0;
+
+    valkeyOptions options = {0};
+    VALKEY_OPTIONS_SET_TCP(&options, "localhost", config.tcp.port);
+    options.attach_fn = valkeyLibeventAttachAdapter;
+    options.attach_data = base;
+    options.async_connect_callback = record_connect_cb;
+    valkeyAsyncContext *ac = valkeyAsyncConnectWithOptions(&options);
+    assert(ac != NULL && ac->err == 0);
+
+    /* Commands are queued before the connection is established. */
+    int count = 0;
+    valkeyAsyncCommand(ac, async_ping_cb, &count, "PING");
+    valkeyAsyncCommand(ac, async_ping_cb, &count, "PING");
+    event_base_dispatch(base);
+
+    event_free(timeout);
+    event_base_free(base);
+    test_cond(deferred_connect_calls == 1 &&
+              deferred_connect_status == VALKEY_OK && count == 2);
+}
+
+/* A Unix socket has no name to resolve, so the connect must never be deferred. */
+static void test_async_connect_unix_no_defer(struct config config) {
+    test("Async Unix connect does not defer DNS: ");
+    base = event_base_new();
+    struct event *timeout = evtimer_new(base, timeout_cb, NULL);
+    struct timeval timeout_tv = {.tv_sec = 3};
+    evtimer_add(timeout, &timeout_tv);
+
+    valkeyOptions options = {0};
+    VALKEY_OPTIONS_SET_UNIX(&options, config.unix_sock.path);
+    options.attach_fn = valkeyLibeventAttachAdapter;
+    options.attach_data = base;
+    valkeyAsyncContext *ac = valkeyAsyncConnectWithOptions(&options);
+    assert(ac != NULL && ac->err == 0);
+
+    int deferred = (ac->c.flags & VALKEY_CONNECT_DEFERRED) != 0;
+    int resolving = (ac->dns_state != NULL);
+
+    /* Run the connection to completion so the context tears down through the
+     * event loop, as in the other async tests. */
+    int count = 0;
+    valkeyAsyncCommand(ac, async_ping_cb, &count, "PING");
+    valkeyAsyncCommand(ac, async_ping_cb, &count, "PING");
+    event_base_dispatch(base);
+
+    event_free(timeout);
+    event_base_free(base);
+    test_cond(!deferred && !resolving && count == 2);
+}
+#endif /* VALKEY_USE_CARES */
 
 static void test_async_connect_unix(struct config config) {
     test("Async Unix connect: ");
@@ -3295,6 +3417,9 @@ int main(int argc, char **argv) {
     test_async_command_parsing(cfg);
     test_async_connect_with_attach_in_options(cfg);
     test_async_connect_with_attach_in_options_dns_fail();
+#ifdef VALKEY_USE_CARES
+    test_async_connect_deferred_dns(cfg);
+#endif
     test_pubsub_handling(cfg);
     test_pubsub_multiple_channels(cfg);
     test_monitor(cfg);
@@ -3331,6 +3456,9 @@ int main(int argc, char **argv) {
         cfg.type = CONN_UNIX;
         test_async_connect_unix(cfg);
         test_async_connect_unix_with_attach_in_options(cfg);
+#ifdef VALKEY_USE_CARES
+        test_async_connect_unix_no_defer(cfg);
+#endif
     }
 
 #endif /* VALKEY_TEST_ASYNC */
