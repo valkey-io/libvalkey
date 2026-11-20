@@ -37,6 +37,7 @@
 
 #include "adlist.h"
 #include "alloc.h"
+#include "async_private.h"
 #include "command.h"
 #include "dict.h"
 #include "vkutil.h"
@@ -74,6 +75,7 @@ vk_static_assert(VALKEY_OPT_USE_CLUSTER_NODES > VALKEY_OPT_LAST_SA_OPTION);
 #define SLOTMAP_UPDATE_ONGOING INT64_MAX
 
 typedef struct cluster_async_data {
+    valkeyCallbackTarget target;
     valkeyClusterAsyncContext *acc;
     struct cmd *command;
     valkeyClusterCallbackFn *callback;
@@ -2563,19 +2565,22 @@ static inline void valkeyClusterAsyncClearError(valkeyClusterAsyncContext *acc) 
     acc->err = acc->cc.err;
 }
 
-static cluster_async_data *cluster_async_data_create(void) {
-    /* use calloc to guarantee all fields are zeroed */
-    return vk_calloc(1, sizeof(cluster_async_data));
+static void valkeyClusterAsyncCallback(valkeyAsyncContext *ac, void *r, void *privdata);
+
+static void cluster_async_data_free(void *ptr) {
+    cluster_async_data *cad = ptr;
+    command_destroy(cad->command);
+    vk_free(cad);
 }
 
-static void cluster_async_data_free(cluster_async_data *cad) {
-    if (cad == NULL) {
-        return;
+static cluster_async_data *cluster_async_data_create(void) {
+    cluster_async_data *cad = vk_calloc(1, sizeof(*cad));
+    if (cad) {
+        cad->target.refs = 1;
+        cad->target.invoke = valkeyClusterAsyncCallback;
+        cad->target.destroy = cluster_async_data_free;
     }
-
-    command_destroy(cad->command);
-
-    vk_free(cad);
+    return cad;
 }
 
 static void unlinkAsyncContextAndNode(void *data) {
@@ -2935,10 +2940,8 @@ static void valkeyClusterAsyncCallback(valkeyAsyncContext *ac, void *r,
 
     acc = cad->acc;
     assert(acc != NULL);
-    if (acc == NULL) {
-        cluster_async_data_free(cad);
+    if (acc == NULL)
         return;
-    }
 
     cc = &acc->cc;
 
@@ -3022,18 +3025,18 @@ static void valkeyClusterAsyncCallback(valkeyAsyncContext *ac, void *r,
         }
 
         /* Retry the command on the selected connection. */
-        ret = valkeyAsyncFormattedCommand(ac_retry, valkeyClusterAsyncCallback,
+        ret = valkeyAsyncFormattedCommand(ac_retry, valkeyInvokeCallbackTarget,
                                           cad, command->cmd, command->clen);
         if (ret == VALKEY_OK)
-            return; /* Ownership of cad transferred to retry callback. */
+            return; /* The retry queue holds its own reference. */
         /* Retry failed, fall through to notify the user. */
     }
 
 done:
     /* Deliver result to the user callback. */
-    cad->callback(acc, acc->err ? NULL : r, cad->privdata);
+    if (cad->callback)
+        cad->callback(acc, acc->err ? NULL : r, cad->privdata);
     valkeyClusterAsyncClearError(acc);
-    cluster_async_data_free(cad);
 }
 
 int valkeyClusterAsyncFormattedCommand(valkeyClusterAsyncContext *acc,
@@ -3105,12 +3108,13 @@ int valkeyClusterAsyncFormattedCommand(valkeyClusterAsyncContext *acc,
     cad->callback = fn;
     cad->privdata = privdata;
 
-    status = valkeyAsyncFormattedCommand(ac, valkeyClusterAsyncCallback, cad,
+    status = valkeyAsyncFormattedCommand(ac, valkeyInvokeCallbackTarget, cad,
                                          cmd, len);
     if (status != VALKEY_OK) {
         valkeyClusterAsyncSetError(acc, ac->err, ac->errstr);
         goto error;
     }
+    valkeyReleaseCallbackTarget(&cad->target);
     return VALKEY_OK;
 
 oom:
@@ -3118,7 +3122,8 @@ oom:
     // passthrough
 
 error:
-    cluster_async_data_free(cad);
+    if (cad)
+        valkeyReleaseCallbackTarget(&cad->target);
     command_destroy(command);
     return VALKEY_ERR;
 }
@@ -3171,13 +3176,14 @@ int valkeyClusterAsyncFormattedCommandToNode(valkeyClusterAsyncContext *acc,
     cad->privdata = privdata;
     cad->retry_count = NO_RETRY;
 
-    status = valkeyAsyncFormattedCommand(ac, valkeyClusterAsyncCallback, cad,
+    status = valkeyAsyncFormattedCommand(ac, valkeyInvokeCallbackTarget, cad,
                                          cmd, len);
     if (status != VALKEY_OK) {
         valkeyClusterAsyncSetError(acc, ac->err, ac->errstr);
         goto error;
     }
 
+    valkeyReleaseCallbackTarget(&cad->target);
     return VALKEY_OK;
 
 oom:
@@ -3185,7 +3191,8 @@ oom:
     // passthrough
 
 error:
-    cluster_async_data_free(cad);
+    if (cad)
+        valkeyReleaseCallbackTarget(&cad->target);
     command_destroy(command);
     return VALKEY_ERR;
 }

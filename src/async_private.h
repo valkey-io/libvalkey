@@ -62,6 +62,17 @@
         ctx->ev.cleanup = NULL;                \
     } while (0)
 
+/* Internal callback targets shared by the reply queue and subscription tables.
+ * The submitter owns the initial reference. All users run on the event loop. */
+typedef struct valkeyCallbackTarget {
+    size_t refs;
+    valkeyCallbackFn *invoke;
+    void (*destroy)(void *);
+} valkeyCallbackTarget;
+
+void valkeyInvokeCallbackTarget(valkeyAsyncContext *ac, void *reply, void *privdata);
+void valkeyReleaseCallbackTarget(valkeyCallbackTarget *target);
+
 /* Visible although private since required by libvalkey_tls.so */
 LIBVALKEY_API void refreshTimeout(valkeyAsyncContext *ac);
 LIBVALKEY_API void valkeyAsyncDisconnectInternal(valkeyAsyncContext *ac);
