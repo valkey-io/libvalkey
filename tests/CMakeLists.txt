@@ -284,6 +284,9 @@ if(LIBUV_LIBRARY AND LIBUV_INCLUDE_DIR)
   add_executable(ct_async_pubsub ct_async_pubsub.c test_utils.c)
   target_include_directories(ct_async_pubsub PRIVATE ${LIBUV_INCLUDE_DIR})
   target_link_libraries(ct_async_pubsub valkey ${LIBUV_LIBRARY})
+  # Recent libuv headers use C11 anonymous unions.
+  set_target_properties(ct_async_libuv ct_async_pubsub
+                        PROPERTIES C_STANDARD 11 C_STANDARD_REQUIRED ON)
   add_test(NAME ct_async_pubsub COMMAND ct_async_pubsub)
   set_tests_properties(ct_async_pubsub PROPERTIES TIMEOUT 15 SKIP_RETURN_CODE 77)
 else()
