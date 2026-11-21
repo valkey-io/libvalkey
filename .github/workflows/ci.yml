@@ -15,8 +15,10 @@ jobs:
     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
     - name: Install clang-format
       run: |
-        sudo apt-get update
-        sudo apt-get install -y clang-format-${{ env.LLVM_VERSION }}
+        wget https://apt.llvm.org/llvm.sh
+        chmod +x llvm.sh
+        sudo ./llvm.sh ${{ env.LLVM_VERSION }}
+        sudo apt install -y clang-format-${{ env.LLVM_VERSION }}
     - name: Run clang-format style check (.c and .h)
       run: |
         find . -regex '.*\.\(c\|h\)' -exec clang-format-${{ env.LLVM_VERSION }} -style=file --dry-run --Werror {} +
