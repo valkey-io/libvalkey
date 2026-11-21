@@ -64,12 +64,35 @@
 typedef struct {
     sds command;
     size_t len;
+    size_t pending_acks;
     valkeyCallbackFn *user_callback;
     void *user_priv_data;
 } ssubscribeCallbackData;
 
 /* Forward declarations of valkey.c functions */
 int valkeyAppendCmdLen(valkeyContext *c, const char *cmd, size_t len);
+
+void valkeyInvokeCallbackTarget(valkeyAsyncContext *ac, void *reply, void *privdata) {
+    valkeyCallbackTarget *target = privdata;
+    target->invoke(ac, reply, privdata);
+}
+
+void valkeyReleaseCallbackTarget(valkeyCallbackTarget *target) {
+    if (--target->refs == 0)
+        target->destroy(target);
+}
+
+/* Public async callbacks borrow their privdata. Cluster callbacks also own
+ * the routing state needed for retries and later subscription notifications. */
+static void retainCallback(const valkeyCallback *cb) {
+    if (cb->fn == valkeyInvokeCallbackTarget)
+        ((valkeyCallbackTarget *)cb->privdata)->refs++;
+}
+
+static void releaseCallback(const valkeyCallback *cb) {
+    if (cb->fn == valkeyInvokeCallbackTarget)
+        valkeyReleaseCallbackTarget(cb->privdata);
+}
 
 /* Functions managing dictionary of callbacks for pub/sub. */
 static uint64_t callbackHash(const void *key) {
@@ -92,6 +115,7 @@ static void callbackKeyDestructor(void *key) {
 }
 
 static void callbackValDestructor(void *val) {
+    releaseCallback(val);
     vk_free(val);
 }
 
@@ -308,6 +332,7 @@ static int valkeyPushCallback(valkeyCallbackList *list, valkeyCallback *source) 
     if (source != NULL) {
         memcpy(cb, source, sizeof(*cb));
         cb->next = NULL;
+        retainCallback(cb);
     }
 
     /* Store callback in list */
@@ -329,6 +354,8 @@ static int valkeyShiftCallback(valkeyCallbackList *list, valkeyCallback *target)
         /* Copy callback from heap to stack */
         if (target != NULL)
             memcpy(target, cb, sizeof(*cb));
+        else
+            releaseCallback(cb);
         vk_free(cb);
         return VALKEY_OK;
     }
@@ -387,10 +414,14 @@ static void valkeyAsyncFreeInternal(valkeyAsyncContext *ac) {
     dictEntry *de;
 
     /* Execute pending callbacks with NULL reply. */
-    while (valkeyShiftCallback(&ac->replies, &cb) == VALKEY_OK)
+    while (valkeyShiftCallback(&ac->replies, &cb) == VALKEY_OK) {
         valkeyRunCallback(ac, &cb, NULL);
-    while (valkeyShiftCallback(&ac->sub.replies, &cb) == VALKEY_OK)
+        releaseCallback(&cb);
+    }
+    while (valkeyShiftCallback(&ac->sub.replies, &cb) == VALKEY_OK) {
         valkeyRunCallback(ac, &cb, NULL);
+        releaseCallback(&cb);
+    }
 
     /* Run subscription callbacks with NULL reply */
     if (ac->sub.channels) {
@@ -499,7 +530,7 @@ void valkeyAsyncDisconnect(valkeyAsyncContext *ac) {
 
     /** unset the auto-free flag here, because disconnect undoes this */
     c->flags &= ~VALKEY_NO_AUTO_FREE;
-    if (!(c->flags & VALKEY_IN_CALLBACK) && ac->replies.head == NULL)
+    if (!(c->flags & VALKEY_IN_CALLBACK) && ac->replies.head == NULL && ac->sub.replies.head == NULL)
         valkeyAsyncDisconnectInternal(ac);
 }
 
@@ -507,6 +538,23 @@ static int valkeyIsShardedVariant(const char *cstr) {
     return !strncasecmp("sm", cstr, 2) || /* smessage */
            !strncasecmp("ss", cstr, 2) || /* ssubscribe */
            !strncasecmp("sun", cstr, 3);  /* sunsubscribe */
+}
+
+/* Return to normal reply ordering after the last registration goes away. */
+static void endSubscriptionsIfIdle(valkeyAsyncContext *ac) {
+    if (dictSize(ac->sub.channels) || dictSize(ac->sub.patterns) ||
+        dictSize(ac->sub.schannels) || ac->sub.pending_unsubs)
+        return;
+
+    ac->c.flags &= ~VALKEY_SUBSCRIBED;
+    if (ac->sub.replies.head) {
+        if (ac->replies.tail)
+            ac->replies.tail->next = ac->sub.replies.head;
+        else
+            ac->replies.head = ac->sub.replies.head;
+        ac->replies.tail = ac->sub.replies.tail;
+        ac->sub.replies.head = ac->sub.replies.tail = NULL;
+    }
 }
 
 static int valkeyGetSubscribeCallback(valkeyAsyncContext *ac, valkeyReply *reply, valkeyCallback *dstcb) {
@@ -541,6 +589,7 @@ static int valkeyGetSubscribeCallback(valkeyAsyncContext *ac, valkeyReply *reply
             if ((de = dictFind(callbacks, sname)) != NULL) {
                 cb = dictGetVal(de);
                 memcpy(dstcb, cb, sizeof(*dstcb));
+                retainCallback(dstcb);
             }
         }
 
@@ -562,19 +611,8 @@ static int valkeyGetSubscribeCallback(valkeyAsyncContext *ac, valkeyReply *reply
 
             /* Unset subscribed flag only when no pipelined pending subscribe
              * or pending unsubscribe replies. */
-            if (reply->element[2]->integer == 0 &&
-                dictSize(ac->sub.channels) == 0 &&
-                dictSize(ac->sub.patterns) == 0 &&
-                dictSize(ac->sub.schannels) == 0 &&
-                ac->sub.pending_unsubs == 0) {
-                c->flags &= ~VALKEY_SUBSCRIBED;
-
-                /* Move ongoing regular command callbacks. */
-                valkeyCallback reply_cb;
-                while (valkeyShiftCallback(&ac->sub.replies, &reply_cb) == VALKEY_OK) {
-                    valkeyPushCallback(&ac->replies, &reply_cb);
-                }
-            }
+            if (reply->element[2]->integer == 0)
+                endSubscriptionsIfIdle(ac);
         }
         sdsfree(sname);
     } else {
@@ -623,6 +661,37 @@ static int valkeyIsSubscribeReply(valkeyReply *reply) {
            !strncasecmp(str, "unsubscribe", len);
 }
 
+static void valkeySsubscribeCallback(valkeyAsyncContext *ac, void *reply, void *privdata);
+
+static int isShardedSubscribeAck(valkeyReply *reply) {
+    return (reply->type == VALKEY_REPLY_PUSH || reply->type == VALKEY_REPLY_ARRAY) &&
+           reply->elements == 3 && reply->element[0]->type == VALKEY_REPLY_STRING &&
+           reply->element[0]->len == sizeof("ssubscribe") - 1 &&
+           memcmp(reply->element[0]->str, "ssubscribe", sizeof("ssubscribe") - 1) == 0 &&
+           reply->element[1]->type == VALKEY_REPLY_STRING &&
+           reply->element[2]->type == VALKEY_REPLY_INTEGER;
+}
+
+/* Messages may interleave with acknowledgements. Keep a multi-channel
+ * registration queued until its last acknowledgement, or its error reply. */
+static int takeShardedSubscribeReply(valkeyAsyncContext *ac, valkeyReply *reply, valkeyCallback *cb) {
+    valkeyCallback *head = ac->sub.replies.head;
+    if (head == NULL || head->fn != valkeySsubscribeCallback)
+        return 0;
+
+    if (reply->type == VALKEY_REPLY_ERROR)
+        return valkeyShiftCallback(&ac->sub.replies, cb) == VALKEY_OK;
+    if (!isShardedSubscribeAck(reply))
+        return 0;
+
+    ssubscribeCallbackData *data = head->privdata;
+    if (--data->pending_acks == 0)
+        valkeyShiftCallback(&ac->sub.replies, cb);
+    else
+        *cb = *head;
+    return 1;
+}
+
 void valkeyProcessCallbacks(valkeyAsyncContext *ac) {
     valkeyContext *c = &(ac->c);
     void *reply = NULL;
@@ -632,7 +701,8 @@ void valkeyProcessCallbacks(valkeyAsyncContext *ac) {
         if (reply == NULL) {
             /* When the connection is being disconnected and there are
              * no more replies, this is the cue to really disconnect. */
-            if (c->flags & VALKEY_DISCONNECTING && sdslen(c->obuf) == 0 && ac->replies.head == NULL) {
+            if (c->flags & VALKEY_DISCONNECTING && sdslen(c->obuf) == 0 &&
+                ac->replies.head == NULL && ac->sub.replies.head == NULL) {
                 valkeyAsyncDisconnectInternal(ac);
                 return;
             }
@@ -662,7 +732,8 @@ void valkeyProcessCallbacks(valkeyAsyncContext *ac) {
         /* Even if the context is subscribed, pending regular
          * callbacks will get a reply before pub/sub messages arrive. */
         valkeyCallback cb = {NULL, NULL, 0, 0, NULL};
-        if (valkeyShiftCallback(&ac->replies, &cb) != VALKEY_OK) {
+        if (valkeyShiftCallback(&ac->replies, &cb) != VALKEY_OK &&
+            !takeShardedSubscribeReply(ac, reply, &cb)) {
             /*
              * A spontaneous reply in a not-subscribed context can be the error
              * reply that is sent when a new connection exceeds the maximum
@@ -703,6 +774,7 @@ void valkeyProcessCallbacks(valkeyAsyncContext *ac) {
 
             /* Proceed with free'ing when valkeyAsyncFree() was called. */
             if (c->flags & VALKEY_FREEING) {
+                releaseCallback(&cb);
                 valkeyAsyncFreeInternal(ac);
                 return;
             }
@@ -718,6 +790,7 @@ void valkeyProcessCallbacks(valkeyAsyncContext *ac) {
         if (c->flags & VALKEY_MONITORING) {
             valkeyPushCallback(&ac->replies, &cb);
         }
+        releaseCallback(&cb);
     }
 
     /* Disconnect when there was an error reading the reply */
@@ -910,6 +983,7 @@ static void valkeyAsyncCommandTimeoutCallback(void *privdata) {
 
     while (valkeyShiftCallback(&ac->replies, &cb) == VALKEY_OK) {
         valkeyRunCallback(ac, &cb, NULL);
+        releaseCallback(&cb);
     }
 
     valkeyAsyncDisconnectInternal(ac);
@@ -1027,80 +1101,73 @@ error:
     return NULL;
 }
 
-void valkeySsubscribeCallback(struct valkeyAsyncContext *ac, void *reply, void *privdata) {
-    /*
-      This callback called on the first reply from ssubscribe:
-      - on successful subscription:
-          iterate over all channels specified in original ssubscribe command, assign them user provided callback and mark as subscribed, then call original user callback.
-      - on failed ssubscribe:
-          iterate over all channels specified in original ssubscribe command, reduce pending_subs and remove all not subscribed callbacks
-    */
+static void valkeySsubscribeCallback(valkeyAsyncContext *ac, void *reply, void *privdata) {
     valkeyReply *r = reply;
     ssubscribeCallbackData *data = privdata;
-    size_t clen, alen;
-    const char *p, *cstr, *astr;
-    sds sname;
-    valkeyCallback *cb = NULL;
-    dictEntry *de;
+    valkeyCallback user = {.fn = data->user_callback, .privdata = data->user_priv_data};
 
-    assert(data != NULL);
-    assert(data->command != NULL);
-    assert(r != NULL);
-    if (r->type == VALKEY_REPLY_ERROR) {
-        /*/ On CROSSSLOT, MOVED and other errors */
-        p = nextArgument(data->command, data->len, &cstr, &clen);
-        while (p != NULL && ((p = nextArgument(p, data->len - (p - data->command), &astr, &alen)) != NULL || astr != NULL)) {
-            sname = sdsnewlen(astr, alen);
-            if (sname == NULL)
+    int finished = !r || !isShardedSubscribeAck(r) || data->pending_acks == 0;
+
+    if (r && r->type == VALKEY_REPLY_ERROR) {
+        /* Revert pending registrations. Previously active callbacks survive. */
+        const char *arg;
+        size_t len;
+        const char *p = nextArgument(data->command, data->len, &arg, &len);
+        while (p) {
+            p = nextArgument(p, data->len - (p - data->command), &arg, &len);
+            if (arg == NULL)
+                break;
+            sds name = sdsnewlen(arg, len);
+            if (!name)
                 goto oom;
-
-            if ((de = dictFind(ac->sub.schannels, sname)) != NULL) {
-                cb = dictGetVal(de);
-                if (cb != NULL) {
-                    cb->pending_subs -= 1;
-                    if (cb->pending_subs == 0 && !cb->subscribed) {
-                        dictDelete(ac->sub.schannels, sname);
-                    }
-                }
+            dictEntry *de = dictFind(ac->sub.schannels, name);
+            if (de) {
+                valkeyCallback *cb = dictGetVal(de);
+                if (--cb->pending_subs == 0 && !cb->subscribed)
+                    dictDelete(ac->sub.schannels, name);
             }
-            sdsfree(sname);
+            sdsfree(name);
         }
-    } else {
-        if ((r->type == VALKEY_REPLY_ARRAY || r->type == VALKEY_REPLY_PUSH) && r->elements >= 1 &&
-            r->element[0]->type == VALKEY_REPLY_STRING && strncasecmp(r->element[0]->str, "ssubscribe", 10) == 0) {
-            p = nextArgument(data->command, data->len, &cstr, &clen);
-            while (p != NULL && ((p = nextArgument(p, data->len - (p - data->command), &astr, &alen)) != NULL || astr != NULL)) {
-                sname = sdsnewlen(astr, alen);
-                if (sname == NULL)
-                    goto oom;
-
-                if ((de = dictFind(ac->sub.schannels, sname)) != NULL) {
-                    cb = dictGetVal(de);
-                    if (cb != NULL) {
-                        cb->subscribed = 1;
-                        cb->fn = data->user_callback;
-                    }
-                }
-                sdsfree(sname);
-            }
+        endSubscriptionsIfIdle(ac);
+    } else if (r) {
+        if (!isShardedSubscribeAck(r)) {
+            valkeySetError(&ac->c, VALKEY_ERR_PROTOCOL, "Invalid sharded subscription channel");
+            goto error;
         }
-
-        valkeyCallback sub_cb = {0};
-        valkeyGetSubscribeCallback(ac, reply, &sub_cb);
-        valkeyRunCallback(ac, &sub_cb, reply);
-        vk_free(data->command);
-        vk_free(privdata);
-        return;
+        sds name = sdsnewlen(r->element[1]->str, r->element[1]->len);
+        if (!name)
+            goto oom;
+        dictEntry *de = dictFind(ac->sub.schannels, name);
+        sdsfree(name);
+        if (!de) {
+            valkeySetError(&ac->c, VALKEY_ERR_PROTOCOL, "Unknown sharded subscription channel");
+            goto error;
+        }
+        valkeyCallback *cb = dictGetVal(de);
+        retainCallback(&user);
+        releaseCallback(cb);
+        cb->fn = user.fn;
+        cb->privdata = user.privdata;
+        cb->subscribed = 1;
+        cb->pending_subs--;
     }
 
-    data->user_callback(ac, reply, data->user_priv_data);
-    vk_free(data->command);
-    vk_free(privdata);
+notify:
+    if (user.fn)
+        user.fn(ac, reply, user.privdata);
+    if (finished) {
+        releaseCallback(&user);
+        vk_free(data->command);
+        vk_free(data);
+    }
     return;
+
 oom:
-    sdsfree(sname);
-    vk_free(data->command);
-    vk_free(privdata);
+    valkeySetError(&ac->c, VALKEY_ERR_OOM, "Out of memory");
+error:
+    valkeyAsyncCopyError(ac);
+    reply = NULL;
+    goto notify;
 }
 
 /* Helper function for the valkeyAsyncCommand* family of functions. Writes a
@@ -1108,7 +1175,7 @@ oom:
  * function with the context. */
 static int valkeyAsyncAppendCmdLen(valkeyAsyncContext *ac, valkeyCallbackFn *fn, void *privdata, const char *cmd, size_t len) {
     valkeyContext *c = &(ac->c);
-    valkeyCallback cb;
+    valkeyCallback cb = {0};
     struct dict *cbdict;
     dictIterator it;
     dictEntry *de;
@@ -1144,7 +1211,7 @@ static int valkeyAsyncAppendCmdLen(valkeyAsyncContext *ac, valkeyCallbackFn *fn,
     cb.subscribed = 0;
 
     if (hasnext && strncasecmp(cstr, "subscribe\r\n", 11) == 0) {
-        int was_subscribed = c->flags & VALKEY_SUBSCRIBED;
+        size_t channel_count = 0;
         c->flags |= VALKEY_SUBSCRIBED;
 
         /* Add every channel/pattern to the list of subscription callbacks. */
@@ -1156,28 +1223,42 @@ static int valkeyAsyncAppendCmdLen(valkeyAsyncContext *ac, valkeyCallbackFn *fn,
             cbdict = pvariant ? ac->sub.patterns :
                      svariant ? ac->sub.schannels :
                                 ac->sub.channels;
-            if (svariant) {
-                cb.fn = NULL;
-            }
-
-            if ((de = dictFind(cbdict, sname)) != NULL) {
+            channel_count++;
+            de = dictFind(cbdict, sname);
+            if (de) {
                 existcb = dictGetVal(de);
-                cb.pending_subs = existcb->pending_subs + 1;
-                cb.subscribed = existcb->subscribed;
-                cb.fn = existcb->fn;
+                if (!svariant && existcb->fn != valkeyInvokeCallbackTarget)
+                    existcb->privdata = cb.privdata;
+                existcb->pending_subs++;
+                existcb->unsubscribe_sent = 0;
+                sdsfree(sname);
+                continue;
             }
 
-            /* Create a duplicate to be stored in dict. */
+            /* Install a sharded callback only after the server accepts it. */
             valkeyCallback *dup = vk_malloc(sizeof(*dup));
-            if (dup == NULL)
-                goto oom;
-            memcpy(dup, &cb, sizeof(*dup));
-
-            if (dictReplace(cbdict, sname, dup) == 0)
+            if (dup == NULL) {
                 sdsfree(sname);
+                goto oom;
+            }
+            *dup = cb;
+            if (svariant) {
+                dup->fn = NULL;
+                dup->privdata = NULL;
+            }
+            if (dictAdd(cbdict, sname, dup) != DICT_OK) {
+                sdsfree(sname);
+                vk_free(dup);
+                goto oom;
+            }
+            retainCallback(dup);
         }
 
         if (svariant) {
+            if (channel_count == 0) {
+                endSubscriptionsIfIdle(ac);
+                return VALKEY_ERR;
+            }
             ssubscribe_data = vk_malloc(sizeof(*ssubscribe_data));
             if (ssubscribe_data == NULL)
                 goto oom;
@@ -1191,18 +1272,11 @@ static int valkeyAsyncAppendCmdLen(valkeyAsyncContext *ac, valkeyCallbackFn *fn,
             ssubscribe_data->user_callback = fn;
             ssubscribe_data->user_priv_data = privdata;
 
-            cb.fn = &valkeySsubscribeCallback;
-            cb.privdata = ssubscribe_data;
-            cb.pending_subs = 1;
-            cb.unsubscribe_sent = 0;
-            cb.subscribed = 1;
-            if (was_subscribed) {
-                if (valkeyPushCallback(&ac->sub.replies, &cb) != VALKEY_OK)
-                    goto oom;
-            } else {
-                if (valkeyPushCallback(&ac->replies, &cb) != VALKEY_OK)
-                    goto oom;
-            }
+            valkeyCallback registration = {.fn = valkeySsubscribeCallback, .privdata = ssubscribe_data};
+            ssubscribe_data->pending_acks = channel_count;
+            if (valkeyPushCallback(&ac->sub.replies, &registration) != VALKEY_OK)
+                goto oom;
+            retainCallback(&cb);
         }
     } else if (strncasecmp(cstr, "unsubscribe\r\n", 13) == 0) {
         /* It is only useful to call (P)UNSUBSCRIBE when the context is
